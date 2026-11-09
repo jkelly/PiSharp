@@ -3,8 +3,8 @@ title: Durable on Chord's store
 description: Share storage, followed views and plugin registries with the real Chord host.
 ---
 
-:::caution[Candidate 1.5.0.1 — unpublished]
-`PiSharp.Durable.Store` retains `PISHARP_DURABLE001`. It is one of the five new experimental libraries prepared for 1.5.0.1. Use source references until publication. [Chord and hosting](/docs/embed/chord/) have separate experimental and framework requirements.
+:::caution[Experimental — from 1.5.0.1]
+`PiSharp.Durable.Store` is available on NuGet at version **1.5.0.1** and retains `PISHARP_DURABLE001`. [Chord and hosting](/docs/embed/chord/) have separate experimental and framework requirements. Keep all PiSharp sibling references at the same exact version.
 :::
 
 `StoreStorage` implements Durable's `IStorage` over a real Chord v2 store. It declares records under an owner, uses the shared allocator, and commits through the store queue. The application owns the underlying store: closing the adapter releases its claims after calls drain and leaves the store open. A separate owner can share the same store; duplicate claims are refused. The [implementation](https://github.com/jkelly/PiSharp/blob/main/src/PiSharp.Durable.Store/Storage.cs) requires a store opened by Chord's `Tables.OpenStoreAsync`.
@@ -35,4 +35,4 @@ These are offline examples with real SQLite, `Hosts.Create`, loaded facets, nati
 
 `ViewBridge` explicitly projects typed immutable Durable views into the host's JSON members and returns the observer detacher. It forwards replacement, retirement and terminal failure; the projection does not replace either runtime. [Integration tests](https://github.com/jkelly/PiSharp/tree/main/tests/PiSharp.Chord.Durable.Integration.Tests) add atomic two-view publication, pre-load acquisition, plugin reload/removal and lost commit acknowledgement.
 
-Historical hand-built registry tests remain lower-level evidence. The real-host examples extend that evidence; their presence alone does not establish package publication or all-platform qualification.
+Historical hand-built registry tests remain lower-level evidence. The real-host examples extend that evidence. The [release qualification record](https://github.com/jkelly/PiSharp/blob/main/AI_DOCS/release-1.5.0.1-publication-results.md) separates package publication, source tests and platform qualifications.

@@ -86,11 +86,44 @@ export async function publishGitHubRelease(options, { gh = runGh } = {}) {
       throw new Error('The existing release tag does not resolve to the expected source commit');
   }
 
-  async function release() {
-    const value = await api(`${base}/releases/tags/${encodeURIComponent(tag)}`, { missing: true });
-    if (value !== null && (!Number.isSafeInteger(value.id) || value.id <= 0 || value.tag_name !== tag || typeof value.draft !== 'boolean'))
+  function validateRelease(value, { expectedTag, expectedId } = {}) {
+    if (!value || Array.isArray(value) || !Number.isSafeInteger(value.id) || value.id <= 0 ||
+      typeof value.tag_name !== 'string' || !value.tag_name.length || typeof value.draft !== 'boolean' ||
+      (expectedTag !== undefined && value.tag_name !== expectedTag) || (expectedId !== undefined && value.id !== expectedId))
       throw new Error('GitHub returned an invalid or mismatched release');
     return value;
+  }
+
+  async function release() {
+    const byTag = await api(`${base}/releases/tags/${encodeURIComponent(tag)}`, { missing: true });
+    if (byTag !== null) {
+      validateRelease(byTag, { expectedTag: tag });
+      if (!byTag.draft) return byTag;
+    }
+    // The by-tag endpoint can return 404 for an authenticated, visible draft.
+    // Establish absence and uniqueness using the full bounded release listing.
+    const seen = new Set();
+    let matching = null;
+    for (let page = 1; page <= 20; page++) {
+      const values = await api(`${base}/releases?per_page=100&page=${page}`);
+      if (!Array.isArray(values) || values.length > 100) throw new Error('GitHub returned an invalid release list');
+      for (const value of values) {
+        validateRelease(value);
+        if (seen.has(value.id)) throw new Error('GitHub returned duplicate release identities; publication refused');
+        seen.add(value.id);
+        if (byTag && value.id === byTag.id && (value.tag_name !== byTag.tag_name || value.draft !== byTag.draft))
+          throw new Error('GitHub release lookups disagree; publication refused');
+        if (value.tag_name !== tag) continue;
+        if (matching) throw new Error('GitHub returned ambiguous releases for the tag; publication refused');
+        matching = value;
+      }
+      if (values.length < 100) {
+        if (byTag && (!matching || matching.id !== byTag.id || matching.draft !== byTag.draft))
+          throw new Error('GitHub release lookups disagree; publication refused');
+        return matching;
+      }
+    }
+    throw new Error('GitHub release pagination exceeded the bounded lookup; publication refused');
   }
 
   async function mutate(args) {
@@ -111,8 +144,8 @@ export async function publishGitHubRelease(options, { gh = runGh } = {}) {
   await mutate(['release', 'upload', tag, '--repo', repo, '--clobber', ...assets]);
   // An interrupted upload leaves the draft unpublished. Recheck both identities before promotion.
   await verifyTag();
-  const current = await release();
-  if (!current?.draft || current.id !== existing.id) throw new Error('The draft changed during upload; refusing promotion');
+  const current = validateRelease(await api(`${base}/releases/${existing.id}`), { expectedTag: tag, expectedId: existing.id });
+  if (!current.draft) throw new Error('The draft changed during upload; refusing promotion');
   await mutate(['release', 'edit', tag, '--repo', repo, '--title', `PiSharp ${version}`, '--draft=false',
     `--prerelease=${prerelease}`, ...(hasNotes ? ['--notes-file', notes] : [])]);
   return { action: 'promoted', tag, sourceSha: expectedSourceSha, assets: assets.length };

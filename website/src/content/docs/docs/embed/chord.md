@@ -3,8 +3,8 @@ title: Chord and native hosting
 description: The experimental Chord v2 host, native plugins, HTTP and worker processes.
 ---
 
-:::caution[Candidate 1.5.0.1 — experimental and unpublished]
-`PiSharp.Chord` and `PiSharp.Chord.Hosting` are prepared for admission, not available as the candidate on NuGet. Build from source. Their public APIs use `PISHARP_CHORD001`; hosting also requires the ASP.NET Core shared framework. See the [package contract](https://github.com/jkelly/PiSharp/blob/main/docs/contracts/gap-package-admission.md).
+:::caution[Experimental — from 1.5.0.1]
+`PiSharp.Chord` and `PiSharp.Chord.Hosting` are available on NuGet at version **1.5.0.1**. Their public APIs use `PISHARP_CHORD001`; hosting also requires the ASP.NET Core shared framework. Keep all PiSharp sibling references at the same exact version. See the [package contract](https://github.com/jkelly/PiSharp/blob/main/docs/contracts/gap-package-admission.md).
 :::
 
 Chord is the reactive host and store used by the [Durable.Store adapter](/docs/embed/durable-store/). The v2 implementation includes host roots and resources, facet loading/reload, jobs, links, remote routes, registries, state watches and a SQLite store. See [host source](https://github.com/jkelly/PiSharp/tree/main/src/PiSharp.Chord/Host) and the [current mapping](https://github.com/jkelly/PiSharp/blob/main/compatibility/gap-status-2026-11-08.json) for implementation and test boundaries.

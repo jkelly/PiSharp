@@ -17,11 +17,11 @@
     "fixedSupervisorReason": "Retain the exact existing approved system-import identity; no loader guard is relaxed."
   },
   "qualification": {
-    "versionSpecificProductsQualified": false,
-    "versionSpecificPackageConsumptionQualified": false,
+    "versionSpecificProductsQualified": true,
+    "versionSpecificPackageConsumptionQualified": true,
     "fullProviderParity": false,
-    "completeNativeGateReady": false,
-    "status": "Unpublished 1.5.0.1 candidate on the unchanged Pi v1.5.0 baseline. Source implements the November 8 gap plan: 23 corrections, Durable APIs and Store, current and distinct legacy Chord runtimes, native hosting, Env protocol/client/daemon, Anthropic message threads, schema/store captures and repository evaluations. The candidate prepares 28 libraries plus the CLI (29 packages), including five new experimental libraries. Earlier Windows implementation and package-consumer receipts retain their original versions and source fingerprints; candidate-specific package, consumer and exact-source platform qualification remain pending. No complete upstream, provider or all-platform parity is claimed."
+    "completeNativeGateReady": true,
+    "status": "Released 2026-11-09 from immutable source 8144e3eaa138a5faf56f5cbb0de477a56fd48f8f. All required exact-source release gates passed. The release publishes 28 libraries plus the CLI (29 packages), including five new experimental libraries, and native daemon archives for linux-x64, osx-arm64 and win-x64. All 29 archives and a fresh external consumer of the five new libraries passed preparation checks; publication evidence records official NuGet downloads and released asset integrity. Native provenance retains its repositoryDirty=true manifests alongside hosted trackedChanges=[] evidence. Explicit skips and live-provider, real-SSH-host, physical macOS input and other-platform qualification limits remain. No complete upstream, provider or all-platform parity is claimed."
   },
   "releaseCandidate": {
     "branch": "codex/prepare-1.5.0.1",
@@ -61,9 +61,14 @@
     "reviewedUpstreamThrough": "7d073328e44337d3292a7db9b0f0308f679c5e97"
   },
   "publication": {
-    "tagCreated": false,
-    "binaryReleasePublished": false,
-    "nugetPackagesPublished": false
+    "tagCreated": true,
+    "binaryReleasePublished": true,
+    "nugetPackagesPublished": true,
+    "publishedOn": "2026-11-09",
+    "publishedAt": "2026-11-09T04:11:05Z",
+    "tagCommit": "8144e3eaa138a5faf56f5cbb0de477a56fd48f8f",
+    "releaseRun": "42558097795",
+    "evidence": "AI_DOCS/release-1.5.0.1-publication-results.md"
   },
   "previousReleases": [
     {

@@ -15,7 +15,7 @@ sidebar:
 
 To send spans to a tracing backend, implement the contract yourself and check your adapter with the conformance kit described below.
 
-The unpublished 1.5.0.1 candidate adds a SQLite recorder in `PiSharp.Chord.TelemetrySqlite`, supplied by the new [Chord library](/docs/embed/chord/). `SqliteTelemetry.CreateAsync(database, options, timeProvider)` creates it; `SqliteTelemetryOptions` bounds retention and queued spans. It implements telemetry context, store, propagation and metrics, exposes dropped span/measurement counts, and is asynchronously disposable. The database remains caller-owned. See the [source](https://github.com/jkelly/PiSharp/blob/main/src/PiSharp.Chord/TelemetrySqlite/SqliteTelemetry.cs) for lifecycle and queue behavior. This recorder is host-owned and local; the CLI still does not enable telemetry automatically.
+PiSharp 1.5.0.1 adds a SQLite recorder in `PiSharp.Chord.TelemetrySqlite`, supplied by the new [Chord library](/docs/embed/chord/). `SqliteTelemetry.CreateAsync(database, options, timeProvider)` creates it; `SqliteTelemetryOptions` bounds retention and queued spans. It implements telemetry context, store, propagation and metrics, exposes dropped span/measurement counts, and is asynchronously disposable. The database remains caller-owned. See the [source](https://github.com/jkelly/PiSharp/blob/main/src/PiSharp.Chord/TelemetrySqlite/SqliteTelemetry.cs) for lifecycle and queue behavior. This recorder is host-owned and local; the CLI still does not enable telemetry automatically.
 
 ## Install
 
@@ -27,7 +27,7 @@ The unpublished 1.5.0.1 candidate adds a SQLite recorder in `PiSharp.Chord.Telem
   <NoWarn>$(NoWarn);PISHARP_TELEMETRY001</NoWarn>
 </PropertyGroup>
 <ItemGroup>
-  <PackageReference Include="PiSharp.Telemetry" Version="1.5.0" />
+  <PackageReference Include="PiSharp.Telemetry" Version="1.5.0.1" />
 </ItemGroup>
 ```
 

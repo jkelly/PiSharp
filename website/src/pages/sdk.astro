@@ -1,6 +1,7 @@
 ---
 import SitePage from '../components/SitePage.astro';
 import { packages } from '../data/packages';
+import { versions } from '../data/site';
 
 const groups = ['Core', 'Frontends', 'Extensions'] as const;
 ---
@@ -10,7 +11,7 @@ const groups = ['Core', 'Frontends', 'Extensions'] as const;
 		<div>
 			<div class="ps-eyebrow">SDK · NuGet</div>
 			<h1 class="ps-h1">Take the whole agent, <em>or just a layer</em></h1>
-			<p class="ps-lede">Use the streaming LLM client on its own, add the agent loop, or embed the full coding agent. Published 1.5.0 contains 23 libraries and the CLI; the 1.5.0.1 candidate prepares 28 libraries and the CLI (29 packages), including five unpublished experimental libraries.</p>
+			<p class="ps-lede">Use the streaming LLM client on its own, add the agent loop, or embed the full coding agent. PiSharp 1.5.0.1 publishes 28 libraries and the CLI (29 packages), including five new experimental libraries for Chord, native hosting, shared Durable storage and remote environments.</p>
 			<div style="display: flex; flex-wrap: wrap; gap: 0.8rem">
 				<a href="/docs/embed/sdk/" class="ps-button">Embedding guide →</a>
 				<a href="/docs/reference/architecture/" class="ps-button ps-ghost">Architecture</a>
@@ -45,10 +46,10 @@ const groups = ['Core', 'Frontends', 'Extensions'] as const;
 						.filter((p) => p.group === group)
 						.map((p) => (
 							<div class="ps-card pkg" style={p.optional || p.experimental ? 'border-style: dashed' : undefined}>
-								<h3 class="ps-mono"><a href={p.unpublished ? `https://github.com/jkelly/PiSharp/tree/main/src/${p.id}` : `https://www.nuget.org/packages/${p.id}`}>{p.id}</a></h3>
+								<h3 class="ps-mono"><a href={p.unpublished ? `https://github.com/jkelly/PiSharp/tree/main/src/${p.id}` : `https://www.nuget.org/packages/${p.id}/${versions.pisharp}`}>{p.id}</a></h3>
 								{p.experimental && <p class="ps-mono ps-muted"><a href={p.docs ?? '/docs/guides/durable/'}>Experimental</a></p>}
 								<p class="ps-muted">{p.description}</p>
-								{p.unpublished ? <a class="ps-mono add" href={p.docs}>Unpublished · source guide →</a> : <code class="ps-mono add">{p.tool ? `dotnet tool install -g ${p.id}` : `dotnet add package ${p.id}`}</code>}
+								{p.unpublished ? <a class="ps-mono add" href={p.docs}>Unpublished · source guide →</a> : <code class="ps-mono add">{p.tool ? `dotnet tool install -g ${p.id} --version ${versions.pisharp}` : `dotnet add package ${p.id} --version ${versions.pisharp}`}</code>}
 							</div>
 						))}
 				</div>

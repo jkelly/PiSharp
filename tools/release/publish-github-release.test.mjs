@@ -24,7 +24,8 @@ async function fixture(run, { version = '1.5.0.1', notes = true } = {}) {
   } finally { await rm(cwd, { recursive: true, force: true }); }
 }
 
-function fakeGh(options, { release = null, reference, releaseResponse, uploadCode = 0 } = {}) {
+function fakeGh(options, { release = null, reference, releaseResponse, uploadCode = 0, byTagMissing = false,
+  listResponse, listPages, byIdResponse } = {}) {
   const commands = [];
   let refCalls = 0, releaseCalls = 0;
   const gh = async (args, context) => {
@@ -41,7 +42,17 @@ function fakeGh(options, { release = null, reference, releaseResponse, uploadCod
         return response(200, { object: { type: 'commit', sha } });
       if (endpoint === `repos/${options.repo}/releases/tags/${options.tag}`) {
         releaseCalls++;
-        return releaseResponse ? releaseResponse(releaseCalls) : release ? response(200, release) : absent();
+        return releaseResponse ? releaseResponse(releaseCalls) : !byTagMissing && release ? response(200, release) : absent();
+      }
+      const pageMatch = /^releases\?per_page=100&page=(\d+)$/.exec(endpoint.slice(`repos/${options.repo}/`.length));
+      if (pageMatch) {
+        const page = Number(pageMatch[1]);
+        if (listResponse) return listResponse(page);
+        return response(200, listPages ? listPages[page - 1] ?? [] : release ? [release] : []);
+      }
+      if (/^releases\/\d+$/.test(endpoint.slice(`repos/${options.repo}/`.length))) {
+        releaseCalls++;
+        return byIdResponse ? byIdResponse() : releaseResponse ? releaseResponse(releaseCalls) : response(200, release);
       }
       throw new Error(`Unexpected API request: ${endpoint}`);
     }
@@ -62,7 +73,9 @@ test('new release requires the existing exact tag and creates with verified tag,
     '--notes-file', join(options.cwd, 'notes', '1.5.0.1.md'),
     join(options.cwd, 'packages', 'PiSharp.AI.1.5.0.1.nupkg'), join(options.cwd, 'packages', 'PiSharp.Cli.1.5.0.1.nupkg'),
   ]]);
-  assert.deepEqual(fake.commands.map(args => args[0] === 'api' ? args[4].split('/').at(-2) : args[1]), ['tags', 'tags', 'tags', 'create']);
+  assert.deepEqual(fake.commands.map(args => args[0] === 'api' ? args[4] : args[1]), [
+    `repos/${options.repo}/git/ref/tags/${options.tag}`, `repos/${options.repo}/releases/tags/${options.tag}`,
+    `repos/${options.repo}/releases?per_page=100&page=1`, `repos/${options.repo}/git/ref/tags/${options.tag}`, 'create']);
 }));
 
 test('new prerelease uses generated notes when no notes file exists', async () => fixture(async options => {
@@ -78,7 +91,8 @@ test('matching draft uploads every validated asset before rechecking identity an
   const fake = fakeGh(options, { release: { id: 23, tag_name: options.tag, draft: true } });
   const result = await publishGitHubRelease(options, fake);
   assert.equal(result.action, 'promoted');
-  assert.deepEqual(fake.commands.map(args => args[0] === 'api' ? 'GET' : args[1]), ['GET', 'GET', 'upload', 'GET', 'GET', 'edit']);
+  assert.deepEqual(fake.commands.map(args => args[0] === 'api' ? 'GET' : args[1]), ['GET', 'GET', 'GET', 'upload', 'GET', 'GET', 'edit']);
+  assert.equal(fake.commands.at(-2)[4], `repos/${options.repo}/releases/23`);
   const [upload, edit] = fake.writes();
   assert.ok(upload.includes('--clobber'));
   assert.deepEqual(upload.slice(-2), [join(options.cwd, 'packages', 'PiSharp.AI.1.5.0.1.nupkg'), join(options.cwd, 'packages', 'PiSharp.Cli.1.5.0.1.nupkg')]);
@@ -140,6 +154,7 @@ test('moved tag or changed draft after upload refuses promotion', async () => {
   for (const change of ['tag', 'published', 'replaced']) {
     await fixture(async options => {
       const fake = fakeGh(options, {
+        release: { id: 23, tag_name: options.tag, draft: true },
         reference: count => response(200, { ref: `refs/tags/${options.tag}`, object: { type: 'commit', sha: change === 'tag' && count > 1 ? 'c'.repeat(40) : sha } }),
         releaseResponse: count => response(200, { id: change === 'replaced' && count > 1 ? 24 : 23, tag_name: options.tag, draft: !(change === 'published' && count > 1) }),
       });
@@ -185,3 +200,88 @@ test('mismatched draft tag refuses without mutation', async () => fixture(async 
   await assert.rejects(publishGitHubRelease(options, fake), /mismatched release/);
   assert.deepEqual(fake.writes(), []);
 }));
+
+test('actual by-tag 404 with a listed draft uploads then promotes without creating', async () => fixture(async options => {
+  const fake = fakeGh(options, { byTagMissing: true, release: { id: 23, tag_name: options.tag, draft: true } });
+  assert.equal((await publishGitHubRelease(options, fake)).action, 'promoted');
+  assert.deepEqual(fake.writes().map(args => args[1]), ['upload', 'edit']);
+  assert.equal(fake.commands.at(-2)[4], `repos/${options.repo}/releases/23`);
+}));
+
+test('a draft on the second release page is found and promoted', async () => fixture(async options => {
+  const release = { id: 23, tag_name: options.tag, draft: true };
+  const first = Array.from({ length: 100 }, (_, index) => ({ id: index + 100, tag_name: `v0.0.${index}`, draft: false }));
+  const fake = fakeGh(options, { byTagMissing: true, release, listPages: [first, [release]] });
+  await publishGitHubRelease(options, fake);
+  assert.deepEqual(fake.commands.filter(args => args[4]?.includes('?per_page=')).map(args => args[4]), [
+    `repos/${options.repo}/releases?per_page=100&page=1`, `repos/${options.repo}/releases?per_page=100&page=2`]);
+  assert.deepEqual(fake.writes().map(args => args[1]), ['upload', 'edit']);
+}));
+
+test('release list auth, network, malformed JSON and HTTP failures never permit creation', async () => {
+  for (const result of [response(401, { message: 'Bad credentials' }), response(403, { message: 'Forbidden' }), absent(),
+    { code: 1, stdout: '', stderr: 'network failure' }, { code: 0, stdout: 'HTTP/2.0 200 OK\n\ninvalid-json', stderr: '' }]) {
+    await fixture(async options => {
+      const fake = fakeGh(options, { listResponse: () => result });
+      await assert.rejects(publishGitHubRelease(options, fake));
+      assert.deepEqual(fake.writes(), []);
+    });
+  }
+});
+
+test('release listings require arrays and valid tag, ID and draft fields on every entry', async () => {
+  for (const body of [{ releases: [] }, null, [null], [{ id: 0, tag_name: 'v0', draft: true }],
+    [{ id: 23, tag_name: '', draft: true }], [{ id: 23, tag_name: 'v0', draft: 'true' }],
+    Array.from({ length: 101 }, (_, index) => ({ id: index + 1, tag_name: `v${index}`, draft: false }))]) {
+    await fixture(async options => {
+      const fake = fakeGh(options, { listResponse: () => response(200, body) });
+      await assert.rejects(publishGitHubRelease(options, fake));
+      assert.deepEqual(fake.writes(), []);
+    });
+  }
+});
+
+test('ambiguous tags, duplicate IDs and inconsistent by-tag/list identities refuse mutation', async () => {
+  await fixture(async options => {
+    const release = { id: 23, tag_name: options.tag, draft: true };
+    for (const setup of [
+      { byTagMissing: true, listPages: [[release, { ...release, id: 24 }]] },
+      { byTagMissing: true, listPages: [[release, release]] },
+      { release, listPages: [[{ ...release, id: 24 }]] },
+      { release, listPages: [[{ ...release, tag_name: 'v0' }]] },
+      { release, listPages: [[{ ...release, draft: false }]] },
+      { release, listPages: [[]] },
+    ]) {
+      const fake = fakeGh(options, setup);
+      await assert.rejects(publishGitHubRelease(options, fake));
+      assert.deepEqual(fake.writes(), []);
+    }
+  });
+});
+
+test('a published release discovered in the listing refuses mutation', async () => fixture(async options => {
+  const fake = fakeGh(options, { byTagMissing: true, release: { id: 23, tag_name: options.tag, draft: false } });
+  await assert.rejects(publishGitHubRelease(options, fake), /already published/);
+  assert.deepEqual(fake.writes(), []);
+}));
+
+test('full release pages stop at the lookup bound without treating it as absence', async () => fixture(async options => {
+  const fake = fakeGh(options, { listResponse: page => response(200, Array.from({ length: 100 }, (_, index) => ({
+    id: (page - 1) * 100 + index + 1, tag_name: `v0.${page}.${index}`, draft: false,
+  }))) });
+  await assert.rejects(publishGitHubRelease(options, fake), /bounded lookup/);
+  assert.equal(fake.commands.filter(args => args[4]?.includes('?per_page=')).length, 20);
+  assert.deepEqual(fake.writes(), []);
+}));
+
+test('by-ID recheck failures or changed tag refuse promotion after upload', async () => {
+  await fixture(async options => {
+    for (const result of [absent(), response(401, { message: 'Bad credentials' }),
+      response(200, { id: 23, tag_name: 'v0', draft: true })]) {
+      const fake = fakeGh(options, { byTagMissing: true, release: { id: 23, tag_name: options.tag, draft: true },
+        byIdResponse: () => result });
+      await assert.rejects(publishGitHubRelease(options, fake));
+      assert.deepEqual(fake.writes().map(args => args[1]), ['upload']);
+    }
+  });
+});

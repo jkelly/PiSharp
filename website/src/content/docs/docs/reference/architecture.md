@@ -99,7 +99,7 @@ The third-party packages are pinned exactly, and their licenses are in [`third-p
 
 | Part | Status | Where |
 | --- | --- | --- |
-| The 23 libraries listed on the SDK page, and the `PiSharp.Cli` tool | Released on NuGet, 1.5.0 | [SDK](/sdk/) |
+| The 28 libraries listed on the SDK page, and the `PiSharp.Cli` tool | Released on NuGet, 1.5.0.1 | [SDK](/sdk/) |
 | Durable libraries and `pisharp durable` | Released as experimental in 1.2.0.1, and moved to `pi-durable` v1.5.0 in 1.5.0. Every durable API carries `[Experimental("PISHARP_DURABLE001")]`. | [Pi Durable](/docs/guides/durable/) |
 | Telemetry (`PiSharp.Telemetry`) | Released as experimental in 1.5.0. `[Experimental("PISHARP_TELEMETRY001")]`. | [Telemetry](/docs/embed/telemetry/) |
 | Media library (`PiSharp.AI.Media`) and the media tools | Released as experimental in 1.2.0.2. `[Experimental("PISHARP_MEDIA001")]`. | [Media](/docs/embed/media/) |
@@ -108,7 +108,7 @@ The third-party packages are pinned exactly, and their licenses are in [`third-p
 | Durable device server (`pisharp durable serve`) | Released as experimental in 1.2.0.2, inside the CLI tool. `PiSharp.Durable.Hosting`, `PiSharp.Durable.Server` and `PiSharp.Durable.Client` are not packages. | [Device server](/docs/guides/durable/#device-server) |
 | `PiSharp.ModelRuntime` | Inside the CLI tool, not a package. | |
 
-The unpublished **1.5.0.1 candidate** prepares five more experimental libraries: [Chord and Chord.Hosting](/docs/embed/chord/) (`PISHARP_CHORD001`), [Durable.Store](/docs/embed/durable-store/) (`PISHARP_DURABLE001`), and [Env.Protocol and Env](/docs/embed/env/) (`PISHARP_ENV001`). This brings the candidate inventory to 28 libraries plus the CLI, **29 packages**. Chord now includes the real v2 host and a separate legacy runtime; hosting supplies native plugins, HTTP and workers. The Env daemon is a separate NativeAOT artifact. Use [source builds](/docs/contribute/build/) until publication.
+PiSharp **1.5.0.1** publishes five more experimental libraries: [Chord and Chord.Hosting](/docs/embed/chord/) (`PISHARP_CHORD001`), [Durable.Store](/docs/embed/durable-store/) (`PISHARP_DURABLE001`), and [Env.Protocol and Env](/docs/embed/env/) (`PISHARP_ENV001`). This brings the published inventory to 28 libraries plus the CLI, **29 packages**. Chord now includes the real v2 host and a separate legacy runtime; hosting supplies native plugins, HTTP and workers. The Env daemon is a separate NativeAOT artifact. Use version 1.5.0.1 for all sibling references, or [build from source](/docs/contribute/build/).
 
 Other source-only applications include `PiSharp.WebAgent`, `PiSharp.Durable.Web`, `PiSharp.Durable.MSSQL`, `PiSharp.Web.Common` and [PiSharp.Evals](/docs/contribute/evaluations/). They are not added to the NuGet library inventory.
 

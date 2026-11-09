@@ -174,7 +174,7 @@ The device server needs the ASP.NET Core runtime. The .NET SDK includes it; with
 - **A lost lock fails the session.** Pi's agent ends its process when its session lock is lost; PiSharp fails the session instead, so the TUI can say why before it exits with 1. Either way nothing more is saved.
 - **Images use SkiaSharp.** Upstream resizes images with Photon compiled to WebAssembly. PiSharp applies the same rules through the image codec its main `read` tool uses.
 - **No Cloudflare adapters.** The Cloudflare Durable Object storage and image processor are not ported, nor is the browser's IndexedDB storage.
-- **Chord is candidate source.** The unpublished 1.5.0.1 candidate implements the real [Chord host](/docs/embed/chord/) and [Durable.Store examples 35–37](/docs/embed/durable-store/). Published 1.5.0 packages do not include these new libraries.
+- **Chord libraries ship in 1.5.0.1.** This release includes the real [Chord host](/docs/embed/chord/) and [Durable.Store examples 35–37](/docs/embed/durable-store/). These libraries retain their experimental diagnostics and exact sibling-version requirements.
 - **Questions and plan mode are PiSharp's.** `pi-durable` has no `ask_user_question` tool and no plan mode. PiSharp adds both, in `PiSharp.Durable.Tools` and in `pisharp durable`, so a session that used them stores two document kinds that Pi doesn't know (`pisharp.interaction` and `pisharp.plan-mode`).
 
 ## Libraries
@@ -194,9 +194,9 @@ Every public type is marked `[Experimental("PISHARP_DURABLE001")]`, so the compi
   <NoWarn>$(NoWarn);PISHARP_DURABLE001</NoWarn>
 </PropertyGroup>
 <ItemGroup>
-  <PackageReference Include="PiSharp.Durable" Version="1.5.0" />
-  <PackageReference Include="PiSharp.Durable.Sqlite" Version="1.5.0" />
-  <PackageReference Include="PiSharp.Durable.Tools" Version="1.5.0" />
+  <PackageReference Include="PiSharp.Durable" Version="1.5.0.1" />
+  <PackageReference Include="PiSharp.Durable.Sqlite" Version="1.5.0.1" />
+  <PackageReference Include="PiSharp.Durable.Tools" Version="1.5.0.1" />
 </ItemGroup>
 ```
 

@@ -40,7 +40,7 @@ Starlight renders the title, so a page starts with an intro paragraph and uses `
 
 No link checker runs when the site builds. Check new links yourself, and write internal links root-relative with a trailing slash, such as `/docs/reference/settings/`.
 
-During 1.5.0.1 preparation, keep the published header and install references at **1.5.0**. `src/data/site.ts` reads the last published record from `compatibility/public-release.json`, including `previousReleases` while a candidate's publication flags are false. Candidate changelogs use `status: in-progress`; the released RSS feed excludes them, and the changelog page omits their GitHub release link. Mark unpublished SDK libraries with `unpublished: true` and provide a source guide instead of a NuGet install command. The current preparation inventory is 29 packages; the five new libraries are unpublished.
+`src/data/site.ts` reads the published version from `compatibility/public-release.json`, including `previousReleases` while a future candidate's publication flags are false. PiSharp 1.5.0.1 publishes 29 packages, including five new experimental libraries. Promote a changelog to `status: released` and add its actual UTC date only after publication is verified; released entries enter RSS and gain their GitHub release link. Future candidate changelogs use `status: in-progress` and stay out of released RSS. Mark any future unpublished SDK library with `unpublished: true` and provide a source guide instead of a NuGet install command.
 
 ## The sidebar
 
@@ -140,4 +140,4 @@ Because the site publishes from `main`, it documents features that are merged bu
 - For a CLI-only feature, say that it is in no release yet and needs a CLI built from source.
 - Don't add it to `packages.ts` until it ships as a package.
 
-Since 1.5.0, the only documented API in no package is `RegistryReader` in `PiSharp.Durable.Store`, and [its section](/docs/embed/durable/#registries-from-chord) says so. A released experimental feature, such as [Pi Durable](/docs/guides/durable/) or [custom agents](/docs/custom-agents/overview/), uses an `Experimental` badge with the `caution` variant instead, and its aside names the release it shipped in. When a feature ships, remove its markers in the release preparation.
+`RegistryReader` now ships in `PiSharp.Durable.Store` from 1.5.0.1; [its section](/docs/embed/durable/#registries-from-chord) names that release. A released experimental feature, such as [Pi Durable](/docs/guides/durable/) or [custom agents](/docs/custom-agents/overview/), uses an `Experimental` badge with the `caution` variant instead, and its aside names the release it shipped in. When a feature ships, remove its unreleased markers.

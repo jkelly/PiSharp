@@ -1,10 +1,10 @@
 ---
 title: Anthropic message threads
-description: Candidate continuation state, request compatibility, cleanup and fallback behavior.
+description: Continuation state, request compatibility, cleanup and fallback behavior.
 ---
 
-:::note[Candidate 1.5.0.1]
-These changes are in source and are not part of the published 1.5.0 packages. The Pi baseline remains 1.5.0.
+:::note[New in 1.5.0.1]
+These changes ship in PiSharp 1.5.0.1. The Pi baseline remains 1.5.0; bounded continuation state is an optimization over the complete transcript.
 :::
 
 Anthropic request factories can retain bounded process-local message continuation state. The [thread implementation](https://github.com/jkelly/PiSharp/blob/main/src/PiSharp.AI/Protocols/AnthropicMessages/AnthropicMessageThreads.cs) stores transcript hashes and reply IDs, not prompts or credentials. Its default capacity is 10,000 sessions. It requires a session identity and compatible projected requests; support defaults to the direct Anthropic endpoint and can be controlled by `SupportsMessageThreads` / model `compat.supportsMessageThreads`.

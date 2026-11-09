@@ -1,10 +1,10 @@
 ---
 title: Remote environments and daemon
-description: Use the candidate pi-env protocol, reconnecting client, remote adapters and native daemon.
+description: Use the pi-env protocol, reconnecting client, remote adapters and native daemon.
 ---
 
-:::caution[Candidate 1.5.0.1 — unpublished]
-`PiSharp.Env.Protocol` and `PiSharp.Env` are new experimental libraries with diagnostic `PISHARP_ENV001`. The daemon is a separate NativeAOT executable, excluded from library packing. Build and verify artifacts from source; no candidate package or native release download is implied.
+:::caution[Experimental — from 1.5.0.1]
+`PiSharp.Env.Protocol` and `PiSharp.Env` are available on NuGet at version **1.5.0.1**, with diagnostic `PISHARP_ENV001`. The daemon is a separate NativeAOT executable, excluded from library packing. Qualified native ZIPs for Linux x64, macOS arm64 and Windows x64 are attached to the [release](https://github.com/jkelly/PiSharp/releases/tag/v1.5.0.1). Keep each binary's accompanying notices and verify the release integrity records before deployment.
 :::
 
 `PiSharp.Env.Protocol` defines [framing and bounds](https://github.com/jkelly/PiSharp/blob/main/src/PiSharp.Env.Protocol/FrameCodec.cs). `PiSharp.Env` adds a lazy reconnecting `Connection`, remote filesystem/process/terminal/watch adapters, and SSH bootstrap. `RemoteExecutionEnv` implements Durable's `IExecutionEnv`. These are explicit host choices, not a default dependency or remote mode added to the CLI.
@@ -45,4 +45,4 @@ Remote filesystem operations preserve binary payloads and descriptor metadata. P
 
 Use a fresh output directory. The [native qualification guide](https://github.com/jkelly/PiSharp/blob/main/tools/Env/README.md) documents prerequisites, notices, hash manifests and smoke cases. The executable is compiled for the actual host RID; no cross-compilation is configured. Native/trim warnings fail publication. Retain the complete notices bundle with redistributed binaries.
 
-The [env-native workflow](https://github.com/jkelly/PiSharp/blob/main/.github/workflows/env-native.yml) records exact source, toolchain, ABI and test results. Only a successful job qualifies that tested platform/revision. It does not establish older glibc/macOS compatibility, musl, Android or other RIDs. See [release qualification](/docs/contribute/releasing/#four-required-validation-gates) for candidate readiness.
+The [env-native workflow](https://github.com/jkelly/PiSharp/blob/main/.github/workflows/env-native.yml) records exact source, toolchain, ABI and test results. The three native platform jobs passed for release source `8144e3ea`; only the tested platform/revision is qualified. This does not establish older glibc/macOS compatibility, musl, Android or other RIDs. See [release qualification](/docs/contribute/releasing/#four-required-validation-gates) and the [publication evidence](https://github.com/jkelly/PiSharp/blob/main/AI_DOCS/release-1.5.0.1-publication-results.md).

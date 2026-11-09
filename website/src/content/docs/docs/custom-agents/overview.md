@@ -93,10 +93,10 @@ Reference the packages you need from your own `net10.0` project and suppress bot
     <NoWarn>$(NoWarn);PISHARP_DURABLE001;PISHARP_AGENTS001</NoWarn>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="PiSharp.CustomAgents" Version="1.5.0" />
-    <PackageReference Include="PiSharp.CustomAgents.JavaScript" Version="1.5.0" />
-    <PackageReference Include="PiSharp.CustomAgents.Scripting" Version="1.5.0" />
-    <PackageReference Include="PiSharp.Durable.Sqlite" Version="1.5.0" />
+    <PackageReference Include="PiSharp.CustomAgents" Version="1.5.0.1" />
+    <PackageReference Include="PiSharp.CustomAgents.JavaScript" Version="1.5.0.1" />
+    <PackageReference Include="PiSharp.CustomAgents.Scripting" Version="1.5.0.1" />
+    <PackageReference Include="PiSharp.Durable.Sqlite" Version="1.5.0.1" />
   </ItemGroup>
 </Project>
 ```

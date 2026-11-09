@@ -19,9 +19,9 @@ Add the packages and suppress the experimental diagnostic:
   <NoWarn>$(NoWarn);PISHARP_DURABLE001</NoWarn>
 </PropertyGroup>
 <ItemGroup>
-  <PackageReference Include="PiSharp.Durable" Version="1.5.0" />
-  <PackageReference Include="PiSharp.Durable.Sqlite" Version="1.5.0" />
-  <PackageReference Include="PiSharp.Durable.Tools" Version="1.5.0" />
+  <PackageReference Include="PiSharp.Durable" Version="1.5.0.1" />
+  <PackageReference Include="PiSharp.Durable.Sqlite" Version="1.5.0.1" />
+  <PackageReference Include="PiSharp.Durable.Tools" Version="1.5.0.1" />
 </ItemGroup>
 ```
 
@@ -31,7 +31,7 @@ Add the packages and suppress the experimental diagnostic:
 | `PiSharp.Durable.Sqlite` | `PiSharp.Durable.Sqlite` | SQLite storage over `Microsoft.Data.Sqlite` |
 | `PiSharp.Durable.Tools` | `PiSharp.Durable.Tools`, `PiSharp.Durable.Tools.Env` | The local execution environment, the coding tools, `tool_search`, durable code mode, and, from 1.2.0.2, the media tools |
 
-The harness's telemetry types come from `PiSharp.Telemetry`, which `PiSharp.Durable` references. The **unpublished 1.5.0.1 candidate** implements [Chord and native hosting](/docs/embed/chord/) and prepares [PiSharp.Durable.Store](/docs/embed/durable-store/) for packaging. The install references above remain the published 1.5.0 versions.
+The harness's telemetry types come from `PiSharp.Telemetry`, which `PiSharp.Durable` references. PiSharp **1.5.0.1** includes [Chord and native hosting](/docs/embed/chord/) and [PiSharp.Durable.Store](/docs/embed/durable-store/). Use version 1.5.0.1 for every PiSharp sibling package.
 
 ## Upgrading from 1.2.0.x
 
@@ -647,11 +647,11 @@ From 1.5.0, `HarnessOptions.Telemetry` takes a host-owned `ITelemetryContext` fr
 - **Propagation** stores an opaque trace carrier on submission and task records, without a storage migration, so a phase that runs after a restart joins the trace it started in (its first invocation after a reopen is marked resumed). `TaskOptions.Trace` inherits the creator's carrier when null; `TaskTrace.Of` sets one and `TaskTrace.Root` starts at the adapter root without storing one. A run started for several queued inputs takes the first input's trace and links the others.
 - **Metrics** record `pi.durable.phase.duration` (milliseconds, by task, phase and outcome) and `pi.durable.tasks.active` (live tasks by task name), without record IDs. Closing the Harness releases its active counts.
 
-## Candidate options (1.5.0.1)
+## Options added in 1.5.0.1
 
-These options are implemented in source and remain unreleased. Existing 1.5.0 install references above continue to describe the published packages.
+These options ship in PiSharp 1.5.0.1 on the unchanged Pi 1.5.0 baseline.
 
-| API | Candidate behavior |
+| API | Behavior |
 | --- | --- |
 | `AgentChange.Compaction` / agent compaction settings | Persist a per-conversation compaction override, including model overrides, alongside agent configuration. |
 | `ITx.GetSubmissionAsync(SubmissionId)` | Read a committed submission before table writes or transaction settlement. External transaction implementations must override the compatibility default to support this read. |
@@ -664,7 +664,7 @@ The [model contracts](https://github.com/jkelly/PiSharp/blob/main/src/PiSharp.Du
 
 ## Registries from Chord
 
-`RegistryReader.Create` in the candidate `PiSharp.Durable.Store` adapts a registry composed by the real Chord v2 host, so a harness follows extensions contributed by plugins. [Examples 35–37](/docs/embed/durable-store/) now exercise host load, shared storage, followed views and registry contributions. The adapter remains experimental and unpublished.
+`RegistryReader.Create` in `PiSharp.Durable.Store` from 1.5.0.1 adapts a registry composed by the real Chord v2 host, so a harness follows extensions contributed by plugins. [Examples 35–37](/docs/embed/durable-store/) now exercise host load, shared storage, followed views and registry contributions. The adapter is published as experimental.
 
 ## Samples
 
@@ -715,7 +715,7 @@ PiSharp 1.2.0.x numbered them as upstream v1.2.0 did: v1.5.0 dropped `04-chord-s
 | `33-turn-limit-and-continue` | (from 1.5.0) A turn limit stops a long run; a continue resumes it without a user message. |
 | `34-submit-in-commit` | (from 1.5.0) Messages that only steer a running agent, admitted inside the host's own commit. |
 
-The candidate adds `35-durable-on-the-store`, `36-durable-views` and `37-harness-registry` in the separate [Durable.Chord.Examples project](/docs/embed/durable-store/#run-examples-3537), using the real host and SQLite.
+PiSharp 1.5.0.1 adds `35-durable-on-the-store`, `36-durable-views` and `37-harness-registry` in the separate [Durable.Chord.Examples project](/docs/embed/durable-store/#run-examples-3537), using the real host and SQLite.
 
 [`samples/Durable.Chat`](https://github.com/jkelly/PiSharp/tree/main/samples/Durable.Chat) sends one prompt to a real model, prints the answer, then reopens the storage and prints the stored answer. Its API key comes from the provider's environment variable:
 

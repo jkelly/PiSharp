@@ -139,17 +139,17 @@ As in Pi, Codex requests go over a WebSocket first. If the WebSocket fails befor
 | `websocket` | WebSocket, sending the whole request every turn. |
 | `sse` | Server-sent events only. |
 
-Published 1.5.0 gives the WebSocket 15 seconds to open. The unpublished 1.5.0.1 candidate carries `websocketConnectTimeoutMs` through configured/native/hosted request paths.
+The earlier 1.5.0 release gave the WebSocket 15 seconds to open. PiSharp 1.5.0.1 carries `websocketConnectTimeoutMs` through configured/native/hosted request paths.
 
 ## Differences from Pi
 
 - Chat requests carry Pi's detailed user agent, `pi/1.5.0 (<platform>; dotnet/<version>; <arch>)`, with the runtime naming .NET where Pi names Node. Bedrock sends `pi/1.5.0` as the whole user agent, since PiSharp has no AWS SDK user agent to append it to.
 - PiSharp sends no attribution headers. Pi attributes OpenRouter, NVIDIA NIM and OpenCode requests to pi (`https://pi.dev`) while install telemetry is on; PiSharp never does. OpenCode requests with a session carry `x-opencode-client: pisharp`, where Pi sends `x-opencode-client: pi` only while attribution is on.
 - PiSharp's zstd frames are valid zstd but not byte for byte what Node's zstd writes.
-- Published 1.5.0 classifier calls use built-in catalogs only. Candidate 1.5.0.1 propagates provider overrides, including `baseUrl` and `compat`, and adds Copilot System One routing.
+- The earlier 1.5.0 release used built-in classifier catalogs only. PiSharp 1.5.0.1 propagates provider overrides, including `baseUrl` and `compat`, and adds Copilot System One routing.
 
-## Candidate provider updates
+## Provider updates in 1.5.0.1
 
-The unpublished 1.5.0.1 candidate adds [bounded Anthropic message threads](/docs/embed/anthropic-threads/), schema reference/root-definition corrections, accurate tool-history declarations, request header/retry/output-budget corrections, Responses transcript tool handling and reviewed catalog updates. Responses usage pricing uses the effective per-request service tier when the provider omits its echo. [Durable request options](/docs/embed/durable/#candidate-options-1501) carry reasoning budgets, timeout, identity and account hooks through native and hosted paths. The [current source/test mapping](https://github.com/jkelly/PiSharp/blob/main/compatibility/gap-status-2026-11-08.json) and [acceptance report](https://github.com/jkelly/PiSharp/blob/main/AI_DOCS/gap-implementation-results.md) qualify the claims; offline transport cases are not live-provider qualification.
+PiSharp 1.5.0.1 adds [bounded Anthropic message threads](/docs/embed/anthropic-threads/), schema reference/root-definition corrections, accurate tool-history declarations, request header/retry/output-budget corrections, Responses transcript tool handling and reviewed catalog updates. Responses usage pricing uses the effective per-request service tier when the provider omits its echo. [Durable request options](/docs/embed/durable/#options-added-in-1501) carry reasoning budgets, timeout, identity and account hooks through native and hosted paths. The [current source/test mapping](https://github.com/jkelly/PiSharp/blob/main/compatibility/gap-status-2026-11-08.json) and [acceptance report](https://github.com/jkelly/PiSharp/blob/main/AI_DOCS/gap-implementation-results.md) qualify the claims; offline transport cases are not live-provider qualification.
 
 The [Parity](/parity/) page lists the smaller differences.

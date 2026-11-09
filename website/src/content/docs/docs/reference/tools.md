@@ -183,9 +183,9 @@ Turn it on with `--tools +codemode` or `"defaultTools": ["+codemode"]`. MCP serv
 
 There is no `powershell` tool in the PiSharp CLI. Pi v1.5.0 has one for Windows; PiSharp hasn't ported it to the CLI yet, and the [Parity](/parity/) page lists it as deferred. The name is reserved, and the terminal UI can show a `powershell` call from an extension. On Windows, `bash` runs through Git Bash.
 
-## Candidate tool corrections (1.5.0.1)
+## Tool corrections in 1.5.0.1
 
-The unreleased candidate preserves mixed line endings during edits, bounds large-file read/search output, corrects relative search globs and argument expansion, preserves Unicode truncation boundaries, and avoids repeated whole-history copying of streamed tool arguments. Process capture is bounded while cleanup retains ownership of the complete child tree. See the [source/test mapping](https://github.com/jkelly/PiSharp/blob/main/compatibility/gap-status-2026-11-08.json) for the corresponding tool and provider cases. These are candidate source changes; the published tool install remains 1.5.0.
+PiSharp 1.5.0.1 preserves mixed line endings during edits, bounds large-file read/search output, corrects relative search globs and argument expansion, preserves Unicode truncation boundaries, and avoids repeated whole-history copying of streamed tool arguments. Process capture is bounded while cleanup retains ownership of the complete child tree. See the [source/test mapping](https://github.com/jkelly/PiSharp/blob/main/compatibility/gap-status-2026-11-08.json) for the corresponding tool and provider cases. Install or update the CLI at version 1.5.0.1 to use these corrections.
 
 ## Selecting tools
 

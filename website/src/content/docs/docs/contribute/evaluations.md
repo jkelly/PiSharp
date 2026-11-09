@@ -3,7 +3,7 @@ title: Evaluation tooling
 description: Run deterministic fixtures, compare observations, or explicitly execute a staged runtime.
 ---
 
-The candidate source includes [`tools/PiSharp.Evals`](https://github.com/jkelly/PiSharp/tree/main/tools/PiSharp.Evals). It is a repository tool, not a NuGet library. Its default mode runs deterministic synthetic fixtures without starting a CLI process or contacting a provider:
+PiSharp 1.5.0.1 source includes [`tools/PiSharp.Evals`](https://github.com/jkelly/PiSharp/tree/main/tools/PiSharp.Evals). It is a repository tool, not a NuGet library. Its default mode runs deterministic synthetic fixtures without starting a CLI process or contacting a provider:
 
 ```powershell
 dotnet run --project tools/PiSharp.Evals -- --repetitions 2 --out artifacts/eval-fixture-check

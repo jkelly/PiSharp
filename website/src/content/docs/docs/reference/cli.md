@@ -202,11 +202,11 @@ export PI_SELF_UPDATE_COMMAND="dotnet tool update -g {packageName} --version {ve
 
 Exit code 0 doesn't prove the update worked, so PiSharp then checks the installed version, first in its own installation and then with `pisharp --version` on your `PATH`. If that isn't the new version, it says so in yellow.
 
-Candidate 1.5.0.1 also reports package update outcomes as **Updated**, **Unchanged**, **Skipped** (offline) or **Warning**, with scope and available before/after versions. It no longer treats an attempted update as proof of a change. Empty package configuration is reported explicitly. See [update summary source](https://github.com/jkelly/PiSharp/blob/main/src/PiSharp.Cli/Packages/PiPackageUpdateSummary.cs).
+PiSharp 1.5.0.1 also reports package update outcomes as **Updated**, **Unchanged**, **Skipped** (offline) or **Warning**, with scope and available before/after versions. It no longer treats an attempted update as proof of a change. Empty package configuration is reported explicitly. See [update summary source](https://github.com/jkelly/PiSharp/blob/main/src/PiSharp.Cli/Packages/PiPackageUpdateSummary.cs).
 
 ## auth
 
-`pisharp auth` resolves credentials as Pi does, for scripts and other programs. Credential-print/check commands need `--provider`, `--model` or both. Candidate 1.5.0.1 adds shell login/logout with a positional provider id or name:
+`pisharp auth` resolves credentials as Pi does, for scripts and other programs. Credential-print/check commands need `--provider`, `--model` or both. PiSharp 1.5.0.1 adds shell login/logout with a positional provider id or name:
 
 ```sh
 pisharp auth login anthropic
@@ -214,7 +214,7 @@ pisharp auth login openai --api-key
 pisharp auth logout anthropic
 ```
 
-Login needs an interactive terminal, uses account sign-in when available, and supports `--no-browser` for an alternate account sign-in method. Logout removes stored credentials only. These candidate commands are [implemented here](https://github.com/jkelly/PiSharp/blob/main/src/PiSharp.Cli/Pi/PiAuthCommand.Login.cs); published 1.5.0 retains the commands below.
+Login needs an interactive terminal, uses account sign-in when available, and supports `--no-browser` for an alternate account sign-in method. Logout removes stored credentials only. These commands are [implemented here](https://github.com/jkelly/PiSharp/blob/main/src/PiSharp.Cli/Pi/PiAuthCommand.Login.cs). Credential resolution commands are listed below.
 
 | Command | What it does |
 | --- | --- |

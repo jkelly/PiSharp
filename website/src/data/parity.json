@@ -402,9 +402,9 @@
       "notes": "1.2.0.1 ships pisharp durable and the PiSharp.Durable, PiSharp.Durable.Tools and PiSharp.Durable.Sqlite packages as experimental: a port of pi-durable v1.2.0 whose every upstream file is ported or recorded as excluded (decision 0005, durable-port-map.json). Open: JSONL storage keeps its records in memory, and code mode scripts interrupted under Pi or PiSharp don't resume in the other. 1.2.0.2 adds PiSharp-only questions, plan mode, media tools and a device server (decisions 0005, 0007 and 0008), which pi-durable doesn't have. 1.5.0 moves the libraries to pi-durable v1.5.0 (decision 0013): 1.2.0.x can't open what 1.5.0 writes, no session written by pi-durable v1.5.0 has been compared yet, and Chord v2's host and durable on its store wait for 1.5.0.x."
     },
     {
-      "title": "1.5.0.1 gap candidate",
-      "status": "partial",
-      "notes": "Implementation complete for the November 8 authorized gap plan: Chord v2 and legacy, native hosting, Durable.Store, Env/daemon, Anthropic threads and evaluations. Five added experimental libraries prepare 28 libraries plus the CLI. Candidate package and exact-SHA hosted gates remain separate; no publication or complete parity claim. Current mappings: compatibility/gap-status-2026-11-08.json."
+      "title": "1.5.0.1 gap release",
+      "status": "ported",
+      "notes": "Released on the unchanged Pi 1.5.0 baseline: Chord v2 and legacy, native hosting, Durable.Store, Env/daemon, Anthropic threads and evaluations. Published inventory: 28 libraries plus the CLI. Exact-source Core/Durable/gap/native gates, macOS and three-platform WebAgent qualification, validation of all 29 archives and a fresh external consumer of the five new libraries passed at 8144e3ea. Experimental APIs, explicit skips and environment limits remain. This does not claim complete upstream parity. Evidence: AI_DOCS/release-1.5.0.1-publication-results.md."
     }
   ]
 }

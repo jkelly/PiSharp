@@ -8,7 +8,7 @@ description: Build terminal interfaces with PiSharp.Tui's components, layout and
 ## Install
 
 ```powershell
-dotnet add package PiSharp.Tui --version 1.5.0
+dotnet add package PiSharp.Tui --version 1.5.0.1
 ```
 
 The package targets net10.0 and has no dependencies. Its main API is in the `PiSharp.Tui.Pi` namespace; every type on this page is there unless the section says otherwise.

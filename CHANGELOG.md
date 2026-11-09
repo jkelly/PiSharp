@@ -1,8 +1,8 @@
 # Changelog
 
-## [1.5.0.1]
+## [1.5.0.1] - 2026-11-09
 
-**Unreleased — preparation in progress.** The published release remains 1.5.0. This candidate keeps the Pi 1.5.0 baseline and adds reviewed backports and native implementations; no release tag or candidate package publication is claimed. See the [candidate guide](https://pisharp.ai/docs/guides/gap-updates/) and [full notes](https://github.com/jkelly/PiSharp/blob/main/docs/release-notes/1.5.0.1.md).
+PiSharp 1.5.0.1 keeps the Pi 1.5.0 baseline and adds reviewed backports and native implementations. Update with `dotnet tool update -g PiSharp.Cli --version 1.5.0.1`. See the [release](https://github.com/jkelly/PiSharp/releases/tag/v1.5.0.1), [updates guide](https://pisharp.ai/docs/guides/gap-updates/) and [full notes](https://github.com/jkelly/PiSharp/blob/main/docs/release-notes/1.5.0.1.md).
 
 ### New experimental source libraries
 
@@ -10,7 +10,7 @@
 - Native Chord hosting: plugin generations, HTTP and process workers
 - Durable.Store with real-host examples 35–37, shared storage, followed views and registry composition
 - Env.Protocol and Env: framed remote filesystem/process/watch adapters, SSH bootstrap and a separately packaged native daemon; Windows PTY remains `ENOTSUP`
-- Preparation inventory: 28 libraries plus the CLI (29 packages); the five added libraries are unpublished
+- Published inventory: 28 libraries plus the CLI (29 packages), including five added experimental libraries
 
 ### Corrections and tooling
 
@@ -30,7 +30,7 @@
 - Preserve file-URL query and hash components in the Node compatibility loader so reloads retain their fresh module identity; reproduced with real Node
 - Repair CI prerequisites and evidence parsing: actual strict result statuses, resolved SDK executable, integrity-pinned historical archive and required `fd` setup. These controls do not establish hosted or upstream parity
 
-Historical pins and capture evidence remain separate from current source mappings. Local Windows receipts do not establish all-platform or complete upstream parity. Publication waits for the [four release gates](https://pisharp.ai/docs/contribute/releasing/#four-required-validation-gates) at the intended source revision.
+Historical pins and capture evidence remain separate from current source mappings. The [four release gates](https://pisharp.ai/docs/contribute/releasing/#four-required-validation-gates) passed for immutable release source `8144e3ea`, with additional Web and macOS checks. Qualified native daemon ZIPs are attached to the release. Explicit platform skips, experimental APIs and live-provider/SSH/physical-key limitations remain; no complete upstream or all-platform parity is claimed.
 
 ## [1.5.0] - 2026-11-05
 

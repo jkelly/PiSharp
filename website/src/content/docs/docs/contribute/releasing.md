@@ -40,11 +40,11 @@ Releases are prepared on a `release/<version>` branch, such as `release/1.5.0`, 
 
 A separate commit then re-seals the derivative integrity table, because `Directory.Build.props`, `README.md`, `THIRD-PARTY-NOTICES.md` and other files above are pinned there. See [Derivative integrity pins](/docs/contribute/porting/#derivative-integrity-pins).
 
-### Current preparation: 1.5.0.1
+### Published release: 1.5.0.1
 
-The candidate is **1.5.0.1**, on the unchanged Pi v1.5.0 source pin. The inventory is 28 libraries plus the CLI (29 packages). Chord, Chord.Hosting, Durable.Store, Env.Protocol and Env are added experimental libraries and remain unpublished. An external package-only consumer must validate their exact sibling references and framework requirements. The native daemon is a separate artifact.
+Release **1.5.0.1** keeps the Pi v1.5.0 source pin and publishes 28 libraries plus the CLI (29 packages). Chord, Chord.Hosting, Durable.Store, Env.Protocol and Env are added experimental libraries. Validation of all 29 archives and a fresh external consumer of the five new libraries passed against the release source and exact sibling references. Three qualified native daemon ZIPs remain separate from NuGet.
 
-`compatibility/public-release.json` keeps publication flags false and preserves the complete published 1.5.0 record in `previousReleases`. The website continues to show 1.5.0 as published. The candidate changelog uses `kind: patch`, `baseline: 1.5.0`, `status: in-progress` and is excluded from released RSS. No release tag has been created as part of preparation.
+Tag [`v1.5.0.1`](https://github.com/jkelly/PiSharp/releases/tag/v1.5.0.1) identifies immutable source `8144e3eaa138a5faf56f5cbb0de477a56fd48f8f`. The [publication record](https://github.com/jkelly/PiSharp/blob/main/AI_DOCS/release-1.5.0.1-publication-results.md) records actual package/release verification and asset integrity. `compatibility/public-release.json` preserves the complete 1.5.0 record in `previousReleases`. For future candidates, keep publication flags false and `status: in-progress` until publication is verified; only then promote the changelog and its RSS entry.
 
 ### Regenerate CHANGELOG.md
 
@@ -75,7 +75,7 @@ The package list is written out in several places. A new library needs all of th
 
 ## Dry run
 
-Run the release workflow by hand from the Actions tab to build and check a version without publishing anything. Set `version` explicitly to `1.5.0.1` for this candidate. It takes two inputs:
+Run the release workflow by hand from the Actions tab to build and check a version without publishing anything. Set `version` explicitly to the intended version; `1.5.0.1` is the latest published version. It takes two inputs:
 
 | Input | Default | Effect |
 | --- | --- | --- |
@@ -149,7 +149,7 @@ It writes provenance files to `artifacts/release-inputs/`, recording the commit,
 - The current 28-library admission list, with `tools/release/PiSharp.NativeSdk.targets`. The targets file sets the package id, version, description, license, readme and notices, embeds the provenance, and fails without a version, a commit, the provenance file or `net10.0`. Each package is checked by `Assert-PiSharpNativeSdkPackage`: its members, its dependencies (PiSharp siblings at exactly the release version, `[<version>]`, so a consumer can't mix packages from different releases, as Pi pins its own packages from 1.3.0; third-party packages at their pinned versions) and its assembly. The targets file is what makes `dotnet pack` write `[<version>]` for project references; NuGet would otherwise write the release version as a minimum.
 - The CLI, as the `PiSharp.Cli` tool with the command `pisharp`, with `tools/packaging/PiSharp.Distribution.targets`, checked by `tools/packaging/validate-distribution.ps1`.
 
-The reports go to `artifacts/validation/`. The unreleased gap-admission preparation extends the list to 28 libraries and the CLI tool (29 packages). The script checks its exact library-list count. The published 1.5.0 release contained 24 packages; its release notes remain historical. Chord, Chord.Hosting, Durable.Store, Env.Protocol and Env additionally require the package-only external consumer gate documented in `docs/contracts/gap-package-admission.md`. The Env daemon is a separately verified native artifact, never a library package.
+The reports go to `artifacts/validation/`. From 1.5.0.1 the list contains 28 libraries and the CLI tool (29 packages). The script checks its exact library-list count. The earlier 1.5.0 release contained 24 packages; its release notes remain historical. Chord, Chord.Hosting, Durable.Store, Env.Protocol and Env additionally require the package-only external consumer gate documented in `docs/contracts/gap-package-admission.md`. The Env daemon is a separately verified native artifact, never a library package.
 
 ## After the release
 

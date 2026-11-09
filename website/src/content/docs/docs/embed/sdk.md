@@ -7,10 +7,10 @@ PiSharp is a set of .NET libraries, and the `pisharp` CLI is built from them. Yo
 
 ## Install
 
-Every library is a NuGet package that targets `net10.0`. The current release is 1.5.0:
+Every library is a NuGet package that targets `net10.0`. The current release is 1.5.0.1:
 
 ```powershell
-dotnet add package PiSharp.CodingAgent --version 1.5.0
+dotnet add package PiSharp.CodingAgent --version 1.5.0.1
 ```
 
 A package brings the packages it is built on, so `PiSharp.CodingAgent` also gives you `PiSharp.Agent`, `PiSharp.AI`, `PiSharp.Sessions` and `PiSharp.Contracts`. All PiSharp packages share one version number. Use the same version for every PiSharp package you reference. From 1.5.0, each package depends on its PiSharp packages at exactly its own version (`[1.5.0]`), so NuGet reports a conflict instead of mixing packages from different releases, as Pi pins its own packages since 1.3.0. [Versioning](/docs/versioning/) explains how the number relates to the Pi release it ports.
@@ -47,7 +47,7 @@ dotnet tool install -g PiSharp.Cli
 
 ## Packages
 
-These are the 24 packages of the published 1.5.0 release, the 23 libraries and the `PiSharp.Cli` tool. `PiSharp.Telemetry` is new in 1.5.0. The [SDK page](/sdk/) also lists five unpublished candidate libraries, clearly marked with source links: [Chord and Chord.Hosting](/docs/embed/chord/), [Durable.Store](/docs/embed/durable-store/), and [Env.Protocol and Env](/docs/embed/env/). The 1.5.0.1 preparation inventory is 28 libraries plus the CLI, 29 packages. Keep published references at 1.5.0 until the candidate is published; all sibling references must use the same exact release version.
+The published 1.5.0.1 inventory is **28 libraries plus the CLI, 29 packages**. The table below retains the 24 packages from 1.5.0; this release adds [Chord and Chord.Hosting](/docs/embed/chord/), [Durable.Store](/docs/embed/durable-store/), and [Env.Protocol and Env](/docs/embed/env/), all experimental. The [SDK page](/sdk/) lists all 29 with NuGet links and versioned install commands. All sibling references must use the same exact release version.
 
 | Package | Group | Purpose | Docs |
 | --- | --- | --- | --- |

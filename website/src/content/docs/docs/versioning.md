@@ -17,10 +17,10 @@ C#-only fixes that don't change the Pi baseline add a fourth number.
 | `1.2.0.1` | C#-only patch on Pi 1.2.0: the experimental durable port |
 | `1.2.0.2` | C#-only patch on Pi 1.2.0: experimental media, service tiers, custom agents and the durable device server |
 | `1.5.0` | Synced to Pi 1.5.0. Pi 1.3.0 and 1.4.0 had no PiSharp release; their changes are in 1.5.0 |
-| `1.5.0.1` (candidate) | Unpublished patch on Pi 1.5.0: reviewed gap corrections, Chord/hosting, Durable.Store, remote environments and evaluation tooling |
+| `1.5.0.1` | Patch on Pi 1.5.0: reviewed gap corrections, Chord/hosting, Durable.Store, remote environments and evaluation tooling |
 
 Bumping the third number instead (`0.99.2`) would claim to match a Pi release that PiSharp doesn't match. NuGet and .NET both order four-part versions correctly, so `0.99.1.2` sorts after `0.99.1` and before `1.1.0`.
 
 The [changelog](/changelog/) labels each release as either a **Pi sync** or a **C# patch**. [Releasing](/docs/contribute/releasing/) describes how a release is prepared and published.
 
-Features on `main` that are in no release yet are marked **Unreleased** or **candidate**. A source build reports `VersionPrefix` from `Directory.Build.props`, now 1.5.0.1 during preparation. The published install labels remain **1.5.0** until publication is verified; a source version bump is not a release. The candidate changelog is excluded from the released RSS feed. See [candidate updates](/docs/guides/gap-updates/).
+The current published release is **1.5.0.1**, on Pi **1.5.0**. A source build reports `VersionPrefix` from `Directory.Build.props`. Features on `main` that are in no release yet are marked **Unreleased** or **candidate**; a source version bump alone is not a release. Future candidate changelogs remain excluded from released RSS until publication is verified. See [1.5.0.1 updates](/docs/guides/gap-updates/).

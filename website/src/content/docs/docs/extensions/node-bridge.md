@@ -5,8 +5,8 @@ description: Run Pi's TypeScript and JavaScript extensions in PiSharp through th
 
 PiSharp runs Pi's TypeScript and JavaScript extensions unchanged. It starts Node, loads each extension with Pi's own packages, and connects the extension to the C# session. Write extensions as Pi's [Extensions](https://github.com/earendil-works/pi/blob/v1.5.0/packages/coding-agent/docs/extensions.md) page describes.
 
-:::note[Candidate runtime changes]
-The installed Pi 1.5.0 runtime and overlay handle behavior described below are in the unpublished 1.5.0.1 candidate source. Published PiSharp 1.5.0 used Pi 1.2.0 runtime packages. The candidate retains old caches for rollback, disables default attribution and adds overlay lifetime/focus/visibility/resize synchronization. Platform qualification is tracked separately from the runtime installation check.
+:::note[Runtime changes in 1.5.0.1]
+The installed Pi 1.5.0 runtime and overlay handle behavior described below ship in PiSharp 1.5.0.1. The earlier PiSharp 1.5.0 release used Pi 1.2.0 runtime packages. This release retains old caches for rollback, disables default attribution and adds overlay lifetime/focus/visibility/resize synchronization. Platform qualification is tracked separately from the runtime installation check.
 :::
 
 ## Where extensions come from
