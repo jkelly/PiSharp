@@ -28,28 +28,27 @@ const assessedOn = new Date(`${parity.assessedOn}T00:00:00Z`).toLocaleDateString
 ---
 
 <SitePage title="Parity" description="How close PiSharp is to Pi, across three separate compatibility promises.">
-	<div style="padding-top: 3rem">
-		<div class="ps-eyebrow">Parity</div>
-		<h1 class="ps-h1">How close to <em>Pi</em> are we?</h1>
+	<div class="ps-pagehead">
+		<h1 class="ps-h1">How close to Pi are we?</h1>
 		<p class="ps-lede">PiSharp makes three separate promises and tracks each one separately. The baseline below is read from the port's pinned compatibility lock file.</p>
 		<p class="ps-muted assessed">
 			The historical assessment below uses the {parity.baseline} baseline, from PiSharp's own test suites and its <a href={links.compatibility}>compatibility inventories</a>. Assessed on {assessedOn} for release {parity.release}. "Ported" means it works and PiSharp's tests cover it. Some suites compare against output captured from Pi 1.1.0 itself, such as session files; the rest are authored tests. Released 1.5.0.1 coverage is listed separately below, preserving the original assessment and evidence pins.
 		</p>
 	</div>
 
-	<section class="ps-section" style="padding-top: 0">
-		<h2 class="ps-h3">Released 1.5.0.1: coverage and qualification</h2>
+	<section class="ps-section released">
+		<h2 class="ps-h2">Released 1.5.0.1: coverage and qualification</h2>
 		<p class="ps-muted">The tables below preserve the 1.5.0 assessment and its historical capture pins. Version 1.5.0.1 adds Chord v2 and legacy runtimes, native hosting, Durable.Store, Env and evaluation tooling, and closes reviewed provider, tool and lifecycle gaps. The four required hosted gates passed for immutable source 8144e3ea; release qualification also includes macOS checks, the three-platform WebAgent suite, validation of all 29 archives and a fresh external consumer of the five new libraries.</p>
 		<p class="ps-muted"><a href="/docs/guides/gap-updates/">Read the release updates</a>, the <a href="https://github.com/jkelly/PiSharp/blob/main/compatibility/gap-status-2026-11-08.json">current source/test mapping</a> and the <a href="https://github.com/jkelly/PiSharp/blob/main/AI_DOCS/release-1.5.0.1-publication-results.md">publication evidence</a>. Results retain explicit skips and tested-environment limits. Windows PTY remains unsupported; live providers, real SSH hosts, physical macOS keys, browser/Cloudflare exclusions and native runtime policy differences remain separate.</p>
 	</section>
 
 	<div class="strip">
-		<div><div class="ps-mono k">PISHARP</div><div class="ps-mono v">{versions.pisharp}</div></div>
+		<div><div class="k">PiSharp</div><div class="v">{versions.pisharp}</div></div>
 		<div>
-			<div class="ps-mono k">BASELINE</div>
-			<div class="ps-mono v"><a href={versions.baselineUrl}>Pi {versions.baseline}</a></div>
+			<div class="k">Baseline</div>
+			<div class="v"><a href={versions.baselineUrl}>Pi {versions.baseline}</a></div>
 		</div>
-		<div><div class="ps-mono k">LATEST PI</div><div class="ps-mono v">{versions.latestPi}</div></div>
+		<div><div class="k">Latest Pi</div><div class="v">{versions.latestPi}</div></div>
 		<div class="info">
 			<strong>{inSync ? 'Published baseline matches the latest Pi' : `Sync to Pi ${versions.latestPi} in progress`}</strong>
 			<span>The first three numbers name the Pi baseline. A fourth number (such as 1.5.0.1) is a C#-only patch. <a href="/docs/versioning/">How versions work</a></span>
@@ -67,7 +66,7 @@ const assessedOn = new Date(`${parity.assessedOn}T00:00:00Z`).toLocaleDateString
 	</div>
 
 	<div class="legend">
-		<span class="ps-mono" style="font-size: 0.7rem; letter-spacing: 0.14em; color: var(--sl-color-gray-3)">LEGEND</span>
+		<span class="ps-fine">Legend</span>
 		{
 			Object.entries(statusLabel).map(([tone, label]) => (
 				<span class="legend-item">
@@ -81,7 +80,7 @@ const assessedOn = new Date(`${parity.assessedOn}T00:00:00Z`).toLocaleDateString
 	{
 		parity.promises.map((p, i) => (
 			<div role="tabpanel" id={`panel-${p.id}`} aria-labelledby={`tab-${p.id}`} hidden={i !== 0}>
-				<p class="ps-muted" style="max-width: 48rem">{p.blurb}</p>
+				<p class="ps-muted blurb">{p.blurb}</p>
 				<div class="ps-table-wrap">
 					<table>
 						<thead>
@@ -90,11 +89,11 @@ const assessedOn = new Date(`${parity.assessedOn}T00:00:00Z`).toLocaleDateString
 						<tbody>
 							{p.rows.map((row: { area: string; status: string; notes?: string; evidence?: string }) => (
 								<tr>
-									<td style="font-weight: 500">{row.area}</td>
+									<td class="area">{row.area}</td>
 									<td><span class="ps-chip" data-tone={row.status}>{statusLabel[row.status] ?? row.status}</span></td>
-									<td class="ps-muted" style="font-size: 0.95rem">
+									<td class="ps-muted">
 										{row.notes ?? ''}
-										{row.evidence && <a href={row.evidence}> Evidence ↗</a>}
+										{row.evidence && <> <a href={row.evidence}>Evidence</a></>}
 									</td>
 								</tr>
 							))}
@@ -105,15 +104,15 @@ const assessedOn = new Date(`${parity.assessedOn}T00:00:00Z`).toLocaleDateString
 		))
 	}
 
-	<section class="ps-section" style="margin-top: 5rem">
+	<section class="ps-section lower">
 		<h2 class="ps-h2">Published 1.5.0 differences</h2>
 		<p class="ps-muted">This historical list describes release 1.5.0. Resolutions in 1.5.0.1 are summarized above and in the current mapping; retained entries are not claims that all these gaps remain in the current release.</p>
 		<div class="devs">
 			{
 				parity.deviations.map((group: { title: string; blurb: string; items: { title: string; notes: string }[] }) => (
 					<div>
-						<h3 class="ps-h3" style="margin-top: 0">{group.title}</h3>
-						<p class="ps-muted" style="max-width: 48rem">{group.blurb}</p>
+						<h3 class="ps-h3">{group.title}</h3>
+						<p class="ps-muted">{group.blurb}</p>
 						<ul class="dev-list">
 							{group.items.map((item) => (
 								<li>
@@ -127,19 +126,21 @@ const assessedOn = new Date(`${parity.assessedOn}T00:00:00Z`).toLocaleDateString
 		</div>
 	</section>
 
-	<section class="ps-section" style="margin-top: 5rem">
+	<section class="ps-section">
 		<div class="road-head">
-			<h2 class="ps-h2" style="margin: 0">Roadmap</h2>
-			<a href={links.plans} class="ps-link-mono">Full plans on GitHub ↗</a>
+			<h2 class="ps-h2">Roadmap</h2>
+			<a href={links.plans}>Full plans on GitHub</a>
 		</div>
 		<ol class="phases">
 			{
 				parity.phases.map((ph: { title: string; status: string; notes?: string }, i) => (
-					<li class="ps-card">
-						<span class="ps-mono" style="font-size: 0.75rem; letter-spacing: 0.14em; color: var(--ps-blue)">PHASE {i + 1}</span>
-						<span style="font-weight: 600; color: var(--sl-color-white)">{ph.title}</span>
-						<span class="ps-chip" data-tone={ph.status} style="align-self: flex-start">{statusLabel[ph.status] ?? ph.status}</span>
-						{ph.notes && <span class="ps-muted" style="font-size: 0.9rem">{ph.notes}</span>}
+					<li>
+						<span class="num">Phase {i + 1}</span>
+						<div>
+							<strong>{ph.title}</strong>
+							{ph.notes && <p class="ps-muted">{ph.notes}</p>}
+						</div>
+						<span class="ps-chip" data-tone={ph.status}>{statusLabel[ph.status] ?? ph.status}</span>
 					</li>
 				))
 			}
@@ -171,105 +172,151 @@ const assessedOn = new Date(`${parity.assessedOn}T00:00:00Z`).toLocaleDateString
 </script>
 
 <style>
+	.released p {
+		max-width: 52rem;
+	}
 	.strip {
 		display: flex;
 		flex-wrap: wrap;
-		border: 1px solid var(--sl-color-gray-5);
-		border-radius: 12px;
-		overflow: hidden;
+		gap: 1.25rem 3rem;
+		background: var(--ps-surface);
+		border-radius: 16px;
+		padding: 1.5rem 1.75rem;
 		margin-bottom: 3.5rem;
 	}
-	.strip > div {
-		flex: 1 1 12rem;
-		padding: 1.3rem 1.6rem;
-		background: var(--ps-surface);
-		border-inline-start: 1px solid var(--sl-color-gray-5);
-	}
-	.strip > div:first-child {
-		border-inline-start: 0;
-	}
 	.strip .k {
-		font-size: 0.7rem;
-		letter-spacing: 0.16em;
+		font-size: 0.875rem;
 		color: var(--sl-color-gray-3);
 	}
 	.strip .v {
-		font-size: 1.8rem;
-		font-weight: 700;
+		font-size: 1.5rem;
+		font-weight: 600;
 		color: var(--sl-color-white);
+		font-variant-numeric: tabular-nums;
+		white-space: nowrap;
+	}
+	.strip .v a {
+		text-decoration: none;
+	}
+	.strip .v a:hover {
+		text-decoration: underline;
 	}
 	.strip .info {
-		flex: 2 1 18rem;
-		background: var(--ps-info-bg);
-		border-inline-start-color: var(--ps-info-border);
+		flex: 1 1 18rem;
 		display: flex;
 		flex-direction: column;
 		justify-content: center;
-		font-size: 0.95rem;
-		color: var(--sl-color-gray-2);
+		font-size: 0.9375rem;
+		color: var(--sl-color-gray-3);
 	}
 	.strip .info strong {
 		color: var(--sl-color-white);
+		font-weight: 600;
 	}
 	.tabs {
 		display: flex;
 		flex-wrap: wrap;
 		gap: 0.5rem;
-		margin-bottom: 1rem;
+		margin-bottom: 1.25rem;
 	}
 	.legend {
 		display: flex;
 		flex-wrap: wrap;
 		gap: 0.6rem 1.4rem;
 		align-items: center;
-		margin-bottom: 1rem;
+		margin-bottom: 1.5rem;
 	}
 	.legend-item {
 		display: inline-flex;
 		align-items: center;
 		gap: 0.5rem;
-		font-size: 0.85rem;
+		font-size: 0.875rem;
 	}
 	.assessed {
 		max-width: 48rem;
-		font-size: 0.95rem;
-		margin-top: 1rem;
+		font-size: 0.9375rem;
+	}
+	.blurb {
+		max-width: 48rem;
+		margin-bottom: 1.25rem;
+	}
+	.area {
+		font-weight: 600;
+		color: var(--sl-color-white);
+	}
+	.lower {
+		margin-top: 5.5rem;
 	}
 	.road-head {
 		display: flex;
 		flex-wrap: wrap;
 		justify-content: space-between;
-		align-items: end;
+		align-items: baseline;
 		gap: 1rem;
-		margin-bottom: 1.5rem;
+		margin-bottom: 1rem;
+	}
+	.road-head .ps-h2 {
+		margin: 0;
 	}
 	.phases {
 		list-style: none;
 		margin: 0;
 		padding: 0;
+	}
+	.phases li {
 		display: grid;
-		grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
-		gap: 0.9rem;
+		grid-template-columns: 5rem minmax(0, 1fr) auto;
+		gap: 0.25rem 1.25rem;
+		align-items: baseline;
+		margin: 0;
+		padding-block: 0.9rem;
+		border-top: 1px solid var(--sl-color-gray-5);
+	}
+	.phases .num {
+		color: var(--sl-color-gray-3);
+		font-size: 0.9375rem;
+		font-variant-numeric: tabular-nums;
+	}
+	.phases strong {
+		font-weight: 600;
+		color: var(--sl-color-white);
+	}
+	.phases p {
+		font-size: 0.9375rem;
+		margin: 0.2rem 0 0;
+		max-width: 48rem;
+		overflow-wrap: anywhere;
 	}
 	.devs {
 		display: grid;
-		gap: 2rem;
+		gap: 2.25rem;
+		margin-top: 1.5rem;
+	}
+	.devs p {
+		max-width: 48rem;
 	}
 	.dev-list {
-		margin: 0;
+		margin: 0.6rem 0 0;
 		padding-inline-start: 1.2rem;
 		display: grid;
 		gap: 0.5rem;
 		max-width: 52rem;
 		overflow-wrap: anywhere;
+		font-size: 0.9375rem;
 	}
 	.dev-list li {
 		margin: 0;
 	}
-	.phases li {
-		display: flex;
-		flex-direction: column;
-		gap: 0.4rem;
-		margin: 0;
+	.dev-list strong {
+		color: var(--sl-color-white);
+		font-weight: 600;
+	}
+	@media (max-width: 40rem) {
+		.phases li {
+			grid-template-columns: minmax(0, 1fr) auto;
+		}
+		.phases .num {
+			grid-column: 1 / -1;
+		}
 	}
 </style>

@@ -1,60 +1,69 @@
-/* PiSharp theme for Starlight, plus shared styles for the custom pages (ps-* classes). */
+/* PiSharp theme for Starlight, plus shared styles for the custom pages (ps-* classes).
+   A neutral grey scale, system fonts and monochrome pill buttons, as in the PiSharp Web Agent.
+   Colour is for status only: ported, partial, planned, added and removed. */
 
 :root {
-	--sl-font: 'IBM Plex Sans', system-ui, sans-serif;
-	--sl-font-mono: 'JetBrains Mono', ui-monospace, monospace;
-	--ps-font-serif: 'Instrument Serif', Georgia, serif;
+	--sl-font: 'Segoe UI Variable Text', 'Segoe UI', system-ui, -apple-system, 'Helvetica Neue', sans-serif;
+	--sl-font-mono: 'Cascadia Code', 'Cascadia Mono', Consolas, ui-monospace, 'SF Mono', Menlo, monospace;
 
 	/* Dark (default) */
-	--sl-color-accent-low: #241b4f;
-	--sl-color-accent: #7c4dff;
-	--sl-color-accent-high: #d6caff;
-	--sl-color-white: #ffffff;
-	--sl-color-gray-1: #eceaf7;
-	--sl-color-gray-2: #c9c4e8;
-	--sl-color-gray-3: #a9a4cc;
-	--sl-color-gray-4: #6e6a99;
-	--sl-color-gray-5: #2e2866;
-	--sl-color-gray-6: #16123a;
-	--sl-color-black: #0d0a24;
+	--sl-color-accent-low: #343434;
+	--sl-color-accent: #9a9a9a;
+	--sl-color-accent-high: #ececec;
+	--sl-color-white: #f5f5f5;
+	--sl-color-gray-1: #ececec;
+	--sl-color-gray-2: #c8c8c8;
+	--sl-color-gray-3: #a6a6a6;
+	--sl-color-gray-4: #707070;
+	--sl-color-gray-5: #3b3b3b;
+	--sl-color-gray-6: #2a2a2a;
+	--sl-color-black: #212121;
+	--sl-color-bg-nav: var(--sl-color-black);
+	--sl-color-bg-sidebar: var(--sl-color-black);
 
-	--ps-blue: #38bdf8;
-	--ps-link: #b39bff;
-	--ps-surface: #16123a;
-	--ps-surface-2: #120e33;
-	--ps-info-bg: #10203a;
-	--ps-info-border: #1e4a6e;
-	--ps-shadow: 0 30px 80px rgba(0, 0, 0, 0.45);
+	--ps-surface: #2a2a2a;
+	--ps-raised: #343434;
+	--ps-pill: #f2f2f2;
+	--ps-on-pill: #171717;
+	--ps-ok: #4cc38a;
+	--ps-warn: #e0b050;
+	--ps-info: #7ab8f5;
+	--ps-add: #7bd39a;
+	--ps-del: #f28b82;
 }
 
 :root[data-theme='light'] {
-	--sl-color-accent-low: #e6deff;
-	--sl-color-accent: #5b2ee0;
-	--sl-color-accent-high: #2a1580;
-	--sl-color-white: #0d0a24;
-	--sl-color-gray-1: #1a1446;
-	--sl-color-gray-2: #2e2866;
-	--sl-color-gray-3: #4a4578;
-	--sl-color-gray-4: #77739e;
-	--sl-color-gray-5: #d4cfee;
-	--sl-color-gray-6: #eceaf7;
-	--sl-color-gray-7: #f6f4fc;
+	--sl-color-accent-low: #ebebeb;
+	--sl-color-accent: #171717;
+	--sl-color-accent-high: #171717;
+	--sl-color-white: #171717;
+	--sl-color-gray-1: #262626;
+	--sl-color-gray-2: #3d3d3d;
+	--sl-color-gray-3: #666666;
+	--sl-color-gray-4: #8f8f8f;
+	--sl-color-gray-5: #dcdcdc;
+	--sl-color-gray-6: #ededed;
+	--sl-color-gray-7: #f5f5f5;
 	--sl-color-black: #ffffff;
+	--sl-color-bg-nav: var(--sl-color-black);
+	--sl-color-bg-sidebar: var(--sl-color-black);
 
-	--ps-blue: #0369a1;
-	--ps-link: #5b2ee0;
-	--ps-surface: #f6f4fc;
-	--ps-surface-2: #f1eefb;
-	--ps-info-bg: #e8f4fc;
-	--ps-info-border: #9cc9e8;
-	--ps-shadow: 0 24px 60px rgba(13, 10, 36, 0.18);
+	--ps-surface: #f5f5f5;
+	--ps-raised: #e9e9e9;
+	--ps-pill: #171717;
+	--ps-on-pill: #ffffff;
+	--ps-ok: #1a7f4e;
+	--ps-warn: #8f6200;
+	--ps-info: #1d5fa8;
+	--ps-add: #1a7f37;
+	--ps-del: #c62828;
 }
 
 /* Header nav links (added by the SiteTitle override) */
 .ps-topnav {
 	display: none;
-	gap: 1.4rem;
-	margin-inline-start: 1.5rem;
+	gap: 0.15rem;
+	margin-inline-start: 1.25rem;
 }
 @media (min-width: 64rem) {
 	.ps-topnav {
@@ -63,33 +72,31 @@
 }
 .ps-topnav a,
 .ps-mobilenav a {
-	font-family: var(--sl-font-mono);
-	font-size: 0.8rem;
-	letter-spacing: 0.08em;
-	text-transform: uppercase;
-	color: var(--sl-color-gray-2);
+	font-size: 0.9375rem;
+	color: var(--sl-color-gray-3);
 	text-decoration: none;
-	padding: 0.6rem 0.15rem;
+	border-radius: 999px;
+	padding: 0.4rem 0.8rem;
 	white-space: nowrap;
 }
 .ps-topnav a:hover,
-.ps-mobilenav a:hover,
-.ps-topnav a[aria-current='page'],
-.ps-mobilenav a[aria-current='page'] {
+.ps-mobilenav a:hover {
+	background: var(--ps-surface);
 	color: var(--sl-color-white);
 }
 .ps-topnav a[aria-current='page'],
 .ps-mobilenav a[aria-current='page'] {
-	text-decoration: underline;
-	text-underline-offset: 0.4rem;
+	background: var(--ps-surface);
+	color: var(--sl-color-white);
 }
 .ps-mobilenav {
 	display: flex;
 	flex-wrap: wrap;
-	gap: 0.2rem 1.2rem;
+	gap: 0.15rem;
 	padding-bottom: 0.8rem;
 	border-bottom: 1px solid var(--sl-color-gray-5);
 	margin-bottom: 1rem;
+	margin-inline: -0.8rem;
 }
 @media (min-width: 64rem) {
 	.ps-mobilenav {
@@ -97,19 +104,20 @@
 	}
 }
 
-/* Docs page titles use the display serif, like the rest of the site. */
-h1#_top {
-	font-family: var(--ps-font-serif);
-	font-weight: 400;
-	font-size: clamp(2.4rem, 5vw, 3.2rem);
-}
-
 .site-title img {
-	height: 2rem;
+	height: 1.75rem;
 	width: auto;
 }
 
-/* Custom pages: remove Starlight's empty title panel and widen the content area. */
+/* Docs sidebar: the current page is a quiet grey pill, not an inverted one. */
+nav.sidebar a[aria-current='page'],
+nav.sidebar a[aria-current='page']:hover,
+nav.sidebar a[aria-current='page']:focus {
+	background: var(--ps-raised);
+	color: var(--sl-color-white);
+}
+
+/* Custom pages: remove Starlight's empty title panel and set the content width. */
 main:has(.ps-page) > .content-panel:has(+ .content-panel) {
 	display: none;
 }
@@ -118,97 +126,110 @@ main:has(.ps-page) > .content-panel + .content-panel {
 	padding-top: 0;
 }
 main:has(.ps-page) .sl-container {
-	max-width: 75rem;
+	max-width: 66rem;
 }
 
 /* Shared custom-page styles */
 .ps-page {
 	color: var(--sl-color-gray-1);
-	font-size: 1.05rem;
-	line-height: 1.6;
+	font-size: 1rem;
+	line-height: 1.55;
 }
-.ps-page p {
+/* Element defaults sit in :where() so a page's own scoped class always wins over them
+   (Starlight scopes page styles with :where(), which adds no specificity). */
+:where(.ps-page) p {
 	margin-block: 0 0.9rem;
 }
-.ps-page a {
-	color: var(--ps-link);
-	text-decoration: none;
+:where(.ps-page) p:where(:last-child) {
+	margin-bottom: 0;
 }
-.ps-page a:hover {
+:where(.ps-page) a {
+	color: var(--sl-color-white);
 	text-decoration: underline;
+	text-decoration-color: var(--sl-color-gray-4);
+	text-underline-offset: 0.22em;
 }
-.ps-serif {
-	font-family: var(--ps-font-serif);
-	font-weight: 400;
+:where(.ps-page) a:hover {
+	text-decoration-color: currentColor;
 }
-.ps-serif em,
-.ps-em {
-	font-style: italic;
+.ps-page :focus-visible {
+	outline: 2px solid var(--sl-color-white);
+	outline-offset: 3px;
+	border-radius: 6px;
+}
+:where(.ps-page) code {
+	font-family: var(--sl-font-mono);
+	font-size: 0.9em;
+	background: var(--ps-raised);
+	border-radius: 4px;
+	padding: 0.1em 0.35em;
 }
 .ps-mono {
 	font-family: var(--sl-font-mono);
 }
-.ps-eyebrow {
-	font-family: var(--sl-font-mono);
-	font-size: 0.75rem;
-	letter-spacing: 0.16em;
-	text-transform: uppercase;
-	color: var(--ps-blue);
-}
 .ps-h1 {
-	font-family: var(--ps-font-serif);
-	font-weight: 400;
-	font-size: clamp(2.6rem, 6vw, 4.2rem);
-	line-height: 1.04;
-	margin: 0.6rem 0 1rem;
+	font-weight: 600;
+	font-size: clamp(2.1rem, 4.8vw, 3.1rem);
+	line-height: 1.12;
+	letter-spacing: -0.02em;
+	margin: 0 0 1rem;
 	color: var(--sl-color-white);
+	text-wrap: balance;
 }
 .ps-h2 {
-	font-family: var(--ps-font-serif);
-	font-weight: 400;
-	font-size: clamp(2rem, 4vw, 3rem);
-	line-height: 1.08;
-	margin: 0.6rem 0 1.4rem;
+	font-weight: 600;
+	font-size: 1.5rem;
+	line-height: 1.2;
+	letter-spacing: -0.012em;
+	margin: 0 0 0.5rem;
 	color: var(--sl-color-white);
 }
 .ps-h3 {
-	font-family: var(--ps-font-serif);
-	font-weight: 400;
-	font-size: clamp(1.8rem, 3vw, 2.6rem);
-	line-height: 1.1;
-	margin: 0 0 1rem;
+	font-weight: 600;
+	font-size: 1.0625rem;
+	line-height: 1.35;
+	margin: 0 0 0.35rem;
 	color: var(--sl-color-white);
 }
 .ps-lede {
-	font-size: 1.2rem;
-	color: var(--sl-color-gray-2);
-	max-width: 44rem;
-	margin: 0 0 2rem;
+	font-size: 1.125rem;
+	color: var(--sl-color-gray-3);
+	max-width: 40rem;
+	margin: 0 0 1.75rem;
 }
 .ps-muted {
-	color: var(--sl-color-gray-2);
+	color: var(--sl-color-gray-3);
+}
+.ps-fine {
+	font-size: 0.875rem;
+	color: var(--sl-color-gray-3);
 }
 .ps-section {
-	margin-block: 0 7rem;
+	margin-block: 0 5.5rem;
 }
+.ps-pagehead {
+	padding-top: 3.5rem;
+	margin-bottom: 3.5rem;
+}
+
+/* Panels: a grey surface, no border. Used where a block holds code or stands apart. */
 .ps-card {
 	background: var(--ps-surface);
-	border: 1px solid var(--sl-color-gray-5);
-	border-radius: 12px;
+	border-radius: 16px;
 	padding: 1.6rem;
 }
-a.ps-card {
+.ps-page a.ps-card {
 	display: block;
 	color: inherit;
-}
-a.ps-card:hover {
 	text-decoration: none;
-	border-color: var(--sl-color-accent);
+}
+.ps-page a.ps-card:hover {
+	background: var(--ps-raised);
 }
 .ps-grid {
 	display: grid;
 	grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
-	gap: 1.25rem;
+	gap: 1rem;
 }
 .ps-row {
 	display: flex;
@@ -217,170 +238,196 @@ a.ps-card:hover {
 	align-items: center;
 }
 .ps-row > * {
-	flex: 1 1 26rem;
+	flex: 1 1 24rem;
 	min-width: 0;
 }
-.ps-row.ps-reverse {
-	flex-wrap: wrap-reverse;
+
+/* Plain rows: a bold term over a muted line, with a hairline between rows. */
+.ps-rows {
+	list-style: none;
+	margin: 0;
+	padding: 0;
 }
-.ps-kbd {
-	font-family: var(--sl-font-mono);
-	font-size: 0.85em;
-	background: var(--sl-color-accent-low);
-	border: 1px solid var(--sl-color-gray-5);
-	border-radius: 4px;
-	padding: 0.05rem 0.4rem;
+.ps-rows > li {
+	margin: 0;
+	padding-block: 0.85rem;
+	border-top: 1px solid var(--sl-color-gray-5);
+}
+.ps-rows > li > strong {
+	display: block;
+	font-weight: 600;
 	color: var(--sl-color-white);
 }
-.ps-link-mono {
-	font-family: var(--sl-font-mono);
-	font-size: 0.8rem;
-	letter-spacing: 0.1em;
-	text-transform: uppercase;
+.ps-rows > li > span {
+	color: var(--sl-color-gray-3);
+	font-size: 0.9375rem;
 }
-.ps-button {
+
+.ps-kbd {
+	font-family: var(--sl-font-mono);
+	font-size: 0.9em;
+	background: var(--ps-raised);
+	border-radius: 4px;
+	padding: 0.1em 0.35em;
+	color: var(--sl-color-white);
+}
+
+/* Buttons are monochrome pills. */
+.ps-page .ps-button {
 	display: inline-block;
-	font-family: var(--sl-font-mono);
-	font-size: 0.8rem;
-	font-weight: 700;
-	letter-spacing: 0.1em;
-	text-transform: uppercase;
-	border-radius: 8px;
-	padding: 0.85rem 1.3rem;
-	background: var(--sl-color-accent);
-	color: #ffffff !important;
+	font-size: 0.9375rem;
+	font-weight: 500;
+	line-height: 1;
+	text-decoration: none;
+	border-radius: 999px;
+	padding: 0.7rem 1.15rem;
+	background: var(--ps-pill);
+	border: 1px solid var(--ps-pill);
+	color: var(--ps-on-pill);
 }
-.ps-button.ps-ghost {
+.ps-page .ps-button:hover {
+	opacity: 0.88;
+}
+.ps-page .ps-button.ps-ghost {
 	background: transparent;
-	border: 1px solid var(--sl-color-gray-4);
-	color: var(--sl-color-white) !important;
-	font-weight: 400;
+	border-color: var(--sl-color-gray-5);
+	color: var(--sl-color-white);
 }
-.ps-button:hover {
-	text-decoration: none !important;
-	filter: brightness(1.1);
+.ps-page .ps-button.ps-ghost:hover {
+	opacity: 1;
+	background: var(--ps-surface);
 }
+.ps-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.6rem;
+}
+
+/* Chips carry a status. Kinds that are not a status stay grey. */
 .ps-chip {
 	display: inline-block;
-	font-family: var(--sl-font-mono);
-	font-size: 0.72rem;
-	letter-spacing: 0.08em;
-	text-transform: uppercase;
+	font-size: 0.8125rem;
+	line-height: 1.5;
 	border-radius: 999px;
-	padding: 0.15rem 0.65rem;
+	padding: 0.1rem 0.65rem;
 	white-space: nowrap;
-	background: var(--sl-color-accent-low);
+	background: var(--ps-raised);
 	color: var(--sl-color-gray-2);
 }
-.ps-chip[data-tone='ported'] { background: #0f3a2e; color: #6ee7b7; }
-.ps-chip[data-tone='partial'] { background: #3a2e0f; color: #fbd38d; }
-.ps-chip[data-tone='planned'],
-.ps-chip[data-tone='sync'] { background: #10203a; color: #7dd3fc; }
-.ps-chip[data-tone='patch'] { background: #241b4f; color: #c4b5fd; }
+.ps-chip[data-tone='ported'] { background: #17382b; color: #7fe0b0; }
+.ps-chip[data-tone='partial'],
+.ps-chip[data-tone='experimental'] { background: #3a2f14; color: #f0cc7a; }
+.ps-chip[data-tone='planned'] { background: #182c44; color: #9ccbfa; }
 .ps-chip[data-tone='unknown'] { background: transparent; border: 1px dashed var(--sl-color-gray-4); color: var(--sl-color-gray-3); }
-:root[data-theme='light'] .ps-chip[data-tone='ported'] { background: #d1fae5; color: #065f46; }
-:root[data-theme='light'] .ps-chip[data-tone='partial'] { background: #fef3c7; color: #92400e; }
-:root[data-theme='light'] .ps-chip[data-tone='planned'],
-:root[data-theme='light'] .ps-chip[data-tone='sync'] { background: #e0f2fe; color: #075985; }
-:root[data-theme='light'] .ps-chip[data-tone='patch'] { background: #ede9fe; color: #4c1d95; }
+:root[data-theme='light'] .ps-chip[data-tone='ported'] { background: #d9f5e6; color: #0f5c3a; }
+:root[data-theme='light'] .ps-chip[data-tone='partial'],
+:root[data-theme='light'] .ps-chip[data-tone='experimental'] { background: #fbefc9; color: #7a5200; }
+.ps-page a.ps-chip { text-decoration: none; }
+:root[data-theme='light'] .ps-chip[data-tone='planned'] { background: #dcebfb; color: #174f8c; }
 
-/* Terminal panels stay dark in both themes. */
+/* Terminal and code panels follow the theme. */
 .ps-term {
-	background: #0a0820;
-	border: 1px solid #2e2866;
-	border-radius: 10px;
+	background: var(--ps-surface);
+	border-radius: 16px;
 	overflow: hidden;
-	color: #c9c4e8;
+	color: var(--sl-color-gray-2);
+}
+.ps-card .ps-term,
+.ps-card .ps-termbody {
+	background: var(--sl-color-black);
+	border-radius: 10px;
 }
 .ps-termbar {
 	display: flex;
 	justify-content: space-between;
 	align-items: center;
 	gap: 0.6rem;
-	padding: 0.6rem 1rem;
-	border-bottom: 1px solid #2e2866;
-	background: #141036;
+	padding: 1rem 1.6rem 0;
 	font-family: var(--sl-font-mono);
-	font-size: 0.75rem;
-	letter-spacing: 0.1em;
-	text-transform: uppercase;
-	color: #a9a4cc;
-}
-.ps-termbar .ps-dot {
-	display: inline-block;
-	width: 8px;
-	height: 8px;
-	border-radius: 50%;
-	background: #7c4dff;
-	margin-inline-end: 0.6rem;
+	font-size: 0.8125rem;
+	color: var(--sl-color-gray-3);
 }
 .ps-termbody {
-	padding: 1.2rem 1.4rem;
+	padding: 1.4rem 1.6rem;
 	font-family: var(--sl-font-mono);
-	font-size: 0.85rem;
+	font-size: 0.8438rem;
 	line-height: 1.75;
 	white-space: pre;
 	overflow-x: auto;
 	margin: 0;
 	background: transparent;
-	color: #c9c4e8;
+	color: var(--sl-color-gray-2);
 }
-.ps-term .k { color: #b39bff; }
-.ps-term .t { color: #38bdf8; }
-.ps-term .s { color: #fbbf77; }
-.ps-term .c { color: #8a85b3; }
-.ps-term .w { color: #ffffff; }
-.ps-term .g { color: #4ade80; }
-.ps-term .r { color: #f87171; }
+.ps-termbar + .ps-termbody {
+	padding-top: 0.9rem;
+}
+.ps-card .ps-termbody {
+	padding: 1.1rem 1.25rem;
+}
+.ps-term .k,
+.ps-termbody .k { color: var(--sl-color-gray-3); }
+.ps-term .t,
+.ps-termbody .t,
+.ps-term .w,
+.ps-termbody .w { color: var(--sl-color-white); font-weight: 600; }
+.ps-term .c,
+.ps-termbody .c { color: var(--sl-color-gray-3); }
+.ps-term .g,
+.ps-termbody .g { color: var(--ps-add); }
+.ps-term .r,
+.ps-termbody .r { color: var(--ps-del); }
 
+/* Tables: hairlines between rows, no outer frame. */
 .ps-table-wrap {
 	overflow-x: auto;
-	border: 1px solid var(--sl-color-gray-5);
-	border-radius: 12px;
 }
 .ps-table-wrap table {
 	width: 100%;
-	min-width: 38rem;
+	min-width: 34rem;
 	border-collapse: collapse;
 	margin: 0;
 	display: table;
+	font-size: 0.9375rem;
 }
 .ps-table-wrap th,
 .ps-table-wrap td {
 	text-align: start;
-	padding: 0.85rem 1rem;
+	padding: 0.75rem 1rem 0.75rem 0;
 	border: 0;
-	border-bottom: 1px solid var(--sl-color-gray-5);
-	vertical-align: middle;
-}
-.ps-table-wrap tr:last-child td {
-	border-bottom: 0;
+	border-top: 1px solid var(--sl-color-gray-5);
+	vertical-align: top;
+	background: transparent;
 }
 .ps-table-wrap th {
-	font-family: var(--sl-font-mono);
-	font-size: 0.7rem;
-	letter-spacing: 0.14em;
-	text-transform: uppercase;
+	border-top: 0;
+	padding-block: 0 0.5rem;
+	font-size: 0.875rem;
 	color: var(--sl-color-gray-3);
 	font-weight: 400;
-	background: transparent;
+}
+.ps-table-wrap td code {
+	background: none;
+	padding: 0;
+	white-space: nowrap;
 }
 
 .ps-toggle {
-	font-family: var(--sl-font-mono);
-	font-size: 0.8rem;
-	letter-spacing: 0.06em;
-	border-radius: 8px;
-	padding: 0.7rem 1.1rem;
+	font: inherit;
+	font-size: 0.9375rem;
+	border-radius: 999px;
+	padding: 0.5rem 1rem;
 	min-height: 44px;
 	cursor: pointer;
 	background: transparent;
 	color: var(--sl-color-gray-2);
-	border: 1px solid var(--sl-color-gray-4);
+	border: 1px solid var(--sl-color-gray-5);
+}
+.ps-toggle:hover {
+	background: var(--ps-surface);
 }
 .ps-toggle[aria-selected='true'],
 .ps-toggle[aria-pressed='true'] {
-	background: var(--sl-color-accent);
-	border-color: var(--sl-color-accent);
-	color: #ffffff;
+	background: var(--ps-pill);
+	border-color: var(--ps-pill);
+	color: var(--ps-on-pill);
 }

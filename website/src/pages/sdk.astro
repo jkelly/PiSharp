@@ -3,70 +3,82 @@ import SitePage from '../components/SitePage.astro';
 import { packages } from '../data/packages';
 import { versions } from '../data/site';
 
-const groups = ['Core', 'Frontends', 'Extensions'] as const;
+const groups = [
+	{ id: 'Core', title: 'Core' },
+	{ id: 'Frontends', title: 'Front ends' },
+	{ id: 'Extensions', title: 'Extensions' },
+] as const;
 ---
 
 <SitePage title="SDK" description="PiSharp's libraries on NuGet: take the whole agent, or just a layer.">
-	<div class="ps-row" style="padding-top: 3rem; margin-bottom: 4rem">
+	<div class="ps-row ps-pagehead">
 		<div>
-			<div class="ps-eyebrow">SDK · NuGet</div>
-			<h1 class="ps-h1">Take the whole agent, <em>or just a layer</em></h1>
+			<h1 class="ps-h1">Take the whole agent, or just a layer</h1>
 			<p class="ps-lede">Use the streaming LLM client on its own, add the agent loop, or embed the full coding agent. PiSharp 1.5.0.1 publishes 28 libraries and the CLI (29 packages), including five new experimental libraries for Chord, native hosting, shared Durable storage and remote environments.</p>
-			<div style="display: flex; flex-wrap: wrap; gap: 0.8rem">
-				<a href="/docs/embed/sdk/" class="ps-button">Embedding guide →</a>
+			<div class="ps-actions">
+				<a href="/docs/embed/sdk/" class="ps-button">Read the embedding guide</a>
 				<a href="/docs/reference/architecture/" class="ps-button ps-ghost">Architecture</a>
 			</div>
 		</div>
 		<figure class="stack" aria-label="How the libraries build on each other">
 			<div class="stack-main">
 				<div class="three"><div class="layer">Cli</div><div class="layer">Rpc</div><div class="layer">Tui</div></div>
-				<div class="layer" style="border-color: var(--sl-color-accent)">CodingAgent</div>
+				<div class="layer">CodingAgent</div>
 				<div class="three"><div class="layer">Agent</div><div class="layer">Tools</div><div class="layer">Sessions</div></div>
-				<div class="layer" style="border-color: var(--ps-blue)">AI</div>
-				<div class="layer base">Contracts</div>
+				<div class="layer">AI</div>
+				<div class="layer">Contracts</div>
 			</div>
 			<div class="stack-ext">
-				<div class="ps-mono ext-label">EXTENSIONS</div>
+				<div class="ext-label">Extensions</div>
 				<div class="layer sm">Abstractions</div>
 				<div class="layer sm">Runtime</div>
 				<div class="layer sm">Agent</div>
 				<div class="layer sm">ExtensionHost</div>
-				<div class="layer sm" style="border-style: dashed">Compatibility .Node</div>
+				<div class="layer sm optional">Compatibility.Node</div>
 			</div>
-			<figcaption class="ps-muted">Each layer builds on the ones below it. Extensions plug in beside the stack.</figcaption>
+			<figcaption class="ps-fine">Each layer builds on the ones below it. Extensions plug in beside the stack. The dashed one is optional.</figcaption>
 		</figure>
 	</div>
 
 	{
 		groups.map((group) => (
-			<section style="margin-bottom: 3rem">
-				<h2 class="ps-mono grp">{group}</h2>
-				<div class="pkgs">
+			<section class="group">
+				<h2 class="ps-h2">{group.title}</h2>
+				<ul class="pkgs">
 					{packages
-						.filter((p) => p.group === group)
+						.filter((p) => p.group === group.id)
 						.map((p) => (
-							<div class="ps-card pkg" style={p.optional || p.experimental ? 'border-style: dashed' : undefined}>
-								<h3 class="ps-mono"><a href={p.unpublished ? `https://github.com/jkelly/PiSharp/tree/main/src/${p.id}` : `https://www.nuget.org/packages/${p.id}/${versions.pisharp}`}>{p.id}</a></h3>
-								{p.experimental && <p class="ps-mono ps-muted"><a href={p.docs ?? '/docs/guides/durable/'}>Experimental</a></p>}
-								<p class="ps-muted">{p.description}</p>
-								{p.unpublished ? <a class="ps-mono add" href={p.docs}>Unpublished · source guide →</a> : <code class="ps-mono add">{p.tool ? `dotnet tool install -g ${p.id} --version ${versions.pisharp}` : `dotnet add package ${p.id} --version ${versions.pisharp}`}</code>}
-							</div>
+							<li>
+								<div class="name">
+									<a class="ps-mono" href={p.unpublished ? `https://github.com/jkelly/PiSharp/tree/main/src/${p.id}` : `https://www.nuget.org/packages/${p.id}/${versions.pisharp}`}>{p.id}</a>
+									{p.experimental && <a class="ps-chip" data-tone="experimental" href={p.docs ?? '/docs/guides/durable/'}>Experimental</a>}
+									{p.optional && <span class="ps-chip">Optional</span>}
+								</div>
+								<div>
+									<p class="ps-muted">{p.description}</p>
+									{p.unpublished ? <p class="ps-fine"><a href={p.docs}>Unpublished. Read the source guide</a></p> : <code class="add">{p.tool ? `dotnet tool install -g ${p.id} --version ${versions.pisharp}` : `dotnet add package ${p.id} --version ${versions.pisharp}`}</code>}
+								</div>
+							</li>
 						))}
-				</div>
+				</ul>
 			</section>
 		))
 	}
 
-	<section style="margin-bottom: 3rem">
-		<h2 class="ps-mono grp">Inside the packages</h2>
-		<div class="pkgs">
-			<div class="ps-card pkg" style="border-style: dashed">
-				<h3 class="ps-mono"><a href="/docs/embed/media/">Media and service tiers</a></h3>
-				<p class="ps-mono ps-muted"><a href="/docs/guides/service-tiers/">Experimental</a></p>
-				<p class="ps-muted">Image, video, speech, music, transcription, embedding and rerank models, and per-request service tiers. In PiSharp.AI, PiSharp.Agent, PiSharp.CodingAgent and PiSharp.Durable.Tools from 1.2.0.2.</p>
-				<a class="ps-mono add" href="/docs/embed/media/">Media library →</a>
-			</div>
-		</div>
+	<section class="group">
+		<h2 class="ps-h2">Inside the packages</h2>
+		<ul class="pkgs">
+			<li>
+				<div class="name">
+					<a href="/docs/embed/media/">Media and service tiers</a>
+					<a class="ps-chip" data-tone="experimental" href="/docs/guides/service-tiers/">Experimental</a>
+				</div>
+				<div>
+					<p class="ps-muted">Image, video, speech, music, transcription, embedding and rerank models, and per-request service tiers. In PiSharp.AI, PiSharp.Agent, PiSharp.CodingAgent and PiSharp.Durable.Tools from 1.2.0.2.</p>
+					<p class="ps-fine"><a href="/docs/embed/media/">Read the media library guide</a></p>
+				</div>
+			</li>
+		</ul>
 	</section>
 </SitePage>
 
@@ -75,7 +87,7 @@ const groups = ['Core', 'Frontends', 'Extensions'] as const;
 		margin: 0;
 		display: flex;
 		flex-wrap: wrap;
-		gap: 0.75rem;
+		gap: 0.6rem;
 	}
 	.stack-main {
 		flex: 3 1 16rem;
@@ -88,13 +100,12 @@ const groups = ['Core', 'Frontends', 'Extensions'] as const;
 		display: flex;
 		flex-direction: column;
 		gap: 0.5rem;
-		border: 1px dashed var(--sl-color-gray-4);
-		border-radius: 10px;
-		padding: 0.5rem;
+		padding-inline-start: 0.6rem;
+		border-inline-start: 1px solid var(--sl-color-gray-5);
 	}
 	.stack figcaption {
 		flex: 1 1 100%;
-		font-size: 0.9rem;
+		margin-top: 0.4rem;
 	}
 	.three {
 		display: grid;
@@ -102,72 +113,90 @@ const groups = ['Core', 'Frontends', 'Extensions'] as const;
 		gap: 0.5rem;
 	}
 	.layer {
-		border: 1px solid var(--sl-color-gray-4);
-		border-radius: 8px;
-		padding: 0.85rem 0.6rem;
+		border: 1px solid transparent;
+		border-radius: 10px;
+		padding: 0.8rem 0.6rem;
 		font-family: var(--sl-font-mono);
-		font-size: 0.88rem;
+		font-size: 0.875rem;
 		text-align: center;
 		background: var(--ps-surface);
 		color: var(--sl-color-white);
 	}
 	.layer.sm {
 		font-size: 0.78rem;
-		padding: 0.75rem 0.4rem;
+		padding: 0.7rem 0.4rem;
 	}
-	.layer.base {
-		background: var(--sl-color-black);
+	.layer.optional {
+		background: transparent;
+		border: 1px dashed var(--sl-color-gray-4);
+		overflow-wrap: anywhere;
 	}
 	.ext-label {
-		font-size: 0.66rem;
-		letter-spacing: 0.14em;
+		font-size: 0.8125rem;
 		color: var(--sl-color-gray-3);
 		text-align: center;
-		padding: 0.25rem 0;
+		padding: 0.1rem 0;
 	}
-	.grp {
-		font-size: 0.75rem;
-		letter-spacing: 0.16em;
-		text-transform: uppercase;
-		color: var(--sl-color-gray-3);
-		font-weight: 400;
-		margin: 0 0 1rem;
-		padding-bottom: 0.6rem;
-		border-bottom: 1px solid var(--sl-color-gray-5);
+	.group {
+		margin-bottom: 4rem;
+	}
+	.group .ps-h2 {
+		margin-bottom: 1rem;
 	}
 	.pkgs {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+	}
+	.pkgs li {
 		display: grid;
-		grid-template-columns: repeat(auto-fill, minmax(19rem, 1fr));
-		gap: 1.1rem;
+		grid-template-columns: minmax(0, 19rem) minmax(0, 1fr);
+		gap: 0.5rem 2.5rem;
+		margin: 0;
+		padding-block: 1.1rem;
+		border-top: 1px solid var(--sl-color-gray-5);
 	}
-	.pkg {
+	.name {
 		display: flex;
-		flex-direction: column;
-		gap: 0.6rem;
-		padding: 1.35rem;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 0.4rem 0.6rem;
+		align-self: start;
+		font-weight: 600;
+		min-width: 0;
 	}
-	.pkg h3 {
-		margin: 0;
-		font-size: 1rem;
-		color: var(--sl-color-white);
+	.name > a:first-child {
+		text-decoration: none;
+		overflow-wrap: anywhere;
+		font-size: 0.9375rem;
 	}
-	.pkg h3 a {
-		color: var(--sl-color-white);
+	.name > a:first-child:hover {
+		text-decoration: underline;
 	}
-	.pkg p {
-		margin: 0;
-		flex: 1 1 auto;
-		font-size: 0.95rem;
+	.name .ps-chip {
+		font-weight: 400;
+		text-decoration: none;
+	}
+	.pkgs p {
+		margin: 0 0 0.5rem;
+		font-size: 0.9375rem;
 	}
 	.add {
 		display: block;
-		font-size: 0.78rem;
-		background: #0a0820;
-		color: #c9c4e8;
-		border: 1px solid #2e2866;
-		border-radius: 6px;
-		padding: 0.55rem 0.7rem;
+		font-size: 0.8125rem;
+		background: transparent;
+		color: var(--sl-color-gray-3);
+		padding: 0;
 		overflow-x: auto;
 		white-space: nowrap;
+	}
+	.add::before {
+		content: '$ ';
+		color: var(--sl-color-gray-4);
+	}
+	@media (max-width: 46rem) {
+		.pkgs li {
+			grid-template-columns: minmax(0, 1fr);
+		}
 	}
 </style>

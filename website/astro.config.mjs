@@ -9,21 +9,18 @@ export default defineConfig({
 		starlight({
 			title: 'PiSharp',
 			description: 'An independent native .NET port of the Pi coding agent.',
-			logo: { src: './src/assets/mark.svg', alt: 'PiSharp' },
+			logo: { dark: './src/assets/mark-dark.svg', light: './src/assets/mark-light.svg', alt: 'PiSharp' },
 			favicon: '/favicon.svg',
 			social: [{ icon: 'github', label: 'GitHub', href: 'https://github.com/jkelly/PiSharp' }],
 			editLink: { baseUrl: 'https://github.com/jkelly/PiSharp/edit/main/website/' },
-			customCss: [
-				'@fontsource/ibm-plex-sans/400.css',
-				'@fontsource/ibm-plex-sans/500.css',
-				'@fontsource/ibm-plex-sans/600.css',
-				'@fontsource/ibm-plex-sans/700.css',
-				'@fontsource/instrument-serif/400.css',
-				'@fontsource/instrument-serif/400-italic.css',
-				'@fontsource/jetbrains-mono/400.css',
-				'@fontsource/jetbrains-mono/700.css',
-				'./src/styles/custom.css',
-			],
+			// The site uses system fonts, so there are no font packages to load.
+			customCss: ['./src/styles/custom.css'],
+			// Code blocks: VS Code's neutral themes on the site's own grey surfaces.
+			expressiveCode: {
+				themes: ['dark-plus', 'light-plus'],
+				useStarlightUiThemeColors: true,
+				styleOverrides: { borderRadius: '10px', codeBackground: 'var(--ps-surface)' },
+			},
 			components: {
 				SiteTitle: './src/components/overrides/SiteTitle.astro',
 				PageTitle: './src/components/overrides/PageTitle.astro',

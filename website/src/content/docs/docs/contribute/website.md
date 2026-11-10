@@ -19,7 +19,7 @@ This site, [pisharp.ai](https://pisharp.ai), is an [Astro](https://astro.build) 
 | `src/styles/custom.css` | Theme colors and shared styles. |
 | `src/assets/`, `public/` | The logo and the favicon. |
 
-The site uses Astro 7 and Starlight 0.42, with fonts from Fontsource and `sharp` for images. Starlight adds search, the sidebar, dark mode and an "Edit page" link to each docs page, which points at the file on GitHub.
+The site uses Astro 7 and Starlight 0.42, with system fonts and `sharp` for images. Starlight adds search, the sidebar, dark mode and an "Edit page" link to each docs page, which points at the file on GitHub.
 
 ## Docs pages
 
