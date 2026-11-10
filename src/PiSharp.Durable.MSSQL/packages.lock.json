@@ -27,6 +27,12 @@
         "resolved": "7.1.0",
         "contentHash": "rWunOb6Dby0lcI82PohARcRbF+4x4wNKxnKRSHXhuwZMu8/cCS68DCfhceq4bv1gUEfoL5dWXHYnfxVvLQUN+Q=="
       },
+      "System.Security.Cryptography.Pkcs": {
+        "type": "Direct",
+        "requested": "[9.0.21, 9.0.21]",
+        "resolved": "9.0.21",
+        "contentHash": "KD+oHoYIxwNCajjVe58WVwq9cRpum+Pg3tRveDRtkcaw6w3oc7sNBoMRtb5P5OehI3bgv1ucMpgjf8lpj5J96A=="
+      },
       "Microsoft.Bcl.Cryptography": {
         "type": "Transitive",
         "resolved": "9.0.18",
@@ -167,11 +173,6 @@
           "Microsoft.IdentityModel.Tokens": "8.16.0"
         }
       },
-      "System.Security.Cryptography.Pkcs": {
-        "type": "Transitive",
-        "resolved": "9.0.18",
-        "contentHash": "NKMKhUdLGNZryY9GXXTF5dXyP6S37EYXhiA2JYvwshJbd4DRq07IOS9it8Opi9atadvv5rlNkD76Mio+5Oo2aQ=="
-      },
       "System.Security.Cryptography.ProtectedData": {
         "type": "Transitive",
         "resolved": "9.0.18",
@@ -185,8 +186,8 @@
       "pisharp.ai": {
         "type": "Project",
         "dependencies": {
-          "PiSharp.Contracts": "[1.2.0, )",
-          "PiSharp.Telemetry": "[1.2.0, )"
+          "PiSharp.Contracts": "[1.5.0.1, )",
+          "PiSharp.Telemetry": "[1.5.0.1, )"
         }
       },
       "pisharp.contracts": {
@@ -195,8 +196,8 @@
       "pisharp.durable": {
         "type": "Project",
         "dependencies": {
-          "PiSharp.AI": "[1.2.0, )",
-          "PiSharp.Contracts": "[1.2.0, )"
+          "PiSharp.AI": "[1.5.0.1, )",
+          "PiSharp.Contracts": "[1.5.0.1, )"
         }
       },
       "pisharp.telemetry": {

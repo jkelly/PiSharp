@@ -52,24 +52,24 @@
       },
       "AngleSharp": {
         "type": "Transitive",
-        "resolved": "0.17.1",
-        "contentHash": "5MPI4bbixlwxb0W/smOMeIR+QlxMy5/5jD+WnIAw4pBC+7AhLPe5bS3cLgQMJyvd6q0A48sG+uYOt/ep406GLA=="
+        "resolved": "1.6.0",
+        "contentHash": "kVnhnZlM4Yww2KWqW3uSL8isvhYsrTTBMSPAgoF8ZhMrLSoay6783AP6dQxAj1J9gvWKi3OIM4ZezdE2Y4ufCQ=="
       },
       "AngleSharp.Css": {
         "type": "Transitive",
-        "resolved": "0.17.0",
-        "contentHash": "bg0AcugmX6BFEi/DHG61QrwRU8iuiX4H8LZehdIzYdqOM/dgb3BsCTzNIcc1XADn4+xfQEdVwJYTSwUxroL4vg==",
+        "resolved": "1.0.0",
+        "contentHash": "yMpYcNkI/ZHTt+qZMczhHEAHZV0AZf75nqJ5LqERFXvJGOFLJjwr0eqaYXqYlt9JPojOd+OkZLlGbnsmKjmh+g==",
         "dependencies": {
-          "AngleSharp": "[0.17.0, 0.18.0)"
+          "AngleSharp": "[1.5.0, 2.0.0)"
         }
       },
       "HtmlSanitizer": {
         "type": "Transitive",
-        "resolved": "9.0.886",
-        "contentHash": "qw87Q+bffcs2Fw/Rd3VXWg/QK+K9eIxeE9QidQLz3C/ffgUGuOB0X4MWUuuolUnnBvoD/u6FqXhsqIA67nL4kg==",
+        "resolved": "9.1.973",
+        "contentHash": "0gDDlj8SZiYFn9fxdWOrxp5mO9y+5jOE0dunOzJ6EELr/FBtlPasvdLR/K3YVgbo4FiPKT3YomlarsvhLm/H2A==",
         "dependencies": {
-          "AngleSharp": "[0.17.1]",
-          "AngleSharp.Css": "[0.17.0]"
+          "AngleSharp": "1.6.0",
+          "AngleSharp.Css": "1.0.0"
         }
       },
       "Markdig": {
@@ -91,7 +91,7 @@
       "pisharp.web.common": {
         "type": "Project",
         "dependencies": {
-          "HtmlSanitizer": "[9.0.886, 9.0.886]",
+          "HtmlSanitizer": "[9.1.973, 9.1.973]",
           "Markdig": "[0.41.3, 0.41.3]"
         }
       }
