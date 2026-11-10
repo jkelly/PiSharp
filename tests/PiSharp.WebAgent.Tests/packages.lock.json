@@ -9,24 +9,24 @@
       },
       "AngleSharp": {
         "type": "Transitive",
-        "resolved": "0.17.1",
-        "contentHash": "5MPI4bbixlwxb0W/smOMeIR+QlxMy5/5jD+WnIAw4pBC+7AhLPe5bS3cLgQMJyvd6q0A48sG+uYOt/ep406GLA=="
+        "resolved": "1.6.0",
+        "contentHash": "kVnhnZlM4Yww2KWqW3uSL8isvhYsrTTBMSPAgoF8ZhMrLSoay6783AP6dQxAj1J9gvWKi3OIM4ZezdE2Y4ufCQ=="
       },
       "AngleSharp.Css": {
         "type": "Transitive",
-        "resolved": "0.17.0",
-        "contentHash": "bg0AcugmX6BFEi/DHG61QrwRU8iuiX4H8LZehdIzYdqOM/dgb3BsCTzNIcc1XADn4+xfQEdVwJYTSwUxroL4vg==",
+        "resolved": "1.0.0",
+        "contentHash": "yMpYcNkI/ZHTt+qZMczhHEAHZV0AZf75nqJ5LqERFXvJGOFLJjwr0eqaYXqYlt9JPojOd+OkZLlGbnsmKjmh+g==",
         "dependencies": {
-          "AngleSharp": "[0.17.0, 0.18.0)"
+          "AngleSharp": "[1.5.0, 2.0.0)"
         }
       },
       "HtmlSanitizer": {
         "type": "Transitive",
-        "resolved": "9.0.886",
-        "contentHash": "qw87Q+bffcs2Fw/Rd3VXWg/QK+K9eIxeE9QidQLz3C/ffgUGuOB0X4MWUuuolUnnBvoD/u6FqXhsqIA67nL4kg==",
+        "resolved": "9.1.973",
+        "contentHash": "0gDDlj8SZiYFn9fxdWOrxp5mO9y+5jOE0dunOzJ6EELr/FBtlPasvdLR/K3YVgbo4FiPKT3YomlarsvhLm/H2A==",
         "dependencies": {
-          "AngleSharp": "[0.17.1]",
-          "AngleSharp.Css": "[0.17.0]"
+          "AngleSharp": "1.6.0",
+          "AngleSharp.Css": "1.0.0"
         }
       },
       "Jint": {
@@ -90,30 +90,30 @@
       "pisharp.agent": {
         "type": "Project",
         "dependencies": {
-          "PiSharp.AI": "[1.1.0.6, )",
-          "PiSharp.Contracts": "[1.1.0.6, )"
+          "PiSharp.AI": "[1.5.0.1, )",
+          "PiSharp.Contracts": "[1.5.0.1, )"
         }
       },
       "pisharp.ai": {
         "type": "Project",
         "dependencies": {
-          "PiSharp.Contracts": "[1.1.0.6, )",
-          "PiSharp.Telemetry": "[1.1.0.6, )"
+          "PiSharp.Contracts": "[1.5.0.1, )",
+          "PiSharp.Telemetry": "[1.5.0.1, )"
         }
       },
       "pisharp.codemode": {
         "type": "Project",
         "dependencies": {
           "Jint": "[4.16.3, 4.16.3]",
-          "PiSharp.Contracts": "[1.1.0.6, )",
-          "PiSharp.Extensions.Abstractions": "[1.1.0.6, )"
+          "PiSharp.Contracts": "[1.5.0.1, )",
+          "PiSharp.Extensions.Abstractions": "[1.5.0.1, )"
         }
       },
       "pisharp.codingagent": {
         "type": "Project",
         "dependencies": {
-          "PiSharp.Agent": "[1.1.0.6, )",
-          "PiSharp.Sessions": "[1.1.0.6, )"
+          "PiSharp.Agent": "[1.5.0.1, )",
+          "PiSharp.Sessions": "[1.5.0.1, )"
         }
       },
       "pisharp.contracts": {
@@ -122,8 +122,8 @@
       "pisharp.durable": {
         "type": "Project",
         "dependencies": {
-          "PiSharp.AI": "[1.1.0.6, )",
-          "PiSharp.Contracts": "[1.1.0.6, )"
+          "PiSharp.AI": "[1.5.0.1, )",
+          "PiSharp.Contracts": "[1.5.0.1, )"
         }
       },
       "pisharp.durable.client": {
@@ -132,23 +132,23 @@
       "pisharp.durable.hosting": {
         "type": "Project",
         "dependencies": {
-          "PiSharp.Durable": "[1.1.0.6, )",
-          "PiSharp.Durable.Sqlite": "[1.1.0.6, )",
-          "PiSharp.Durable.Tools": "[1.1.0.6, )"
+          "PiSharp.Durable": "[1.5.0.1, )",
+          "PiSharp.Durable.Sqlite": "[1.5.0.1, )",
+          "PiSharp.Durable.Tools": "[1.5.0.1, )"
         }
       },
       "pisharp.durable.server": {
         "type": "Project",
         "dependencies": {
-          "PiSharp.Durable.Client": "[1.1.0.6, )",
-          "PiSharp.Durable.Hosting": "[1.1.0.6, )"
+          "PiSharp.Durable.Client": "[1.5.0.1, )",
+          "PiSharp.Durable.Hosting": "[1.5.0.1, )"
         }
       },
       "pisharp.durable.sqlite": {
         "type": "Project",
         "dependencies": {
           "Microsoft.Data.Sqlite": "[10.0.12, 10.0.12]",
-          "PiSharp.Durable": "[1.1.0.6, )",
+          "PiSharp.Durable": "[1.5.0.1, )",
           "SQLitePCLRaw.bundle_e_sqlite3": "[2.1.12, 2.1.12]",
           "SQLitePCLRaw.core": "[2.1.12, 2.1.12]",
           "SQLitePCLRaw.lib.e_sqlite3": "[2.1.12, 2.1.12]",
@@ -158,52 +158,52 @@
       "pisharp.durable.tools": {
         "type": "Project",
         "dependencies": {
-          "PiSharp.Codemode": "[1.1.0.6, )",
-          "PiSharp.Durable": "[1.1.0.6, )",
-          "PiSharp.Tools": "[1.1.0.6, )"
+          "PiSharp.Codemode": "[1.5.0.1, )",
+          "PiSharp.Durable": "[1.5.0.1, )",
+          "PiSharp.Tools": "[1.5.0.1, )"
         }
       },
       "pisharp.extensions.abstractions": {
         "type": "Project",
         "dependencies": {
-          "PiSharp.Contracts": "[1.1.0.6, )"
+          "PiSharp.Contracts": "[1.5.0.1, )"
         }
       },
       "pisharp.extensions.agent": {
         "type": "Project",
         "dependencies": {
-          "PiSharp.Agent": "[1.1.0.6, )",
-          "PiSharp.Extensions.Runtime": "[1.1.0.6, )"
+          "PiSharp.Agent": "[1.5.0.1, )",
+          "PiSharp.Extensions.Runtime": "[1.5.0.1, )"
         }
       },
       "pisharp.extensions.runtime": {
         "type": "Project",
         "dependencies": {
-          "PiSharp.Extensions.Abstractions": "[1.1.0.6, )"
+          "PiSharp.Extensions.Abstractions": "[1.5.0.1, )"
         }
       },
       "pisharp.modelruntime": {
         "type": "Project",
         "dependencies": {
-          "PiSharp.CodingAgent": "[1.1.0.6, )",
-          "PiSharp.Extensions.Agent": "[1.1.0.6, )",
-          "PiSharp.Extensions.Runtime": "[1.1.0.6, )",
-          "PiSharp.Rpc": "[1.1.0.6, )",
-          "PiSharp.Tools": "[1.1.0.6, )"
+          "PiSharp.CodingAgent": "[1.5.0.1, )",
+          "PiSharp.Extensions.Agent": "[1.5.0.1, )",
+          "PiSharp.Extensions.Runtime": "[1.5.0.1, )",
+          "PiSharp.Rpc": "[1.5.0.1, )",
+          "PiSharp.Tools": "[1.5.0.1, )"
         }
       },
       "pisharp.rpc": {
         "type": "Project",
         "dependencies": {
-          "PiSharp.CodingAgent": "[1.1.0.6, )",
-          "PiSharp.Contracts": "[1.1.0.6, )",
-          "PiSharp.Extensions.Abstractions": "[1.1.0.6, )"
+          "PiSharp.CodingAgent": "[1.5.0.1, )",
+          "PiSharp.Contracts": "[1.5.0.1, )",
+          "PiSharp.Extensions.Abstractions": "[1.5.0.1, )"
         }
       },
       "pisharp.sessions": {
         "type": "Project",
         "dependencies": {
-          "PiSharp.Contracts": "[1.1.0.6, )"
+          "PiSharp.Contracts": "[1.5.0.1, )"
         }
       },
       "pisharp.telemetry": {
@@ -212,14 +212,14 @@
       "pisharp.tools": {
         "type": "Project",
         "dependencies": {
-          "PiSharp.Agent": "[1.1.0.6, )",
-          "PiSharp.Contracts": "[1.1.0.6, )"
+          "PiSharp.Agent": "[1.5.0.1, )",
+          "PiSharp.Contracts": "[1.5.0.1, )"
         }
       },
       "pisharp.web.common": {
         "type": "Project",
         "dependencies": {
-          "HtmlSanitizer": "[9.0.886, 9.0.886]",
+          "HtmlSanitizer": "[9.1.973, 9.1.973]",
           "Markdig": "[0.41.3, 0.41.3]"
         }
       },
@@ -227,11 +227,11 @@
         "type": "Project",
         "dependencies": {
           "Microsoft.Data.Sqlite": "[10.0.12, 10.0.12]",
-          "PiSharp.Durable.Client": "[1.1.0.6, )",
-          "PiSharp.Durable.Hosting": "[1.1.0.6, )",
-          "PiSharp.Durable.Server": "[1.1.0.6, )",
-          "PiSharp.ModelRuntime": "[1.1.0.6, )",
-          "PiSharp.Web.Common": "[1.1.0.6, )",
+          "PiSharp.Durable.Client": "[1.5.0.1, )",
+          "PiSharp.Durable.Hosting": "[1.5.0.1, )",
+          "PiSharp.Durable.Server": "[1.5.0.1, )",
+          "PiSharp.ModelRuntime": "[1.5.0.1, )",
+          "PiSharp.Web.Common": "[1.5.0.1, )",
           "SQLitePCLRaw.bundle_e_sqlite3": "[2.1.12, 2.1.12]",
           "SQLitePCLRaw.core": "[2.1.12, 2.1.12]",
           "SQLitePCLRaw.lib.e_sqlite3": "[2.1.12, 2.1.12]",
