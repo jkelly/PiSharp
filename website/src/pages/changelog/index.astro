@@ -8,18 +8,17 @@ const releases = await Promise.all(
 	(await getReleases()).map(async (entry) => ({ entry, Content: (await render(entry)).Content })),
 );
 const dateFormat = new Intl.DateTimeFormat('en', { dateStyle: 'medium', timeZone: 'UTC' });
+// A label that names a status gets that status's colour; any other label stays grey.
+const labelTone = (label: string) => (label.toLowerCase() === 'experimental' ? 'experimental' : undefined);
 ---
 
 <SitePage title="Changelog" description="PiSharp release notes: Pi syncs and C#-only patches.">
 	<div class="log">
 		<div class="head">
-			<div>
-				<div class="ps-eyebrow">Changelog</div>
-				<h1 class="ps-h1" style="margin-bottom: 0">Release notes</h1>
-			</div>
+			<h1 class="ps-h1">Release notes</h1>
 			<a href="/changelog/rss.xml" class="ps-button ps-ghost">RSS feed</a>
 		</div>
-		<p class="ps-lede" style="margin-top: 1rem">
+		<p class="ps-lede">
 			PiSharp's version is the Pi release it matches. <strong>Pi syncs</strong> move the baseline; <strong>C# patches</strong> add a fourth number and leave it unchanged.
 		</p>
 
@@ -35,16 +34,16 @@ const dateFormat = new Intl.DateTimeFormat('en', { dateStyle: 'medium', timeZone
 					<section class="entry" data-kind={entry.data.kind} id={`v${entry.data.version}`}>
 						<span class="dot" data-kind={entry.data.kind} data-status={entry.data.status} aria-hidden="true" />
 						<div class="entry-head">
-							<h2 class="ps-mono">{entry.data.version}</h2>
-							<span class="ps-chip" data-tone={entry.data.kind}>{entry.data.kind === 'sync' ? 'Pi sync' : 'C# patch'}</span>
-							{entry.data.status === 'in-progress' && <span class="ps-chip">In progress</span>}
-							{entry.data.labels.map((l) => <span class="ps-chip" data-tone="ported">{l}</span>)}
-							{entry.data.date && <span class="ps-mono date">{dateFormat.format(entry.data.date)}</span>}
+							<h2>{entry.data.version}</h2>
+							<span class="ps-chip">{entry.data.kind === 'sync' ? 'Pi sync' : 'C# patch'}</span>
+							{entry.data.status === 'in-progress' && <span class="ps-chip" data-tone="partial">In progress</span>}
+							{entry.data.labels.map((l) => <span class="ps-chip" data-tone={labelTone(l)}>{l}</span>)}
+							{entry.data.date && <span class="date">{dateFormat.format(entry.data.date)}</span>}
 						</div>
 						<p class="ps-muted baseline">
 							{entry.data.kind === 'patch' ? `Baseline unchanged: Pi ${entry.data.baseline}.` : `Matches Pi ${entry.data.baseline}.`}
-							{entry.data.status === 'released' && <> <a href={`${links.releases}/tag/v${entry.data.version}`}>GitHub release ↗</a></>}
-							{entry.data.kind === 'sync' && <>{entry.data.status === 'released' ? ' · ' : ' '}<a href={links.piChangelog}>Pi's release notes ↗</a></>}
+							{entry.data.status === 'released' && <> <a href={`${links.releases}/tag/v${entry.data.version}`}>GitHub release</a></>}
+							{entry.data.kind === 'sync' && <>{entry.data.status === 'released' ? ', ' : ' '}<a href={links.piChangelog}>Pi's release notes</a></>}
 						</p>
 						<div class="body sl-markdown-content">
 							<Content />
@@ -73,25 +72,30 @@ const dateFormat = new Intl.DateTimeFormat('en', { dateStyle: 'medium', timeZone
 
 <style>
 	.log {
-		max-width: 52rem;
+		max-width: 50rem;
 		margin: 0 auto;
-		padding-top: 3rem;
+		padding-top: 3.5rem;
 	}
 	.head {
 		display: flex;
 		flex-wrap: wrap;
 		justify-content: space-between;
-		align-items: end;
+		align-items: center;
 		gap: 1rem;
+		margin-bottom: 1rem;
+	}
+	.head .ps-h1 {
+		margin: 0;
+	}
+	.log .ps-lede strong {
+		color: var(--sl-color-white);
+		font-weight: 600;
 	}
 	.filters {
 		display: flex;
 		flex-wrap: wrap;
 		gap: 0.5rem;
 		margin-bottom: 2.5rem;
-	}
-	.filters .ps-toggle {
-		border-radius: 999px;
 	}
 	.timeline {
 		border-inline-start: 1px solid var(--sl-color-gray-5);
@@ -104,21 +108,24 @@ const dateFormat = new Intl.DateTimeFormat('en', { dateStyle: 'medium', timeZone
 	.entry {
 		position: relative;
 	}
+	/* A filled dot is a Pi sync, a hollow one a C# patch, a dashed one a release in progress. */
 	.dot {
 		position: absolute;
 		inset-inline-start: calc(-2rem - 6px);
-		top: 0.75rem;
+		top: 0.7rem;
 		width: 11px;
 		height: 11px;
 		border-radius: 50%;
-		background: var(--ps-blue);
+		background: var(--sl-color-white);
+		box-shadow: 0 0 0 4px var(--sl-color-black);
 	}
 	.dot[data-kind='patch'] {
-		background: var(--ps-link);
+		background: var(--sl-color-black);
+		border: 2px solid var(--sl-color-gray-3);
 	}
 	.dot[data-status='in-progress'] {
 		background: var(--sl-color-black);
-		border: 2px dashed var(--ps-blue);
+		border: 2px dashed var(--ps-warn);
 	}
 	.entry-head {
 		display: flex;
@@ -127,27 +134,28 @@ const dateFormat = new Intl.DateTimeFormat('en', { dateStyle: 'medium', timeZone
 		gap: 0.6rem;
 	}
 	.entry-head h2 {
-		font-size: 1.7rem;
+		font-size: 1.5rem;
+		font-weight: 600;
+		letter-spacing: -0.012em;
 		margin: 0;
 		color: var(--sl-color-white);
+		font-variant-numeric: tabular-nums;
 	}
 	.date {
-		font-size: 0.8rem;
+		font-size: 0.875rem;
 		color: var(--sl-color-gray-3);
 	}
 	.baseline {
 		margin: 0.5rem 0 0;
+		font-size: 0.9375rem;
 	}
 	.body {
 		margin-top: 0.75rem;
 	}
 	.body :global(h3) {
-		font-family: var(--sl-font-mono);
-		font-size: 0.75rem;
-		letter-spacing: 0.14em;
-		text-transform: uppercase;
-		color: var(--sl-color-gray-3);
-		font-weight: 400;
+		font-size: 0.9375rem;
+		font-weight: 600;
+		color: var(--sl-color-white);
 		margin: 1.4rem 0 0.4rem;
 	}
 </style>
