@@ -52,8 +52,11 @@ public sealed partial class PersistentAgentSession
                 foreach (var error in failures) AddDistinctFailure(ordered, error);
                 failures = ordered;
             }
-            // Agent currently exposes only its boolean failure receipt; its source is a separately owned contract.
-            if (_agent.Snapshot.CancellationCallbackFailed)
+            // A linked cancellation can run Agent's callback before our own Cancel call.
+            // Preserve the same original leaves regardless of which owner initiated it.
+            var callbackFailures = _agent.CancellationCallbackFailures;
+            foreach (var error in callbackFailures) AddDistinctFailure(failures, error);
+            if (_agent.Snapshot.CancellationCallbackFailed && callbackFailures.IsEmpty)
                 failures.Add(new InvalidOperationException("An owned Agent run cancellation callback failed."));
         }
         catch (Exception error) { AddDistinctFailure(failures, error); }

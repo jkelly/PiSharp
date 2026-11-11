@@ -20,6 +20,7 @@ internal static class McpHostShutdownTests
         ("mcp-host-shutdown. owner shutdown joins separately held cancellation request progress and physical stop", () => Held(true)),
         ("mcp-host-shutdown. normal close retains exact callback and stop originals", () => Faults(false, false)),
         ("mcp-host-shutdown. owner shutdown retains exact callback and stop originals", () => Faults(true, false)),
+        ("mcp-host-shutdown. owner shutdown retains Agent-initiated callback originals", () => Faults(true, false, abortFirst: true)),
         ("mcp-host-shutdown. synchronous stop initiation failure still joins cancellation and native call", SynchronousStop),
         ("mcp-host-shutdown. late startup acquisition joins actual physical cleanup before either owner original", LateAcquisition),
         ("mcp-host-shutdown. busy admission and idle veto leave actual server stop untouched", BusyAndVeto),
@@ -31,6 +32,14 @@ internal static class McpHostShutdownTests
     private static TranscriptEntry User() => new("user", JsonData.Parse("{\"role\":\"user\",\"content\":\"invoke\",\"timestamp\":1}"));
     private static IEnumerable<Exception> Leaves(Exception error) => error is AggregateException aggregate
         ? aggregate.InnerExceptions.SelectMany(Leaves) : [error];
+    // Session disposal adds its documented cleanup-fault wrapper. It is expected only
+    // when every original inside it has already been observed by the test body.
+    private static IEnumerable<Exception> CleanupLeaves(Exception error) => error switch
+    {
+        PersistentAgentSessionException { InnerException: { } inner } => CleanupLeaves(inner),
+        AggregateException aggregate => aggregate.InnerExceptions.SelectMany(CleanupLeaves),
+        _ => [error],
+    };
     private static async Task<Exception?> Observe(Task original)
     { try { await original; return null; } catch (Exception error) { return error; } }
     private static void ThrowAssertions(Exception? assertion, params Exception?[] unexpected)
@@ -77,15 +86,20 @@ internal static class McpHostShutdownTests
 
     private static async Task SynchronousStop()
     { await Faults(false, true); await Faults(true, true); }
-    private static async Task Faults(bool shutdown, bool synchronous)
+    private static async Task Faults(bool shutdown, bool synchronous, bool abortFirst = false)
     {
         await using var f = await Fixture.Create(); await f.Server.ConnectAsync();
         var callback = new IOException("cancellation callback original"); var stop = new IOException("physical stop original");
         f.Channel.CallbackFailure = callback; f.Channel.StopFailure = stop; f.Channel.SynchronousStop = synchronous;
-        var run = f.Session.PromptAsync(User()); Task? closing = null; Exception? assertion = null;
+        var run = f.Session.PromptAsync(User()); Task? closing = null, earlyAbort = null; Exception? assertion = null;
         try
         {
             await Task.WhenAll(f.Channel.RequestEntered.Task, f.ProgressEntered.Task);
+            if (abortFirst)
+            {
+                earlyAbort = Task.Run(() => f.Session.Abort());
+                await f.Channel.CallbackEntered.Task;
+            }
             closing = shutdown ? f.Owner.StopAdmissionAndJoinAsync() : f.Server.CloseAsync();
             await Task.WhenAll(f.Channel.CallbackEntered.Task, f.Channel.StopEntered.Task);
             Check(!closing.IsCompleted && !run.IsCompleted);
@@ -98,6 +112,7 @@ internal static class McpHostShutdownTests
         }
         catch (Exception error) { assertion = error; }
         finally { f.ReleaseAll(); }
+        if (earlyAbort is not null) await earlyAbort;
         var runFailure = await Observe(run); var closeFailure = closing is null ? null : await Observe(closing);
         if (closeFailure is not null) f.Expected.AddRange(Leaves(closeFailure));
         if (runFailure is OperationCanceledException) runFailure = null;
@@ -217,7 +232,7 @@ internal static class McpHostShutdownTests
             async Task Join(Func<Task> original)
             {
                 try { await original(); }
-                catch (Exception error) { if (!Leaves(error).All(leaf => Expected.Any(expected => ReferenceEquals(expected, leaf)))) unexpected.Add(error); }
+                catch (Exception error) { if (!CleanupLeaves(error).All(leaf => Expected.Any(expected => ReferenceEquals(expected, leaf)))) unexpected.Add(error); }
             }
             if (Server is not null) await Join(Server.CloseAsync);
             if (Owner is not null) await Join(() => Owner.DisposeAsync().AsTask());

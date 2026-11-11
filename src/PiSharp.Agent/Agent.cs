@@ -77,6 +77,7 @@ public sealed class Agent : IAsyncDisposable
     private StreamEvent? _latest;
     private AgentFailureKind? _failure;
     private bool _cancellationCallbackFailed;
+    private ImmutableArray<Exception> _cancellationCallbackFailures = [];
     private bool _cancellationRequested;
     private long _generation;
     private Run? _active;
@@ -114,6 +115,7 @@ public sealed class Agent : IAsyncDisposable
         public long Timestamp;
         public int CancelUsers;
         public bool Done, Settling, CallbackFailed;
+        public ImmutableArray<Exception> CallbackFailures = [];
         public AgentLoopResult? Result;
         public Exception? Error;
     }
@@ -147,6 +149,11 @@ public sealed class Agent : IAsyncDisposable
                 _queue.SteeringCount, _queue.FollowUpCount, _active is not null, _disposed, _failure, _cancellationCallbackFailed,
                 _active?.Cancellation.IsCancellationRequested ?? _cancellationRequested);
         }
+    }
+    /// <summary>Original callback failures for the native owner; the public snapshot retains its boolean contract.</summary>
+    internal ImmutableArray<Exception> CancellationCallbackFailures
+    {
+        get { lock (_gate) return _active?.CallbackFailures ?? _cancellationCallbackFailures; }
     }
     public AgentPendingInputMode SteeringMode
     {
@@ -291,6 +298,7 @@ public sealed class Agent : IAsyncDisposable
             _latest = null;
             _outcomes = [];
             _cancellationCallbackFailed = false;
+            _cancellationCallbackFailures = [];
             _cancellationRequested = false;
         }
         // Registration and all user code run outside the state lock.
@@ -634,7 +642,16 @@ public sealed class Agent : IAsyncDisposable
         var priorGeneration = _callbackGeneration.Value;
         _callbackGeneration.Value = run.Generation;
         try { run.Cancellation.Cancel(); }
-        catch (Exception) { lock (_gate) { run.CallbackFailed = true; _cancellationCallbackFailed = true; } }
+        catch (Exception error)
+        {
+            lock (_gate)
+            {
+                run.CallbackFailed = true; _cancellationCallbackFailed = true;
+                IEnumerable<Exception> originals = error is AggregateException aggregate ? aggregate.Flatten().InnerExceptions : [error];
+                foreach (var original in originals)
+                    if (!run.CallbackFailures.Contains(original)) run.CallbackFailures = run.CallbackFailures.Add(original);
+            }
+        }
         finally
         {
             bool settle;
@@ -665,6 +682,7 @@ public sealed class Agent : IAsyncDisposable
                     (token.IsCancellationRequested || run.Result.Turns.Any(turn => turn.Result.Chat.Message.StopReason == StopReason.Aborted)
                         ? AgentFailureKind.Canceled : AgentFailureKind.ChatFailure) : null;
             _cancellationCallbackFailed = run.CallbackFailed;
+            _cancellationCallbackFailures = run.CallbackFailures;
             _cancellationRequested = token.IsCancellationRequested;
             _latest = null;
             _active = null;
