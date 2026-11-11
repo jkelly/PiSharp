@@ -154,6 +154,7 @@ internal static partial class Program
             await host.LoadAsync([Plugin(before, JsonValue.Create("old"))], ChordContext.Background);
             using var old = await host.GetAsync(before, new(), ChordContext.Background);
             await host.ReloadAsync([Plugin(after, JsonValue.Create(4))], ChordContext.Background);
+            await R1Until(() => old.State.Value.Kind == "failed");
             Equal("failed", old.State.Value.Kind, "old fingerprint no longer binds");
             Equal("contract_mismatch", old.State.Value.Cause!.Error.Code, "fingerprint mismatch classified");
             using var current = await host.GetAsync(after, new(), ChordContext.Background);

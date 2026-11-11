@@ -75,7 +75,15 @@
           "gap.F09.recursive-and-typed-schema",
           "gap.schema.public-json-surrogate-boundary",
           "gap.contracts.source-generated-typed-schema",
-          "gap.contracts.aot-json-boundaries"
+          "gap.contracts.aot-json-boundaries",
+          "sync152.finite-numbers",
+          "sync152.required-undefined",
+          "sync152.bigint-validation",
+          "sync152.bigint-exact-bounds",
+          "sync152.bigint-conversion",
+          "sync152.undefined-conversion",
+          "sync152.bigint-literals-and-unions",
+          "sync152.public-json-boundary"
         ]
       }
     },
@@ -324,20 +332,52 @@
       "requireDeclaredCount": true,
       "expectedCaseIds": {
         "all": [
+          "plugins.152.discovery-and-build-tables",
+          "publication.152.retention",
+          "publication.152.build-once",
+          "publication.152.failure-http-isolation",
+          "publication.152.http-artifact",
+          "publication.152.scripts-round-trip",
+          "workers.152.captures-deployment",
+          "workers.152.failed-build-and-close",
+          "workers.152.close-during-build",
+          "workers.152.later-worker-and-cancelled-close",
+          "workers.152.link-recovery",
+          "workers.152.idle-lock-serializes-start",
+          "http.152.admission-and-headers",
+          "http.152.trace-trust",
+          "http.152.sockets-and-hooks",
+          "app.152.files",
+          "app.152.archives",
+          "app.152.layout",
+          "app.152.owner-links-and-caps",
+          "app.152.routes-and-invites",
+          "app.152.startup-and-recovery",
+          "app.152.session-expiry-and-ephemeral-links",
+          "app.152.base-build-isolation",
+          "app.152.telemetry-shutdown",
+          "app.152.cleanup-retains-store-and-lock",
+          "terminal.152.frames-and-filter",
+          "terminal.152.launcher-and-channel",
+          "terminal.152.confirmation-bounds-and-shutdown",
+          "terminal.152.actions-and-network",
+          "terminal.152.scope-and-optimistic",
+          "terminal.152.actual-attachment",
+          "terminal.152.native-runtime",
           "plugins.discovery-validates-and-orders",
+          "plugins.rollout-continues-failures-and-stops-explicitly",
+          "plugins.new-failed-plugin-retains-dirty-mark",
+          "plugins.builder-natural-exit-joins-descendant-pipes",
           "plugins.build-load-reload-failure-and-collectible-context",
           "http.routes-wraps-origin-and-anonymous-webhook",
           "http.streaming-ranges-files-and-signed-cookies",
           "http.real-loopback-listener-and-websocket",
           "http.close-drains-then-seals-active-request",
-          "workers.real-process-route-stop-restart",
-          "workers.address-lock-waits-and-cancels",
-          "plugins.rollout-continues-failures-and-stops-explicitly",
-          "plugins.new-failed-plugin-retains-dirty-mark",
-          "plugins.builder-natural-exit-joins-descendant-pipes",
           "http.listener-failed-start-disposes-services",
+          "workers.real-process-route-stop-restart",
           "workers.startup-shutdown-closes-connected-host",
-          "processes.natural-and-crashed-leader-kill-descendants"
+          "processes.natural-and-crashed-leader-kill-descendants",
+          "workers.address-lock-waits-and-cancels"
         ]
       }
     },
@@ -821,7 +861,7 @@
     "PiSharp.Env.Watch.Tests": {
       "format": "lines",
       "minimumCases": 1,
-      "completionPattern": "PASS all 5 remote watch cases",
+      "completionPattern": "All 5 remote watch cases passed\\.",
       "expectedCaseIds": {
         "all": [
           "polling coverage, observer isolation, exclusions and joined stop",
@@ -840,6 +880,7 @@
         "all": [
           "piped-binary-large-write-and-eof",
           "exec-decode-stream-boundaries-and-spill-raw-bytes",
+          "raw-input-acknowledges-before-reading-and-preserves-frame-order",
           "window-counts-tail-and-spill-complete",
           "timeout-abort-and-kill-have-distinct-results",
           "wrapper-exit-kills-descendant",

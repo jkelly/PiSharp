@@ -10,7 +10,7 @@ internal static class PluginDiscoveryTests
 {
     public static async Task RunAsync()
     {
-        var root = Path.Combine(Path.GetTempPath(), "pisharp-plugin-discovery-" + Guid.NewGuid().ToString("N"));
+        var root = Path.Combine(Environment.CurrentDirectory, "artifacts", "pisharp-plugin-discovery-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(root);
         try
         {

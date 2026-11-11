@@ -57,7 +57,7 @@ internal static class ArchiveCases
 
     private static async Task SnapshotAndStagingAsync()
     {
-        var root = Path.Combine(Path.GetTempPath(), "pisharp-archive-" + Guid.NewGuid().ToString("N"));
+        var root = Path.Combine(Environment.CurrentDirectory, "artifacts", "pisharp-archive-" + Guid.NewGuid().ToString("N"));
         Layout.PrivateDirectory(root);
         try
         {
@@ -142,7 +142,7 @@ internal static class ArchiveCases
 
     private static async Task IdleServiceAsync()
     {
-        var root = Path.Combine(Path.GetTempPath(), "pisharp-archive-service-" + Guid.NewGuid().ToString("N"));
+        var root = Path.Combine(Environment.CurrentDirectory, "artifacts", "pisharp-archive-service-" + Guid.NewGuid().ToString("N"));
         Layout.PrivateDirectory(root);
         try
         {

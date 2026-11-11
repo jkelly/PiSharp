@@ -173,7 +173,10 @@ public sealed class TerminalActions
                     var stat = Marshal.AllocHGlobal(256);
                     try
                     {
-                        if (UnixFStat(handle.DangerousGetHandle().ToInt32(), stat) != 0) throw CannotAttach();
+                        var fd = handle.DangerousGetHandle().ToInt32();
+                        var status = OperatingSystem.IsMacOS() && RuntimeInformation.ProcessArchitecture == Architecture.X64
+                            ? MacFStat64(fd, stat) : UnixFStat(fd, stat);
+                        if (status != 0) throw CannotAttach();
                         var mode = OperatingSystem.IsMacOS() ? (uint)(ushort)Marshal.ReadInt16(stat, 4) :
                             (uint)Marshal.ReadInt32(stat, RuntimeInformation.ProcessArchitecture == Architecture.Arm64 ? 16 : 24);
                         if ((mode & 0xf000) != 0x8000) throw CannotAttach();
@@ -184,8 +187,14 @@ public sealed class TerminalActions
                     else
                     {
                         var buffer = new byte[4096];
-                        if (UnixGetPath(handle.DangerousGetHandle().ToInt32(), 50, buffer) != 0) throw CannotAttach();
-                        actual = Encoding.UTF8.GetString(buffer, 0, Array.IndexOf(buffer, (byte)0));
+                        // Darwin arm64 passes variadic arguments on the stack. Fill x2-x7 so the
+                        // F_GETPATH pointer occupies its required stack slot, as in PosixOwnedPipeStream.
+                        var result = RuntimeInformation.ProcessArchitecture == Architecture.Arm64
+                            ? MacGetPathArm64(handle.DangerousGetHandle().ToInt32(), 50, 0, 0, 0, 0, 0, 0, buffer)
+                            : UnixGetPath(handle.DangerousGetHandle().ToInt32(), 50, buffer);
+                        var end = Array.IndexOf(buffer, (byte)0);
+                        if (result != 0 || end <= 0) throw CannotAttach();
+                        actual = Encoding.UTF8.GetString(buffer, 0, end);
                     }
                 }
                 var length = RandomAccess.GetLength(handle);
@@ -196,7 +205,10 @@ public sealed class TerminalActions
         }
         [DllImport("libc", EntryPoint = "open", SetLastError = true)] private static extern int UnixOpen([MarshalAs(UnmanagedType.LPUTF8Str)] string path, int flags);
         [DllImport("libc", EntryPoint = "fstat", SetLastError = true)] private static extern int UnixFStat(int fd, nint stat);
+        [DllImport("libc", EntryPoint = "fstat$INODE64", SetLastError = true)] private static extern int MacFStat64(int fd, nint stat);
         [DllImport("libc", EntryPoint = "fcntl", SetLastError = true)] private static extern int UnixGetPath(int fd, int command, [Out] byte[] path);
+        [DllImport("libc", EntryPoint = "fcntl", SetLastError = true)] private static extern int MacGetPathArm64(int fd, int command,
+            nint pad2, nint pad3, nint pad4, nint pad5, nint pad6, nint pad7, [Out] byte[] path);
         [DllImport("kernel32.dll", SetLastError = true)] private static extern uint GetFileType(SafeFileHandle handle);
         [DllImport("kernel32.dll", SetLastError = true)] [return: MarshalAs(UnmanagedType.Bool)] private static extern bool GetFileInformationByHandle(SafeFileHandle handle, out FileInformation info);
         [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)] private static extern uint GetFinalPathNameByHandle(SafeFileHandle handle, StringBuilder path, int size, uint flags);
