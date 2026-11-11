@@ -12,37 +12,16 @@ internal static partial class Program
     {
         yield return ("catalog-c19.runtime-overlay-exact-scope", Sync(() =>
         {
-            var baseline = BuiltinModelCatalog.ShardHashes.Keys.SelectMany(p => BuiltinModelCatalog.Get(p).Models)
-                .Where(m => m.Type == CatalogModelType.Chat).Select(RegistryModel.FromCatalog).ToArray();
-            var corrected = ModelRegistry.Create(new() { MaintainedCatalogPath = Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".absent") });
-            var changes = 0;
-            foreach (var old in baseline)
+            var current = ModelRegistry.Create(new() { MaintainedCatalogPath = Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".absent") });
+            var expected = CurrentModelCatalog.Providers.SelectMany(p => CurrentModelCatalog.Get(p)!.Models)
+                .Where(m => m.Type == CatalogModelType.Chat).ToArray();
+            Equal(1643, expected.Length, "released current chat count");
+            Equal(expected.Length, current.GetAll().Count, "no removed historical entries leak into current catalog");
+            foreach (var row in expected)
             {
-                var model = corrected.GetAll().Single(m => m.Provider == old.Provider && m.Id == old.Id && m.Type == old.Type);
-                var expected = old.CloneJson();
-                var id = old.Id;
-                if (old.Provider == "azure" && new[] { "gpt-6-astra", "gpt-6-luna", "gpt-6-sol", "gpt-6.1-sol", "gpt-6.1-terra" }.Contains(id))
-                    expected["contextWindow"] = 1050000;
-                if (old.Api == "anthropic-messages")
-                {
-                    var compat = expected["compat"] as JsonObject ?? new JsonObject();
-                    if ((old.Provider is "opencode" or "opencode-go") && new[] { "claude-fable-5-1", "claude-haiku-5-5", "claude-opus-5", "claude-opus-5-5", "claude-sonnet-5-5" }.Contains(id))
-                    {
-                        compat["supportsMidConvoEffort"] = true;
-                        if (id is not ("claude-opus-5" or "claude-haiku-5-5"))
-                        {
-                            var map = expected["thinkingLevelMap"] as JsonObject ?? new JsonObject();
-                            map["off"] = null; expected["thinkingLevelMap"] = map;
-                        }
-                    }
-                    if (id.Contains("sonnet-5") || id.Contains("sonnet.5")) compat["supportsTemperature"] = false;
-                    if (compat.Count > 0) expected["compat"] = compat;
-                }
-                Check(JsonNode.DeepEquals(expected, model.CloneJson()), old.Provider + "/" + id + " unexpected catalog change");
-                if (!JsonNode.DeepEquals(old.CloneJson(), expected)) changes++;
+                var actual = current.GetAll().Single(m => m.Provider == row.Provider && m.Id == row.Id && m.Type == row.Type);
+                Check(JsonNode.DeepEquals(JsonNode.Parse(row.Raw.ToString()), actual.CloneJson()), row.Provider + "/" + row.Id + " exact released metadata");
             }
-            Equal(18, changes, "exact reviewed changed row count");
-            Equal(baseline.Length + 11, corrected.GetAll().Count, "only F09 reviewed chat additions");
         }));
         yield return ("catalog-c19.anthropic-request-capabilities", Sync(() =>
         {

@@ -78,10 +78,12 @@ internal sealed class LiveProviderRoute
             if (resolved is null || resolved.ApiKey is null && resolved.Headers is null)
                 throw new LiveSessionException("MissingLiveApiKey", "Provider is not configured: " + provider);
             if (selection.Model.Api is "anthropic-messages" or "openai-completions" or "openai-responses")
-                return new(selection, runtime.CreateHttpHandler(), string.Empty) { ProviderRoute = new LiveProviderRoute(selection, authentication, runtime, environment) };
+                return new(selection, runtime.CreateHttpHandler(), string.Empty) { ProviderRoute = new LiveProviderRoute(selection, authentication, runtime, environment),
+                    CacheRetention = LiveSessionConnection.ResolveCacheRetention(resolved?.Environment?.GetValueOrDefault("PI_CACHE_RETENTION"), environment.Get("PI_CACHE_RETENTION")) };
             if (resolved.ApiKey is not { Length: > 0 } key || key.Length > 4096 || key.Any(char.IsControl))
                 throw new LiveSessionException("MissingLiveApiKey", "Provider is not configured: " + provider);
-            return new(selection, runtime.CreateHttpHandler(), key);
+            return new(selection, runtime.CreateHttpHandler(), key) { CacheRetention = LiveSessionConnection.ResolveCacheRetention(
+                resolved.Environment?.GetValueOrDefault("PI_CACHE_RETENTION"), environment.Get("PI_CACHE_RETENTION")) };
         }
         if (resolved is null)
             throw new LiveSessionException("MissingLiveApiKey", provider == "openai-codex"
@@ -90,7 +92,8 @@ internal sealed class LiveProviderRoute
         // providers/github-copilot.ts filterModels: an OAuth credential's availableModelIds hide every other model.
         if (provider == "github-copilot" && GitHubCopilotOAuth.AvailableModels(authentication.LastCredential) is { } available && !available.Contains(selection.Model.Id))
             throw new LiveSessionException("UnknownLiveModel", "The selected GitHub Copilot model is not available to this account.");
-        return new(selection, runtime.CreateHttpHandler(), string.Empty) { ProviderRoute = new LiveProviderRoute(selection, authentication, runtime, environment) };
+        return new(selection, runtime.CreateHttpHandler(), string.Empty) { ProviderRoute = new LiveProviderRoute(selection, authentication, runtime, environment),
+                    CacheRetention = LiveSessionConnection.ResolveCacheRetention(resolved?.Environment?.GetValueOrDefault("PI_CACHE_RETENTION"), environment.Get("PI_CACHE_RETENTION")) };
     }
 
     private async ValueTask<ProviderResolvedAuth> CurrentAsync(CancellationToken token) =>
@@ -99,7 +102,7 @@ internal sealed class LiveProviderRoute
 
     /// <summary>Binds the provider's protocol for the main route or a summary (no caching; thinking off unless <paramref name="thinking"/>,
     /// a summary carrying a reasoning level, keeps the route's thinking binding).</summary>
-    internal NativeHttpModelProvider Create(HttpMessageHandler? handler, int maximum, bool summary, bool thinking = false)
+    internal NativeHttpModelProvider Create(HttpMessageHandler? handler, int maximum, bool summary, bool thinking = false, string? cacheRetention = null)
     {
         var model = selection.Model; var definition = selection.Definition; var plain = summary && !thinking;
         switch (model.Provider)
@@ -107,7 +110,7 @@ internal sealed class LiveProviderRoute
             case "amazon-bedrock":
                 return NativeProviderFactory.CreateBedrock(model, definition.Raw, new BedrockConverseOptions
                 {
-                    MaxTokens = maximum, CacheRetention = summary ? "none" : null,
+                    MaxTokens = maximum, CacheRetention = summary ? "none" : cacheRetention,
                     ThinkingBudgets = runtime.ThinkingBudgets is { } budgets ? budgets.Value.EnumerateObject().ToImmutableDictionary(p => p.Name, p => p.Value.GetInt32()) : null,
                     Auth = async token => { var auth = await CurrentAsync(token).ConfigureAwait(false); return (auth.ApiKey, auth.Environment); }
                 }, new AwsEnvironment(environment.Get, runtime.HomeDirectory ?? Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
@@ -115,7 +118,7 @@ internal sealed class LiveProviderRoute
             case "openai-codex":
                 return NativeProviderFactory.CreateCodexResponses(model, definition.Raw, new OpenAICodexResponsesOptions
                 {
-                    CacheRetention = summary ? "none" : null,
+                    CacheRetention = summary ? "none" : cacheRetention,
                     ModelHeaders = Headers(definition),
                     Transport = runtime.Transport,
                     WebSocketConnectTimeout = runtime.WebSocketConnectTimeout,
@@ -146,7 +149,7 @@ internal sealed class LiveProviderRoute
                     var baseUrl = ProviderHeaderPolicies.ResolveCloudflareBaseUrl(auth.BaseUrl ?? definition.BaseUrl, auth.Environment);
                     return new ProviderRequestAuth(auth.ApiKey, baseUrl, auth.Headers);
                 })
-                { MaxTokens = maximum, ThinkingBudgets = runtime.ThinkingBudgets, Summary = summary, SummaryThinking = thinking, MaximumMessages = PiRequestBudget.RequestMessages }, handler);
+                { MaxTokens = maximum, CacheRetention = cacheRetention, ThinkingBudgets = runtime.ThinkingBudgets, Summary = summary, SummaryThinking = thinking, MaximumMessages = PiRequestBudget.RequestMessages }, handler);
         }
     }
 

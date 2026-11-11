@@ -29,7 +29,7 @@ internal static partial class Program
             Equal("https://api.typesafe.ai/v1/systemone", http.Requests[0].Url, "url");
             // Pi 1.5.0 classifier-shared.ts sends getIdentityHeaders first: the detailed pi/<version> User-Agent.
             Names(["authorization", "content-type", "user-agent"], http.Requests[0].Headers.Keys.Order(StringComparer.Ordinal), "headers");
-            Check(http.Requests[0].Headers["user-agent"].StartsWith("pi/1.5.0 (", StringComparison.Ordinal), "identity user-agent");
+            Check(http.Requests[0].Headers["user-agent"].StartsWith("pi/1.5.2 (", StringComparison.Ordinal), "identity user-agent");
             Equal("Bearer secret", http.Requests[0].Headers["authorization"], "authorization");
             // System One has no temperature field; the option is ignored.
             Body($$$"""{"model":"jev-latest","state":{"text":"The deployment succeeded, thank you."},"questions":{{{SystemOneQuestionsBody}}}}""", http.Requests[0].Body, "typesafe");

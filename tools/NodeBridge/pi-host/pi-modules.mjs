@@ -1,10 +1,10 @@
 // Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/core/extensions/loader.ts (getAliases, loadExtensionModule),
 // packages/coding-agent/src/core/extensions/jiti-loader.ts and packages/coding-agent/src/main.ts (setThemeJsonValidator, initTheme).
 //
-// The real Pi packages: PiSharp installs the exact Pi 1.5.0 packages into the agent dir (PiNodeRuntime) and names their node_modules
+// The real Pi packages: PiSharp installs the exact Pi 1.5.2 packages into the agent dir (PiNodeRuntime) and names their node_modules
 // here. Extensions are then loaded as upstream's unbundled Node build loads them: jiti from Pi's own dependencies, created for the
 // installed coding agent's loader.js, `moduleCache: false`, and getAliases (the coding agent's dist index, pi-agent-core, pi-tui, the
-// pi-ai compat/oauth/providers entries, typebox, and the @mariozechner/* and @sinclair/typebox names). Pi 1.5.0's getAliases also
+// pi-ai compat/oauth/providers entries, typebox, and the @mariozechner/* and @sinclair/typebox names). Pi 1.5.2's getAliases also
 // resolves the pi-ai root and compat entry to the coding agent's pi-ai extension view (dist/core/extensions/pi-ai-extension-view.js)
 // and adds pi-ai/models; an installed Pi that predates the view keeps its compat entry, and one without pi-ai/models gets no alias.
 import fs from 'node:fs';

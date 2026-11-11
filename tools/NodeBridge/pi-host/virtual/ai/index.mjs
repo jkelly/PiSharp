@@ -1,10 +1,11 @@
-// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/ai/src/index.ts.
+// Pi b4afdddf44e059c67ccf5097e5317d913521b470 (MIT): packages/ai/src/index.ts.
 // Ported to plain ESM for the PiSharp Node extension bridge (TypeScript types stripped mechanically; behaviour unchanged).
 export * from "./api/lazy.mjs";
 export * from "./auth/context.mjs";
 export * from "./auth/credential-store.mjs";
 export * from "./auth/helpers.mjs";
 export * from "./auth/types.mjs";
+export * from "./cache-warming.mjs";
 export * from "./models.mjs";
 export * from "./models-store.mjs";
 export * from "./providers/faux.mjs";

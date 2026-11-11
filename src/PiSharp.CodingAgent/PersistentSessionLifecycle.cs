@@ -128,7 +128,8 @@ public sealed class PersistentSessionLifecycle
         if (generation < 1) throw new ArgumentOutOfRangeException(nameof(generation));
         return PersistentAgentSession.OpenWithRuntimeFactoryAsync(request.Path,
             (cwd, token) => AcquireRuntimeAsync(cwd, generation, token), clock, nextEntryId,
-            options with { UseLatestLeaf = request.UseLatestLeaf, SelectedLeafId = request.SelectedLeafId }, fallbackModel, cancellationToken);
+            options with { UseLatestLeaf = request.UseLatestLeaf, SelectedLeafId = request.SelectedLeafId,
+                WorkingDirectoryOverride = request.WorkingDirectoryOverride }, fallbackModel, cancellationToken);
     }
     private ValueTask<SessionRuntimeLease> AcquireRuntimeAsync(string cwd, CancellationToken token)
         => AcquireRuntimeAsync(cwd, 1, token);
@@ -161,9 +162,17 @@ public sealed class PersistentSessionLifecycle
         token.ThrowIfCancellationRequested();
         var labelIds = ImmutableArray.CreateBuilder<string>(labels);
         for (var index = 0; index < labels; index++) { token.ThrowIfCancellationRequested(); labelIds.Add(nextEntryId()); token.ThrowIfCancellationRequested(); }
+        var sourceHeader = state.Log.Header;
+        if (sourceHeader.WireBody.Value.GetProperty("cwd").GetString() != previous.Session.WorkingDirectory)
+        {
+            // A continued missing-folder session retains its original header, while a new fork records its effective cwd.
+            var header = System.Text.Json.Nodes.JsonNode.Parse(sourceHeader.WireBody.Value.GetRawText())!.AsObject();
+            header["cwd"] = previous.Session.WorkingDirectory;
+            sourceHeader = new SessionEntryCodec(options.SessionLogStoreOptions?.ReaderOptions?.CodecOptions).Parse(header.ToJsonString());
+        }
         var plan = request.Kind == AgentSessionCreationKind.New
             ? planner.New(id, timestamp, WorkingDirectoryOverride ?? previous.Session.WorkingDirectory, request.ParentSession, token)
-            : planner.Fork(new(state.Log.Header, state.Log.Entries, entry!, position, id, timestamp,
+            : planner.Fork(new(sourceHeader, state.Log.Entries, entry!, position, id, timestamp,
                 previous.Session.SessionFile, labelIds.MoveToImmutable()), token);
         var directory = System.IO.Path.GetDirectoryName(previous.Session.Path)!;
         var path = System.IO.Path.Combine(directory, timestamp.Replace(':', '-').Replace('.', '-') + "_" + id + ".jsonl");

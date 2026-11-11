@@ -372,8 +372,18 @@ internal sealed record McpSessionHost(string AgentDirectory, string HomeDirector
     }
 
     /// <summary>The provider token for `auth.provider` servers (<see cref="ProviderToken"/>, else the CLI credentials).</summary>
-    private ValueTask<string?> ProviderTokenAsync(string provider, CancellationToken token) =>
-        ProviderToken?.Invoke(provider, token) ?? McpProviderTokens.ResolveAsync(PiSharp.Cli.Commands.LiveSessionRuntime.Default, provider, token);
+    private readonly object providerTokenGate = new();
+    private PiSharp.Cli.Commands.LiveSessionRuntime? providerTokenRuntime;
+    private ValueTask<string?> ProviderTokenAsync(string provider, CancellationToken token)
+    {
+        if (ProviderToken is { } supplied) return supplied(provider, token);
+        PiSharp.Cli.Commands.LiveSessionRuntime runtime;
+        lock (providerTokenGate)
+            runtime = providerTokenRuntime ??= new(name => InheritedEnvironment().GetValueOrDefault(name),
+                () => CreateHttpHandler?.Invoke(), Path.Combine(AgentDirectory, "auth.json"), () => CreateClient(),
+                ModelsPath: Path.Combine(AgentDirectory, "models.json"));
+        return McpProviderTokens.ResolveAsync(runtime, provider, token);
+    }
 
     private Dictionary<string, string> InheritedEnvironment()
     {
@@ -447,11 +457,12 @@ internal sealed record McpSessionHost(string AgentDirectory, string HomeDirector
         if (McpConfigurationReader.UsesOAuth(entry.Config))
         {
             var store = new McpOAuthCredentialStore(Credentials ?? McpOAuthFileCredentialBackend.InAgentDirectory(AgentDirectory)).ForServer(entry.Name, url);
-            var settings = McpOAuthSettings.From(entry, Resolve);
-            var adapter = new McpAdmittedOAuthRefreshAdapter(url, store, (request, token) => new(ExchangeAsync(client, request, token)), UnixMilliseconds,
-                new McpOAuthCancellationAdmission(), settings.ClientId is { Length: > 0 } id ? new McpOAuthAdmittedClient(id, settings.ClientSecret) : null)
-            { RefreshLock = McpOAuthRefreshLock.For(AgentDirectory, entry.Name, url), OnChallenge = challenge };
-            authentication = adapter.CreateAuthentication();
+            var adapter = new McpOAuthAuthProvider(store, () => McpSignInClient.Create(new(url, store,
+                McpOAuthSettings.From(entry, Resolve), new(_ => { }, _ => Task.FromResult<string?>(null)),
+                AdmittedHttpClientRequestFactory.Create(client))
+                { UnixMilliseconds = UnixMilliseconds, RefreshLock = McpOAuthRefreshLock.For(AgentDirectory, entry.Name, url) }),
+                challenge, UnixMilliseconds);
+            authentication = adapter.Authentication;
         }
         // runtime.ts auth.provider: the provider's current token, read on every request so its refreshes apply.
         else if (entry.Config.AuthProvider is not null && entry.Scope != McpConfigurationScope.Project)

@@ -93,6 +93,12 @@ internal static partial class StoreInternal
             // Only bases are looked up by it (a load's newest base at or below a point): deltas write no entry.
             "CREATE INDEX chord_revisions_bases ON chord_revisions (document_id, seq) WHERE kind = 'base'",
         ]),
+        new(3,
+        [
+            // Do not infer ownership for existing records: SQL leaves their host NULL.
+            "ALTER TABLE chord_documents ADD COLUMN host TEXT",
+            "CREATE INDEX chord_documents_host ON chord_documents (host) WHERE host IS NOT NULL",
+        ]),
     ];
 
     /// <summary>The store's schema version: the newest entry of its history (archives carry it; upstream <c>STORE_SCHEMA</c>).</summary>

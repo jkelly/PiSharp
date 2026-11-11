@@ -51,11 +51,20 @@ internal interface ITableOwner
     /// <summary>The object's documents: a transaction of another object refuses the handle.</summary>
     object Scope { get; }
 
+    /// <summary>The live queries registered by the owner's active attempts.</summary>
+    LiveQueries Queries => TableOwnerQueries.Get(this);
+
     /// <summary>Throws <c>released</c> once the object ended.</summary>
     void AssertLive();
 
     /// <summary>A row the code cannot read (a <c>json(...)</c> cell, slice 6a §9) fails the owner <c>broken</c> (§1.4).</summary>
     void Fail(ChordError error);
+}
+
+internal static class TableOwnerQueries
+{
+    private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<ITableOwner, LiveQueries> Owners = new();
+    internal static LiveQueries Get(ITableOwner owner) => Owners.GetValue(owner, static _ => new LiveQueries());
 }
 
 internal static partial class StoreInternal

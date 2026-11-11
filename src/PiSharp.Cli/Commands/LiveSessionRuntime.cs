@@ -48,7 +48,7 @@ internal static class LiveSessionRuntimeSelection
 
         /// <summary>Anthropic, resolved at start and before every request (<see cref="LiveSessionSelection.ResolveAnthropicRouteAsync"/>).</summary>
         internal ValueTask<(AuthenticationResolution Authentication, HttpMessageHandler? Handler,
-            Func<CancellationToken, ValueTask<AuthenticationResolution>> Reresolve)> ResolveAnthropicAsync(LiveSessionRuntime? runtime,
+            Func<CancellationToken, ValueTask<AuthenticationResolution>> Reresolve, string CacheRetention)> ResolveAnthropicAsync(LiveSessionRuntime? runtime,
             CancellationToken cancellationToken) => selection.ResolveAnthropicRouteAsync(runtime ?? LiveSessionRuntime.Default, cancellationToken);
     }
 }

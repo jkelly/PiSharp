@@ -8,9 +8,11 @@ namespace PiSharp.Chord.Link;
 internal abstract record Message(string Kind) { public long? Origin { get; init; } }
 internal sealed record HelloMessage(long Protocol, string Incarnation, long Calls) : Message("hello");
 internal sealed record HoldMessage(long Hold, string Type, long Version, string Fingerprint, Part Params, WireAddress Address,
-    JsonNode? Principal = null, string? Incarnation = null, IReadOnlyList<string>? Chain = null, long? Limit = null) : Message("hold");
+    JsonNode? Principal = null, string? Incarnation = null, IReadOnlyList<string>? Chain = null, long? Limit = null,
+    IReadOnlyDictionary<string, string>? Trace = null) : Message("hold");
 internal sealed record ReleaseMessage(long Hold) : Message("release");
-internal sealed record CallMessage(long Call, long Hold, long Method, Part? Args = null, IReadOnlyList<ReadOnlyMemory<byte>>? Segments = null) : Message("call");
+internal sealed record CallMessage(long Call, long Hold, long Method, Part? Args = null, IReadOnlyList<ReadOnlyMemory<byte>>? Segments = null,
+    IReadOnlyDictionary<string, string>? Trace = null, bool? Old = null) : Message("call");
 internal sealed record AbortMessage(long Call) : Message("abort");
 internal sealed record RetryMessage(long Hold, long Hops) : Message("retry");
 internal sealed record BoundMessage(IReadOnlyList<BoundEntry> Holds) : Message("bound");
@@ -79,6 +81,9 @@ internal static class MessageCheck
     internal const long MaxSafeInteger = 9007199254740991;
     internal const int Chain = 32;
     internal const int RetryHops = 16;
+    internal const int NameLength = 256;
+    internal const int CarrierKeys = 8;
+    internal const int CarrierLength = 256;
     private static readonly Regex Uuid = new("^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", RegexOptions.CultureInvariant);
     private static readonly Regex Fingerprint = new("^[0-9a-f]{16}$", RegexOptions.CultureInvariant);
     internal static ArgumentException Invalid(string detail) => new("message: fails the message schema (" + detail + ")");
@@ -96,12 +101,17 @@ internal static class MessageCheck
             case HelloMessage x: Number(x.Protocol); Number(x.Calls, 1); if (!Uuid.IsMatch(x.Incarnation)) throw Invalid("incarnation"); break;
             case HoldMessage x:
                 Number(x.Hold); Number(x.Version, 1); if (!Fingerprint.IsMatch(x.Fingerprint)) throw Invalid("fingerprint");
+                if (x.Type.Length > NameLength || x.Address.Kind.Length > NameLength) throw Invalid("name");
+                Carrier(x.Trace);
                 if (x.Principal is not null && (x.Principal is not JsonObject p || ChordJson.AsString(p["kind"]) is null)) throw Invalid("principal");
                 if (x.Incarnation is not null && !Uuid.IsMatch(x.Incarnation)) throw Invalid("incarnation");
                 if (x.Chain is not null && (x.Chain.Count > Chain || x.Chain.Any(c => !Uuid.IsMatch(c)))) throw Invalid("chain");
                 if (x.Limit is { } limit) Number(limit); break;
             case ReleaseMessage x: Number(x.Hold); break;
-            case CallMessage x: Ids([x.Call, x.Hold, x.Method]); break;
+            case CallMessage x:
+                Ids([x.Call, x.Hold, x.Method]); Carrier(x.Trace);
+                if (x.Old == false) throw Invalid("old");
+                break;
             case AbortMessage x: Number(x.Call); break;
             case RetryMessage x: Number(x.Hold); Number(x.Hops, 1, RetryHops); break;
             case BoundMessage x:
@@ -120,4 +130,21 @@ internal static class MessageCheck
         return m;
     }
     private static void Failures(IEnumerable<FailedMember> failures) { foreach(var f in failures) { Number(f.Member); f.Error.Check(); } }
+    internal static void Carrier(IReadOnlyDictionary<string, string>? carrier)
+    {
+        if (carrier is null) return;
+        if (carrier.Count > CarrierKeys) throw Invalid("trace");
+        foreach (var (key, value) in carrier)
+            if (key.Length is 0 or > CarrierLength || key.Any(c => c < '!' || c > '~') ||
+                value is null || value.Length > CarrierLength || value.Any(c => c < ' ' || c > '~')) throw Invalid("trace");
+    }
+    internal static IReadOnlyDictionary<string, string> ReadCarrier(JsonNode? node)
+    {
+        if (node is not JsonObject record) throw Invalid("trace");
+        var result = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var (key, value) in record) result.Add(key, ChordJson.AsString(value) ?? throw Invalid("trace"));
+        Carrier(result); return result;
+    }
+    internal static JsonObject CarrierJson(IReadOnlyDictionary<string, string> carrier) =>
+        new(carrier.Select(pair => KeyValuePair.Create<string, JsonNode?>(pair.Key, JsonValue.Create(pair.Value))));
 }

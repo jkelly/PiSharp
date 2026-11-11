@@ -376,7 +376,7 @@ internal sealed partial class InteractiveMode : IRpcExtensionUiPresentationObser
     internal void SetCustomEditorComponent(Func<ITui, EditorTheme, PiSharp.Tui.Pi.KeybindingsManager, IEditorComponent>? factory)
     {
         editorComponentFactory = factory;
-        var currentText = editor.GetText();
+        var currentText = editor.GetExpandedText();
         // Pi 1.5.0: an open extension dialog keeps the editor slot; the new editor shows when the last dialog closes.
         var dialogOpen = extensionDialogs.Count > 0;
         if (!dialogOpen)
@@ -429,7 +429,7 @@ internal sealed partial class InteractiveMode : IRpcExtensionUiPresentationObser
             ShowTopExtensionDialog();
         }
         openRpcDialogs.Clear();
-        ui.HideOverlay();
+        ResetCustomComponents();
         ClearExtensionTerminalInputListeners();
         extensionTerminalInputs.Clear();
         extensionComponentWidgets.Clear();

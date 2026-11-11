@@ -567,9 +567,13 @@ internal static partial class Program
             for (var index = 0; index < 25; index++)
             {
                 time.NowMs = 20_000;
+                // Span starts follow the monotonic clock within the wall clock's 10ms tolerance.
+                // Explicitly model tied roots and later children with both clocks.
+                time.ClockMs = 0;
                 await f.StartSpanAsync(new SpanOptions("root") { Attributes = new() { ["index"] = index } }, async root =>
                 {
                     time.NowMs = 20_001;
+                    time.ClockMs = 1;
                     await root.StartSpanAsync("child", _ => { });
                 });
             }

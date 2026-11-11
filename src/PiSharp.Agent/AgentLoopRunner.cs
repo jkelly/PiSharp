@@ -33,6 +33,7 @@ public sealed record AgentLoopCallbacks(
     Func<AgentLoopTurn, CancellationToken, ValueTask>? FinishTurn = null,
     Func<AgentLoopTurn, CancellationToken, ValueTask<AgentLoopFinishAction>>? FinishTurnDecision = null)
 {
+    public Func<TranscriptEntry, CancellationToken, ValueTask<TranscriptEntry>>? NormalizeInput { get; init; }
     public Func<ImmutableArray<TranscriptEntry>, CancellationToken, ValueTask<ImmutableArray<TranscriptEntry>>>? TransformRequestMessages { get; init; }
     public Func<AgentRequestBoundary, CancellationToken, ValueTask<AgentLoopRequestPreparation?>>? PrepareRequestBoundary { get; init; }
     /// <summary>Context-only custom inputs after tool results; consuming these never requests another turn.</summary>
@@ -300,6 +301,11 @@ public sealed class AgentLoopRunner
         // Returns the message as message_end handlers left it (source in-place replacement).
         async ValueTask<TranscriptEntry> EmitInputAsync(TranscriptEntry message)
         {
+            if (callbacks.NormalizeInput is { } normalize)
+            {
+                message = await normalize(message, deliveryToken).ConfigureAwait(false);
+                ValidateInputs([message]);
+            }
             await sink.EmitAsync(new AgentLoopInputMessageStarted(message), deliveryToken).ConfigureAwait(false);
             var ended = new AgentLoopInputMessageEnded(message);
             await sink.EmitAsync(ended, deliveryToken).ConfigureAwait(false);

@@ -37,7 +37,7 @@ internal static partial class Program
             Equal("https://api.openai.com/v1/decisions", request.Url, "url");
             // Pi 1.5.0 classifier-shared.ts sends getIdentityHeaders first: the detailed pi/<version> User-Agent.
             Names(["authorization", "content-type", "user-agent"], request.Headers.Keys.Order(StringComparer.Ordinal), "headers");
-            Check(request.Headers["user-agent"].StartsWith("pi/1.5.0 (", StringComparison.Ordinal), "identity user-agent " + request.Headers["user-agent"]);
+            Check(request.Headers["user-agent"].StartsWith("pi/1.5.2 (", StringComparison.Ordinal), "identity user-agent " + request.Headers["user-agent"]);
             Equal("Bearer secret", request.Headers["authorization"], "authorization");
             Equal("application/json", request.Headers["content-type"], "content-type");
             Body($$$"""{"model":"gpt-6-luna","input":"{\"text\":\"The deployment succeeded, thank you.\"}","questions":{{{DecisionsQuestionsBody}}}}""", request.Body, "decisions");

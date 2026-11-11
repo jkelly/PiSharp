@@ -81,12 +81,13 @@ public static partial class NativeProviderFactory
         var endpoint = new Uri(baseUrl);
         ValidateCatalog(model, endpoint, explicitApiKey, "anthropic-messages", modelMetadata);
         projectionOptions = AnthropicCatalogCompatibility.Apply(projectionOptions, modelMetadata);
+        requestOptions = AnthropicCatalogCompatibility.Apply(requestOptions, modelMetadata, model, endpoint);
         if (model.Provider is "anthropic" or "github-copilot") throw new ArgumentException("Unsupported native model or endpoint selection.");
         var maximum = requestOptions.MaxTokens ?? projectionOptions.MaximumTokens;
         if (maximum != Math.Truncate(maximum) || maximum is <= 0 or > int.MaxValue) throw new ArgumentException("Unsupported native thinking token cap.");
         var metadata = thinkingProfile ? modelMetadata : null;
         var profile = metadata is null ? null : new NativeThinkingProfile(model, metadata, projectionOptions.ModelReasoning, (int)maximum);
-        if (profile is not null) projectionOptions = projectionOptions with { SupportsMidConversationEffort = profile.MidConversationEffort, SupportsThinkingOff = profile.SupportsOff };
+        if (profile is not null) projectionOptions = projectionOptions with { SupportsThinkingOff = profile.SupportsOff };
         if (profile is null && projectionOptions.ModelReasoning && !projectionOptions.SupportsThinkingOff)
             throw new ArgumentException("Native thinking off is unsupported by the configured profile.");
         var factory = new AnthropicMessagesKeyAuthRequestFactory(endpoint, model, projectionOptions, requestOptions);

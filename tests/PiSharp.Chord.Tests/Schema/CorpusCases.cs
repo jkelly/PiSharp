@@ -66,7 +66,8 @@ internal static partial class Program
                     var path = Path.Combine(temp.FullName, "store.db"); File.Copy(CorpusFile(pass, "store.db"), path);
                     await using var store = await StoreOver(new TestSqliteDatabase(path));
                     var actual = new JsonArray((await Exported(store)).Select(x => (JsonNode?)x).ToArray());
-                    Json(new JsonArray(CorpusLines(pass, "stopped.jsonl").ToArray()).ToJsonString(), actual, "exact upstream stopped-store export");
+                    var expected = new JsonArray(Schema3ArchiveExpectation(CorpusLines(pass, "stopped.jsonl")).ToArray());
+                    Json(expected.ToJsonString(), actual, "exact historical stopped-store payload with authored schema-3 manifest overlay");
                 }
                 finally { temp.Delete(true); }
             });

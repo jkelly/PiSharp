@@ -13,7 +13,7 @@ public sealed partial class PersistentAgentSession
             Sessions.Context.SessionContextProjection context;
             string level;
             lock (_gate) { context = _context; level = _configuration.ThinkingLevel; }
-            if (context.ThinkingLevel == level) return;
+            if (PiSharp.AI.ThinkingLevels.Clamp(GetSupportedThinkingLevels(), context.ThinkingLevel) == level) return;
             var log = _store.Snapshot;
             var entry = Record(_codec, "thinking_level_change", Identity(_nextEntryId, log.Header.Id, log.Entries),
                 context.LeafId, _clock, writer => writer.WriteString("thinkingLevel", level));

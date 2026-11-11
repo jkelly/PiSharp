@@ -310,8 +310,9 @@ internal sealed class ModelSelectorComponent : Container, IComponent, IFocusable
                             refreshStatusSuccess = true;
                         }
                     }
+                    var preferredModel = selectedIndex >= 0 && selectedIndex < filteredModels.Count ? filteredModels[selectedIndex] : null;
                     LoadModelsFromSnapshot();
-                    FilterModels(searchInput.GetValue());
+                    FilterModels(searchInput.GetValue(), preferredModel);
                     tui.RequestRender();
                 }
                 else
@@ -388,7 +389,7 @@ internal sealed class ModelSelectorComponent : Container, IComponent, IFocusable
         scopeText?.SetText(GetScopeText());
     }
 
-    private void FilterModels(string query)
+    private void FilterModels(string query, ModelItem? preferredModel = null)
     {
         if (query.Length > 0)
         {
@@ -409,7 +410,8 @@ internal sealed class ModelSelectorComponent : Container, IComponent, IFocusable
         // When filtering by a query, move the selector to the top row so the best
         // match is highlighted. When the query is cleared, keep the current position
         // clamped to the (restored) list length.
-        selectedIndex = query.Length > 0 ? 0 : Math.Min(selectedIndex, Math.Max(0, filteredModels.Count - 1));
+        var preferredIndex = preferredModel is null ? -1 : filteredModels.FindIndex(item => item.Provider == preferredModel.Provider && item.Id == preferredModel.Id);
+        selectedIndex = preferredIndex >= 0 ? preferredIndex : query.Length > 0 ? 0 : Math.Min(selectedIndex, Math.Max(0, filteredModels.Count - 1));
         UpdateList();
     }
 

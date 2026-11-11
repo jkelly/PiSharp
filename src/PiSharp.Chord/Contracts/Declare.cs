@@ -97,7 +97,7 @@ public sealed partial class Contract
         {
             var path = $"{name}.{ContractsInternal.Local}.{member}";
             if (value.Value is MethodDeclaration method) methods[member] = ContractsInternal.ReadMethod(method, path);
-            else if (value.Value is KeyedMember keyedMember) keyed[member] = ContractsInternal.SnapshotSchema(keyedMember.Schema, path);
+            else if (value.Value is KeyedMember keyedMember) keyed[member] = ContractsInternal.SnapshotSchema(keyedMember.Schema, path) with { KeyHost = keyedMember.KeyHost };
             else state[member] = ContractsInternal.SnapshotSchema(value.Value, path);
         }
         var variants = new OrderedDictionary<string, VariantData>(StringComparer.Ordinal) { [ContractsInternal.Local] = new VariantData(state, methods, keyed) };

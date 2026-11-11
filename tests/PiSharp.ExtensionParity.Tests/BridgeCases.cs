@@ -23,6 +23,7 @@ internal static partial class Program
         ("bridge.rpc-ui-dialog-round-trip", RpcDialog),
         ("bridge.virtual-model-routes-each-request", VirtualModel),
         ("bridge.renderers-markdown-and-shortcuts-through-the-host", Renderers),
+        ("bridge.sync152-markdown-registration-surfaces-and-isolation", MarkdownRegistrationSurfaces),
         ("bridge.virtual-modules-for-upstream-imports", VirtualModules),
     ];
 
@@ -62,9 +63,49 @@ internal static partial class Program
         Check(await host.RenderMessageAsync("other", new JsonObject(), 20, false, CancellationToken.None) is null, "unrendered custom type");
         var entry = await host.RenderEntryAsync("marker", new JsonObject { ["data"] = new JsonObject { ["n"] = 7 } }, 20, false, CancellationToken.None);
         Equal("ENTRY 7", entry!.Value.Single().Trim(), "entry renderer");
-        Equal("all DONE", await host.TransformMarkdownAsync("all TODO", null, CancellationToken.None), "markdown transformer");
+        Equal("all DONE", await host.TransformMarkdownAsync("all TODO", new JsonObject { ["messageType"] = "assistant" }, CancellationToken.None), "markdown transformer");
         var shortcut = host.Shortcuts.Single();
         Equal("ctrl+shift+k", shortcut.Shortcut, "shortcut key"); Equal("Probe shortcut", shortcut.Description, "shortcut description");
+    }
+
+    private static async Task MarkdownRegistrationSurfaces()
+    {
+        using var sandbox = NodeSandbox("markdown-surfaces-152");
+        var defaultExtension = sandbox.Write(Path.Combine(sandbox.Cwd, "default.ts"), """
+            export default (pi: any) => pi.registerMarkdownTransformer((text: string) => text + "D");
+            """);
+        await using var host = await StartHost(sandbox, defaultExtension);
+        string Write(string name, string body) => sandbox.Write(Path.Combine(sandbox.Cwd, name + ".ts"), body);
+        await host.LoadAsync([
+            Write("subset", """
+                export default (pi: any) => pi.registerMarkdownTransformer((text: string) => text + "S", { messageTypes: ["custom", "summary", "changelog"] });
+                """),
+            Write("empty", """
+                export default (pi: any) => pi.registerMarkdownTransformer(() => "never", { messageTypes: [] });
+                """),
+            Write("replacement", """
+                export default (pi: any) => {
+                  pi.registerMarkdownTransformer(() => "stale");
+                  pi.registerMarkdownTransformer((text: string) => text + "R", { messageTypes: ["user", "assistant", "assistant-thinking", "custom", "summary", "changelog"] });
+                };
+                """),
+            Write("throwing", """
+                export default (pi: any) => pi.registerMarkdownTransformer(() => { throw new Error("isolated"); }, { messageTypes: ["user", "assistant", "assistant-thinking", "custom", "summary", "changelog"] });
+                """),
+            Write("tail", """
+                export default (pi: any) => pi.registerMarkdownTransformer((text: string, ctx: any) => text + ":" + ctx.messageType + ":" + ctx.availableWidth + ":" + ctx.messageId + ":" + ctx.timestamp,
+                  { messageTypes: ["user", "assistant", "assistant-thinking", "custom", "summary", "changelog"] });
+                """)
+        ], CancellationToken.None);
+        Check(host.Errors.IsEmpty, "all registration shapes load");
+        Check(host.Extensions.All(extension => extension.Descriptor["markdownTransformer"]?.GetValue<bool>() == true), "boolean descriptors include object registrations and empty surface set");
+        foreach (var surface in new[] { "user", "assistant", "assistant-thinking", "custom", "summary", "changelog" })
+        {
+            var context = new JsonObject { ["messageType"] = surface, ["availableWidth"] = 38, ["isStreaming"] = false, ["messageId"] = "saved", ["timestamp"] = "stamp" };
+            var prefix = surface is "user" or "assistant" or "assistant-thinking" ? "xDR" : "xSR";
+            Equal(prefix + ":" + surface + ":38:saved:stamp", await host.TransformMarkdownAsync("x", context, CancellationToken.None), surface + " filter, load order, metadata and throw isolation");
+        }
+        Equal("x", await host.TransformMarkdownAsync("x", new JsonObject { ["messageType"] = "Custom" }, CancellationToken.None), "exact surface matching");
     }
 
     // virtual-modules.ts: the runtime values extensions import from Pi's packages resolve in the bridge (typebox, pi-ai StringEnum,

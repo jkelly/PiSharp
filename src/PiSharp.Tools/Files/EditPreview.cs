@@ -124,7 +124,7 @@ public sealed class EditPreview
                 token.ThrowIfCancellationRequested();
                 var plan = EditPlan.Create(normalized, input.Edits, input.DisplayPath, new(options.MaximumPlanCharacters, options.MaximumEdits));
                 token.ThrowIfCancellationRequested();
-                var display = DiffFormatter.FormatDisplay(plan.BaseContent, plan.NewContent, diff, token);
+                var display = DiffFormatter.FormatEdit(input.DisplayPath, plan, diff, token, includePatch: false);
                 token.ThrowIfCancellationRequested();
                 var body = new Dictionary<string, object> { ["diff"] = display.Diff };
                 if (display.FirstChangedLine is { } line) body.Add("firstChangedLine", line);

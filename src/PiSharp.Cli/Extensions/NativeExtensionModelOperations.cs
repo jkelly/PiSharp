@@ -113,7 +113,7 @@ public sealed class NativeExtensionModelOperations(ModelOperationsRegistry regis
     {
         ArgumentNullException.ThrowIfNull(readEnvironment);
         var catalogs = new List<FrozenModelCatalog>();
-        foreach (var provider in BuiltinModelCatalog.ShardHashes.Keys.Concat(ReviewedModelCatalog.AdditionalProviders).Distinct().Order(StringComparer.Ordinal))
+        foreach (var provider in CurrentModelCatalog.Providers)
         {
             try
             {

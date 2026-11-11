@@ -67,6 +67,12 @@ public sealed class Step : ISqliteExecutor
     /// <summary>The statements the step ran.</summary>
     public long Statements { get; internal set; }
 
+    /// <summary>The rows written or deleted by the step.</summary>
+    public long Rows { get; internal set; }
+
+    /// <summary>The catalog as this step has changed it so far.</summary>
+    internal IEnumerable<TableRecord> Records() => catalog.Keys.Concat(Tables.Keys).Distinct(StringComparer.Ordinal).Select(name => Table(name)!);
+
     /// <summary>The record of table <paramref name="name"/> as this step leaves it so far.</summary>
     internal TableRecord? Table(string name) =>
         Tables.TryGetValue(name, out var changed) ? changed : catalog.TryGetValue(name, out var recorded) ? recorded : null;

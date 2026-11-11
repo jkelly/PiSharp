@@ -9,6 +9,10 @@ sidebar:
 
 :::caution[Experimental]
 Pi Durable ships as experimental from PiSharp 1.2.0.1: the `pisharp durable` command and the `PiSharp.Durable`, `PiSharp.Durable.Tools` and `PiSharp.Durable.Sqlite` packages. PiSharp 1.2.0.2 adds questions, plan mode, service tiers, the media tools and the [device server](#device-server). PiSharp 1.5.0 moves the libraries to `pi-durable` v1.5.0, whose session format older PiSharp versions can't open (see [Upgrading to 1.5.0](#upgrading-to-150)). Its command, session format and library API may change or be removed in any release, without notice or a deprecation period.
+
+:::note[Unreleased 1.5.2 source candidate]
+The source update targets Pi Durable 1.5.2, including 1.5.1 changes to read-only JSONL recovery, SQLite batching, compaction and scheduling. Local source validation is recorded with explicit suite and platform limitations. The published release is still PiSharp 1.5.0.1 on Pi 1.5.0; the compatibility and upgrade evidence below remains historical. The [candidate overlay](https://github.com/jkelly/PiSharp/blob/main/compatibility/durable-sync-1.5.2-overlay.json) preserves that earlier map and records current source work separately.
+:::
 :::
 
 Pi includes `pi-durable`, an experimental agent harness that saves every step of a conversation before it shows it. PiSharp ports it as a set of .NET libraries and as an interactive mode, `pisharp durable`.

@@ -40,7 +40,74 @@ public static class DiffFormatter
         return result;
     }
 
-    private static FormattedEditDisplay Display(ImmutableArray<Line> lines, string oldContent, string newContent, DiffFormatterOptions options, CancellationToken token)
+    /// <summary>Diff only bounded windows around the admitted replacements, before a write is attempted.</summary>
+    public static FormattedEditDiff FormatEdit(string path, EditPlan plan, DiffFormatterOptions? options = null, CancellationToken token = default, bool includePatch = true)
+    {
+        options ??= new(); ValidateOptions(options);
+        var before = plan.BaseContent; var after = plan.NewContent;
+        var width = Math.Max(CountLines(before), CountLines(after)).ToString(CultureInfo.InvariantCulture).Length;
+        var windows = new List<(int Start, int End, int NewStart, int NewEnd, int OldLine, int NewLine)>();
+        var offsetDelta = 0; var lineDelta = 0; var cursor = 0; var cursorLine = 0;
+        foreach (var replacement in plan.Replacements)
+        {
+            token.ThrowIfCancellationRequested();
+            var matchEnd = replacement.MatchIndex + replacement.MatchLength;
+            var start = LineStart(before, replacement.MatchIndex);
+            for (var i = 0; i < 32 && start > 0; i++) start = LineStart(before, start - 1);
+            var end = matchEnd;
+            for (var i = 0; i <= 32 && end < before.Length; i++)
+            {
+                var lf = before.IndexOf('\n', i == 0 ? Math.Max(matchEnd - 1, replacement.MatchIndex) : end);
+                end = lf < 0 ? before.Length : lf + 1;
+            }
+            var delta = replacement.NewText.Length - replacement.MatchLength;
+            var linesDelta = CountFeeds(replacement.NewText, 0, replacement.NewText.Length) - CountFeeds(before, replacement.MatchIndex, matchEnd);
+            if (windows.Count > 0 && start <= windows[^1].End)
+            {
+                var previous = windows[^1]; end = Math.Max(end, previous.End);
+                previous.End = end; previous.NewEnd = end + offsetDelta + delta; windows[^1] = previous;
+            }
+            else
+            {
+                cursorLine += CountFeeds(before, cursor, start); cursor = start;
+                windows.Add((start, end, start + offsetDelta, end + offsetDelta + delta, cursorLine, cursorLine + lineDelta));
+            }
+            offsetDelta += delta; lineDelta += linesDelta;
+        }
+        var display = new List<string>(); var patch = new StringBuilder(); int? first = null;
+        var skip = " " + new string(' ', width) + " ...";
+        foreach (var window in windows)
+        {
+            token.ThrowIfCancellationRequested();
+            var oldText = before[window.Start..window.End]; var newText = after[window.NewStart..window.NewEnd];
+            var oldLines = EditPlan.SplitLines(oldText); var newLines = EditPlan.SplitLines(newText);
+            if (oldLines.Length > options.MaximumLines || newLines.Length > options.MaximumLines) throw EditPlan.Limit();
+            var lines = Compute(oldLines, newLines, options, token);
+            var shown = Display(lines, oldText, newText, options, token, window.OldLine + 1, window.NewLine + 1, width);
+            first ??= shown.FirstChangedLine;
+            var output = shown.Diff.Split('\n').ToList();
+            if (display.Count > 0 && display[^1] == skip && output[0] == skip) output.RemoveAt(0);
+            display.AddRange(output);
+            if (includePatch)
+            {
+                var unified = Unified(path, lines, options.ContextLines, window.OldLine, window.NewLine);
+                if (patch.Length > 0) unified = unified[(unified.IndexOf('\n', unified.IndexOf('\n') + 1) + 1)..];
+                patch.Append(unified);
+            }
+            if (patch.Length > options.MaximumOutputCharacters || display.Sum(line => (long)line.Length + 1) > options.MaximumOutputCharacters + 1L) throw EditPlan.Limit();
+        }
+        return new(string.Join('\n', display), patch.ToString(), first);
+    }
+    private static int LineStart(string text, int offset) => offset == 0 ? 0 : text.LastIndexOf('\n', offset - 1) + 1;
+    private static int CountLines(string text) => CountFeeds(text, 0, text.Length) + 1;
+    private static int CountFeeds(string text, int start, int end)
+    {
+        var count = 0;
+        for (var i = start; i < end; i++) if (text[i] == '\n') count++;
+        return count;
+    }
+
+    private static FormattedEditDisplay Display(ImmutableArray<Line> lines, string oldContent, string newContent, DiffFormatterOptions options, CancellationToken token, int oldStart = 1, int newStart = 1, int? numberWidth = null)
     {
         var parts = new List<Part>();
         for (var start = 0; start < lines.Length;)
@@ -48,8 +115,8 @@ public static class DiffFormatter
             var end = start + 1; while (end < lines.Length && lines[end].Kind == lines[start].Kind) end++;
             parts.Add(new(lines[start].Kind, lines.Skip(start).Take(end - start).Select(value => value.Text).ToImmutableArray())); start = end;
         }
-        var width = Math.Max(oldContent.Split('\n').Length, newContent.Split('\n').Length).ToString(CultureInfo.InvariantCulture).Length;
-        var display = new List<string>(); var oldNumber = 1; var newNumber = 1; int? firstChanged = null;
+        var width = numberWidth ?? Math.Max(oldContent.Split('\n').Length, newContent.Split('\n').Length).ToString(CultureInfo.InvariantCulture).Length;
+        var display = new List<string>(); var oldNumber = oldStart; var newNumber = newStart; int? firstChanged = null;
         for (var index = 0; index < parts.Count; index++)
         {
             token.ThrowIfCancellationRequested(); var part = parts[index];
@@ -83,6 +150,33 @@ public static class DiffFormatter
 
     private static ImmutableArray<Line> Compute(string[] before, string[] after, DiffFormatterOptions options, CancellationToken token)
     {
+        // Large disjoint changed blocks need no Myers trace: every old line is removed and every new line added.
+        // Trim equal edges first, then prove disjointness rather than exhausting a quadratic trace for bulk edits.
+        if (before.Length + after.Length > 256)
+        {
+            var prefix = 0;
+            while (prefix < Math.Min(before.Length, after.Length) && before[prefix] == after[prefix]) prefix++;
+            var oldEnd = before.Length; var newEnd = after.Length;
+            while (oldEnd > prefix && newEnd > prefix && before[oldEnd - 1] == after[newEnd - 1]) { oldEnd--; newEnd--; }
+            if ((long)before.Length + after.Length > options.MaximumWork) throw EditPlan.Limit();
+            var oldSet = new HashSet<string>(before[prefix..oldEnd], StringComparer.Ordinal);
+            var disjoint = true;
+            for (var i = prefix; i < newEnd; i++)
+            {
+                token.ThrowIfCancellationRequested();
+                if (oldSet.Contains(after[i])) { disjoint = false; break; }
+            }
+            if (disjoint)
+            {
+                var direct = ImmutableArray.CreateBuilder<Line>();
+                for (var i = 0; i < prefix; i++) direct.Add(new(' ', before[i]));
+                for (var i = prefix; i < oldEnd; i++) direct.Add(new('-', before[i]));
+                for (var i = prefix; i < newEnd; i++) direct.Add(new('+', after[i]));
+                for (var i = oldEnd; i < before.Length; i++) direct.Add(new(' ', before[i]));
+                token.ThrowIfCancellationRequested();
+                return direct.ToImmutable();
+            }
+        }
         var trace = new List<int[]>(); long work = 0; var distance = 0;
         for (; distance <= before.Length + after.Length; distance++)
         {
@@ -138,7 +232,7 @@ public static class DiffFormatter
         }
         return ordered.ToImmutable();
     }
-    private static string Unified(string path, ImmutableArray<Line> lines, int context)
+    private static string Unified(string path, ImmutableArray<Line> lines, int context, int oldOffset = 0, int newOffset = 0)
     {
         // Quoted labels avoid manufacturing patch headers from filename tabs/newlines. Ordinary labels retain source spelling.
         var label = path.Contains('\n') || path.Contains('\r') || path.Contains('\t') ? System.Text.Json.JsonSerializer.Serialize(path) : path;
@@ -159,8 +253,8 @@ public static class DiffFormatter
                 end = Math.Min(lines.Length, end + context); break;
             }
             var oldCount = oldPositions[end] - oldPositions[start]; var newCount = newPositions[end] - newPositions[start];
-            result.Append("@@ -").Append(Number(oldPositions[start] + (oldCount == 0 ? 0 : 1))).Append(',').Append(Number(oldCount))
-                .Append(" +").Append(Number(newPositions[start] + (newCount == 0 ? 0 : 1))).Append(',').Append(Number(newCount)).Append(" @@\n");
+            result.Append("@@ -").Append(Number(oldOffset + oldPositions[start] + (oldCount == 0 ? 0 : 1))).Append(',').Append(Number(oldCount))
+                .Append(" +").Append(Number(newOffset + newPositions[start] + (newCount == 0 ? 0 : 1))).Append(',').Append(Number(newCount)).Append(" @@\n");
             for (var index = start; index < end; index++)
             {
                 result.Append(lines[index].Kind).Append(Body(lines[index].Text)).Append('\n');

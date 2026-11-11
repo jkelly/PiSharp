@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Builder;
 using PiSharp.Chord.Host;
 using PiSharp.Chord.Registries;
+using PiSharp.Telemetry;
 
 namespace PiSharp.Chord.Hosting.Http;
 
@@ -18,13 +19,16 @@ public delegate Task<HttpResult> HttpHandler(HttpRequestContext request, CallCon
 public delegate Task<HttpResult> HttpWrap(HttpRequestContext request, Func<Task<HttpResult>> next, CallContext context);
 public delegate Task HttpSocket(WebSocket socket, HttpRequestContext request, CallContext context);
 public delegate Task<JsonObject?> HttpAuthenticator(HttpRequestContext request, ChordContext context);
-public sealed record HttpRoute(HttpHandler Handler, bool Page = false, bool CrossSite = false);
+public sealed record HttpRoute(HttpHandler Handler, bool Page = false, bool CrossSite = false, bool Public = false);
+public sealed record HttpSocketOptions(HttpSocket Handler, bool Public = false, int? MaxPayload = null);
 public sealed record HttpWrapper(string Name, HttpWrap Wrap, string Phase = "observe", bool All = false, string? Route = null);
 public sealed record HttpRelay(string Name, Func<HttpRequest, ChordContext, Task<RelayAdmission?>> Verify);
 public sealed class HttpContribution
 {
     public IReadOnlyDictionary<string, HttpRoute> Routes { get; init; } = new Dictionary<string, HttpRoute>();
     public IReadOnlyDictionary<string, HttpSocket> Sockets { get; init; } = new Dictionary<string, HttpSocket>();
+    public IReadOnlyDictionary<string, HttpSocketOptions> SocketOptions { get; init; } = new Dictionary<string, HttpSocketOptions>();
+    public IReadOnlyList<string> ScriptPaths { get; init; } = [];
     public IReadOnlyList<HttpWrapper> Wraps { get; init; } = [];
     public IReadOnlyList<string> Hosts { get; init; } = [];
     public IReadOnlyList<string> Framers { get; init; } = [];
@@ -45,6 +49,9 @@ public sealed class ChordHttpOptions
     public int? Port { get; init; }
     public string? LinksPath { get; init; }
     public Func<HttpRequestContext, JsonObject, LinkOptions>? LinkOptions { get; init; }
+    /// <summary>Runs after a link upgrade is accepted; its optional cleanup runs once when the socket closes.</summary>
+    public Func<HttpRequestContext, JsonObject, Task<Func<Task>?>>? LinksOpened { get; init; }
+    public ITelemetryContext? Telemetry { get; init; }
     public TimeSpan CloseTimeout { get; init; } = TimeSpan.FromSeconds(30);
     public required Action<HttpError> OnError { get; init; }
 }
@@ -56,6 +63,8 @@ public sealed class HttpRequestContext
     { Native = native; Origin = origin; Provenance = provenance; Params = parameters; Framer = framer; }
     public string Method => Native.Request.Method;
     public string Path => Native.Request.Path.Value ?? "/";
+    /// <summary>The transport peer, including for relayed requests; forwarded headers are never used.</summary>
+    public IPAddress? RemoteAddress => Native.Connection.RemoteIpAddress;
     public IReadOnlyDictionary<string, string> Params { get; }
     public IQueryCollection Query => Native.Request.Query;
     public IHeaderDictionary Headers => Native.Request.Headers;

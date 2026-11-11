@@ -38,7 +38,7 @@ public interface IFileOperations
 }
 
 /// <summary>Framework file I/O with bounded reads and an existing-segment symlink/junction resolution profile.</summary>
-/// <summary>Optional streaming seam. Returns an owned readable, seekable stream positioned at zero.
+/// <summary>Optional streaming seam. Returns an owned readable stream positioned at its start (seeking is not required).
 /// The caller disposes the stream. Legacy adapters need implement only IFileOperations.</summary>
 public interface IStreamingFileOperations
 {

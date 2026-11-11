@@ -14,6 +14,13 @@ namespace PiSharp.Chord.Data;
 /// one silently splits identities.</summary>
 public delegate string PrincipalKeyFunction(JsonObject principal);
 
+public static class Principals
+{
+    /// <summary>Canonical principal equality, independent of a host's custom identity function.</summary>
+    public static bool Same(JsonObject? principal, JsonObject other, ChordContext context) =>
+        principal is not null && DataInternal.PrincipalKey(principal, context) == DataInternal.PrincipalKey(other, context);
+}
+
 internal static partial class DataInternal
 {
     private static readonly ConditionalWeakTable<JsonObject, string> DefaultKeys = new();

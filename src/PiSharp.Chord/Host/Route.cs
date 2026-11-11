@@ -4,6 +4,7 @@ using PiSharp.Chord.Contracts;
 using PiSharp.Chord.Data;
 using PiSharp.Chord.Link;
 using PiSharp.Chord.Remote;
+using PiSharp.Telemetry;
 
 namespace PiSharp.Chord.Host;
 
@@ -38,6 +39,7 @@ internal sealed class HostRoute
         internal readonly Address Address = address;
         internal RemotePath Path = null!;
         internal bool Resolving, Suspended;
+        internal OpenSpan? Span;
         internal ChordError? Failure;
     }
     private readonly ChordHost host;
@@ -101,33 +103,46 @@ internal sealed class HostRoute
         else if (change == "attached")
         {
             if (routed.Suspended) holder!.Unreachable(Suspended(routed));
-            else if (!routed.Resolving) _ = Resolve(routed);
+            else if (!routed.Resolving) _ = Resolve(routed, holder?.Span);
+            else if (routed.Span is { } resolving && holder?.Span is { } waiting) waiting.AddLink(new(resolving.Span));
         }
         else if (!routed.Path.Held) addresses.Remove(routed.Address.Key);
         else if (routed.Suspended) routed.Path.Unreachable(Suspended(routed));
         else if (routed.Failure is { } failure) routed.Path.Unreachable(failure);
         else _ = Resolve(routed);
     }
-    private async Task Resolve(Routed routed)
+    private async Task Resolve(Routed routed, ITelemetrySpan? trigger = null)
     {
         if (routed.Resolving || host.Closed) return;
         routed.Resolving = true;
+        OpenSpan? span = null;
+        if (!ChordTelemetry.IsUntraced(host.Telemetry))
+        {
+            var attributes = host.Attributes(); attributes["kind"] = kind.Kind; attributes["address"] = ChordTelemetry.Capped(routed.Address.Key);
+            span = new OpenSpan(host.Telemetry, "chord.resolve", attributes);
+            routed.Span = span;
+            if (trigger is not null) { span.Span.AddLink(new(trigger)); trigger.AddLink(new(span.Span)); }
+        }
         try
         {
-            var resolved = await options.Resolve(routed.Address, context);
+            var traced = span is null ? context : ChordContext.WithTelemetry(span.Span, context);
+            var resolved = await options.Resolve(routed.Address, traced);
             routed.Resolving = false;
             if (host.Closed) { resolved.Link.Close(); return; }
             var link = host.MakeLink(resolved.Link, resolved.Options, LinkRole.Route, context);
             if (!link.Open) { Settle(routed, new ChordError("unavailable", $"{routed.Address.Key}: the link closed before its handshake")); return; }
             routed.Failure = null; links.Add(link, (routed, link.Greeted)); routed.Path.Connected(link);
+            span?.Span.SetAttributes(new SpanAttributes { ["outcome"] = "linked" });
         }
         catch (Exception error)
         {
+            if (span is not null) { ChordTelemetry.SpanFailed(span.Span, "resolve_failed", error); span.Span.SetAttributes(new SpanAttributes { ["outcome"] = "failed" }); }
             routed.Resolving = false;
             if (host.Closed) return;
             host.Report(new HostError("resolve_failed", error, routed.Address.Key));
             Settle(routed, DataInternal.AsChordError(error, routed.Address.Key));
         }
+        finally { routed.Span = null; span?.End(); }
     }
     private void Settle(Routed routed, ChordError error)
     {

@@ -1,4 +1,4 @@
-// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/codemode/src/runtime/prelude-source.ts.
+// Pi b4afdddf44e059c67ccf5097e5317d913521b470 (MIT): packages/codemode/src/runtime/prelude-source.ts.
 using System.Security.Cryptography;
 using System.Text;
 
@@ -9,7 +9,7 @@ namespace PiSharp.Codemode;
 internal static class CodemodePrelude
 {
     /// <summary>SHA-256 of the evaluated upstream PRELUDE_SOURCE (UTF-8, LF line endings).</summary>
-    public const string UpstreamSha256 = "57c8dc8c0e812117d82167fa751bc368f249d5aaee56d321066fc5280c785281";
+    public const string UpstreamSha256 = "e64ad1a6afffbfb8f75a0d08434a9a3fec88d1e54206b03953bfc7b5820cc119";
 
     private static readonly Lazy<string> Body = new(() =>
     {

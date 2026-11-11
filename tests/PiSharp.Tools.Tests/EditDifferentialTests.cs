@@ -49,7 +49,7 @@ internal static class EditDifferentialTests
         var reports = new List<object>(); var differences = new List<object>(); var successes = 0; var failures = 0;
         for (var index = 0; index < inputs.Length; index++)
         {
-            var authored = inputs[index]; var source = GapEditExpectations.ForCase(sources[index]); var id = authored.GetProperty("caseId").GetString()!;
+            var authored = inputs[index]; var source = Sync152EditExpectations.ForCase(GapEditExpectations.ForCase(sources[index])); var id = authored.GetProperty("caseId").GetString()!;
             Equal(id, source.GetProperty("caseId").GetString());
             var path = authored.GetProperty("path").GetString()!; Equal(path, source.GetProperty("path").GetString());
             Check(path.StartsWith("files/", StringComparison.Ordinal) && !path.Contains("..", StringComparison.Ordinal) && !path.Contains('\\') && !path.Contains(':') && !path.Contains('\0'), "Only confined literal fixture paths are admitted.");
@@ -85,7 +85,7 @@ internal static class EditDifferentialTests
             else if (missing) { Equal(1, counts.accessCalls); Equal(0, counts.readCalls); Equal(0, counts.writeCalls); }
             else if (result.IsError) { Equal(1, counts.accessCalls); Equal(1, counts.readCalls); Equal(0, counts.writeCalls); }
             else { Equal(1, counts.accessCalls); Equal(2, counts.readCalls); Equal(1, counts.writeCalls); }
-            reports.Add(new { caseId = id, historicalObservation = sources[index].Clone(), currentC05Expectation = source.Clone(), native = new
+            reports.Add(new { caseId = id, historicalObservation = sources[index].Clone(), currentC05Expectation = GapEditExpectations.ForCase(sources[index]), current152Expectation = source.Clone(), native = new
             {
                 ownedSuppliedBefore = owned.Value.Clone(), ownedSuppliedAfter = owned.Value.Clone(), publicPrepared,
                 finalAction = new { prepared.ToolName, prepared.Operation, prepared.Kind, prepared.Target, arguments = prepared.Arguments.Value.Clone(),
@@ -97,7 +97,7 @@ internal static class EditDifferentialTests
         Equal(5, successes); Equal(7, failures);
         Evidence = JsonSerializer.SerializeToElement(new { schemaVersion = 1, sourceSha = SourceSha,
             inputSha256 = InputSha, expectedSha256 = ExpectedSha, corpusCases = inputs.Length, successes, failures,
-            compared = "Complete portable tool results, all failure name/message contracts, prepared public fields, available pure helpers and exact file snapshots; explicit authored C05 byte-preservation expectations for two historical cases; no broad masks.",
+            compared = "Complete portable tool results, all failure name/message contracts, prepared public fields, available pure helpers and exact file snapshots; explicit authored C05 byte-preservation expectations plus versioned Pi 1.5.2 replacement-local EOL overlay; no broad masks.",
             mapping = "Typed native TextContent maps to source type:text; native InvalidArguments/ExecutionError failures map to source generic Error name. Native envelope/effect metadata retained separately. Owned input mutation and missing preview seam remain explicit observations.",
             cases = reports, differences, phaseAcceptanceClaimed = false });
         Check(differences.Count == 0, "Frozen edit comparison differences: " + JsonSerializer.Serialize(differences));

@@ -6,8 +6,13 @@
     <ProjectReference Include="../../src/PiSharp.Compatibility.Node/PiSharp.Compatibility.Node.csproj" />
     <ProjectReference Include="../../src/PiSharp.ExtensionHost/PiSharp.ExtensionHost.csproj" />
     <ProjectReference Include="../fixtures/extensions/native/PublishedFixture.SessionLifecycle/PublishedFixture.SessionLifecycle.csproj" />
+    <ProjectReference Include="../fixtures/extensions/native/PublishedFixture.InitializerContext/PublishedFixture.InitializerContext.csproj" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="../fixtures/extensions/native/PublishedFixture.InitializerContext/bin/$(Configuration)/$(TargetFramework)/PublishedFixture.InitializerContext.deps.json"
+          Link="PublishedFixture.InitializerContext.deps.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="../fixtures/extensions/native/PublishedFixture.InitializerContext/bin/$(Configuration)/$(TargetFramework)/PublishedFixture.InitializerContext.runtimeconfig.json"
+          Link="PublishedFixture.InitializerContext.runtimeconfig.json" CopyToOutputDirectory="PreserveNewest" />
     <None Update="Fixtures/terminal-default-source/*.json" CopyToOutputDirectory="PreserveNewest" />
     <None Include="../fixtures/extensions/native/PublishedFixture.SessionLifecycle/bin/$(Configuration)/$(TargetFramework)/PublishedFixture.SessionLifecycle.deps.json"
           Link="PublishedFixture.SessionLifecycle.deps.json" CopyToOutputDirectory="PreserveNewest" />

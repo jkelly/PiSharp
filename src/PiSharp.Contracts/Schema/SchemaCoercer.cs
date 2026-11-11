@@ -229,6 +229,10 @@ internal sealed class SchemaCoercer(SchemaCompiler c, object? schema)
                 return TryBoolean(value, out var flag) ? flag : value;
             case "null":
                 return TryNull(value) ? null : value;
+            case "bigint":
+                return TryBigInt(value, out var big) ? big : value;
+            case "undefined":
+                return TryNull(value) ? Js.Undefined : value;
             case "array":
                 return ConvertArray(node, b, value);
             case "object":
@@ -472,6 +476,7 @@ internal sealed class SchemaCoercer(SchemaCompiler c, object? schema)
             double x when b is double y => x.Equals(y) || x == y,
             string x when b is string y => string.Equals(x, y, StringComparison.Ordinal),
             bool x when b is bool y => x == y,
+            BigInteger x when b is BigInteger y => x == y,
             _ => ReferenceEquals(a, b),
         };
 
@@ -480,6 +485,7 @@ internal sealed class SchemaCoercer(SchemaCompiler c, object? schema)
             double d => d == 0 ? 0 : d.GetHashCode(),
             string s => StringComparer.Ordinal.GetHashCode(s),
             bool b => b.GetHashCode(),
+            BigInteger b => b.GetHashCode(),
             _ => RuntimeHelpers.GetHashCode(o),
         };
     }
@@ -500,6 +506,8 @@ internal sealed class SchemaCoercer(SchemaCompiler c, object? schema)
                 return TryNumber(value, out var n) && n == number ? n : value;
             case bool flag:
                 return TryBoolean(value, out var b) && b == flag ? b : value;
+            case BigInteger integer:
+                return TryBigInt(value, out var big) && big == integer ? big : value;
             default:
                 return value;
         }
@@ -509,6 +517,9 @@ internal sealed class SchemaCoercer(SchemaCompiler c, object? schema)
     {
         switch (value)
         {
+            case BigInteger big:
+                result = big.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                return true;
             case bool b:
                 result = b ? "true" : "false";
                 return true;
@@ -534,6 +545,9 @@ internal sealed class SchemaCoercer(SchemaCompiler c, object? schema)
     {
         switch (value)
         {
+            case BigInteger big when big >= MinSafe && big <= MaxSafe:
+                result = (double)big;
+                return true;
             case bool b:
                 result = b ? 1 : 0;
                 return true;
@@ -589,11 +603,32 @@ internal sealed class SchemaCoercer(SchemaCompiler c, object? schema)
         return null;
     }
 
+    private static bool TryBigInt(object? value, out BigInteger result)
+    {
+        switch (value)
+        {
+            case BigInteger big: result = big; return true;
+            case bool flag: result = flag ? BigInteger.One : BigInteger.Zero; return true;
+            case double number when double.IsFinite(number): result = new BigInteger(number); return true;
+            case null or JsUndefined: result = BigInteger.Zero; return true;
+            case string text:
+                if (BigIntOfString(text) is { } parsed) { result = parsed; return true; }
+                var lower = LowerCase(text);
+                if (lower is "true" or "false") { result = lower == "true" ? BigInteger.One : BigInteger.Zero; return true; }
+                break;
+        }
+        result = default;
+        return false;
+    }
+
     private static bool TryBoolean(object? value, out bool result)
     {
         result = false;
         switch (value)
         {
+            case BigInteger big when big.IsZero || big.IsOne:
+                result = big.IsOne;
+                return true;
             case bool b:
                 result = b;
                 return true;
@@ -627,6 +662,7 @@ internal sealed class SchemaCoercer(SchemaCompiler c, object? schema)
 
     private static bool TryNull(object? value) => value switch
     {
+        BigInteger big => big.IsZero,
         bool b => !b,
         double d when double.IsFinite(d) => d == 0,
         null or JsUndefined => true,
@@ -646,11 +682,13 @@ internal sealed class SchemaCoercer(SchemaCompiler c, object? schema)
 
     private static bool MatchesType(object? value, string type) => type switch
     {
-        "number" => value is double,
+        "number" => Js.IsNumber(value),
         "integer" => Js.IsInteger(value),
         "boolean" => value is bool,
         "string" => value is string,
         "null" => value is null,
+        "bigint" => value is BigInteger,
+        "undefined" => value is JsUndefined,
         "array" => value is JsArray,
         "object" => value is JsObject or byte[],
         _ => false,

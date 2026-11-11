@@ -149,7 +149,7 @@ internal static partial class Program
         using var sandbox = NodeSandbox("triggered-run-at-print-exit");
         sandbox.ForceCompatibilityModules = forceCompatibility;
         var expectedError = sandbox.UseCompatibilityModules
-            ? "Warning: Extensions are not running against the Pi 1.5.0 packages: compatibility modules explicitly selected by the embedding host\n" : "";
+            ? "Warning: Extensions are not running against the Pi 1.5.2 packages: compatibility modules explicitly selected by the embedding host\n" : "";
         // A late answer: a run that reached the model before print mode read the last message still has no assistant text there.
         sandbox.Respond = (_, _) => { Thread.Sleep(2000); return AnthropicText("late answer"); };
         var extension = sandbox.Write(Path.Combine(sandbox.Cwd, "kick.ts"), LateTriggerExtension);

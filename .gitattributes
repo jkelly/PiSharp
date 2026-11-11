@@ -60,3 +60,6 @@ src/PiSharp.Codemode/Runtime/*.js text eol=lf
 src/PiSharp.CodingAgent/Export/Assets/** -text
 # Baseline diagnostic patches retain physical line endings and significant blank context lines.
 tools/PerformanceReview/memory-pass-2/restore-previous-pass.patch -text whitespace=-blank-at-eol
+
+# Exact current release catalog bytes, independently verified against the npm archive.
+/src/PiSharp.AI/Catalogs/Releases/1.5.2/*.json -text

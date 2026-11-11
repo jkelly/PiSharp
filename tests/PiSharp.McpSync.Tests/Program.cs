@@ -49,6 +49,7 @@ internal static partial class Program
         cases.AddRange(CompletionCases());
         cases.AddRange(Sync150CliCases());
         cases.AddRange(Sync150OwnerDefaultsCases());
+        cases.AddRange(Sync152McpCases());
         // Linked existing contract cases (tests/PiSharp.Extensions.ContractTests/McpConfigurationTests.cs).
         cases.AddRange(McpConfigurationTests.Cases().Select(item => ("linked." + item.Name, item.Run)));
         var results = new List<object>(); var failures = 0;
@@ -445,6 +446,17 @@ internal static partial class Program
             response.Headers.TryAddWithoutValidation("WWW-Authenticate", "Bearer error=\"insufficient_scope\", scope=\"write\"");
             var failure = await Failure(host.Authentication.OnUnauthorized!(new(response, Server, "old"), CancellationToken.None).AsTask());
             Find<McpOAuthAuthorizationRequiredException>(failure);
+            Equal(null, redirected);
+            Equal(0, server.Log.Count);
+            // Connections report the challenge without opening a browser. The explicit sign-in is responsible for step-up.
+            var stored = (await store.LoadAsync())!;
+            await store.SaveAsync(stored with { ClientInformation = JsonData.Parse(JsonSerializer.Serialize(new
+                { client_id = "admitted-client", redirect_uris = new[] { LoopbackCallback.AbsoluteUri } })) });
+            var client = McpSignInClient.Create(new(Server, store, new(),
+                new(_ => { }, _ => Task.FromResult<string?>(null)), server.Factory));
+            var signIn = await new McpOAuthSignIn().StartAsync(new(client, LoopbackCallback.AbsoluteUri,
+                new("insufficient_scope", "write")));
+            redirected = new Uri(signIn.Redirect!.AuthorizationUrl);
             // The challenge lists only the missing scope; the step-up asks for it on top of the granted one and never refreshes.
             Check(redirected is not null && Query(redirected, "scope") == "read write", "Step-up scope union missing: " + redirected);
             Equal(0, server.Log.Count);

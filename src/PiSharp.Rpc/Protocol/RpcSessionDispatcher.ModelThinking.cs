@@ -48,16 +48,16 @@ public sealed partial class RpcSessionDispatcher
                     if (!scope.IsDefaultOrEmpty)
                     {
                         var scoped = scope.Where(value => models.ContainsKey(value.Model)).ToList();
-                        if (scoped.Count <= 1) return NullData;
                         var scopedIndex = scoped.FindIndex(value => value.Model == current.Agent.Model);
-                        var next = scoped[((scopedIndex < 0 ? 0 : scopedIndex) + 1) % scoped.Count];
+                        if (scoped.Count == 0 || scoped.Count == 1 && scopedIndex >= 0) return NullData;
+                        var next = scoped[scopedIndex < 0 ? 0 : (scopedIndex + 1) % scoped.Count];
                         selected = next.Model; scopedThinking = next.ThinkingLevel; isScoped = true;
                     }
                     else
                     {
-                        if (modelOrder.Length <= 1) return NullData;
                         var index = modelOrder.IndexOf(current.Agent.Model);
-                        selected = modelOrder[((index < 0 ? 0 : index) + 1) % modelOrder.Length];
+                        if (modelOrder.Length == 0 || modelOrder.Length == 1 && index >= 0) return NullData;
+                        selected = modelOrder[index < 0 ? 0 : (index + 1) % modelOrder.Length];
                     }
                 }
                 var selectedWire = models[selected];

@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "package": "@earendil-works/pi-ai",
+  "version": "1.5.2",
+  "sourceCommit": "b4afdddf44e059c67ccf5097e5317d913521b470",
+  "tarball": {
+    "url": "https://registry.npmjs.org/@earendil-works/pi-ai/-/pi-ai-1.5.2.tgz",
+    "integrity": "sha512-2tWPSnV3qzfiDIY3aWluBag3vC++Vs+VsXt/UquSU5onPMohPih72FUhIhaqmDdMYubOgB3Byl9uF4Vk40JLvQ==",
+    "sha256": "d5715efa834c23bfdf10a042b49df4ee169cc99000bf16d7998fab2d533b45f8"
+  },
+  "manifestSha256": "71375843feaa116c7d928e74e0500a22cc267e12bfb6869efb92dfd39acf7fee",
+  "providerCount": 43,
+  "generatedAt": "2026-11-10T12:05:37.628Z",
+  "entries": {
+    "chat": 1643,
+    "image": 66,
+    "classifier": 64
+  },
+  "verification": "Every copied provider shard and manifest matches the exact SRI-verified package archive; all provider digests match the package manifest. Historical native shards remain immutable."
+}

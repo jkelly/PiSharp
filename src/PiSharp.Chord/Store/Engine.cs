@@ -21,7 +21,7 @@ using static PiSharp.Chord.Store.StoreInternal.StoreTables;
 /// <summary>A document's address: the owner name, the adapter's namespace (claimed with the owner: Chord's <c>chord</c>, <c>chord.jobs</c>,
 /// <c>chord.job-states</c>; Durable's scopes), the kind and, for a keyed document, its key; a singleton has none (upstream
 /// <c>DocumentAddress</c>).</summary>
-public sealed record DocumentAddress(string Owner, string Namespace, string Kind, string? Key = null);
+public sealed record DocumentAddress(string Owner, string Namespace, string Kind, string? Key = null, string? Host = null);
 
 /// <summary>What a record keeps (R1), applied at a new base and at retirement (upstream <c>DocumentHistory</c>): <see cref="None"/>
 /// (Chord) drops older revisions at a new base and the row and its revisions at retirement; <see cref="Latest"/> drops older revisions at a
@@ -47,6 +47,9 @@ public sealed record DocumentRecord
     /// <summary>A keyed document's key; null for a singleton (as stored records read: <c>""</c> reads as none).</summary>
     public string? Key { get; init; }
 
+    /// <summary>The canonical address key of the host this record belongs to; absent for unscoped and older records.</summary>
+    public string? Host { get; init; }
+
     /// <summary>What the record keeps.</summary>
     public required DocumentHistory History { get; init; }
 
@@ -69,7 +72,7 @@ public sealed record DocumentRecord
     public required string Fingerprint { get; init; }
 
     /// <summary>The record's address.</summary>
-    public DocumentAddress Address => new(Owner, Namespace, Kind, Key);
+    public DocumentAddress Address => new(Owner, Namespace, Kind, Key, Host);
 
     /// <summary>The record in upstream's data form, as the outbox and archives carry it: <c>{ id, owner, namespace, kind, key?, history,
     /// createdAt, retiredAt?, meta?, revision, version, fingerprint }</c>.</summary>
@@ -81,6 +84,7 @@ public sealed record DocumentRecord
         json["createdAt"] = CreatedAt;
         if (RetiredAt is { } retiredAt) json["retiredAt"] = retiredAt;
         if (Meta is not null) json["meta"] = Meta;
+        if (Host is not null) json["host"] = Host;
         json["revision"] = Revision;
         json["version"] = Version;
         json["fingerprint"] = Fingerprint;
@@ -251,10 +255,10 @@ public static class DocumentEngine
         ArgumentNullException.ThrowIfNull(step);
         ArgumentNullException.ThrowIfNull(record);
         await step.RunAsync(
-            $"INSERT INTO {Documents}\n\t\t\t(id, owner, namespace, kind, key, history, created_at, retired_at, meta, revision, version, fingerprint)\n" +
-            "\t\t\tVALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            $"INSERT INTO {Documents}\n\t\t\t(id, owner, namespace, kind, key, history, created_at, retired_at, meta, host, revision, version, fingerprint)\n" +
+            "\t\t\tVALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             record.Id, record.Owner, record.Namespace, record.Kind, record.Key ?? "", StoreInternal.Name(record.History), record.CreatedAt,
-            record.RetiredAt, record.Meta, record.Revision, record.Version, record.Fingerprint).ConfigureAwait(false);
+            record.RetiredAt, record.Meta, record.Host, record.Revision, record.Version, record.Fingerprint).ConfigureAwait(false);
         if (text is not null) await StoreInternal.InsertRevisionAsync(step, record.Id, record.CreatedAt, "base", record.Version, text).ConfigureAwait(false);
         if (record.RetiredAt is not null) await StoreInternal.DropRetiredAsync(step, record.Id, record.History).ConfigureAwait(false);
     }
@@ -304,6 +308,10 @@ public static class DocumentEngine
         var row = await executor.GetAsync(StoreInternal.ReadSql, id).ConfigureAwait(false);
         return row is null ? null : StoreInternal.RecordOf(row);
     }
+
+    /// <summary>Live records belonging to a canonical host address key.</summary>
+    public static Task<IReadOnlyList<DocumentRecord>> ListHostRecordsAsync(ISqliteExecutor executor, string host, long after, long limit) =>
+        StoreInternal.ListHostRecordsAsync(executor, host, after, limit);
 
     /// <summary>The record at <paramref name="address"/> live at <paramref name="at"/> (the half-open lifetime <c>createdAt &lt;= at &lt;
     /// retiredAt</c>), if any (upstream <c>findDocument</c>).</summary>
@@ -404,7 +412,7 @@ public static class DocumentEngine
 internal static partial class StoreInternal
 {
     /// <summary>The columns of a record read (upstream <c>RECORD_COLUMNS</c>).</summary>
-    internal const string RecordColumns = "id, owner, namespace, kind, key, history, created_at, retired_at, meta, revision, version, fingerprint";
+    internal const string RecordColumns = "id, owner, namespace, kind, key, history, created_at, retired_at, meta, host, revision, version, fingerprint";
 
     /// <summary>A record by id (upstream <c>READ</c>).</summary>
     internal static readonly string ReadSql = $"SELECT {RecordColumns} FROM {Documents} WHERE id = ?";
@@ -451,6 +459,7 @@ internal static partial class StoreInternal
                 Namespace = address.Namespace,
                 Kind = address.Kind,
                 Key = address.Key,
+                Host = address.Host,
                 History = DocumentHistory.None,
                 CreatedAt = step.Seq,
                 Revision = 1,
@@ -526,6 +535,13 @@ internal static partial class StoreInternal
         return [.. rows.Select(RecordOf)];
     }
 
+    /// <summary>Live records belonging to one host, ordered by id. Older unscoped records never match.</summary>
+    internal static async Task<IReadOnlyList<DocumentRecord>> ListHostRecordsAsync(ISqliteExecutor executor, string host, long after, long limit)
+    {
+        var rows = await executor.AllAsync($"SELECT {RecordColumns} FROM {Documents} WHERE host = ? AND id > ? AND retired_at IS NULL ORDER BY id LIMIT ?", host, after, limit).ConfigureAwait(false);
+        return [.. rows.Select(RecordOf)];
+    }
+
     /// <summary>Up to <paramref name="limit"/> stored revisions of document <paramref name="id"/> after seq <paramref name="after"/>, in
     /// seq order (an export's page; upstream <c>listRevisions</c>).</summary>
     internal static async Task<IReadOnlyList<DocumentRevision>> ListRevisionsAsync(ISqliteExecutor executor, long id, long after, long limit)
@@ -576,6 +592,7 @@ internal static partial class StoreInternal
             CreatedAt = SqliteValues.Integer(row["created_at"]),
             RetiredAt = SqliteValues.NullableInteger(row["retired_at"]),
             Meta = row["meta"] as string,
+            Host = row.TryGetValue("host", out var host) ? host as string : null,
             Revision = SqliteValues.Integer(row["revision"]),
             Version = SqliteValues.Integer(row["version"]),
             Fingerprint = (string)row["fingerprint"]!,

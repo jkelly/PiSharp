@@ -425,5 +425,7 @@ jobs:
         run: |
           git init -q "$RUNNER_TEMP/pi" && cd "$RUNNER_TEMP/pi"
           git fetch -q --depth 1 https://github.com/earendil-works/pi f9a26365568127461c47a07a37dcb42c140a3ac5 06a466935536f8c9bcacb2d5efc0fc021be1bdff
-      - name: Check compatibility/durable-port-map.json
-        run: node tools/DurablePortMap/build-port-map.mjs --upstream "$RUNNER_TEMP/pi" --check
+      - name: Check the preserved historical v1.5.0 Durable map
+        run: node tools/DurablePortMap/build-port-map.mjs --upstream "$RUNNER_TEMP/pi" --map compatibility/durable-port-map.v1.5.0.json --check
+      - name: Check the current Pi 1.5.2 Durable overlay and applicability
+        run: node --test tools/CompatibilityReport/sync-1.5.2-applicability.test.mjs

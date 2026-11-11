@@ -74,7 +74,7 @@ public static class BuiltinProviders
         P("moonshotai-cn", "Moonshot AI CN", "https://api.moonshot.cn/v1", "MOONSHOT_API_KEY", null, Completions),
         P("nvidia", "NVIDIA", "https://integrate.api.nvidia.com/v1", "NVIDIA_API_KEY", null, Completions),
         P("openai", "OpenAI", "https://api.openai.com/v1", "OPENAI_API_KEY", "OpenAI (ChatGPT subscription)", Responses, "openai-decisions"),
-        new("openai-codex", "OpenAI Codex (legacy)", "https://chatgpt.com/backend-api", [], ProviderAuthKind.OAuthOnly,
+        new("openai-codex", "OpenAI Codex", "https://chatgpt.com/backend-api", [], ProviderAuthKind.OAuthOnly,
             "OpenAI (ChatGPT Plus/Pro)", ["openai-codex-responses"]),
         P("opencode", "OpenCode Zen", null, "OPENCODE_API_KEY", null, Messages, "google-generative-ai", Completions, Responses, "typesafe-system-one"),
         P("opencode-go", "OpenCode Go", null, "OPENCODE_API_KEY", null, Messages, "google-generative-ai", Completions, Responses),

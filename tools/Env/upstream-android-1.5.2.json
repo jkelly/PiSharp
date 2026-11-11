@@ -1,0 +1,16 @@
+[
+  {
+    "platform": "android", "arch": "arm64", "version": "1.5.2",
+    "path": "package/bin/pi-env-android-arm64/pi-env",
+    "sha256": "1a91f482f18fc2ef96aa5b5b74a84a989f9ae8fe3ad5cd0f2f7565383489e12c",
+    "backend": "upstream-rust", "sourceCommit": "b4afdddf44e059c67ccf5097e5317d913521b470",
+    "license": "MIT", "testStatus": "npm SHA-512, archive regular-file entries, binary SHA-256 and ELF64 little-endian architecture inspected; Android runtime not executed locally. Source commit identifies the repository v1.5.2 tag, not independently reproduced binary compilation."
+  },
+  {
+    "platform": "android", "arch": "x64", "version": "1.5.2",
+    "path": "package/bin/pi-env-android-x64/pi-env",
+    "sha256": "d446b5d2e477f1128448fe5738bd689adbd65a6dedc1816fa5a77aa4a6b56dd4",
+    "backend": "upstream-rust", "sourceCommit": "b4afdddf44e059c67ccf5097e5317d913521b470",
+    "license": "MIT", "testStatus": "npm SHA-512, archive regular-file entries, binary SHA-256 and ELF64 little-endian architecture inspected; Android runtime not executed locally. Source commit identifies the repository v1.5.2 tag, not independently reproduced binary compilation."
+  }
+]

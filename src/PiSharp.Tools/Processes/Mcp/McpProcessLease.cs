@@ -5,7 +5,7 @@ namespace PiSharp.Tools.Processes.Mcp;
 /// <summary>Explicit effect admission. The caller authorizes all values; no ambient environment is read.</summary>
 public sealed record McpProcessAdmission(string Executable, ImmutableArray<string> Arguments,
     string WorkingDirectory, ImmutableDictionary<string, string> Environment,
-    int MaximumStderrBytes = 1024 * 1024)
+    int MaximumStderrBytes = 64 * 1024)
 {
     /// <summary>A command line tail passed as is after the quoted executable, instead of <see cref="Arguments"/> (which must
     /// then be empty): the `cmd.exe /d /s /c "..."` line that runs a batch file, like node's windowsVerbatimArguments.</summary>
@@ -49,17 +49,31 @@ public sealed class McpProcessLease
     private readonly AsyncLocal<int> _dependencyDepth = new();
     private Task? _start, _close, _stderr;
     private IMcpOwnedDuplexProcess? _process;
-    private readonly MemoryStream _capture = new();
+    private readonly byte[] _capture;
+    private int _captureStart, _captureCount;
     private bool _stderrTruncated;
 
     public McpProcessLease(McpProcessAdmission admission, McpProcessLauncher? launcher = null)
     {
         admission.Validate(); _admission = admission; _launch = launcher ?? LaunchNativeAsync;
+        _capture = new byte[admission.MaximumStderrBytes];
     }
 
     public Stream Input { get { lock (_gate) return Ready().Input; } }
     public Stream Output { get { lock (_gate) return Ready().Output; } }
-    public byte[] CapturedStderr { get { lock (_gate) return _capture.ToArray(); } }
+    /// <summary>The last MaximumStderrBytes emitted on stderr, in original byte order.</summary>
+    public byte[] CapturedStderr
+    {
+        get
+        {
+            lock (_gate)
+            {
+                var result = new byte[_captureCount]; var first = Math.Min(_captureCount, _capture.Length - _captureStart);
+                _capture.AsSpan(_captureStart, first).CopyTo(result);
+                _capture.AsSpan(0, _captureCount - first).CopyTo(result.AsSpan(first)); return result;
+            }
+        }
+    }
     public bool StderrTruncated { get { lock (_gate) return _stderrTruncated; } }
     private IMcpOwnedDuplexProcess Ready() => _close is null && _start?.IsCompletedSuccessfully == true
         ? _process! : throw new InvalidOperationException("MCP process lease is not started or is closing.");
@@ -91,9 +105,21 @@ public sealed class McpProcessLease
             if (count == 0) return;
             lock (_gate)
             {
-                var remaining = _admission.MaximumStderrBytes - checked((int)_capture.Length);
-                _capture.Write(bytes, 0, Math.Min(count, remaining));
-                _stderrTruncated |= count > remaining;
+                _stderrTruncated |= _captureCount + count > _capture.Length;
+                if (count >= _capture.Length)
+                {
+                    bytes.AsSpan(count - _capture.Length, _capture.Length).CopyTo(_capture);
+                    _captureStart = 0; _captureCount = _capture.Length;
+                }
+                else
+                {
+                    var overflow = Math.Max(0, _captureCount + count - _capture.Length);
+                    _captureStart = (_captureStart + overflow) % _capture.Length; _captureCount -= overflow;
+                    var end = (_captureStart + _captureCount) % _capture.Length;
+                    var first = Math.Min(count, _capture.Length - end);
+                    bytes.AsSpan(0, first).CopyTo(_capture.AsSpan(end)); bytes.AsSpan(first, count - first).CopyTo(_capture);
+                    _captureCount += count;
+                }
             }
         }
     }

@@ -18,11 +18,11 @@ internal enum ColumnType { Str, Int, Num, Bool, Json }
 /// <summary>A column of the store: its name, type, nullability and default; a <c>json(...)</c> one with its definition (upstream
 /// <c>Column</c>, a union of the scalar and the <c>json(...)</c> shape: <see cref="Default"/> is only a scalar column's, <see cref="Json"/>
 /// only a <c>json(...)</c> one's).</summary>
-internal sealed record Column(string Name, ColumnType Type, bool Optional, Scalar? Default, JsonColumn? Json);
+internal sealed record Column(string Name, ColumnType Type, bool Optional, Scalar? Default, JsonColumn? Json, HostColumn? Host = null);
 
 /// <summary>A column as the <c>table</c> write records it (slice 6a §5): what a replica needs without the plugin's code; a <c>json(...)</c>
 /// column's version and schema fingerprint (upstream <c>ColumnRecord</c>).</summary>
-internal sealed record ColumnRecord(ColumnType Type, bool Optional = false, Scalar? Default = null, long? Version = null, string? Fingerprint = null)
+internal sealed record ColumnRecord(ColumnType Type, bool Optional = false, Scalar? Default = null, long? Version = null, string? Fingerprint = null, string? Host = null)
 {
     /// <summary>The record as JSON, in upstream's key order: <c>{ type, optional?, default? }</c>, or <c>{ type: "json", optional?, version,
     /// fingerprint }</c>.</summary>
@@ -33,6 +33,7 @@ internal sealed record ColumnRecord(ColumnType Type, bool Optional = false, Scal
         if (Default is { } value) json["default"] = value.ToNode();
         if (Version is { } version) json["version"] = version;
         if (Fingerprint is not null) json["fingerprint"] = Fingerprint;
+        if (Host is not null) json["host"] = Host;
         return json;
     }
 }
@@ -93,6 +94,11 @@ internal static partial class StoreInternal
         var fields = ChordJson.AsObject(optional ? ((Optional)column.Value!).Schema : column.Value as JsonNode);
         if (fields is not null && fields.TryGetPropertyValue("json", out var json) && json is JsonValue holder && holder.TryGetValue<JsonColumn>(out var definition))
             return new Column(name, ColumnType.Json, optional, null, definition);
+        if (fields is not null && fields.TryGetPropertyValue("host", out var host) && host is JsonValue hostHolder && hostHolder.TryGetValue<HostColumn>(out var hostDefinition))
+        {
+            if (optional) throw new ArgumentException($"{what}: a host(...) column is not opt(...)");
+            return new Column(name, ColumnType.Str, false, null, null, hostDefinition);
+        }
         if (fields is null || ChordJson.AsString(fields["type"]) is not { } typeName || !ScalarTypes.TryGetValue(typeName, out var type))
             throw new ArgumentException($"{what}: expected str(), int(), num(), bool(), opt(...) or json(...)");
         foreach (var key in ChordJson.KeysInJavaScriptOrder(fields))
@@ -124,6 +130,7 @@ internal static partial class StoreInternal
     /// <summary>The record of <paramref name="column"/> in the <c>table</c> write (upstream <c>columnRecord</c>).</summary>
     internal static ColumnRecord RecordOf(Column column) => column.Type == ColumnType.Json
         ? new ColumnRecord(ColumnType.Json, column.Optional, Version: column.Json!.Version, Fingerprint: column.Json.Fingerprint)
+        : column.Host is { } host ? new ColumnRecord(ColumnType.Str, Host: host.Kind.Kind)
         : new ColumnRecord(column.Type, column.Optional, column.Default);
 
     /// <summary><c>Number.isSafeInteger</c>: an integer within ±(2^53 - 1).</summary>

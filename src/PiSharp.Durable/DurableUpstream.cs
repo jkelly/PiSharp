@@ -36,14 +36,14 @@
 namespace PiSharp.Durable;
 
 /// <summary>The upstream source this port follows (decision 0005): Pi's <c>packages/durable</c> and the Chord subset it uses, at the
-/// pinned Pi v1.5.0 commit. The port began at Pi v1.1.0 and was synced to v1.2.0 and v1.5.0:
+/// pinned Pi v1.5.2 commit. The port began at Pi v1.1.0 and was synced to v1.2.0, v1.5.0 and v1.5.2:
 /// <c>compatibility/durable-port-map.json</c> maps each upstream file to its C# counterpart and status, and marks the files whose port still
 /// follows v1.2.0 (<c>needs-sync</c>: Chord v1 files phase 6 of the v1.5.0 sync re-syncs); <c>compatibility/durable-sync-1.5.0-worklist.json</c>
 /// records how the v1.5.0 sync was split.</summary>
 public static class DurableUpstream
 {
     /// <summary>The pinned Pi commit.</summary>
-    public const string Commit = "f9a26365568127461c47a07a37dcb42c140a3ac5";
+    public const string Commit = "b4afdddf44e059c67ccf5097e5317d913521b470";
     /// <summary>The upstream package and version.</summary>
-    public const string Package = "@earendil-works/pi-durable@1.5.0";
+    public const string Package = "@earendil-works/pi-durable@1.5.2";
 }

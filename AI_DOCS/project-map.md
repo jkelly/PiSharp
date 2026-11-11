@@ -1,3 +1,5 @@
+> Active 2026-11-10: [Pi/Pi Durable v1.5.2 sync](sync-1.5.2.md). Prior records below are historical.
+
 > Active 2026-11-08 implementation: see [context](gap-implementation-context.md), [execution plan](gap-execution-plan.md) and [audit contracts](upstream-audit-2026-11-08/contracts.md). Historical material below is preserved.
 
 # Project Map

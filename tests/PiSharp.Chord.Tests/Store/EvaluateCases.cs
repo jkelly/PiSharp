@@ -86,7 +86,7 @@ internal static partial class Program
             Gt(refs["note"], "a"),
             Gte(refs["count"], 0),
             InArray(refs["note"], ["z", ""]),
-            InArray(refs["note"], []),
+            InArray(refs["note"], Array.Empty<JsonNode?>()),
             Prefix(refs["note"], "a"),
             Prefix(refs["note"], ""),
             IsNull(refs["count"]),
@@ -110,7 +110,7 @@ internal static partial class Program
                 Equal(true, StoreInternal.Matches(Where(Or(IsNull(refs["note"]), Ne(refs["note"], "a"))), row), "isNull or ne");
                 Equal(true, StoreInternal.Matches(Where(And()), row), "and()");
                 Equal(false, StoreInternal.Matches(Where(Or()), row), "or()");
-                Equal(false, StoreInternal.Matches(Where(InArray(refs["n"], [])), row), "inArray []");
+                Equal(false, StoreInternal.Matches(Where(InArray(refs["n"], Array.Empty<JsonNode?>())), row), "inArray []");
             }),
             Case("store.evaluate.the-evaluator-evaluates-every-right-side-against-the-row-before-a-swap", () =>
             {

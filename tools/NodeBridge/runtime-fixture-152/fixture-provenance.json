@@ -1,0 +1,23 @@
+{
+  "kind": "test-only-published-runtime-fixture",
+  "runtimeVersion": "1.5.2",
+  "runtimePolicy": "no-default-attribution-v1",
+  "manifestSource": "src/PiSharp.Cli/Extensions/Pi/PiNodeRuntime.cs:PackageJson",
+  "initialLockSource": "tools/NodeBridge/runtime-fixture-152/package-lock.json",
+  "registry": "https://registry.npmjs.org",
+  "packageCount": 123,
+  "manifestSha256": "cf63a1ddd638264bbb37e504f876d22c415c9d4f518113f63c0c6e0be20fd8f1",
+  "lockSha256": "d07ed142a75f32d2162a4ed6b7756e8b5fc84825ed30c6f88844465e0d54d925",
+  "validation": {
+    "date": "2026-11-10",
+    "node": "v24.22.0",
+    "npm": "11.19.1",
+    "command": "npm ci --ignore-scripts --no-audit --no-fund --fetch-retries=0",
+    "destination": "artifacts/node-runtime-152",
+    "exitCode": 0,
+    "installedPackages": 123,
+    "productionCacheAdmission": false,
+    "abiCommand": "node tools/NodeBridge/installed-runtime-abi.mjs artifacts/node-runtime-152/node_modules",
+    "abiExitCode": 0
+  }
+}

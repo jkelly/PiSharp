@@ -8,6 +8,7 @@ internal static class McpProcessLeaseTests
         ("mcp-process. admission rejects relative paths and invalid environment", Admission),
         ("mcp-process. close before start acquires nothing and is stable", CloseBeforeStart),
         ("mcp-process. transferred duplex streams and bounded stderr", Capture),
+        ("mcp-process. stderr ring keeps the last bytes across partial reads", CaptureTail),
         ("mcp-process. close joins held start and stop originals", Held),
         ("mcp-process. close preserves stop and disposal faults", Failures),
         ("mcp-process. canceled launch is joined without replacement acquisition", Canceled),
@@ -40,7 +41,7 @@ internal static class McpProcessLeaseTests
     {
         var process = new Fake(); var lease = new McpProcessLease(Request(3), (_, _) => ValueTask.FromResult<IMcpOwnedDuplexProcess>(process));
         await lease.StartAsync(); Check(ReferenceEquals(lease.Input, process.Input) && ReferenceEquals(lease.Output, process.Output));
-        await lease.CloseAsync(); Check(lease.CapturedStderr.SequenceEqual(new byte[] { 1, 2, 3 }) && lease.StderrTruncated);
+        await lease.CloseAsync(); Check(lease.CapturedStderr.SequenceEqual(new byte[] { 2, 3, 4 }) && lease.StderrTruncated);
         Check(process.StopCount == 1 && process.DisposeCount == 1);
     }
     private static async Task Held()
@@ -59,6 +60,22 @@ internal static class McpProcessLeaseTests
             release.TrySetResult(); stopRelease.TrySetResult();
             await JoinAll(start, close);
         }
+    }
+    private static async Task CaptureTail()
+    {
+        var bytes = Enumerable.Range(0, 100).Select(value => (byte)value).ToArray();
+        var process = new Fake { Error = new ShortReadStream(bytes) };
+        var lease = new McpProcessLease(Request(8), (_, _) => ValueTask.FromResult<IMcpOwnedDuplexProcess>(process));
+        await lease.StartAsync(); await lease.CloseAsync();
+        Check(lease.CapturedStderr.SequenceEqual(bytes[^8..]) && lease.StderrTruncated);
+        var exact = new McpProcessLease(Request(8), (_, _) => ValueTask.FromResult<IMcpOwnedDuplexProcess>(new Fake { Error = new ShortReadStream(bytes[..8]) }));
+        await exact.StartAsync(); await exact.CloseAsync();
+        Check(exact.CapturedStderr.SequenceEqual(bytes[..8]) && !exact.StderrTruncated);
+    }
+    private sealed class ShortReadStream(byte[] bytes) : MemoryStream(bytes)
+    {
+        public override ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default) =>
+            base.ReadAsync(buffer[..Math.Min(3, buffer.Length)], cancellationToken);
     }
     private static async Task Failures()
     {
@@ -165,7 +182,7 @@ internal static class McpProcessLeaseTests
     {
         public Stream Input { get; } = new MemoryStream();
         public Stream Output { get; } = new MemoryStream();
-        public Stream Error { get; } = new MemoryStream(new byte[] { 1, 2, 3, 4 });
+        public Stream Error { get; init; } = new MemoryStream(new byte[] { 1, 2, 3, 4 });
         public Func<Task> Stop { get; init; } = () => Task.CompletedTask;
         public Exception? DisposalFailure { get; init; }
         public Func<ValueTask>? Dispose { get; init; }

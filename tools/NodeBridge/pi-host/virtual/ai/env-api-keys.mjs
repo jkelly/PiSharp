@@ -1,4 +1,4 @@
-// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/ai/src/env-api-keys.ts.
+// Pi b4afdddf44e059c67ccf5097e5317d913521b470 (MIT): packages/ai/src/env-api-keys.ts.
 // Ported to plain ESM for the PiSharp Node extension bridge (TypeScript types stripped mechanically; behaviour unchanged).
 let _existsSync = null;
 let _homedir = null;
@@ -68,6 +68,7 @@ function getApiKeyEnvVars(provider) {
         "qwen-token-plan": "QWEN_TOKEN_PLAN_API_KEY",
         "qwen-token-plan-cn": "QWEN_TOKEN_PLAN_CN_API_KEY",
         "qwen-token-plan-individual": "QWEN_TOKEN_PLAN_API_KEY",
+        "qwen-token-plan-individual-cn": "QWEN_TOKEN_PLAN_CN_API_KEY",
         openai: "OPENAI_API_KEY",
         azure: "AZURE_OPENAI_API_KEY",
         nvidia: "NVIDIA_API_KEY",

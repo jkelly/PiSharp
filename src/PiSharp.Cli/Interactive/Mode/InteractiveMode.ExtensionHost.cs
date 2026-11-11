@@ -194,7 +194,7 @@ internal sealed partial class InteractiveMode
     }
 
     private sealed record ActiveCustomComponent(PiSharp.Extensions.ExtensionCustomComponentIdentity Identity, TaskCompletionSource Done,
-        ExtensionRowsComponent Component, Action RefreshOverlayState);
+        ExtensionRowsComponent Component, Action RefreshOverlayState, Action Retire);
     /// <summary>The open ctx.ui.custom() components (inline ones are on the dialog stack, overlays on the TUI's overlay stack).</summary>
     private readonly Dictionary<PiSharp.Extensions.ExtensionCustomComponentIdentity, ActiveCustomComponent> activeCustomComponents = [];
 
@@ -219,6 +219,16 @@ internal sealed partial class InteractiveMode
         IOverlayHandle? overlay = null;
         long overlaySequence = 0;
         PiSharp.Extensions.ExtensionCustomComponentOverlayHandle? overlayControl = null;
+        var blockedSource = "extension-overlay-" + Guid.NewGuid().ToString("N");
+        var retired = false;
+        void Retire()
+        {
+            if (retired) return;
+            retired = true;
+            overlayControl?.Retire();
+            overlay?.Hide();
+            programStatus.SetBlocked(blockedSource, null);
+        }
         void UpdateOverlayState()
         {
             if (overlay?.CaptureSnapshot() is not { } snapshot) return;
@@ -233,58 +243,59 @@ internal sealed partial class InteractiveMode
             finally { context.Loop.Post(UpdateOverlayState); }
         }, data => _ = callbacks.Input(data, extensionContext, CancellationToken.None)
             .ContinueWith(static task => _ = task.Exception, TaskScheduler.Default), callbacks.CapturesViewportInput);
-        var active = new ActiveCustomComponent(callbacks.Identity, done, component, UpdateOverlayState);
+        var active = new ActiveCustomComponent(callbacks.Identity, done, component, UpdateOverlayState, Retire);
         var savedText = "";
-        await context.Loop.InvokeAsync(() =>
-        {
-            if (!activeCustomComponents.TryAdd(callbacks.Identity, active)) throw new InvalidOperationException("This extension component is already open.");
-            savedText = editor.GetText();
-            if (callbacks.Overlay is { } options)
-            {
-                overlayControl = new((operation, hidden, sequence) => context.Loop.Post(() =>
-                {
-                    if (!activeCustomComponents.TryGetValue(callbacks.Identity, out var current) || !ReferenceEquals(current, active)) return;
-                    var before = overlay?.CaptureSnapshot();
-                    switch (operation)
-                    {
-                        case "hide": overlay?.Hide(); break;
-                        case "setHidden": overlay?.SetHidden(hidden == true); break;
-                        case "focus": overlay?.Focus(); break;
-                        case "unfocus": overlay?.Unfocus(); break;
-                    }
-                    overlaySequence = sequence;
-                    if (before != overlay?.CaptureSnapshot())
-                    {
-                        RefreshCustomOverlayStates();
-                        ui.RequestRender();
-                    }
-                    else UpdateOverlayState(); // acknowledge a no-op without invalidating rows or causing a render feedback loop
-                }));
-                var nativeOptions = OverlayOptionsOf(options.Options) ?? new OverlayOptions();
-                if (options.Visible is { } visible)
-                {
-                    bool? cached = null; var cachedColumns = 0; var cachedRows = 0;
-                    nativeOptions = nativeOptions with { Visible = (columns, rows) =>
-                    {
-                        if (cached.HasValue && cachedColumns == columns && cachedRows == rows) return cached.Value;
-                        UpdateOverlayState();
-                        using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(1));
-                        try { cached = visible(columns, rows, deadline.Token).WaitAsync(deadline.Token).GetAwaiter().GetResult(); }
-                        catch (Exception error) when (error is not OutOfMemoryException) { cached = false; }
-                        cachedColumns = columns; cachedRows = rows;
-                        // One bounded predicate query per UI turn/dimension pair, even when the TUI asks repeatedly during a frame.
-                        context.Loop.Post(() => { cached = null; UpdateOverlayState(); });
-                        return cached.Value;
-                    }};
-                }
-                overlay = ui.ShowOverlay(component, nativeOptions);
-                RefreshCustomOverlayStates();
-            }
-            // Pi 1.5.0: an inline component that opts in reports pi as blocked while it is the visible dialog.
-            else PushExtensionDialog(component, BlockedStatusOf(callbacks.Blocked), () => done.TrySetResult());
-        });
         try
         {
+            await context.Loop.InvokeAsync(() =>
+            {
+                if (!activeCustomComponents.TryAdd(callbacks.Identity, active)) throw new InvalidOperationException("This extension component is already open.");
+                savedText = editor.GetExpandedText();
+                if (callbacks.Overlay is { } options)
+                {
+                    overlayControl = new((operation, hidden, sequence) => context.Loop.Post(() =>
+                    {
+                        if (!activeCustomComponents.TryGetValue(callbacks.Identity, out var current) || !ReferenceEquals(current, active)) return;
+                        var before = overlay?.CaptureSnapshot();
+                        switch (operation)
+                        {
+                            case "hide": overlay?.Hide(); break;
+                            case "setHidden": overlay?.SetHidden(hidden == true); break;
+                            case "focus": overlay?.Focus(); break;
+                            case "unfocus": overlay?.Unfocus(); break;
+                        }
+                        overlaySequence = sequence;
+                        if (before != overlay?.CaptureSnapshot())
+                        {
+                            RefreshCustomOverlayStates();
+                            ui.RequestRender();
+                        }
+                        else UpdateOverlayState(); // acknowledge a no-op without invalidating rows or causing a render feedback loop
+                    }));
+                    var nativeOptions = OverlayOptionsOf(options.Options) ?? new OverlayOptions();
+                    if (options.Visible is { } visible)
+                    {
+                        bool? cached = null; var cachedColumns = 0; var cachedRows = 0;
+                        nativeOptions = nativeOptions with { Visible = (columns, rows) =>
+                        {
+                            if (cached.HasValue && cachedColumns == columns && cachedRows == rows) return cached.Value;
+                            UpdateOverlayState();
+                            using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(1));
+                            try { cached = visible(columns, rows, deadline.Token).WaitAsync(deadline.Token).GetAwaiter().GetResult(); }
+                            catch (Exception error) when (error is not OutOfMemoryException) { cached = false; }
+                            cachedColumns = columns; cachedRows = rows;
+                            // One bounded predicate query per UI turn/dimension pair, even when the TUI asks repeatedly during a frame.
+                            context.Loop.Post(() => { cached = null; UpdateOverlayState(); });
+                            return cached.Value;
+                        }};
+                    }
+                    overlay = ui.ShowOverlay(component, nativeOptions);
+                    programStatus.SetBlocked(blockedSource, BlockedStatusOf(callbacks.Blocked));
+                    RefreshCustomOverlayStates();
+                }
+                // Pi 1.5.0: an inline component that opts in reports pi as blocked while it is the visible dialog.
+                else PushExtensionDialog(component, BlockedStatusOf(callbacks.Blocked), () => done.TrySetResult());
+            });
             if (overlayControl is not null && callbacks.Overlay?.OnHandle is { } onHandle)
                 await onHandle(overlayControl, token).ConfigureAwait(false);
             await done.Task.WaitAsync(token);
@@ -293,12 +304,11 @@ internal sealed partial class InteractiveMode
         {
             await context.Loop.InvokeAsync(() =>
             {
-                overlayControl?.Retire();
+                Retire();
                 if (activeCustomComponents.TryGetValue(callbacks.Identity, out var current) && ReferenceEquals(current, active))
                     activeCustomComponents.Remove(callbacks.Identity);
                 // Remove this overlay, not the topmost one: another overlay may have opened above it.
-                if (overlay is not null) overlay.Hide();
-                else if (RemoveExtensionDialog(component)) editor.SetText(savedText);
+                if (overlay is null && RemoveExtensionDialog(component)) editor.SetText(savedText);
                 RefreshCustomOverlayStates();
                 ui.RequestRender();
             });
@@ -353,6 +363,16 @@ internal sealed partial class InteractiveMode
         "auth" => new(ProgramBlockedKind.Auth, blocked.Message),
         _ => null
     };
+
+    private void ResetCustomComponents()
+    {
+        foreach (var active in activeCustomComponents.Values.ToArray())
+        {
+            active.Retire();
+            active.Done.TrySetResult();
+        }
+        activeCustomComponents.Clear();
+    }
 
     /// <summary>The open custom component called done() (or asked to be redrawn).</summary>
     internal void SignalExtensionCustomComponent(PiSharp.Extensions.ExtensionCustomComponentIdentity identity, bool done) => context.Loop.Post(() =>

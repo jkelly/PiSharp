@@ -17,6 +17,7 @@ public static class AnthropicResolvedProviderFactory
     {
         ArgumentNullException.ThrowIfNull(authentication);
         projectionOptions = AnthropicCatalogCompatibility.Apply(projectionOptions, modelMetadata);
+        requestOptions = AnthropicCatalogCompatibility.Apply(requestOptions, modelMetadata, model, endpoint);
         // Existing fixed endpoint/model/key admission remains authoritative and unchanged. Federation has no key.
         Validate(model, endpoint, authentication.Kind == AuthenticationKind.WorkloadIdentityFederation ? null : authentication.Authentication.Secret,
             "anthropic", "anthropic-messages");
@@ -27,8 +28,8 @@ public static class AnthropicResolvedProviderFactory
         var profile = modelMetadata is null ? null : new NativeThinkingProfile(model, modelMetadata, projectionOptions.ModelReasoning, (int)maximum);
         // Pi abe508 buildParams: compat.supportsMidConvoEffort selects managed effort, except while thinking is disabled, which needs
         // thinkingLevelMap.off !== null (Pi 1.5.0 dc939913f).
-        if (profile is not null && (profile.MidConversationEffort != projectionOptions.SupportsMidConversationEffort || profile.SupportsOff != projectionOptions.SupportsThinkingOff))
-            factory = new(endpoint, model, projectionOptions = projectionOptions with { SupportsMidConversationEffort = profile.MidConversationEffort, SupportsThinkingOff = profile.SupportsOff }, authentication, requestOptions);
+        if (profile is not null && profile.SupportsOff != projectionOptions.SupportsThinkingOff)
+            factory = new(endpoint, model, projectionOptions = projectionOptions with { SupportsThinkingOff = profile.SupportsOff }, authentication, requestOptions);
         var responseOptions = NativeProviderFactory.AnthropicMessagesOptionsForModel(modelMetadata, new AnthropicMessagesOptions(OAuthToolNames: authentication.UseOAuthProjection,
             MaximumToolDeclarations: projectionOptions.MaximumDeclarations, MaximumActiveTools: projectionOptions.MaximumActiveTools,
             MaximumInputCharacters: projectionOptions.MaximumInputCharacters));

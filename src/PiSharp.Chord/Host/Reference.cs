@@ -9,7 +9,7 @@ using PiSharp.Chord.State;
 
 namespace PiSharp.Chord.Host;
 
-internal sealed class Binding : IReference, IHolder
+internal sealed partial class Binding : IReference, IHolder
 {
     private ChordHost? host;
     internal ChordHost Host => host ?? throw (state.Error ?? HostErrors.Released());
@@ -19,6 +19,9 @@ internal sealed class Binding : IReference, IHolder
     public ChordObject? Dependent { get; private set; }
     internal ITarget? Target { get; private set; }
     internal bool Ended { get; private set; }
+    public bool Listed { get; private set; } = true;
+    internal void Unlist() => Listed = false;
+    internal ChordContext AcquisitionContext { get; set; } = ChordContext.Background;
     private RefState state = RefState.Loading;
     private readonly ReferenceState source;
     private readonly Dictionary<string, ReferenceMember> members = new(StringComparer.Ordinal);
@@ -43,7 +46,7 @@ internal sealed class Binding : IReference, IHolder
     internal void Bind(ITarget target)
     {
         if (Ended || ReferenceEquals(Target, target)) return;
-        Target?.Unhold(this); Target = target; target.Hold(this); Retarget(); Moved();
+        Host.UnboundClock.Stop(this); Target?.Unhold(this); Target = target; target.Hold(this); Retarget(); Moved();
     }
     internal void Waiting(ChordError error) => Failed(new(FailureKind.Waiting, error));
     internal void UnbindForReload()
@@ -51,7 +54,16 @@ internal sealed class Binding : IReference, IHolder
         var target = Target; Target = null; target?.Unhold(this);
         Waiting(new ChordError("unavailable", $"{Contract.Name} is not served here")); Retarget();
     }
-    internal void Failed(FailureCause failure) { if (!Ended) Move(RefState.Failed(failure)); }
+    internal void Failed(FailureCause failure)
+    {
+        if (Ended) return;
+        Move(RefState.Failed(failure));
+        if (Target is null && Host.Published)
+        {
+            Host.UnboundClock.Failed(this, failure.Error);
+            Host.UnboundClock.Start(this, Contract.Name, failure.Error);
+        }
+    }
     public void Retarget()
     {
         foreach (var member in members.Values) member.Retarget();
@@ -60,10 +72,10 @@ internal sealed class Binding : IReference, IHolder
     public void Moved()
     {
         if (Ended) return;
-        var next = Target?.State ?? RefState.Loading;
-        if (next.Kind == "live" && Target is ChordObject provider && !DataInternal.Binds(provider.Served.Provider, Contract.Version, Contract.Fingerprint))
+        var next = Target?.StateFor(Contract.Version, Contract.Fingerprint) ?? RefState.Loading;
+        if (next.Kind == "live" && Target is ChordObject provider && !provider.OldServes(Contract.Version, Contract.Fingerprint) && !DataInternal.Binds(provider.Served.Provider, Contract.Version, Contract.Fingerprint))
             next = RefState.Failed(new(FailureKind.Waiting, new ChordError("contract_mismatch", $"{Contract.Name} fingerprint is no longer served")));
-        if (next.Kind == "live" && Target is ChordObject local && AdaptedMembers.Refusal(local.Served, Contract.Version, local.Variant) is { } refusal)
+        if (next.Kind == "live" && Target is ChordObject local && AdaptedMembers.Refusal(local.FollowingAttempt?.Served ?? local.Served, Contract.Version, local.Variant) is { } refusal)
             next = RefState.Failed(new(FailureKind.Waiting, refusal));
         if (next.Kind == "live" && PendingKeys > 0) next = RefState.Loading;
         Move(next);
@@ -89,6 +101,12 @@ internal sealed class Binding : IReference, IHolder
             catch (TimeoutException) { throw state.Cause?.Error ?? new ChordError("unavailable", $"{Label}: did not become live within {timeout.TotalMilliseconds} ms"); }
         }
     }
+    internal Task ReadyAsOldWorkAsync(ChordContext context)
+    {
+        var waiting = ReadyAsync(context);
+        return Target is ChordObject target && Host.OldWork.Of(context)
+            ? Host.ReloadCycles.WaitAsync(waiting, target, Contract, context) : waiting;
+    }
     public IWatchable<JsonNode?> Member(string name) => Host.Dispatcher.Invoke(() =>
     {
         AssertUsable();
@@ -103,6 +121,8 @@ internal sealed class Binding : IReference, IHolder
     {
         AssertUsable();
         if (!ContractsInternal.DataOf(Contract).Kinds.TryGetValue(name, out var kind) || kind != MemberKind.Keyed) throw HostErrors.InvalidMember(name);
+        if (ContractsInternal.CurrentVariants(Contract)[ContractsInternal.Local].Keyed[name].KeyHost is not null)
+            throw HostErrors.InvalidMember(name);
         if (!keyed.TryGetValue(name, out var handle)) keyed.Add(name, handle = new(this, name));
         return (IKeyedHandle)handle;
     });
@@ -113,7 +133,7 @@ internal sealed class Binding : IReference, IHolder
         return Host.Dispatcher.RunAsync(async () =>
         {
             AssertUsable(); Host.Batch.AssertOutside("call");
-            await ReadyAsync(context);
+            await ReadyAsOldWorkAsync(context);
             AssertUsable();
             return await Target!.CallAsync(name, arguments, context, Caller, Contract.Version);
         });
@@ -128,13 +148,14 @@ internal sealed class Binding : IReference, IHolder
     public void End(ChordError error)
     {
         if (Ended) return;
+        Host.UnboundClock.Stop(this);
         Ended = true; var target = Target; Target = null;
         state = RefState.Ended(error);
         foreach (var member in members.Values) member.Release();
         foreach (var key in KeySources.Values.ToArray()) key.Release();
         KeySources.Clear(); keyed.Clear();
         members.Clear(); source.Released(); changed.TrySetResult(); Changed?.Invoke(); Changed = null;
-        target?.Unhold(this); Host.Forget(this); host = null; Dependent = null;
+        target?.Unhold(this); Host.Forget(this); host = null; Dependent = null; AcquisitionContext = ChordContext.Background;
     }
 }
 

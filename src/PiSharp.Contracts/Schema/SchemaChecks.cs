@@ -26,13 +26,15 @@ internal static class SchemaChecks
     public static readonly IReadOnlyDictionary<string, SchemaCheck> TypeChecks = new Dictionary<string, SchemaCheck>(StringComparer.Ordinal)
     {
         ["string"] = v => v is string,
-        ["number"] = v => v is double,
+        ["number"] = Js.IsNumber,
         ["integer"] = Js.IsInteger,
         ["boolean"] = v => v is bool,
         ["null"] = v => v is null,
         ["array"] = v => v is JsArray,
         ["object"] = IsObject,
         ["bytes"] = v => v is byte[],
+        ["bigint"] = v => v is BigInteger,
+        ["undefined"] = v => v is JsUndefined,
     };
 
     /// <summary>Whether <paramref name="v"/> is a JSON object: not null, an array or bytes.</summary>
@@ -130,11 +132,38 @@ internal static class SchemaChecks
     };
 
     /// <summary>The number keywords (other values pass).</summary>
-    public static SchemaCheck NumberCheck(double min, double max, double xmin, double xmax, double? multipleOf) => v =>
+    public static SchemaCheck NumberCheck(object min, object max, object xmin, object xmax, object? multipleOf) => v =>
     {
-        if (v is not double d) return true;
-        return d >= min && d <= max && d > xmin && d < xmax && (multipleOf is not { } m || IsMultiple(d, m));
+        if (v is not (double or BigInteger)) return true;
+        return CompareNumbers(v, min) is >= 0 && CompareNumbers(v, max) is <= 0 &&
+            CompareNumbers(v, xmin) is > 0 && CompareNumbers(v, xmax) is < 0 &&
+            (multipleOf is null || IsMultiple(v, multipleOf));
     };
+
+    // Relational comparison without rounding a bigint through double. Null is an unordered NaN.
+    public static int? CompareNumbers(object left, object right)
+    {
+        if (left is double a && right is double b) return double.IsNaN(a) || double.IsNaN(b) ? null : a.CompareTo(b);
+        if (left is BigInteger x && right is BigInteger y) return x.CompareTo(y);
+        if (left is double) return CompareNumbers(right, left) is { } reversed ? -reversed : null;
+        var big = (BigInteger)left;
+        var number = (double)right;
+        if (double.IsNaN(number)) return null;
+        if (double.IsPositiveInfinity(number)) return -1;
+        if (double.IsNegativeInfinity(number)) return 1;
+        var truncated = new BigInteger(number);
+        var compared = big.CompareTo(truncated);
+        return compared != 0 ? compared : number > Math.Truncate(number) ? -1 : number < Math.Truncate(number) ? 1 : 0;
+    }
+
+    public static bool IsMultiple(object value, object divisor)
+    {
+        if (value is double v && divisor is double d) return IsMultiple(v, d);
+        if (value is double vn && !Js.IsInteger(vn) || divisor is double dn && !Js.IsInteger(dn)) return false;
+        var integer = value is BigInteger vb ? vb : new BigInteger((double)value);
+        var by = divisor is BigInteger db ? db : new BigInteger((double)divisor);
+        return !by.IsZero && integer % by == 0;
+    }
 
     /// <summary>Whether <paramref name="v"/> is a multiple of <paramref name="d"/>, exactly for decimals.</summary>
     public static bool IsMultiple(double v, double d)
@@ -167,7 +196,7 @@ internal static class SchemaChecks
     public static SchemaCheck GuardArray(SchemaCheck inner) => v => v is not JsArray || inner(v);
 
     /// <summary>
-    /// Declared properties (a property whose value is undefined counts as absent), required keys the properties do not declare,
+    /// Declared properties (optional undefined counts as absent), required keys the properties do not declare,
     /// pattern properties and additional properties. Other values pass.
     /// </summary>
     public static SchemaCheck ObjectCore(
@@ -188,8 +217,8 @@ internal static class SchemaChecks
                 var x = o.GetOwn(key);
                 if (x is JsUndefined)
                 {
-                    if (required) return false;
-                    continue;
+                    if (!required) continue;
+                    if (!o.HasOwn(key)) return false;
                 }
 
                 if (!check(x)) return false;

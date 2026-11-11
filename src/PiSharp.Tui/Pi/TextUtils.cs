@@ -609,7 +609,8 @@ public static partial class TextUtils
             if (ansi)
             {
                 if (currentCol >= startCol && currentCol < endCol) { result.Append(pending).Append(value); pending.Clear(); }
-                else if (currentCol < startCol) pending.Append(value);
+                // APC cursor sentinels are positional, unlike persistent SGR/OSC style state.
+                else if (currentCol < startCol && !value.StartsWith("\u001b_", StringComparison.Ordinal)) pending.Append(value);
                 continue;
             }
             foreach (var segment in Graphemes(value))

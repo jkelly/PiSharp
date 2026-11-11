@@ -10,9 +10,12 @@ internal static class MarkdownMessageType
     public const string User = "user";
     public const string Assistant = "assistant";
     public const string AssistantThinking = "assistant-thinking";
+    public const string Custom = "custom";
+    public const string Summary = "summary";
+    public const string Changelog = "changelog";
 }
 
-/// <param name="MessageType">"user" | "assistant" | "assistant-thinking" (<see cref="MarkdownMessageType"/>).</param>
+/// <param name="MessageType">"user" | "assistant" | "assistant-thinking" | "custom" | "summary" | "changelog" (<see cref="MarkdownMessageType"/>).</param>
 /// <param name="IsStreaming">Whether the message is still streaming.</param>
 /// <param name="AvailableWidth">Content width the Markdown is rendered at.</param>
 /// <param name="MessageId">Persisted session-entry id. Null for live messages or live rendering; set when rendering from persisted

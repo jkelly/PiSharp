@@ -11,10 +11,17 @@ public sealed partial class ChordHost
     private bool loadComplete;
 
     /// <summary>Checks and publishes facets in one batch. Requests made before publication wait for this batch.</summary>
-    public Task<LoadReport> LoadAsync(IReadOnlyList<PluginFacet> facets, ChordContext context) => Dispatcher.RunAsync(async () =>
+    public Task<LoadReport> LoadAsync(IReadOnlyList<PluginFacet> facets, ChordContext context)
+    {
+        ArgumentNullException.ThrowIfNull(facets); ArgumentNullException.ThrowIfNull(context);
+        var attributes = Attributes(); attributes["plugins"] = (double)facets.Count;
+        return TraceOperation("chord.load", attributes, context, traced => LoadCoreAsync(facets, traced));
+    }
+    private Task<LoadReport> LoadCoreAsync(IReadOnlyList<PluginFacet> facets, ChordContext context) => Dispatcher.RunAsync(async () =>
     {
         ArgumentNullException.ThrowIfNull(facets); ArgumentNullException.ThrowIfNull(context);
         AssertOpen(); Batch.AssertOutside("load");
+        PluginStaging.CheckNames(facets);
         if (LoadStarted) throw new InvalidOperationException("load runs once per host");
         context.AbortSignal?.ThrowIfCancellationRequested();
         LoadStarted = true;
@@ -37,7 +44,7 @@ public sealed partial class ChordHost
             throw new ChordError("aborted", "load: aborted before its publication");
         }
         PublishPlugins(loaded);
-        var objects = EnsureHostObjects();
+        var objects = EnsureHostObjects(context);
         // Loading owns its publication once committed; cancellation of the caller cannot unpublish it.
         await Task.WhenAll(objects.Select(obj => obj.FirstOutcome));
         loadComplete = true;
@@ -45,10 +52,17 @@ public sealed partial class ChordHost
     });
 
     /// <summary>Serializes reload transactions while leaving the dispatcher free for the work they await.</summary>
-    public Task<ReloadReport> ReloadAsync(IReadOnlyList<PluginFacet> facets, ChordContext context, ReloadOptions? options = null) => Dispatcher.Invoke(() =>
+    public Task<ReloadReport> ReloadAsync(IReadOnlyList<PluginFacet> facets, ChordContext context, ReloadOptions? options = null)
+    {
+        ArgumentNullException.ThrowIfNull(facets); ArgumentNullException.ThrowIfNull(context);
+        var attributes = Attributes(); attributes["plugins"] = (double)facets.Count;
+        return TraceOperation("chord.reload", attributes, context, traced => ReloadQueuedAsync(facets, traced, options));
+    }
+    private Task<ReloadReport> ReloadQueuedAsync(IReadOnlyList<PluginFacet> facets, ChordContext context, ReloadOptions? options = null) => Dispatcher.Invoke(() =>
     {
         ArgumentNullException.ThrowIfNull(facets); ArgumentNullException.ThrowIfNull(context);
         AssertOpen(); Batch.AssertOutside("reload");
+        PluginStaging.CheckNames(facets);
         if (!loadComplete) throw new InvalidOperationException("reload runs after load");
         var previous = reloadTail;
         var reload = Dispatcher.RunAsync(async () =>
@@ -70,27 +84,29 @@ public sealed partial class ChordHost
         CheckReloadCancellation(context);
         var committed = new CommittedReload(plan.Added, plan.Changed, plan.Removed, plan.Failed.Select(failure => failure.Plugin).ToArray());
         PublishPlugins(plan.Plugins, wake: false);
-        var checks = new List<Task<ReloadedObject>>();
-        foreach (var fate in plan.Fates)
+        var checks = new Dictionary<ReloadFate, Task<ReloadedObject>>();
+        foreach (var fate in plan.Fates.Where(fate => fate.Kind == "end").Concat(plan.Fates.Where(fate => fate.Kind != "end")))
         {
             if (fate.Kind == "end")
             {
                 fate.Object.RemoveForReload();
-                checks.Add(Task.FromResult(new ReloadedObject(fate.Object.Label, "ended")));
+                checks.Add(fate, Task.FromResult(new ReloadedObject(fate.Object.Label, "ended")));
             }
             else
             {
-                var checkedAttempt = fate.Object.ApplyReload(fate.Served!, fate.Kind);
-                checks.Add(fate.Kind == "restart"
-                    ? Task.FromResult(new ReloadedObject(fate.Object.Label, "restarted"))
-                    : ReportObjectAsync(fate.Object.Label, fate.Kind == "swap" ? "swapped" : "retried", checkedAttempt));
+                var checkedAttempt = fate.Object.ApplyReload(fate.Served!, fate.Kind, fate.Requests ?? []);
+                checks.Add(fate, ReportObjectAsync(fate.Object.Label, fate.Kind == "restart" ? "restarted" : "retried", checkedAttempt));
             }
         }
-        EnsureHostObjects();
+        foreach (var fate in plan.Fates) fate.Object.StartSuccessor();
+        EnsureHostObjects(context);
         WakePublication();
         try
         {
-            var objects = await Task.WhenAll(checks).WaitAsync(context.AbortSignal ?? CancellationToken.None);
+            // Task.WaitAsync returns an already-completed task even with an already-cancelled token.
+            // The explicit check preserves awaitWithContext's post-commit cancellation contract.
+            context.AbortSignal?.ThrowIfCancellationRequested();
+            var objects = await Task.WhenAll(plan.Fates.Select(fate => checks[fate])).WaitAsync(context.AbortSignal ?? CancellationToken.None);
             return new(committed, plan.Failed, objects);
         }
         catch (OperationCanceledException)
@@ -164,9 +180,8 @@ public sealed partial class ChordHost
                 {
                     var declarations = PluginStaging.Record(obj, served, context);
                     recorded.Add((served.Plugin, declarations.Requests, fresh.Contains(served.Plugin)));
-                    var fate = obj.State.Kind != "live" ? "retry" :
-                        obj.Current!.OpensNatives || declarations.Natives > 0 || PluginStaging.MigratesTables(obj, declarations) ? "restart" : "swap";
-                    fates.Add(new(obj, fate, served));
+                    var fate = obj.State.Kind != "live" ? "retry" : "restart";
+                    fates.Add(new(obj, fate, served, declarations.Requests));
                 }
                 catch (Exception error) { failures.TryAdd(served.Plugin, error); }
             }
@@ -219,7 +234,7 @@ public sealed partial class ChordHost
     { if (context.AbortSignal?.IsCancellationRequested == true) throw new ChordError("aborted", "reload: aborted before its commit"); }
     private static ArgumentException Twice(string name) => new($"plugin \"{name}\" was given twice");
     private static JsonArray JsonNames(IReadOnlyList<string> names) => new(names.Select(name => (JsonNode?)JsonValue.Create(name)).ToArray());
-    private sealed record ReloadFate(ChordObject Object, string Kind, ServedType? Served = null);
+    private sealed record ReloadFate(ChordObject Object, string Kind, ServedType? Served = null, IReadOnlyList<RecordedRequest>? Requests = null);
     private sealed record ReloadPlan(IReadOnlyList<LoadedPlugin> Plugins, IReadOnlyList<string> Added, IReadOnlyList<string> Changed,
         IReadOnlyList<string> Removed, IReadOnlyList<PluginFailure> Failed, IReadOnlyList<ReloadFate> Fates);
 }

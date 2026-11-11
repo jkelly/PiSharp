@@ -65,23 +65,33 @@ jobs:
           node-version: '22'
       - name: Offline applicability and worklist structure
         run: |
-          node --test tools/CompatibilityReport/sync-applicability.test.mjs tools/ci/validation-manifest.test.mjs tools/release/publish-github-release.test.mjs
+          node --test tools/CompatibilityReport/sync-applicability.test.mjs tools/CompatibilityReport/sync-1.5.2-applicability.test.mjs tools/CompatibilityReport/accept-sync-1.5.2.test.mjs tools/ci/validation-manifest.test.mjs tools/release/publish-github-release.test.mjs
           node --test tools/ci/historical-ai-archive.test.mjs
           node tools/DurablePortMap/check-worklist.mjs --offline
       - name: Fetch immutable upstream objects
         shell: bash
         run: |
           git init "$RUNNER_TEMP/pi"
-          git -C "$RUNNER_TEMP/pi" fetch --depth 1 https://github.com/earendil-works/pi 7d073328e44337d3292a7db9b0f0308f679c5e97 f9a26365568127461c47a07a37dcb42c140a3ac5 06a466935536f8c9bcacb2d5efc0fc021be1bdff
+          git -C "$RUNNER_TEMP/pi" fetch --depth 1 https://github.com/earendil-works/pi 7d073328e44337d3292a7db9b0f0308f679c5e97 f9a26365568127461c47a07a37dcb42c140a3ac5 06a466935536f8c9bcacb2d5efc0fc021be1bdff b4afdddf44e059c67ccf5097e5317d913521b470
           git -C "$RUNNER_TEMP/pi" checkout --detach 7d073328e44337d3292a7db9b0f0308f679c5e97
           test "$(git -C "$RUNNER_TEMP/pi" rev-parse HEAD)" = 7d073328e44337d3292a7db9b0f0308f679c5e97
           git -C "$RUNNER_TEMP/pi" tag v1.5.0 f9a26365568127461c47a07a37dcb42c140a3ac5
           git -C "$RUNNER_TEMP/pi" tag v1.2.0 06a466935536f8c9bcacb2d5efc0fc021be1bdff
-      - name: Required exact-object source checks (no skipped upstream check)
+          git -C "$RUNNER_TEMP/pi" tag v1.5.2 b4afdddf44e059c67ccf5097e5317d913521b470
+      - name: Required historical exact-object checks (no skipped upstream check)
         env:
           PI_REQUIRE_UPSTREAM: '1'
           PI_UPSTREAM_V1_5_0: ${{ runner.temp }}/pi
         run: |
           node --test tools/CompatibilityReport/sync-applicability.test.mjs
           node tools/DurablePortMap/check-worklist.mjs --upstream "$RUNNER_TEMP/pi"
-          node tools/DurablePortMap/build-port-map.mjs --upstream "$RUNNER_TEMP/pi" --check
+          node tools/DurablePortMap/build-port-map.mjs --upstream "$RUNNER_TEMP/pi" --map compatibility/durable-port-map.v1.5.0.json --check
+      - name: Required current Pi 1.5.2 source and applicability checks
+        env:
+          PI_REQUIRE_UPSTREAM: '1'
+          PI_UPSTREAM_V1_5_2: ${{ runner.temp }}/pi
+        run: |
+          git -C "$RUNNER_TEMP/pi" checkout --detach b4afdddf44e059c67ccf5097e5317d913521b470
+          test "$(git -C "$RUNNER_TEMP/pi" rev-parse HEAD)" = b4afdddf44e059c67ccf5097e5317d913521b470
+          node --test tools/CompatibilityReport/sync-1.5.2-source.test.mjs tools/CompatibilityReport/sync-1.5.2-applicability.test.mjs
+          node tools/CompatibilityReport/verify-baseline.mjs --upstream "$RUNNER_TEMP/pi"

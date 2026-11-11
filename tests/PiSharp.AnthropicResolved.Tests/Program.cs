@@ -13,7 +13,7 @@ var report = JsonSerializer.Serialize(new
 {
     source = "d86654abb8862e201933517d6f1fce9f88dd117f", sourceVersion = "0.99.1",
     expectationKind = "SOURCE-DERIVED SYNTHETIC; NO SDK CAPTURE", groups = outcomes.Count,
-    failures, outcomes,
+    failures, outcomes, results = outcomes,
     heldOriginalTasks = ResolvedMainSummaryTests.OriginalTasks.Select(record => new
     {
         record.Name, status = record.Original.Status.ToString(), completed = record.Original.IsCompleted,
@@ -35,6 +35,7 @@ async Task Check(string name, Func<Task> invoke)
     outcomes.Add(new
     {
         name, passed = direct is null && original is { IsCompletedSuccessfully: true },
+        status = direct is null && original is { IsCompletedSuccessfully: true } ? "PASS_AUTHORED_NATIVE_ONLY" : "FAIL",
         originalTaskCaptured = original is not null, originalDirectAwaitCompleted = original is not null,
         originalStatus = original?.Status.ToString(), originalFaultGraph = Graph(original?.Exception),
         directOrSynchronousFaultGraph = Graph(direct)

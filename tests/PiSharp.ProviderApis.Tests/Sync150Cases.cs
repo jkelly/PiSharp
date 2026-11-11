@@ -205,7 +205,7 @@ internal static partial class Program
                 "bedrock user agent unsigned");
             return string.Join(" ", request.Headers.GetValues("User-Agent"));
         }
-        Equal("pi/1.5.0", await BedrockAgent(null), "bedrock detailed");
+        Equal("pi/1.5.2", await BedrockAgent(null), "bedrock detailed");
         Equal("pi/2.0.0", await BedrockAgent(new() { Identity = new() { Version = "2.0.0" } }), "bedrock version");
         Equal("pi", await BedrockAgent(new() { Identity = new() { Version = "2.0.0" } }, new() { UserAgent = ClientUserAgent.Short }), "bedrock short");
         Equal("acme/1.0", await BedrockAgent(new() { Identity = new() { UserAgent = ClientUserAgent.Custom("acme/1.0") } }), "bedrock custom");

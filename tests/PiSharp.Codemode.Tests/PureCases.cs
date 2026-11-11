@@ -185,10 +185,10 @@ internal static partial class Program
         {
             var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "src", "PiSharp.Codemode", "Runtime", "codemode-prelude.js");
             var text = File.ReadAllText(path).Replace("\r\n", "\n", StringComparison.Ordinal);
-            Check(text.StartsWith("// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/codemode/src/runtime/prelude-source.ts", StringComparison.Ordinal), "attribution line");
+            Check(text.StartsWith("// Pi b4afdddf44e059c67ccf5097e5317d913521b470 (MIT): packages/codemode/src/runtime/prelude-source.ts", StringComparison.Ordinal), "attribution line");
             var body = text[(text.IndexOf('\n') + 1)..];
-            // Re-evaluated from @earendil-works/pi-codemode 1.2.0 dist/runtime/prelude-source.js (image() errors, settle propertiesJson).
-            Equal("57c8dc8c0e812117d82167fa751bc368f249d5aaee56d321066fc5280c785281", Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(body))), "evaluated upstream PRELUDE_SOURCE hash");
+            // Evaluated from frozen Pi v1.5.2 packages/codemode/src/runtime/prelude-source.ts (nonfinite primitive formatting).
+            Equal("e64ad1a6afffbfb8f75a0d08434a9a3fec88d1e54206b03953bfc7b5820cc119", Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(body))), "evaluated upstream PRELUDE_SOURCE hash");
             foreach (var constant in new[] { "262144", "1048576", "16777216", "100000" }) Check(body.Contains(constant, StringComparison.Ordinal), "limit constant " + constant);
             await using var sandbox = new CodemodeSandbox();
             var result = await sandbox.ExecuteAsync("return [typeof tools, typeof ALL_TOOLS, typeof text, typeof image, typeof exit, typeof store, typeof load, typeof console.log, Object.isFrozen(Object.prototype)]");

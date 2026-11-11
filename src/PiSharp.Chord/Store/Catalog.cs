@@ -120,7 +120,7 @@ internal static partial class StoreInternal
             ? (Scalar?)Scalar.FromPrimitive(primitive)
             : null;
         return new ColumnRecord(type, ChordJson.IsBoolean(json["optional"], true), @default,
-            ChordJson.AsNumber(json["version"]) is { } version ? (long)version : null, ChordJson.AsString(json["fingerprint"]));
+            ChordJson.AsNumber(json["version"]) is { } version ? (long)version : null, ChordJson.AsString(json["fingerprint"]), ChordJson.AsString(json["host"]));
     }
 
     /// <summary>A JSON array of names as a list.</summary>

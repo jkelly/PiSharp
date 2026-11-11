@@ -1,4 +1,4 @@
-// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/schema/src/coerce.ts.
+// Pi b4afdddf44e059c67ccf5097e5317d913521b470 (MIT): packages/schema/src/coerce.ts.
 // Ported to plain ESM for the PiSharp Node extension bridge (TypeScript types stripped mechanically; behaviour unchanged).
 import { isSchemaObject } from "./resolver.mjs";
 import { sharedRegex } from "./shared.mjs";
@@ -62,7 +62,7 @@ export class Coercer {
         }
     }
     baseOf(node, base) {
-        return isSchemaObject(node) ? this.c.r.baseOf.get(node) ?? base : base;
+        return isSchemaObject(node) ? this.c.r.baseFor(node, base) : base;
     }
     dropOptionalNulls(value, schema, base) {
         if (!isSchemaObject(schema)) return value;
@@ -153,6 +153,10 @@ export class Coercer {
                 return orValue(tryBoolean(value), value);
             case "null":
                 return orValue(tryNull(value), value);
+            case "bigint":
+                return orValue(tryBigInt(value), value);
+            case "undefined":
+                return orValue(tryUndefined(value), value);
             case "array":
                 return this.convertArray(node, b, value);
             case "object":
@@ -320,7 +324,7 @@ function orValue(result, value) {
 }
 function convertLiteral(literal, value) {
     if (literal === value) return value;
-    const result = typeof literal === "string" ? tryString(value) : typeof literal === "number" ? tryNumber(value) : typeof literal === "boolean" ? tryBoolean(value) : undefined;
+    const result = typeof literal === "string" ? tryString(value) : typeof literal === "number" ? tryNumber(value) : typeof literal === "boolean" ? tryBoolean(value) : typeof literal === "bigint" ? tryBigInt(value) : undefined;
     return result !== undefined && result.value === literal ? result.value : value;
 }
 function tryString(value) {
@@ -375,6 +379,41 @@ function bigIntOfString(value) {
     if (/^-?(0|[1-9]\d*)\.\d+$/.test(value)) return BigInt(value.split(".")[0]);
     if (/^-?(0|[1-9]\d*)$/.test(value)) return BigInt(value);
     return undefined;
+}
+function tryBigInt(value) {
+    if (typeof value === "bigint") return {
+        value
+    };
+    if (typeof value === "boolean") return {
+        value: value ? 1n : 0n
+    };
+    if (isFiniteNumber(value)) return {
+        value: BigInt(Math.trunc(value))
+    };
+    if (value === null || value === undefined) return {
+        value: 0n
+    };
+    if (typeof value !== "string") return undefined;
+    const big = bigIntOfString(value);
+    if (big !== undefined) return {
+        value: big
+    };
+    const lowercase = value.toLowerCase();
+    return lowercase === "false" ? {
+        value: 0n
+    } : lowercase === "true" ? {
+        value: 1n
+    } : undefined;
+}
+function tryUndefined(value) {
+    if (value === undefined || value === null || value === 0n || value === false || value === 0) return {
+        value: undefined
+    };
+    if (typeof value !== "string") return undefined;
+    const lowercase = value.toLowerCase();
+    return lowercase === "undefined" || lowercase === "null" || value === "" || value === "0" ? {
+        value: undefined
+    } : undefined;
 }
 function tryBoolean(value) {
     if (typeof value === "bigint") return value === 0n ? {
@@ -435,7 +474,7 @@ function typesOf(schema) {
 function matchesType(value, type) {
     switch(type){
         case "number":
-            return typeof value === "number";
+            return Number.isFinite(value);
         case "integer":
             return typeof value === "number" && Number.isInteger(value);
         case "boolean":
@@ -444,6 +483,10 @@ function matchesType(value, type) {
             return typeof value === "string";
         case "null":
             return value === null;
+        case "bigint":
+            return typeof value === "bigint";
+        case "undefined":
+            return value === undefined;
         case "array":
             return Array.isArray(value);
         case "object":

@@ -103,6 +103,8 @@ internal sealed class SlotDefinition
         var (name, version, keyed, persist, fingerprint) = (current.Name, current.Version, current.Keyed, current.Persist, current.Fingerprint);
         if (definition.Keyed != keyed)
             throw new InvalidOperationException($"{name}: declared {(definition.Keyed ? "keyed" : "singleton")}, its documents are not");
+        if (definition.KeyHost?.Kind != current.KeyHost?.Kind)
+            throw new InvalidOperationException($"{name}: changed its document key kind (convert it explicitly)");
         if (definition.Persist != persist)
             throw new InvalidOperationException($"{name}: declared {(definition.Persist ? "persisted" : "in memory")}, its documents are not");
         if (definition.Version < version)

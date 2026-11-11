@@ -9,7 +9,7 @@ import { loadPiModules } from './pi-host/pi-modules.mjs';
 const nodeModules = path.resolve(process.argv[2]);
 delete process.env.PI_TELEMETRY;
 const pi = await loadPiModules(nodeModules, 'dark');
-assert.equal(pi.version, '1.5.0');
+assert.equal(pi.version, '1.5.2');
 assert.equal(process.env.PI_TELEMETRY, '0');
 const { getClientIdentity } = await import(pathToFileURL(path.join(nodeModules, '@earendil-works/pi-coding-agent/dist/core/client-identity.js')).href);
 assert.equal(getClientIdentity({ getEnableInstallTelemetry: () => true }).attribution, null);
@@ -62,7 +62,7 @@ try {
     };`);
   const extension = await pi.importExtension(filename);
   const result = await extension();
-  assert.equal(result.codingAgentVersion, '1.5.0');
+  assert.equal(result.codingAgentVersion, '1.5.2');
   assert.equal(result.sameTui, true);
   assert.equal(result.sameCompile, true);
   assert.equal(result.sameAgent, true);

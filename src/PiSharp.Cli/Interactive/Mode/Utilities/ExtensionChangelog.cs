@@ -40,7 +40,7 @@ internal static partial class ExtensionChangelog
             if (ReadPackageJson(baseDir) is not { Version: { Length: > 0 } version } package) continue;
 
             var lastVersion = settings.GetExtensionChangelogVersion(key);
-            if (string.IsNullOrEmpty(lastVersion))
+            if (string.IsNullOrEmpty(lastVersion) || !Changelog.TryParseVersion(lastVersion, out _))
             {
                 // Fresh install: record the version, don't show the changelog.
                 settings.SetExtensionChangelogVersion(key, version);

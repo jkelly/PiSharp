@@ -1,4 +1,4 @@
-// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/tui/src/tui.ts.
+// Pi b4afdddf44e059c67ccf5097e5317d913521b470 (MIT): packages/tui/src/tui.ts.
 // Ported to plain ESM for the PiSharp Node extension bridge (TypeScript types stripped mechanically; behaviour unchanged).
 import { performance } from "node:perf_hooks";
 import { isKeyRelease, matchesKey } from "./keys.mjs";
@@ -922,7 +922,7 @@ export class TuiBase extends Container {
         for(let i = 0; i < lines.length; i++){
             const line = lines[i];
             if (!isImageLine(line)) {
-                lines[i] = normalizeTerminalOutput(line) + reset;
+                lines[i] = normalizeTerminalOutput(line.replaceAll(CURSOR_MARKER, "")) + reset;
             }
         }
         return lines;
@@ -938,7 +938,7 @@ export class TuiBase extends Container {
             if (markerIndex !== -1) {
                 const beforeMarker = line.slice(0, markerIndex);
                 const col = visibleWidth(beforeMarker);
-                lines[row] = line.slice(0, markerIndex) + line.slice(markerIndex + CURSOR_MARKER.length);
+                lines[row] = line.replaceAll(CURSOR_MARKER, "");
                 return {
                     row,
                     col

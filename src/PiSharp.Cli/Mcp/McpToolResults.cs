@@ -2,6 +2,8 @@
 // toModelContent, blockToContent, limitMcpContent, MCP_OUTPUT_MAX_BYTES), packages/mcp/src/protocol/content.ts (toLlmContent) and
 // packages/coding-agent/src/core/tools/truncate.ts (truncateMiddle, formatSize).
 using System.Globalization;
+using System.Collections.Immutable;
+using PiSharp.Extensions.Runtime.Mcp.Resources;
 using System.Text;
 using System.Text.Encodings.Web;
 using System.Text.Json;
@@ -215,15 +217,9 @@ internal static partial class McpToolResults
     /// the file with the full text; images follow it.</summary>
     private static async Task<(List<object> Content, string? FullOutputPath)> LimitAsync(List<object> content, Saver save, CancellationToken token)
     {
-        var combined = TextOf(content);
-        var bytes = Encoding.UTF8.GetBytes(combined);
-        if (bytes.Length <= MaximumModelTextBytes) return (content, null);
-        string? path = null; string where;
-        try { path = await save(bytes, ".txt", token).ConfigureAwait(false); where = $"[Full output: {path} (read it with offset/limit)]"; }
-        catch (Exception failure) when (failure is IOException or UnauthorizedAccessException) { where = $"[Could not save the full output: {failure.Message}]"; }
-        var lines = combined.Length == 0 ? 0 : combined.Split('\n').Length - (combined.EndsWith('\n') ? 1 : 0);
-        var text = $"Warning: truncated output (original token count: {(bytes.Length + 3) / 4})\nTotal output lines: {lines}\n\n{TruncateMiddle(bytes, MaximumModelTextBytes)}\n\n{where}";
-        return ([Text(text), .. content.Where(block => block is Dictionary<string, object?> image && image["type"] as string == "image")], path);
+        var limited = await McpContentLimiter.LimitAsync(content.Select(Owned).ToImmutableArray(),
+            (data, extension, cancellation) => save(data, extension, cancellation), token).ConfigureAwait(false);
+        return (limited.Content.Select(block => (object)block.Value).ToList(), limited.FullOutputPath);
     }
 
     /// <summary>truncateMiddle: the start and end at character boundaries around <c>…N chars truncated…</c>.</summary>

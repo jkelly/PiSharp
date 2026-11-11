@@ -13,7 +13,7 @@ using PiSharp.Chord.Store;
 // reading stored/store.db and an import of stored/archive.jsonl) wait for the layers they need (Proofs.cs). write-stored.ts, which wrote
 // stored/ with the TypeBox helpers, is not ported: the fixtures are kept as upstream wrote them and never rewritten (decision 0013). Two
 // PiSharp cases (area cv2-store-archive) read stored/ without createHost, through the store alone: archive.jsonl decodes, imports and
-// exports back byte for byte; a copy of store.db opens and exports what archive.jsonl holds, but for the host's close that
+// exports its payload byte for byte with the authored schema-3 manifest overlay below; a copy of store.db opens and exports what archive.jsonl holds, but for the host's close that
 // write-stored.ts ran after the export (an authored expectation, read off the fixtures: one commit at seq 14 stores each job run stopped,
 // a new base at revision 3).
 internal static partial class Program
@@ -50,6 +50,20 @@ internal static partial class Program
         return parts;
     }
 
+    /// <summary>The sole archive change caused by opening historical schema-2 data with the schema-3 store. The captures stay
+    /// untouched: old records have no host ownership to infer, and every payload part must remain exact.</summary>
+    private static List<JsonNode?> Schema3ArchiveExpectation(IEnumerable<JsonNode?> historical)
+    {
+        Equal(3L, StoreInternal.StoreSchema, "authored schema-3 archive overlay target");
+        var expected = historical.Select(part => part?.DeepClone()).ToList();
+        Check(expected.Count > 0 && (string?)expected[0]?["kind"] == "manifest", "historical archive starts with its manifest");
+        Equal(2L, (long)expected[0]!["schema"]!, "captured historical schema remains 2");
+        Check(expected.Where(part => (string?)part?["kind"] == "document.create")
+            .All(part => !part!["record"]!.AsObject().ContainsKey("host")), "historical documents have no host assignment");
+        expected[0]!["schema"] = 3;
+        return expected;
+    }
+
     private static IEnumerable<(string, Func<Task>)> SchemaSchemaSwitchCases() =>
     [
         Case("schema.schema-switch.fixtures-are-upstreams-files-byte-for-byte", () =>
@@ -77,13 +91,17 @@ internal static partial class Program
         {
             var context = ChordContext.Background;
             var bytes = await File.ReadAllBytesAsync(SchemaFixture("stored", "archive.jsonl"));
+            var historical = await SchemaStoredArchive();
+            var canonical = Encoding.UTF8.GetBytes(string.Concat(historical.Select(part => ChordJson.Stringify(part) + "\n")));
+            Check(bytes.AsSpan().SequenceEqual(canonical), "historical capture remains canonical, unchanged JSONL bytes");
+            var expected = Encoding.UTF8.GetBytes(string.Concat(Schema3ArchiveExpectation(historical).Select(part => ChordJson.Stringify(part) + "\n")));
             await using var store = (ChordStore)await Tables.ImportStoreAsync(Tables.SqliteBackend(new TestSqliteDatabase(":memory:")),
                 Tables.DecodeJsonl(SchemaFileChunks(SchemaFixture("stored", "archive.jsonl"))), context);
             Sequence(new[] { 13L, 12L }, new[] { store.LastSeq, store.NextId }, "the manifest's lastSeq and nextId");
             var written = new List<byte>();
             await foreach (var chunk in Tables.EncodeJsonl(store.Export(context))) written.AddRange(chunk.ToArray());
-            Check(bytes.AsSpan().SequenceEqual(written.ToArray()), $"the export is archive.jsonl's {bytes.Length} bytes: {written.Count} bytes, " +
-                $"first difference at {bytes.Zip(written).TakeWhile(pair => pair.First == pair.Second).Count()}");
+            Check(expected.AsSpan().SequenceEqual(written.ToArray()), $"the export changes only archive.jsonl's schema to 3: {expected.Length} expected bytes, {written.Count} actual bytes, " +
+                $"first difference at {expected.Zip(written).TakeWhile(pair => pair.First == pair.Second).Count()}");
         }),
         Case("schema.schema-switch.stored-data-pisharp-a-copy-of-the-stored-store-opens-and-exports-the-archive-after-the-host-s-close", async () =>
         {
@@ -97,7 +115,7 @@ internal static partial class Program
                 await using (var store = await StoreOver(new TestSqliteDatabase(path))) parts = await Exported(store);
                 // The archive, then the host's close (authored, read off the fixtures): one more commit, at seq 14, and each job run's
                 // record at revision 3 with a new base there, its phase stopped.
-                var expected = await SchemaStoredArchive();
+                var expected = Schema3ArchiveExpectation(await SchemaStoredArchive());
                 expected[0]!["lastSeq"] = 14;
                 var runs = new HashSet<long>();
                 foreach (var part in expected)

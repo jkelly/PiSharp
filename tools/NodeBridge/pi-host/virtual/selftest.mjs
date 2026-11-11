@@ -156,7 +156,7 @@ const coverage = [];
 const expected = expectedExports();
 if (args.includes("--write-snapshot")) {
 	assert.ok(expected.source.startsWith("upstream"), "--write-snapshot needs --upstream <dir>");
-	fs.writeFileSync(snapshotPath, `${JSON.stringify({ commit: "f9a26365568127461c47a07a37dcb42c140a3ac5", exports: expected.exports }, null, "\t")}\n`);
+	fs.writeFileSync(snapshotPath, `${JSON.stringify({ commit: "b4afdddf44e059c67ccf5097e5317d913521b470", exports: expected.exports }, null, "\t")}\n`);
 	console.log(`wrote ${snapshotPath}`);
 }
 for (const [mod, names] of Object.entries(expected.exports)) {
@@ -651,7 +651,7 @@ await test("pi-coding-agent: defineTool, guards, truncation, frontmatter, config
 	assert.equal(fm.body, "Body text");
 	assert.equal(ca.stripFrontmatter("---\na: 1\n---\nrest"), "rest");
 	assert.equal(ca.CONFIG_DIR_NAME, ".pi");
-	assert.equal(ca.VERSION, "1.5.0");
+	assert.equal(ca.VERSION, "1.5.2");
 	const previous = process.env.PI_CODING_AGENT_DIR;
 	process.env.PI_CODING_AGENT_DIR = path.join(here, "agent-dir-test");
 	assert.equal(ca.getAgentDir(), path.join(here, "agent-dir-test"));
@@ -868,7 +868,7 @@ await test("(1.5.0) streamProxy parses tool-call arguments incrementally, off th
 await test("(1.5.0) agent identity: requests carry the caller's identity and PiSharp adds no attribution", async () => {
 	const core = mods["pi-agent-core.mjs"];
 	const ai = mods["pi-ai.mjs"];
-	assert.deepEqual(core.DEFAULT_AGENT_IDENTITY, {});
+	assert.deepEqual(core.DEFAULT_AGENT_IDENTITY, { attribution: null });
 	const model = { id: "m", name: "m", api: "faux", provider: "faux", baseUrl: "", reasoning: false, input: ["text"], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 1000, maxTokens: 100 };
 	const identities = [];
 	const streamFn = (_model, _context, options) => {
@@ -883,7 +883,7 @@ await test("(1.5.0) agent identity: requests carry the caller's identity and PiS
 	await agent.prompt("hi");
 	agent.identity = { attribution: { name: "ext" } };
 	await agent.prompt("again");
-	assert.deepEqual(identities, [{}, { userAgent: "ext/1.0" }, { attribution: { name: "ext" } }]);
+	assert.deepEqual(identities, [{ attribution: null }, { attribution: null, userAgent: "ext/1.0" }, { attribution: { name: "ext" } }]);
 });
 
 await test("(1.5.0) Markdown: CJK-friendly emphasis next to CJK punctuation; CommonMark flanking elsewhere", () => {

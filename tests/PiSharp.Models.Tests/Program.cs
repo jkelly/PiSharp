@@ -29,6 +29,7 @@ internal static partial class Program
         cases.AddRange(MaintainedCatalogCases());
         cases.AddRange(CatalogCorrectionCases());
         cases.AddRange(CatalogExpansionCases());
+        cases.AddRange(Sync152CatalogCases());
         cases.AddRange(ResolverCases());
         cases.AddRange(ModelsJsonCases());
         cases.AddRange(ConfigValueCases());

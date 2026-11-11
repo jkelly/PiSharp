@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.5.2]
+
+**UNRELEASED:** Source candidate targeting Pi v1.5.2, including v1.5.1. See the [candidate notes](https://github.com/jkelly/PiSharp/blob/main/docs/release-notes/1.5.2.md) and [complete source applicability map](https://github.com/jkelly/PiSharp/blob/main/compatibility/sync-1.5.2-applicability.json) for validation status and limitations. This entry does not announce a release; the latest published version remains **1.5.0.1**.
+
+- Provider/session strict-tool fallback state, model refresh, prompt-cache settings and CLI session/input behavior.
+- The complete exact Pi 1.5.2 catalog: 43 providers and 1,773 entries, with 82 additions, 21 removals and 104 changes.
+- MCP OAuth/transports, schema and codemode updates, Markdown/terminal rendering and telemetry.
+- Durable JSONL read-only recovery, SQLite batching, compaction and scheduler behavior.
+- Chord runtime, wire protocol, host data/live queries/sync, application/hosting and publication contracts.
+- Exact 1.5.2 Node extension runtime and source pins, with earlier caches, locks and release evidence preserved.
+
+Source changes do not establish complete upstream or all-platform parity. Browser DOM/React, downloaded JavaScript execution, upstream applications and build/example-only changes have explicit applicability dispositions.
+
 ## [1.5.0.1] - 2026-11-09
 
 PiSharp 1.5.0.1 keeps the Pi 1.5.0 baseline and adds reviewed backports and native implementations. Update with `dotnet tool update -g PiSharp.Cli --version 1.5.0.1`. See the [release](https://github.com/jkelly/PiSharp/releases/tag/v1.5.0.1), [updates guide](https://pisharp.ai/docs/guides/gap-updates/) and [full notes](https://github.com/jkelly/PiSharp/blob/main/docs/release-notes/1.5.0.1.md).

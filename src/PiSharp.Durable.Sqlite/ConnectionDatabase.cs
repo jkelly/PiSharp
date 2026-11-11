@@ -18,11 +18,21 @@ using Microsoft.Data.Sqlite;
 
 namespace PiSharp.Durable.Sqlite;
 
+/// <summary>Whether opening a SQLite connection can create or change its file.</summary>
+public enum SqliteDatabaseOpenMode
+{
+    ReadWriteCreate,
+    ReadOnly
+}
+
 /// <summary>Connection settings for a durable storage file, plus the storage's table prefix (upstream <c>NodeSqliteStorageOptions</c>:
 /// <c>NodeSqliteDatabaseOptions</c> and <c>SqliteStorageOptions</c>). <see cref="SqliteConnectionDatabase.OpenAsync"/> reads only the
 /// connection settings, and <see cref="SqliteStorage.OpenAsync(ISqliteDatabase, SqliteStorageOptions?)"/> only the prefix.</summary>
 public sealed record SqliteStorageOptions
 {
+    /// <summary>Read-only opening requires an existing file and avoids write pragmas and close-time checkpoints.</summary>
+    public SqliteDatabaseOpenMode OpenMode { get; init; } = SqliteDatabaseOpenMode.ReadWriteCreate;
+
     /// <summary>SQLite WAL auto-checkpoint threshold in pages. SQLite and this adapter default to 1,000; 0 disables it.</summary>
     public int? WalAutoCheckpointPages { get; init; }
 
@@ -329,10 +339,14 @@ public sealed class SqliteConnectionDatabase : SqliteConnectionExecutor, ISqlite
     private const int DefaultBusyTimeoutMs = 5_000;
 
     private readonly SerialOperationQueue access = new();
+    private readonly bool readOnly;
     private bool closed;
 
     /// <summary>Adapts an open connection, which the database then owns. Open file connections with <c>Pooling=False</c>.</summary>
-    public SqliteConnectionDatabase(SqliteConnection connection) : base(Checked(connection), new StatementCache()) { }
+    public SqliteConnectionDatabase(SqliteConnection connection) : base(Checked(connection), new StatementCache())
+    {
+        readOnly = new SqliteConnectionStringBuilder(connection.ConnectionString).Mode == SqliteOpenMode.ReadOnly;
+    }
 
     /// <summary>Prepare counts for resident statements only, bounded by the cache capacity.</summary>
     internal IReadOnlyDictionary<string, int> PrepareCounts => Statements.PrepareCounts;
@@ -349,7 +363,7 @@ public sealed class SqliteConnectionDatabase : SqliteConnectionExecutor, ISqlite
         return access.RunAsync(async () =>
         {
             AssertOpen();
-            Execute("BEGIN IMMEDIATE");
+            Execute(readOnly ? "BEGIN" : "BEGIN IMMEDIATE");
             var scope = new SqliteConnectionTransaction.TransactionScope();
             try
             {
@@ -382,7 +396,7 @@ public sealed class SqliteConnectionDatabase : SqliteConnectionExecutor, ISqlite
         Statements.Clear();
         try
         {
-            Execute("PRAGMA wal_checkpoint(TRUNCATE)");
+            if (!readOnly) Execute("PRAGMA wal_checkpoint(TRUNCATE)");
         }
         finally
         {
@@ -429,10 +443,14 @@ public sealed class SqliteConnectionDatabase : SqliteConnectionExecutor, ISqlite
 
     private static async Task<SqliteConnectionDatabase> OpenOnceAsync(string path, SqliteStorageOptions? options)
     {
+        var openMode = options?.OpenMode ?? SqliteDatabaseOpenMode.ReadWriteCreate;
+        if (openMode is not (SqliteDatabaseOpenMode.ReadWriteCreate or SqliteDatabaseOpenMode.ReadOnly))
+            throw new ArgumentOutOfRangeException(nameof(options), "Unknown SQLite open mode");
+        var readOnly = openMode == SqliteDatabaseOpenMode.ReadOnly;
         var checkpointPages = options?.WalAutoCheckpointPages ?? DefaultWalAutoCheckpointPages;
         var timeout = options?.BusyTimeoutMs ?? DefaultBusyTimeoutMs;
         ArgumentOutOfRangeException.ThrowIfNegative(timeout, nameof(options));
-        if (path != ":memory:")
+        if (!readOnly && path != ":memory:")
         {
             var directory = Path.GetDirectoryName(Path.GetFullPath(path));
             if (!string.IsNullOrEmpty(directory)) Directory.CreateDirectory(directory);
@@ -440,7 +458,7 @@ public sealed class SqliteConnectionDatabase : SqliteConnectionExecutor, ISqlite
         var connection = new SqliteConnection(new SqliteConnectionStringBuilder
         {
             DataSource = path,
-            Mode = SqliteOpenMode.ReadWriteCreate,
+            Mode = readOnly ? SqliteOpenMode.ReadOnly : SqliteOpenMode.ReadWriteCreate,
             Pooling = false,
             DefaultTimeout = Math.Max(1, (timeout + 999) / 1000),
         }.ToString());
@@ -461,9 +479,12 @@ public sealed class SqliteConnectionDatabase : SqliteConnectionExecutor, ISqlite
                 throw new NotSupportedException($"Durable SQLite storage needs SQLite {MinimumSqliteVersion} or newer for STRICT tables; the loaded " +
                     $"library is {connection.ServerVersion}");
             await adapter.ExecAsync($"PRAGMA busy_timeout = {timeout.ToString(CultureInfo.InvariantCulture)}").ConfigureAwait(false);
-            await adapter.ExecAsync("PRAGMA journal_mode = WAL").ConfigureAwait(false);
-            await adapter.ExecAsync("PRAGMA synchronous = NORMAL").ConfigureAwait(false);
-            await adapter.ExecAsync($"PRAGMA wal_autocheckpoint = {checkpointPages.ToString(CultureInfo.InvariantCulture)}").ConfigureAwait(false);
+            if (!readOnly)
+            {
+                await adapter.ExecAsync("PRAGMA journal_mode = WAL").ConfigureAwait(false);
+                await adapter.ExecAsync("PRAGMA synchronous = NORMAL").ConfigureAwait(false);
+                await adapter.ExecAsync($"PRAGMA wal_autocheckpoint = {checkpointPages.ToString(CultureInfo.InvariantCulture)}").ConfigureAwait(false);
+            }
             return adapter;
         }
         catch

@@ -36,6 +36,7 @@ Directory.CreateDirectory(agentDirectory);
 Environment.SetEnvironmentVariable("PI_CODING_AGENT_DIR", agentDirectory);
 OfflineDemoTests.Configure(dotnetHost, cliDll);
 var tests = PersistentAgentSessionTests.Cases().Concat(OfflineDemoTests.Cases())
+    .Concat(QueuedImageNormalizationTests.Cases())
     .Concat(StartupSettingsTests.Cases())
     .Concat(MistralLiveSelectionTests.Cases())
     .Concat(TerminalCustomComponentPresentationTests.Cases()).Concat(TerminalToolComponentLifecycleTests.Cases())
@@ -149,6 +150,7 @@ if (commandTerminalPackage)
         packageOptions["--published"], packageOptions["--node"], packageOptions["--repo"], packageOptions["--oracle"],
         packageOptions["--jiti"], packageOptions["--reference"], packageOptions["--command-input-reference"], packageOptions["--run-parent"]).ToArray();
 var availableTests = tests.Length;
+if (safeCaseProgress) Console.Error.WriteLine($"CodingAgent available cases: {availableTests}.");
 // IDs belong to this exact source catalog and retain their ordinals after filtering.
 var progressOrdinals = safeCaseProgress ? tests.Select((test, index) => (test.Name, Ordinal: index + 1))
     .ToDictionary(test => test.Name, test => test.Ordinal, StringComparer.Ordinal) : null;
@@ -315,6 +317,12 @@ foreach (var test in tests)
     }
 }
 Console.WriteLine($"CodingAgent tests: {tests.Length - failed - skipped} passed, {failed} failed, {skipped} skipped.");
+if (safeCaseProgress) Console.WriteLine(JsonSerializer.Serialize(new
+{
+    scope = "authored-native-durable-session-agent-and-offline-cli-composition",
+    availableTests, completeSuite = filter is null && exactName is null,
+    results = evidence, progressCaptureFailures
+}));
 await WriteReportAsync(completed: true);
 try { Directory.Delete(agentDirectory, true); } catch (IOException) { } catch (UnauthorizedAccessException) { }
 return failed == 0 && progressCaptureFailures == 0 ? 0 : 1;

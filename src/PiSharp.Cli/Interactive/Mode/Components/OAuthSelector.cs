@@ -2,6 +2,7 @@
 // Also ports InteractiveMode.getLoginProviderOptions (modes/interactive/interactive-mode.ts), which builds this selector's
 // provider list, over the narrow ILoginProviderCatalog.
 using System.Globalization;
+using System.Diagnostics;
 using System.Text.RegularExpressions;
 using PiSharp.Tui.Pi;
 using static PiSharp.Cli.Interactive.Mode.ThemeGlobals;
@@ -78,12 +79,12 @@ internal static partial class AuthSelectorFormatting
                 options.Add(new(provider.Id, provider.Name, "api_key", apiKey, status, subscription));
         }
         // Array.prototype.sort is stable; OrderBy keeps that.
-        return [.. options.OrderBy(option => option.Name, StringComparer.Create(CultureInfo.InvariantCulture, CompareOptions.None))];
+        return [.. PreferredProviders.Sort(options, option => option.Id, option => option.Name)];
     }
 }
 
 /// <summary>Component that renders an auth provider selector.</summary>
-internal sealed class OAuthSelectorComponent : Container, IComponent, IFocusable, IInputHandler
+internal sealed class OAuthSelectorComponent : Container, IComponent, IFocusable, IInputHandler, IDisposableComponent, IDisposable
 {
     private const int MaxVisible = 8;
     /// <summary>Fullscreen viewport keys (PageUp/PageDown) reach the selector, not the transcript.</summary>
@@ -106,13 +107,18 @@ internal sealed class OAuthSelectorComponent : Container, IComponent, IFocusable
     private readonly Action<string, string> onSelectCallback;
     private readonly Action onCancelCallback;
     private readonly bool showAuthTypeLabels;
+    private readonly Func<double> now;
+    private readonly double animationStart;
+    private IDisposable? animationTimer;
 
     /// <param name="mode">"login" or "logout".</param>
     /// <param name="onSelect">(providerId, authType).</param>
     public OAuthSelectorComponent(string mode, IReadOnlyList<AuthSelectorProvider> providers, Action<string, string> onSelect, Action onCancel,
-        string? initialSearchInput = null)
+        string? initialSearchInput = null, ITui? tui = null, Func<double>? now = null)
     {
         this.mode = mode;
+        this.now = now ?? (() => Stopwatch.GetTimestamp() * 1000.0 / Stopwatch.Frequency);
+        animationStart = this.now();
         allProviders = providers;
         filteredProviders = providers;
         showAuthTypeLabels = providers.Select(provider => provider.AuthType).Distinct().Count() > 1;
@@ -149,7 +155,19 @@ internal sealed class OAuthSelectorComponent : Container, IComponent, IFocusable
 
         // Initial render
         FilterProviders(initialSearchInput ?? "");
+        if (tui is not null) animationTimer = ProviderBrand.StartAnimation(tui, () => GetSelectedBrandStyle() is not null);
     }
+
+    private Func<string, double, string>? GetSelectedBrandStyle() => selectedIndex >= 0 && selectedIndex < filteredProviders.Count
+        ? ProviderBrand.GetStyle(filteredProviders[selectedIndex].Id) : null;
+
+    public override List<string> Render(int width)
+    {
+        if (animationTimer is not null && GetSelectedBrandStyle() is not null) UpdateList();
+        return base.Render(width);
+    }
+
+    public void Dispose() { animationTimer?.Dispose(); animationTimer = null; }
 
     private void FilterProviders(string query)
     {
@@ -173,6 +191,7 @@ internal sealed class OAuthSelectorComponent : Container, IComponent, IFocusable
             var isSelected = i == selectedIndex;
 
             var statusIndicator = AuthSelectorFormatting.FormatAuthSelectorProviderStatus(provider);
+            var partnerMarker = PreferredProviders.IsPreferred(provider.Id) ? theme.Fg("muted", " ✦") : "";
             var authTypeLabel = showAuthTypeLabels
                 ? theme.Fg("muted", $" [{AuthSelectorFormatting.FormatAuthSelectorProviderType(provider.AuthType, provider.Subscription)}]")
                 : "";
@@ -180,13 +199,14 @@ internal sealed class OAuthSelectorComponent : Container, IComponent, IFocusable
             if (isSelected)
             {
                 var prefix = theme.Fg("accent", "→ ");
-                var text = theme.Fg("accent", provider.Name);
-                line = prefix + text + authTypeLabel + statusIndicator;
+                var style = animationTimer is not null ? ProviderBrand.GetStyle(provider.Id) : null;
+                var text = style is not null ? style(provider.Name, now() - animationStart) : theme.Fg("accent", provider.Name);
+                line = prefix + text + partnerMarker + authTypeLabel + statusIndicator;
             }
             else
             {
                 var text = $"  {theme.Fg("text", provider.Name)}";
-                line = text + authTypeLabel + statusIndicator;
+                line = text + partnerMarker + authTypeLabel + statusIndicator;
             }
 
             listContainer.AddChild(new TruncatedText(line, 1, 0));

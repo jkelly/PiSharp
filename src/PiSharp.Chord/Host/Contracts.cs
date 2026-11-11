@@ -20,6 +20,8 @@ public sealed class HostOptions
     public required Action<HostError> OnError { get; init; }
     public TimeSpan CloseTimeout { get; init; } = TimeSpan.FromSeconds(30);
     public TimeSpan ReadyTimeout { get; init; } = TimeSpan.FromSeconds(60);
+    public TimeSpan ReloadDrainTimeout { get; init; } = TimeSpan.FromSeconds(5);
+    public Func<JsonObject, SpanAttributes>? PrincipalAttributes { get; init; }
     public TimeSpan HeartbeatPing { get; init; } = TimeSpan.FromSeconds(15);
     public TimeSpan HeartbeatClose { get; init; } = TimeSpan.FromSeconds(30);
     public IStore? Store { get; init; }
@@ -31,10 +33,11 @@ public sealed class HostOptions
 public sealed record HostError(string Kind, Exception? Error = null, string? Object = null, string? Member = null,
     FailureCause? Failure = null, int? Position = null, string? Job = null, string? Id = null, int? Restarts = null,
     string? WaitingFor = null, string? State = null, double? Since = null, string? Registry = null,
-    string? Plugin = null, long? Version = null, string? Message = null, IReadOnlyList<string>? Plugins = null);
+    string? Plugin = null, long? Version = null, string? Message = null, IReadOnlyList<string>? Plugins = null, string? Table = null);
 public sealed record GetOptions(TimeSpan? ReadyTimeout = null);
 public sealed class RootOptions
 {
+    public SpanOptions? Trace { get; init; }
     private JsonObject? principal;
     public JsonObject? Principal { get => principal; init { principal = value; HasPrincipal = true; } }
     internal bool HasPrincipal { get; private init; }
@@ -80,6 +83,7 @@ public interface IReference : IDisposable
     string? Variant { get; }
     IWatchable<JsonNode?> Member(string name);
     IKeyedHandle KeyedMember(string name);
+    IHostKeyedHandle HostKeyedMember(string name) => throw new NotSupportedException("Host-keyed members are not available on this reference.");
     Task<object?> CallAsync(string name, object? arguments, ChordContext context);
     void Retry();
     void Release();
@@ -88,6 +92,7 @@ public interface ISelf
 {
     ISingletonHandle State(StateDefinition definition);
     IKeyedHandle KeyedState(StateDefinition definition);
+    IHostKeyedHandle HostKeyedState(StateDefinition definition) => throw new NotSupportedException("Host-keyed state is not available on this implementation.");
     IWatchable<JsonNode?> Derive(IReadOnlyList<object> sources, Func<IReadOnlyList<object?>, JsonNode?> compute);
     IReference Get(Contract type, JsonObject parameters);
     IRegistryValue<V> Registry<C, V>(Registry<C, V> registry);
@@ -103,6 +108,7 @@ public interface ISelf
 public interface IStoreSelf : ISelf
 {
     ITable Table(TableDefinition definition);
+    IWatchable<JsonNode?> Query(ITable table, Query query, long limit) => throw new NotSupportedException("Live queries are not available on this implementation.");
     void Contribute<C, V>(Registry<C, V> registry, object? value);
 }
 public enum NativeCloseReason { End, Close, Reload }

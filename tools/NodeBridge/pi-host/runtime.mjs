@@ -152,7 +152,7 @@ export function describeExtension(ext) {
     flags: [...ext.flags.values()].map(f => ({ name: f.name, description: f.description, type: f.type, default: f.default })),
     shortcuts: [...ext.shortcuts.values()].map(s => ({ shortcut: s.shortcut, description: s.description })),
     messageRenderers: [...ext.messageRenderers.keys()], entryRenderers: [...(ext.entryRenderers?.keys() ?? [])],
-    toolRenderers: ext.toolRenderers?.length ?? 0, markdownTransformer: typeof ext.markdownTransformer === 'function',
+    toolRenderers: ext.toolRenderers?.length ?? 0, markdownTransformer: typeof ext.markdownTransformer?.transformer === 'function',
   };
 }
 
@@ -264,7 +264,11 @@ export class ExtensionRuntime {
         changed('flag', { name });
       },
       registerMessageRenderer(customType, renderer) { assertActive(); extension.messageRenderers.set(customType, renderer); changed('messageRenderer', { customType }); },
-      registerMarkdownTransformer(transformer) { assertActive(); extension.markdownTransformer = transformer; changed('markdownTransformer', {}); },
+      registerMarkdownTransformer(transformer, options) {
+        assertActive();
+        extension.markdownTransformer = { transformer, messageTypes: new Set(options?.messageTypes ?? ['user', 'assistant', 'assistant-thinking']) };
+        changed('markdownTransformer', {});
+      },
       registerEntryRenderer(customType, renderer) { assertActive(); extension.entryRenderers.set(customType, renderer); changed('entryRenderer', { customType }); },
       registerToolRenderer(resolver) { assertActive(); extension.toolRenderers.push(resolver); changed('toolRenderer', {}); },
       getFlag(name) {
@@ -1131,7 +1135,16 @@ export class ExtensionRuntime {
 
   transformMarkdown(markdown, context) {
     let text = markdown;
-    for (const ext of this.extensions) if (ext.markdownTransformer) text = ext.markdownTransformer(text, context ?? {});
+    for (const ext of this.extensions) {
+      const registration = ext.markdownTransformer;
+      if (!registration?.messageTypes.has(context?.messageType)) continue;
+      try {
+        const transformed = registration.transformer(text, context);
+        if (typeof transformed === 'string') text = transformed;
+      } catch {
+        // Match the native Markdown pipeline: retain current text and continue in load order.
+      }
+    }
     return text;
   }
 

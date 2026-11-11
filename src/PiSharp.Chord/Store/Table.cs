@@ -69,6 +69,7 @@ public sealed class TableDefinition
             if (!StoreInternal.IndexName.IsMatch(index)) throw new ArgumentException($"{name}: index \"{index}\": expected [a-z0-9_]+");
             indexes[index] = StoreInternal.OrderColumns(ByName, declared[index], $"{name}: index \"{index}\"");
         }
+        HostColumn = StoreInternal.HostColumnOf(Columns, Key, indexes, name);
         Indexes = indexes;
         var record = new OrderedDictionary<string, ColumnRecord>(StringComparer.Ordinal);
         foreach (var column in Columns) record[column.Name] = StoreInternal.RecordOf(column);
@@ -90,6 +91,9 @@ public sealed class TableDefinition
 
     /// <summary>The columns in declaration order.</summary>
     internal IReadOnlyList<Column> Columns { get; }
+
+    /// <summary>The one host address column, when this table holds host-scoped rows.</summary>
+    internal Column? HostColumn { get; }
 
     /// <summary>The columns by name.</summary>
     internal IReadOnlyDictionary<string, Column> ByName { get; }

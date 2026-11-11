@@ -38,10 +38,15 @@ internal static partial class Diff
     /// </summary>
     private static (string RemovedLine, string AddedLine) RenderIntraLineDiff(string oldContent, string newContent)
     {
-        var wordDiff = JsDiff.DiffWords(oldContent, newContent);
+        var sharedIndentLength = 0;
+        while (sharedIndentLength < Math.Min(oldContent.Length, newContent.Length)
+            && oldContent[sharedIndentLength] == newContent[sharedIndentLength]
+            && JsDiff.LeadingWs(oldContent[sharedIndentLength].ToString()).Length > 0) sharedIndentLength++;
+        var sharedIndent = oldContent[..sharedIndentLength];
+        var wordDiff = JsDiff.DiffWords(oldContent[sharedIndentLength..], newContent[sharedIndentLength..]);
 
-        var removedLine = "";
-        var addedLine = "";
+        var removedLine = sharedIndent;
+        var addedLine = sharedIndent;
         var isFirstRemoved = true;
         var isFirstAdded = true;
 

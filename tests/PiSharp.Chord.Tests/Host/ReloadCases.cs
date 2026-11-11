@@ -25,11 +25,12 @@ internal static partial class Program
         Case("host.reload.prepublication-get-and-atomic-failed-setup", async () =>
         {
             var type = H2Type(); await using var host = H2Host();
-            var get = host.GetAsync(type, new(), ChordContext.Background);
+            try { await host.GetAsync(type, new(), ChordContext.Background); throw new Exception("expected not_ready"); }
+            catch (ChordError error) { Equal("not_ready", error.Code, "preload get refused"); }
             var good = H2Plugin(type, "old");
             var failed = new PluginFacet("broken", Facet.Define((facet, _) => { facet.Serve(H2Type("reload.partial"), (_, _, _) => H2Read("partial")); throw new Exception("setup stopped"); }));
             var loaded = await host.LoadAsync([good, failed], ChordContext.Background);
-            using var reference = await get;
+            using var reference = await host.GetAsync(type, new(), ChordContext.Background);
             Equal("old", await H2Read(reference), "preload request resolves");
             Equal(1, loaded.Failed.Count, "setup reported");
             Check(!host.Types.ContainsKey("reload.partial"), "failed setup publishes no declarations");
@@ -65,7 +66,7 @@ internal static partial class Program
             Equal(0, opens, "recording never opens native resources"); Equal(1, result.Failed.Count, "factory failure reported");
             Equal("old", await H2Read(reference), "factory rollback retains old code");
         }),
-        Case("host.reload.swap-preserves-old-call-and-incarnation", async () =>
+        Case("host.reload.restart-preserves-old-call-and-renews-incarnation", async () =>
         {
             var type = H2Type(); var started = H2Signal(); var finish = H2Signal(); await using var host = H2Host();
             var old = new PluginFacet("item", Facet.Define((h, _) => h.Serve(type, (_, _, _) => new(new Dictionary<string, object?>
@@ -75,10 +76,12 @@ internal static partial class Program
             var incarnation = host.Dispatcher.Invoke(() => host.Objects.Values.Single().Current!.InstanceId);
             var call = H2Read(reference); await started.Task;
             var report = await host.ReloadAsync([H2Plugin(type, "new")], ChordContext.Background);
-            Equal("swapped", report.Objects.Single().Fate, "pure factory swaps");
-            Equal("new", await H2Read(reference), "new calls use new code");
-            Equal(incarnation, host.Dispatcher.Invoke(() => host.Objects.Values.Single().Current!.InstanceId), "swap retains incarnation");
+            Equal("restarted", report.Objects.Single().Fate, "pure factory restarts");
+            var nextCall = H2Read(reference);
+            Check(!nextCall.IsCompleted, "new call waits while old attempt drains");
+            Check(incarnation != host.Dispatcher.Invoke(() => host.Objects.Values.Single().Current!.InstanceId), "restart renews incarnation");
             Check(!call.IsCompleted, "old call not cancelled by publication"); finish.TrySetResult(); Equal("old", await call, "old result preserved");
+            Equal("new", await nextCall, "new call uses new code after drain");
             await host.DrainReloadsAsync(ChordContext.Background);
             Equal(0, host.Dispatcher.Invoke(() => host.Objects.Values.Single().OldAttempts.Count), "old attempt released after drain");
         }),
@@ -113,9 +116,11 @@ internal static partial class Program
         }),
         Case("host.reload.postcommit-cancellation-reports-applied-set", async () =>
         {
-            var type = H2Type(); await using var host = H2Host(); using var cancellation = new CancellationTokenSource(); var passes = 0;
+            var type = H2Type(); await using var host = H2Host(); using var cancellation = new CancellationTokenSource();
             await host.LoadAsync([H2Plugin(type, "old")], ChordContext.Background);
-            var fresh = new PluginFacet("item", Facet.Define((h, _) => h.Serve(type, (_, _, _) => { if (++passes == 2) cancellation.Cancel(); return H2Read("new"); })));
+            // Final upstream host.test.ts cancels immediately after the publication batch, not in the later successor factory.
+            host.PublishedChanged += cancellation.Cancel;
+            var fresh = H2Plugin(type, "new");
             try { await host.ReloadAsync([fresh], ChordContext.WithAbortSignal(cancellation.Token, ChordContext.Background)); throw new Exception("expected cancellation"); }
             catch (ChordError error) { Equal("aborted", error.Code, "aborted code"); Json("[\"item\"]", error.Details!["committed"]!["changed"], "applied plugin set"); }
             using var reference = await host.GetAsync(type, new(), ChordContext.Background);
@@ -254,11 +259,12 @@ internal static partial class Program
                 return Task.CompletedTask;
             });
             var oldCall = reference.CallAsync("update", null, ChordContext.Background); await started.Task;
-            var reload = host.ReloadAsync([Plugin(true)], ChordContext.Background); await attaching.Task;
+            var reload = host.ReloadAsync([Plugin(true)], ChordContext.Background); await reload;
+            Check(!attaching.Task.IsCompleted, "successor does not open before old work drains");
             commit.TrySetResult(); await committed.Task;
             Equal(1, reference.Member("count").Value!.GetValue<int>(), "old admitted commit remains visible during swap");
             await keyAdvanced.Task.WaitAsync(TimeSpan.FromSeconds(1));
-            finish.TrySetResult(); attached.TrySetResult(); await oldCall; await reload;
+            finish.TrySetResult(); await oldCall; await attaching.Task; attached.TrySetResult(); await host.DrainReloadsAsync(ChordContext.Background);
             Equal(1, reference.Member("count").Value!.GetValue<int>(), "replacement takes same document value");
             await keyWatch.StopAsync();
         }),

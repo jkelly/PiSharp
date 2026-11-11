@@ -72,7 +72,16 @@ internal sealed class SqlServerRow(KeyValuePair<string, object?>[] columns)
 
 /// <summary>Executes SQL on the database's connection: directly for the database's own queued operations, or inside a transaction for a
 /// handle. A handle is valid only while its callback runs.</summary>
-internal sealed class SqlServerExecutor
+internal interface ISqlServerExecutor
+{
+    bool CallFailed { get; set; }
+    Task RunAsync(string sql, params object?[] parameters);
+    Task<SqlServerRow?> GetAsync(string sql, params object?[] parameters);
+    Task<SqlServerRow?> GetWaitingAsync(int timeoutSeconds, string sql, params object?[] parameters);
+    Task<IReadOnlyList<SqlServerRow>> AllAsync(string sql, params object?[] parameters);
+}
+
+internal sealed class SqlServerExecutor : ISqlServerExecutor
 {
     private readonly SqlConnection connection;
     private readonly SqlTransaction? transaction;
@@ -87,8 +96,8 @@ internal sealed class SqlServerExecutor
 
     /// <summary>Whether a call of this handle failed since the flag was last reset. SqlServerStorage's batch commit resets it before each
     /// batch's checks: a failing check is then the database's, an unknown outcome, rather than one of Durable's own refusals (the watched
-    /// executor of SQLite storage, upstream <c>watchCalls</c>).</summary>
-    internal bool CallFailed { get; set; }
+    /// executor of SQLite storage, upstream <c>watchCalls</c>). Decoding malformed persisted data also sets this flag.</summary>
+    public bool CallFailed { get; set; }
 
     /// <summary>Runs one batch, which may hold several statements, with positional bindings @p0, @p1, ...: null, <see cref="long"/>,
     /// <see cref="int"/>, <see cref="bool"/> or <see cref="string"/>.</summary>
@@ -203,7 +212,17 @@ internal sealed class SqlServerExecutor
 /// until it commits or rolls back. Calling the database from inside a callback therefore waits for that callback and, when awaited there,
 /// never settles.
 /// </summary>
-internal sealed class SqlServerDatabase
+internal interface ISqlServerDatabase
+{
+    Task RunAsync(string sql, params object?[] parameters);
+    Task<SqlServerRow?> GetAsync(string sql, params object?[] parameters);
+    Task<IReadOnlyList<SqlServerRow>> AllAsync(string sql, params object?[] parameters);
+    Task<T> HoldAsync<T>(Func<ISqlServerExecutor, Task<T>> callback);
+    Task<T> TransactionAsync<T>(Func<ISqlServerExecutor, Task<T>> callback);
+    Task CloseAsync(Func<ISqlServerExecutor, Task>? beforeClose = null);
+}
+
+internal sealed class SqlServerDatabase : ISqlServerDatabase
 {
     private readonly SqlConnection connection;
     private readonly SerialOperationQueue access = new();
@@ -247,7 +266,7 @@ internal sealed class SqlServerDatabase
 
     /// <summary>Runs <paramref name="callback"/> alone on the connection, outside any transaction: no other operation of this database
     /// interleaves with its statements.</summary>
-    public Task<T> HoldAsync<T>(Func<SqlServerExecutor, Task<T>> callback)
+    public Task<T> HoldAsync<T>(Func<ISqlServerExecutor, Task<T>> callback)
     {
         ArgumentNullException.ThrowIfNull(callback);
         return access.RunAsync(async () =>
@@ -268,7 +287,7 @@ internal sealed class SqlServerDatabase
     /// <summary>Runs <paramref name="callback"/> in one READ COMMITTED transaction and returns its result after commit. When the callback
     /// fails, the transaction is rolled back before the same exception is rethrown; if rollback fails, an <see cref="AggregateException"/>
     /// holds both.</summary>
-    public Task<T> TransactionAsync<T>(Func<SqlServerExecutor, Task<T>> callback)
+    public Task<T> TransactionAsync<T>(Func<ISqlServerExecutor, Task<T>> callback)
     {
         ArgumentNullException.ThrowIfNull(callback);
         return access.RunAsync(async () =>
@@ -303,7 +322,7 @@ internal sealed class SqlServerDatabase
     /// <summary>Runs <paramref name="beforeClose"/> (when given, and the connection is still open) after every queued operation, then closes
     /// the connection; repeated calls succeed. A broken connection skips <paramref name="beforeClose"/>: its session, and every session-owned
     /// lock, has already ended.</summary>
-    public Task CloseAsync(Func<SqlServerExecutor, Task>? beforeClose = null) => access.RunAsync(async () =>
+    public Task CloseAsync(Func<ISqlServerExecutor, Task>? beforeClose = null) => access.RunAsync(async () =>
     {
         if (closed) return true;
         closed = true;

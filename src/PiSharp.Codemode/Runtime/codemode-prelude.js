@@ -1,4 +1,4 @@
-// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/codemode/src/runtime/prelude-source.ts (PRELUDE_SOURCE, evaluated; the lines below this one are unchanged).
+// Pi b4afdddf44e059c67ccf5097e5317d913521b470 (MIT): packages/codemode/src/runtime/prelude-source.ts (PRELUDE_SOURCE, evaluated; the lines below this one are unchanged).
 (function (bridge, toolsJson, globalsJson, storeJson) {
 	"use strict";
 
@@ -127,6 +127,8 @@
 	function format(value) {
 		if (typeof value === "string") return value;
 		if (value instanceof ErrorCtor) return errorText(value);
+		// JSON.stringify turns NaN and Infinity into "null".
+		if (typeof value === "number") return String(value);
 		try {
 			const json = stringify(value);
 			return json === undefined ? String(value) : json;

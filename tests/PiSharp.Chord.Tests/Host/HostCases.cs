@@ -13,16 +13,17 @@ internal static partial class Program
 {
     private static IEnumerable<(string, Func<Task>)> HostRuntimeCases() =>
     [
-        Case("host.runtime.prepublication-reference-and-registry-wait-for-real-load", async () =>
+        Case("host.runtime.local-requests-require-load", async () =>
         {
             var type = Contract.Local("host.counter", new() { Version = 1, Params = new(), Members = new() { ["value"] = Obj(("count", Int())), ["inc"] = Method() } });
             var definition = StateDefinition.Define("counter", new() { Version = 1, Schema = Obj(("count", Int())), Initial = () => new() { ["count"] = 0 } });
             var registry = Registry.Define<string, int>("host.names", new() { Version = 1 });
             var errors = new List<HostError>();
             await using var host = Hosts.Create(new() { OnError = errors.Add });
-            var pending = host.GetAsync(type, new(), ChordContext.Background);
-            var names = host.RegistryAsync(registry, ChordContext.Background);
-            Check(!pending.IsCompleted && !names.IsCompleted, "requests wait before publication");
+            try { await host.GetAsync(type, new(), ChordContext.Background); throw new Exception("expected not_ready"); }
+            catch (ChordError error) { Equal("not_ready", error.Code, "get before load"); }
+            try { await host.RegistryAsync(registry, ChordContext.Background); throw new Exception("expected not_ready"); }
+            catch (ChordError error) { Equal("not_ready", error.Code, "registry before load"); }
             var report = await host.LoadAsync([new("counter", Facet.Define((facet, _) =>
             {
                 facet.Serve(registry, new() { Compose = (table, _) => table.Count });
@@ -38,8 +39,8 @@ internal static partial class Program
                 });
             }))], ChordContext.Background);
             Equal(0, report.Failed.Count, "loaded");
-            using var reference = await pending;
-            Equal(1, (await names).Value, "host object contribution composed");
+            using var reference = await host.GetAsync(type, new(), ChordContext.Background);
+            Equal(1, (await host.RegistryAsync(registry, ChordContext.Background)).Value, "host object contribution composed");
             Equal(0, reference.Member("value").Value!["count"]!.GetValue<int>(), "initial state");
             await reference.CallAsync("inc", null, ChordContext.Background);
             Equal(1, reference.Member("value").Value!["count"]!.GetValue<int>(), "real transaction adopted");

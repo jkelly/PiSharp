@@ -39,12 +39,32 @@ internal static partial class PiAuthCommand
             if (!login)
             {
                 var id = provider?.Id ?? reference;
-                var exists = (await store.ListAsync(token).ConfigureAwait(false)).Any(entry => entry.Provider == id);
-                if (exists) await store.DeleteAsync(id, token).ConfigureAwait(false);
-                await PiCommand.Line(host.Stdout, exists ? $"Logged out of {provider?.Name ?? id}." : $"No stored credentials for {provider?.Name ?? id}.").ConfigureAwait(false);
+                var stored = await store.ListAsync(token).ConfigureAwait(false);
+                var credential = stored.FirstOrDefault(entry => entry.Provider == id);
+                if (provider is null && credential.Provider is null)
+                {
+                    await Error($"Unknown provider \"{SafeAuthText(reference)}\".").ConfigureAwait(false);
+                    await PiCommand.Line(host.Stderr, "Stored credentials: " + (stored.Count == 0 ? "none" : string.Join(", ", stored.Select(entry => SafeAuthText(entry.Provider)).Order(StringComparer.Ordinal)))).ConfigureAwait(false);
+                    return 1;
+                }
+                var name = SafeAuthText(provider?.Name ?? id);
+                if (credential.Provider is null)
+                    await PiCommand.Line(host.Stdout, $"No stored credentials for {name}. Environment variables and models.json config are unchanged.").ConfigureAwait(false);
+                else
+                {
+                    await store.DeleteAsync(id, token).ConfigureAwait(false);
+                    await PiCommand.Line(host.Stdout, credential.Type == "oauth" ? $"Logged out of {name}."
+                        : $"Removed stored API key for {name}. Environment variables and models.json config are unchanged.").ConfigureAwait(false);
+                }
                 return 0;
             }
-            if (provider is null) return await Error($"Unknown provider \"{reference}\".").ConfigureAwait(false);
+            if (provider is null)
+            {
+                await Error($"Unknown provider \"{SafeAuthText(reference)}\".").ConfigureAwait(false);
+                await PiCommand.Line(host.Stderr, "Providers: " + string.Join(", ", ProviderAuthCatalog.LoginOptions("oauth").Concat(ProviderAuthCatalog.LoginOptions("api_key"))
+                    .Select(option => option.Provider.Id).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal))).ConfigureAwait(false);
+                return 1;
+            }
             if (!host.StdinIsTty || !host.StdoutIsTty) return await Error("auth login requires an interactive terminal.").ConfigureAwait(false);
             var method = !apiKey && provider.OAuth is not null ? "oauth" : "api_key";
             var option = options.FirstOrDefault(option => option.AuthType == method);
@@ -57,10 +77,53 @@ internal static partial class PiAuthCommand
             };
             await loginHost.LoginAsync(option, new ShellLoginInteraction(host, loginHost, method == "oauth", browser), token).ConfigureAwait(false);
             await PiCommand.Line(host.Stdout, (method == "oauth" ? $"Logged in to {provider.Name}." : $"Saved API key for {provider.Name}.") + $" Credentials saved to {authPath}").ConfigureAwait(false);
+            await RefreshLoginCatalogAsync(provider.Id, provider.Name, host.Stdout, async refreshToken =>
+            {
+                var registry = await (runtime with { Credentials = () => store }).CreateModelRegistryAsync(refreshToken).ConfigureAwait(false);
+                return await registry.RefreshAsync(allowNetwork: true, force: null, providers: [provider.Id], refreshToken).ConfigureAwait(false);
+            }, token).ConfigureAwait(false);
+            if (provider.Id == "radius")
+            {
+                var agentDir = Path.GetDirectoryName(Path.GetFullPath(authPath))!;
+                try
+                {
+                    if (PiSharp.Cli.Mcp.RadiusMcpServer.Plan(provider.Id, agentDir, host.Cwd) is { } plan)
+                        await PiCommand.Line(host.Stdout, $"{(plan.Apply() ? "Updated" : "Added")} MCP server \"{plan.Name}\" in {plan.ConfigPath} to use the {provider.Name} login.").ConfigureAwait(false);
+                }
+                catch (Exception error) when (error is IOException or UnauthorizedAccessException or InvalidDataException or System.Text.Json.JsonException)
+                { await PiCommand.Line(host.Stderr, $"Could not update {Path.Combine(agentDir, "mcp.json")}: {SafeAuthText(error.Message)}").ConfigureAwait(false); }
+            }
             return 0;
         }
         catch (OperationCanceledException) { return await Error("Login cancelled.").ConfigureAwait(false); }
-        catch (Exception) { return await Error(login ? $"Failed to log in to {provider?.Name ?? reference}." : "Failed to remove stored credentials.").ConfigureAwait(false); }
+        catch (Exception) { return await Error(login ? $"Failed to log in to {SafeAuthText(provider?.Name ?? reference)}." : "Failed to remove stored credentials.").ConfigureAwait(false); }
+    }
+
+    private static string SafeAuthText(string text) => PiSharp.Tui.Pi.TextUtils.ReplaceControlCharacters(text);
+
+    /// <summary>The credential is saved; refresh failures and cancellation are diagnostic only.</summary>
+    internal static async Task RefreshLoginCatalogAsync(string providerId, string providerName, TextWriter output,
+        Func<CancellationToken, Task<IReadOnlyDictionary<string, Exception>>> refresh, CancellationToken token,
+        TimeSpan? refreshTimeout = null)
+    {
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(token);
+        timeout.CancelAfter(refreshTimeout ?? TimeSpan.FromSeconds(15));
+        try
+        {
+            var errors = await refresh(timeout.Token).ConfigureAwait(false);
+            if (token.IsCancellationRequested)
+                await PiCommand.Line(output, $"Skipped the {providerName} model catalog refresh; {PiConfig.DisplayName} refreshes it on next start.").ConfigureAwait(false);
+            else if (timeout.IsCancellationRequested)
+                await PiCommand.Line(output, $"The {providerName} model catalog refresh timed out; {PiConfig.DisplayName} refreshes it on next start.").ConfigureAwait(false);
+            else if (errors.Count > 0)
+                await PiCommand.Line(output, $"The {providerName} model catalog could not be refreshed; {PiConfig.DisplayName} retries on next start.").ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (token.IsCancellationRequested)
+        { await PiCommand.Line(output, $"Skipped the {providerName} model catalog refresh; {PiConfig.DisplayName} refreshes it on next start.").ConfigureAwait(false); }
+        catch (OperationCanceledException) when (timeout.IsCancellationRequested)
+        { await PiCommand.Line(output, $"The {providerName} model catalog refresh timed out; {PiConfig.DisplayName} refreshes it on next start.").ConfigureAwait(false); }
+        catch (Exception error)
+        { await PiCommand.Line(output, $"The {providerName} model catalog could not be refreshed: {SafeAuthText(error.Message)}").ConfigureAwait(false); }
     }
 
     private sealed class ShellLoginInteraction(PiHost host, ProviderLoginHost loginHost, bool account, bool browser) : IProviderAuthInteraction
@@ -82,7 +145,7 @@ internal static partial class PiAuthCommand
                     await PiCommand.Line(host.Stdout, $"Enter a number from 1 to {available.Count}.").ConfigureAwait(false);
                 }
             }
-            await host.Stdout.WriteAsync(prompt.Message + ": ").ConfigureAwait(false);
+            await host.Stdout.WriteAsync(prompt.Message + (prompt.Placeholder is { Length: > 0 } placeholder ? $" ({placeholder})" : "") + ": ").ConfigureAwait(false);
             await host.Stdout.FlushAsync(token).ConfigureAwait(false);
             return await ReadLineAsync(prompt.Kind == AuthPromptKind.Secret, token).ConfigureAwait(false);
         }
@@ -122,12 +185,12 @@ internal static partial class PiAuthCommand
             var url = authEvent.Kind == AuthEventKind.AuthUrl ? authEvent.Url : authEvent.Kind == AuthEventKind.DeviceCode ? authEvent.VerificationUri : null;
             if (url is not null)
             {
-                host.Stdout.WriteLine($"Open this URL to sign in: {url}");
-                if (authEvent.UserCode is { } code) host.Stdout.WriteLine($"Enter code: {code}");
+                host.Stdout.WriteLine($"Open this URL to sign in: {SafeAuthText(url)}");
+                if (authEvent.UserCode is { } code) host.Stdout.WriteLine($"Enter code: {SafeAuthText(code)}");
                 if (browser && Uri.TryCreate(url, UriKind.Absolute, out var uri) && uri.Scheme is "https" or "http") loginHost.OpenBrowser(url);
             }
             if (authEvent.Instructions is { } instructions) host.Stdout.WriteLine(instructions);
-            foreach (var link in authEvent.Links ?? []) host.Stdout.WriteLine($"{link.Label}: {link.Url}");
+            foreach (var link in authEvent.Links ?? []) host.Stdout.WriteLine($"{link.Label}: {SafeAuthText(link.Url)}");
             host.Stdout.Flush();
         }
     }

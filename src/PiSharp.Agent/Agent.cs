@@ -45,6 +45,8 @@ public sealed record AgentOptions(AgentLoopOptions? Loop = null, AgentPendingInp
     AgentCancellationBehavior CancellationBehavior = AgentCancellationBehavior.SettleAborted,
     ToolProgressDeliveryOptions? ProgressDelivery = null)
 {
+    /// <summary>Normalizes delivered input before message events, history and provider requests. Queue identity is retained until delivery.</summary>
+    public Func<ModelDescriptor, TranscriptEntry, CancellationToken, ValueTask<TranscriptEntry>>? NormalizeInput { get; init; }
     public ToolResultValueOptions ResultValues { get; init; } = ToolResultValueOptions.ExecutionBoundary;
     /// <summary>Opt-in monotonic clock for assistant response and tool execution durations (durationMs). Null records
     /// none, preserving the earlier messages and events exactly; session hosts supply the system clock.</summary>
@@ -422,6 +424,20 @@ public sealed class Agent : IAsyncDisposable
                 hooks.FinishTurn is { } finish ? (completed, cancellation) => InCallbackAsync(run, () => finish(completed, cancellation)) : null,
                 hooks.FinishTurnDecision is { } decision ? (completed, cancellation) => InCallbackAsync(run, () => decision(completed, cancellation)) : null)
             {
+                NormalizeInput = async (message, cancellation) =>
+                {
+                    if (_options.NormalizeInput is not { } normalize) return message;
+                    var normalized = await InCallbackAsync(run, () => normalize(config.Model, message, cancellation)).ConfigureAwait(false);
+                    ValidateMessages([normalized], inputsOnly: true);
+                    if (normalized.Role != message.Role) throw new ArgumentException("Input normalization cannot change the role.");
+                    if (!ReferenceEquals(message, normalized))
+                        lock (_gate)
+                        {
+                            var slot = run.Pending.FindIndex(candidate => ReferenceEquals(candidate, message));
+                            if (slot >= 0) run.Pending[slot] = normalized;
+                        }
+                    return normalized;
+                },
                 TransformRequestMessages = Project, PrepareRequestBoundary = (boundary, cancellation) => PrepareBoundary(boundary, cancellation),
                 GetContextOnlyMessages = cancellation => PollContextOnly(run, cancellation),
                 TakeTranscriptReplacement = () => { lock (_gate) { var replaced = run.TranscriptReplacement; run.TranscriptReplacement = null; return replaced; } }

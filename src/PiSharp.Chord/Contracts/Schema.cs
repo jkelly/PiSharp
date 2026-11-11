@@ -100,6 +100,9 @@ public static class Schemas
     /// <summary>Declares a keyed state member of a local contract: documents of <paramref name="schema"/> by string key, each watchable.</summary>
     public static KeyedMember Keyed(JsonNode schema) => new(schema);
 
+    /// <summary>Declares documents keyed by addresses of <paramref name="host"/>.</summary>
+    public static KeyedMember Keyed(HostKind host, JsonNode schema) => new(schema, host);
+
     /// <summary>Declares a method with neither arguments nor result: both sides are <c>null</c>.</summary>
     public static MethodDeclaration Method() => new(Nul(), Nul());
 
@@ -202,10 +205,18 @@ public sealed class MethodDeclaration
 /// <summary>A keyed state member's declaration (slice 6a §12): documents of <see cref="Schema"/> by string key; only in local contracts.</summary>
 public sealed class KeyedMember
 {
-    internal KeyedMember(JsonNode schema) => Schema = schema;
+    internal KeyedMember(JsonNode schema, HostKind? keyHost = null)
+    {
+        if (keyHost is not null) ContractsInternal.KindParams(keyHost);
+        Schema = schema;
+        KeyHost = keyHost;
+    }
 
     /// <summary>The schema of each document.</summary>
     public JsonNode Schema { get; }
+
+    /// <summary>The host kind of the keys, or null for string keys.</summary>
+    public HostKind? KeyHost { get; }
 }
 
 internal static partial class ContractsInternal

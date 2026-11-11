@@ -11,7 +11,8 @@ foreach (var group in groups)
 }
 try
 {
-    var json = JsonSerializer.Serialize(new Report("native-session-model-catalog", groups.Length, groups.Length - failed, failed, Evidence.Rows.ToArray()), Metadata.Default.Report);
+    var json = JsonSerializer.Serialize(new Report("native-session-model-catalog", groups.Length, groups.Length - failed, failed, Evidence.Rows.ToArray(),
+        Evidence.Rows.Where(row => row.Passed is not null).Select(row => new CaseResult(row.Name, row.Passed is true ? "PASS_AUTHORED_NATIVE_ONLY" : "FAIL")).ToArray()), Metadata.Default.Report);
     if (args.Length != 0)
     {
         FileStream? stream = null; var failures = new List<Exception>();
@@ -31,7 +32,8 @@ sealed class MetadataFault(IEnumerable<Exception> errors, RawOriginal[] original
 sealed record FaultNode(int Index, string? Type, string Message, int[] Children);
 sealed record FaultGraph(int? OriginalRoot, int? ObservedRoot, FaultNode[] Nodes, bool Truncated);
 sealed record TaskRow(string Name, bool Captured, bool Joined, string? Status, bool? Passed, FaultGraph Faults);
-sealed record Report(string Profile, int Expected, int Passed, int Failed, TaskRow[] Tasks);
+sealed record CaseResult(string Id, string Status);
+sealed record Report(string Profile, int Expected, int Passed, int Failed, TaskRow[] Tasks, CaseResult[] Results);
 static class Evidence
 {
     internal static readonly List<TaskRow> Rows = [];

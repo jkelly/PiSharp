@@ -1,6 +1,7 @@
 using System.Net;
 using System.Text;
 using System.Text.Json.Nodes;
+using PiSharp.AI.Catalogs;
 using PiSharp.Cli.Models;
 
 // Authored from packages/coding-agent/src/core/remote-catalog-provider.ts, core/models-store.ts and
@@ -22,7 +23,7 @@ internal static partial class Program
     {
         var response = new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(json, Encoding.UTF8, "application/json") };
         if (etag is not null) response.Headers.TryAddWithoutValidation("ETag", etag);
-        response.Content.Headers.LastModified = lastModified ?? DateTimeOffset.FromUnixTimeMilliseconds(BuiltinModelCatalog.GeneratedAtUnixMilliseconds + 60_000);
+        response.Content.Headers.LastModified = lastModified ?? DateTimeOffset.FromUnixTimeMilliseconds(CurrentModelCatalog.GeneratedAtUnixMilliseconds + 60_000);
         return response;
     }
 
@@ -62,14 +63,14 @@ internal static partial class Program
         var request = endpoint.Requests.Single();
         Equal("https://catalog.invalid/api/models/providers/groq?types=chat%2Cimage%2Cclassifier", request.Url, "catalog URL");
         Equal("application/json", request.Headers["accept"], "accept");
-        Check(System.Text.RegularExpressions.Regex.IsMatch(request.Headers["User-Agent"], @"^pi/1\.5\.0 \((win32|linux|darwin); dotnet/[0-9.]+; [a-z0-9]+\)$"), "user agent: " + request.Headers["User-Agent"]);
+        Check(System.Text.RegularExpressions.Regex.IsMatch(request.Headers["User-Agent"], @"^pi/1\.5\.2 \((win32|linux|darwin); dotnet/[0-9.]+; [a-z0-9]+\)$"), "user agent: " + request.Headers["User-Agent"]);
         Check(!request.Headers.ContainsKey("if-none-match"), "no validator without a cached body");
         Equal("GPT OSS 120B (remote)", registry.Find("groq", "openai/gpt-oss-120b")!.Name, "remote entry replaces the built-in in place");
         Equal("groq/groq-new", registry.GetAll().Where(model => model.Provider == "groq").Last().Reference, "new entries are appended");
         var stored = (await store.ReadAsync("groq", CancellationToken.None))!;
         Equal(2, stored.Models.Count, "unsupported types and id-less entries dropped");
         Equal("\"v1\"", stored.ETag, "etag stored verbatim"); Equal(1_800_000_000_000d, stored.CheckedAt, "checkedAt");
-        Equal((double)(BuiltinModelCatalog.GeneratedAtUnixMilliseconds + 60_000), stored.LastModified, "lastModified");
+        Equal((double)(CurrentModelCatalog.GeneratedAtUnixMilliseconds + 60_000), stored.LastModified, "lastModified");
         // Within four hours nothing is requested; the restored overlay stays.
         clock = clock.AddHours(3); phase = 1;
         var fresh = RemoteRegistry(endpoint, store, () => clock);
@@ -103,7 +104,7 @@ internal static partial class Program
         // A stored catalog that is not newer than the built-in data is ignored.
         var older = new InMemoryModelsStore();
         await older.WriteAsync("groq", new(new JsonArray(JsonNode.Parse("""{"id":"stale","provider":"groq","api":"openai-completions"}""")),
-            BuiltinModelCatalog.GeneratedAtUnixMilliseconds, 1), CancellationToken.None);
+            CurrentModelCatalog.GeneratedAtUnixMilliseconds, 1), CancellationToken.None);
         var restored = await ModelRegistry.CreateAsync(new() { Environment = Env(), ModelsStore = older }, CancellationToken.None);
         Check(restored.Find("groq", "stale") is null, "older catalog ignored");
         // radius: a stored gateway catalog replaces the shipped baseline.

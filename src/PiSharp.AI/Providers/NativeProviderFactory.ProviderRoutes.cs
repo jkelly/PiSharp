@@ -36,6 +36,8 @@ public sealed record ProviderRouteOptions(Func<CancellationToken, ValueTask<Prov
     /// (compaction.ts completeSummarization); only caching stays off.</summary>
     public bool SummaryThinking { get; init; }
     public string? SessionId { get; init; }
+    /// <summary>The effective prompt-cache retention: none, short or long. Null uses short; summary routes always use none.</summary>
+    public string? CacheRetention { get; init; }
     /// <summary>Caller request headers (options.headers), applied after model and provider headers; null removes.</summary>
     public ImmutableDictionary<string, string?>? Headers { get; init; }
     /// <summary>Provider env values for base URL placeholders such as {CLOUDFLARE_ACCOUNT_ID}.</summary>
@@ -122,6 +124,8 @@ public static partial class NativeProviderFactory
         HttpMessageHandler? handler = null)
     {
         ArgumentNullException.ThrowIfNull(model); ArgumentNullException.ThrowIfNull(modelMetadata); ArgumentNullException.ThrowIfNull(options);
+        if (options.CacheRetention is not (null or "none" or "short" or "long"))
+            throw new ArgumentException("Unsupported cache retention.", nameof(options));
         if (model.Api is not ("anthropic-messages" or "openai-completions" or "openai-responses") || string.IsNullOrWhiteSpace(model.Id) ||
             string.IsNullOrWhiteSpace(model.Provider) || model.Id.Length > 1024 || model.Id.Any(char.IsControl))
             throw new ArgumentException("Unsupported native model or endpoint selection.");
@@ -180,6 +184,7 @@ public static partial class NativeProviderFactory
         var handler = client is null ? null : new RouteHandler(client, rewrites);
         var maximum = options.MaxTokens; var summary = options.Summary; var plain = summary && !options.SummaryThinking;
         var sessionId = options.Summary ? null : options.SessionId;
+        var cacheRetention = summary ? "none" : options.CacheRetention ?? "short";
         // Pi has no request-size cap: projection budgets follow the configured payload limit (images of ~4.5 MB reach the provider).
         var budget = options.MaximumPayloadBytes;
         switch (model.Api)
@@ -191,7 +196,8 @@ public static partial class NativeProviderFactory
                     MaximumEntryCharacters: options.MaximumEntryCharacters, MaximumInputCharacters: budget, MaximumOutputCharacters: budget, MaximumOutputBytes: budget,
                     ToolDeclarations: new(MaximumMessages: options.MaximumMessages, MaximumEntryCharacters: options.MaximumEntryCharacters,
                         MaximumInputCharacters: budget, MaximumOutputCharacters: budget, MaximumOutputBytes: budget)) { ModelSupportsImages = images };
-                var request = new CompletionsKeyAuthRequestOptions(MaxTokens: maximum, CacheRetention: summary ? CompletionsCacheRetention.None : CompletionsCacheRetention.Short,
+                var request = new CompletionsKeyAuthRequestOptions(MaxTokens: maximum, CacheRetention: cacheRetention switch
+                    { "none" => CompletionsCacheRetention.None, "long" => CompletionsCacheRetention.Long, _ => CompletionsCacheRetention.Short },
                     MaximumPayloadBytes: options.MaximumPayloadBytes, SessionId: sessionId) { ModelMetadata = metadata, ThinkingBudgets = options.ThinkingBudgets };
                 return BindCompletions(model, endpoint, key, projection, request with { ModelHeaders = modelHeaders }, handler, plain ? null : metadata);
             }
@@ -202,14 +208,15 @@ public static partial class NativeProviderFactory
                     MaximumInputCharacters: budget, MaximumOutputCharacters: budget,
                     ToolDeclarations: new(MaximumMessages: options.MaximumMessages, MaximumEntryCharacters: options.MaximumEntryCharacters,
                         MaximumInputCharacters: budget, MaximumOutputCharacters: budget, MaximumOutputBytes: budget)) { ModelSupportsImages = images },
-                    new(SupportsMaxOutputTokens: true, MaxOutputTokens: maximum, MaximumPayloadBytes: options.MaximumPayloadBytes, SessionId: sessionId, CacheRetention: summary ? "none" : null) { ModelHeaders = modelHeaders },
+                    new(SupportsMaxOutputTokens: true, MaxOutputTokens: maximum, MaximumPayloadBytes: options.MaximumPayloadBytes, SessionId: sessionId, CacheRetention: cacheRetention) { ModelHeaders = modelHeaders },
                     handler, plain ? null : metadata);
             }
             default:
                 return BindRouteAnthropic(model, new Uri(baseUrl), key, RouteAnthropicProjection(raw, new(MaximumTokens: maximum, ModelReasoning: reasoning,
                     ModelSupportsImages: images, ThinkingEnabled: false, MaximumMessages: options.MaximumMessages, MaximumEntryCharacters: options.MaximumEntryCharacters,
                     MaximumInputCharacters: budget, MaximumOutputCharacters: budget, MaximumOutputBytes: budget,
-                    CacheRetention: summary ? AnthropicCacheRetention.None : AnthropicCacheRetention.Short) { ThinkingBudgets = options.ThinkingBudgets }, plain),
+                    CacheRetention: cacheRetention switch
+                    { "none" => AnthropicCacheRetention.None, "long" => AnthropicCacheRetention.Long, _ => AnthropicCacheRetention.Short }) { ThinkingBudgets = options.ThinkingBudgets }, plain),
                     new(MaxTokens: maximum, MaximumPayloadBytes: options.MaximumPayloadBytes, ModelHeaders: modelHeaders, SessionId: sessionId)
                     { BearerAuthorization = model.Provider == "github-copilot" },
                     handler, plain ? null : metadata);
@@ -225,8 +232,7 @@ public static partial class NativeProviderFactory
         {
             SupportsMidConversationEffort = value.TryGetProperty("compat", out var compat) && compat.ValueKind == JsonValueKind.Object &&
                 compat.TryGetProperty("supportsMidConvoEffort", out var mid) && mid.ValueKind == JsonValueKind.True,
-            SupportsTemperature = projection.SupportsTemperature && !(compat.ValueKind == JsonValueKind.Object &&
-                compat.TryGetProperty("supportsTemperature", out var temperature) && temperature.ValueKind == JsonValueKind.False),
+
             SupportsMessageThreads = projection.SupportsMessageThreads ?? (compat.ValueKind == JsonValueKind.Object &&
                 compat.TryGetProperty("supportsMessageThreads", out var threads) && threads.ValueKind is JsonValueKind.True or JsonValueKind.False ? threads.GetBoolean() : null),
             SupportsThinkingOff = supportsOff, ModelReasoning = projection.ModelReasoning && (supportsOff || !summary),
@@ -257,11 +263,13 @@ public static partial class NativeProviderFactory
     private static NativeHttpModelProvider BindRouteAnthropic(ModelDescriptor model, Uri endpoint, string key,
         AnthropicMessagesRequestOptions projectionOptions, AnthropicMessagesKeyAuthRequestOptions requestOptions, HttpMessageHandler? handler, JsonData? modelMetadata)
     {
+        projectionOptions = AnthropicCatalogCompatibility.Apply(projectionOptions, modelMetadata);
+        requestOptions = AnthropicCatalogCompatibility.Apply(requestOptions, modelMetadata, model, endpoint);
         var factory = new AnthropicMessagesKeyAuthRequestFactory(endpoint, model, projectionOptions, requestOptions);
         var maximum = requestOptions.MaxTokens ?? projectionOptions.MaximumTokens;
         var profile = modelMetadata is null ? null : new NativeThinkingProfile(model, modelMetadata, projectionOptions.ModelReasoning, (int)maximum);
-        if (profile is not null && (profile.MidConversationEffort != projectionOptions.SupportsMidConversationEffort || profile.SupportsOff != projectionOptions.SupportsThinkingOff))
-            factory = new(endpoint, model, projectionOptions = projectionOptions with { SupportsMidConversationEffort = profile.MidConversationEffort, SupportsThinkingOff = profile.SupportsOff }, requestOptions);
+        if (profile is not null && profile.SupportsOff != projectionOptions.SupportsThinkingOff)
+            factory = new(endpoint, model, projectionOptions = projectionOptions with { SupportsThinkingOff = profile.SupportsOff }, requestOptions);
         var messagesOptions = AnthropicMessagesOptionsForModel(modelMetadata);
         return Bind(model, handler, client =>
         {

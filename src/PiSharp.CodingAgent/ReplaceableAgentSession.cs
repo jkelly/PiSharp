@@ -5,7 +5,13 @@ namespace PiSharp.CodingAgent;
 
 /// <summary>Identity of one actual host attachment. Returning to the same file creates a new generation.</summary>
 public sealed record AgentSessionAttachment(PersistentAgentSession Session, long Generation, CancellationToken LifetimeToken);
-public sealed record AgentSessionSwitchRequest(string Path, bool UseLatestLeaf = true, string? SelectedLeafId = null);
+public sealed record AgentSessionSwitchRequest(string Path, bool UseLatestLeaf = true, string? SelectedLeafId = null)
+{
+    public string? WorkingDirectoryOverride { get; init; }
+}
+
+/// <summary>A prepared switch, with optional cleanup of a newly owned file if the switch does not commit.</summary>
+public sealed record AgentSessionSwitchPreparation(AgentSessionSwitchRequest Request, Func<ValueTask>? Rollback = null);
 public sealed record AgentSessionResumeRequest(string CatalogKey, bool UseLatestLeaf = true, string? SelectedLeafId = null);
 public sealed record AgentSessionReplacement(AgentSessionAttachment Previous, AgentSessionAttachment Current)
 {
@@ -289,6 +295,9 @@ public sealed partial class ReplaceableAgentSession : IAsyncDisposable
         ValidateSwitchRequest(expected, request);
         return ReplaceCoreAsync(expected, request, null, beforeSwitch, afterSwitch, null, cancellationToken);
     }
+    /// <summary>Runs under the source reservation before opening a target; null cancels. Used by hosts to offer
+    /// relocation of missing working directories consistently for RPC and extension switches.</summary>
+    public Func<AgentSessionSwitchRequest, CancellationToken, ValueTask<AgentSessionSwitchPreparation?>>? PrepareSwitch { get; set; }
     private static void ValidateSwitchRequest(AgentSessionAttachment expected, AgentSessionSwitchRequest request)
     {
         if (!System.IO.Path.IsPathFullyQualified(request.Path) || string.IsNullOrWhiteSpace(request.Path) ||
@@ -336,6 +345,8 @@ public sealed partial class ReplaceableAgentSession : IAsyncDisposable
         CancellationTokenSource? stagedLifetime = null;
         CancellationTokenSource? notificationLifetime = null;
         PersistentSessionLifecycle.PreparedCreation? created = null;
+        AgentSessionSwitchPreparation? switchPreparation = null;
+        var switchCommitted = false;
         Exception? replacementPrimary = null;
         var replacementOriginals = new SessionBoundaryOriginals();
         SessionCreationSetupWriter? setupManager = null;
@@ -355,7 +366,17 @@ public sealed partial class ReplaceableAgentSession : IAsyncDisposable
                 created = await creationServices!.PrepareAsync(expected, creation, linked.Token).ConfigureAwait(false);
                 staged = created.Session;
             }
-            else staged = await open(request!, linked.Token).ConfigureAwait(false);
+            else
+            {
+                if (PrepareSwitch is { } prepare)
+                {
+                    switchPreparation = await prepare(request!, linked.Token).ConfigureAwait(false);
+                    if (switchPreparation is null) return null;
+                    request = switchPreparation.Request;
+                    ValidateSwitchRequest(expected, request);
+                }
+                staged = await open(request!, linked.Token).ConfigureAwait(false);
+            }
             if (ReferenceEquals(staged, expected.Session)) { staged = null; throw new InvalidOperationException("Replacement factory returned the current coordinator."); }
             var state = staged.Snapshot;
             if (state.IsDisposed || state.IsRetired || state.IsAdmittingInput || state.IsConfiguring || state.IsAppendingExtensionEntry || state.IsEditingContext || state.IsCompacting || state.IsProcessingOperation || state.Agent.IsRunning || state.Fault is not null ||
@@ -403,7 +424,7 @@ public sealed partial class ReplaceableAgentSession : IAsyncDisposable
                 var lifetime = stagedLifetime!; stagedLifetime = null; lifetimes.Add(lifetime);
                 attachedLifetime = lifetime; cancelAttached = closed;
                 attached = new(staged, checked(expected.Generation + 1), lifetime.Token);
-                current = attached; sessions.Add(staged); staged = null;
+                current = attached; sessions.Add(staged); staged = null; switchCommitted = true;
             }
             // Bind admitted runtime owners against the actual committed attachment while its target
             // reservation still excludes native calls. General host/lifecycle callbacks follow release.
@@ -477,6 +498,9 @@ public sealed partial class ReplaceableAgentSession : IAsyncDisposable
                     catch (Exception error) { SessionBoundaryOriginals.Add(rollbackFailures, error); }
                 if (created is not null)
                     try { await rollbackOriginals.Join(created.DisposeAsync().AsTask(), "replacement-created-release").ConfigureAwait(false); }
+                    catch (Exception error) { SessionBoundaryOriginals.Add(rollbackFailures, error); }
+                if (!switchCommitted && switchPreparation?.Rollback is { } rollback && rollbackFailures.Count == 0)
+                    try { await rollbackOriginals.Join(rollback().AsTask(), "replacement-preparation-release").ConfigureAwait(false); }
                     catch (Exception error) { SessionBoundaryOriginals.Add(rollbackFailures, error); }
             }
             finally

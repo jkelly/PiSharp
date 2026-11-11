@@ -8,8 +8,8 @@ $Repo = (Resolve-Path -LiteralPath $Repo).Path
 $scratch = Join-Path ([IO.Path]::GetTempPath()) ('pisharp-distribution-' + [Guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $scratch | Out-Null
 $commit = '7452a7b2a355e1f603a31eb693def91a9f565df1'
-$version = '0.1.0-preview.1'
 $baselineLock = Get-Content -LiteralPath (Join-Path $Repo 'compatibility/target.lock.json') -Raw | ConvertFrom-Json
+$version = $baselineLock.source.tag.Substring(1)
 $results = [Collections.Generic.List[object]]::new()
 
 function New-FixtureFiles {
@@ -93,7 +93,79 @@ function Assert-Rejected {
     }
     throw "Expected rejection: $Message"
 }
+function Write-SourcePinMetadata {
+    param([string]$Root, [string]$Relative, $Value)
+    $path = Join-Path $Root $Relative
+    New-Item -ItemType Directory -Force -Path (Split-Path -Parent $path) | Out-Null
+    [IO.File]::WriteAllText($path, ($Value | ConvertTo-Json -Depth 20), [Text.UTF8Encoding]::new($false))
+}
+function New-SourcePinFixture {
+    $root = Join-Path $scratch 'source-pin'
+    $current = @{ tag='v1.5.2'; commit=('b' * 40); tree=('c' * 40); tagResolvedCommit=('b' * 40) }
+    $previous = @{ tag='v1.5.0'; commit=('d' * 40); tree=('e' * 40); tagResolvedCommit=('d' * 40) }
+    Write-SourcePinMetadata $root 'compatibility/target.lock.json' @{
+        source=$current; previousTarget=@{tag='v1.5.0';commit=('d' * 40);tree=('e' * 40);lock='compatibility/target.v1.5.0.lock.json'} }
+    Write-SourcePinMetadata $root 'compatibility/target.v1.5.0.lock.json' @{source=$previous}
+    Write-SourcePinMetadata $root 'compatibility/public-release.json' @{version='1.5.0.1';upstream=@{tag='v1.5.0';commit=('d' * 40)}}
+    Write-SourcePinMetadata $root 'AI_DOCS/source-validation.json' @{sourceValidationOnly=$true;pendingSuites=@();additionalPending=@()}
+    Write-SourcePinMetadata $root 'AI_DOCS/source-coverage.json' @{complete=$true}
+    $ledger=@{path='AI_DOCS/source-validation.json';sha256=(Get-FileHash (Join-Path $root 'AI_DOCS/source-validation.json')).Hash.ToLowerInvariant()}
+    $coverage=@{path='AI_DOCS/source-coverage.json';sha256=(Get-FileHash (Join-Path $root 'AI_DOCS/source-coverage.json')).Hash.ToLowerInvariant()}
+    Write-SourcePinMetadata $root 'compatibility/sync-1.5.2-acceptance.json' @{
+        eligible=$true; status='tested-with-limitations';appliedAt='2026-11-11T00:00:00Z';problems=@();source=$current;ledger=$ledger;coverage=$coverage }
+    Write-SourcePinMetadata $root 'compatibility/sync-1.5.2-applicability.json' @{
+        to=$current;acceptance=@{record='compatibility/sync-1.5.2-acceptance.json';ledger=$ledger;coverage=$coverage};
+        rows=@(@{status='tested'},@{status='tested-with-limitations'},@{status='no-op'}) }
+    return $root
+}
 try {
+    Test-Case 'published version selects its preserved lock while current target differs' {
+        $pinRepo=New-SourcePinFixture
+        $pin=Get-PiSharpDistributionSourcePin -Repo $pinRepo -Version '1.5.0.1'
+        if($pin.evidence -cne 'published-release' -or $pin.baseline.source.commit -cne ('d' * 40)){throw 'Wrong historical source selected.'}
+    }
+    Test-Case 'current candidate requires accepted source and frozen ledger hashes' {
+        $pinRepo=New-SourcePinFixture
+        $pin=Get-PiSharpDistributionSourcePin -Repo $pinRepo -Version '1.5.2'
+        if($pin.evidence -cne 'accepted-source-candidate' -or $pin.baseline.source.commit -cne ('b' * 40)){throw 'Wrong candidate source selected.'}
+    }
+    Test-Case 'unapproved package version rejected' {
+        $pinRepo=New-SourcePinFixture
+        Assert-Rejected { Get-PiSharpDistributionSourcePin -Repo $pinRepo -Version '0.1.0-preview.1' } 'version does not match'
+    }
+    Test-Case 'unapplied source acceptance rejected' {
+        $pinRepo=New-SourcePinFixture
+        $path=Join-Path $pinRepo 'compatibility/sync-1.5.2-acceptance.json'
+        $value=Get-Content $path -Raw|ConvertFrom-Json -AsHashtable;$value.eligible=$false
+        Write-SourcePinMetadata $pinRepo 'compatibility/sync-1.5.2-acceptance.json' $value
+        Assert-Rejected { Get-PiSharpDistributionSourcePin -Repo $pinRepo -Version '1.5.2' } 'not applied and qualified'
+    }
+    Test-Case 'candidate acceptance source mismatch rejected' {
+        $pinRepo=New-SourcePinFixture
+        $path=Join-Path $pinRepo 'compatibility/sync-1.5.2-acceptance.json'
+        $value=Get-Content $path -Raw|ConvertFrom-Json -AsHashtable;$value.source.commit=('a' * 40)
+        Write-SourcePinMetadata $pinRepo 'compatibility/sync-1.5.2-acceptance.json' $value
+        Assert-Rejected { Get-PiSharpDistributionSourcePin -Repo $pinRepo -Version '1.5.2' } 'does not match the current source target'
+    }
+    Test-Case 'changed accepted evidence rejected' {
+        $pinRepo=New-SourcePinFixture
+        [IO.File]::AppendAllText((Join-Path $pinRepo 'AI_DOCS/source-validation.json'), ' ')
+        Assert-Rejected { Get-PiSharpDistributionSourcePin -Repo $pinRepo -Version '1.5.2' } 'frozen evidence hash mismatch'
+    }
+    Test-Case 'published source cannot bypass malformed current target' {
+        $pinRepo=New-SourcePinFixture
+        $path=Join-Path $pinRepo 'compatibility/target.lock.json'
+        $value=Get-Content $path -Raw|ConvertFrom-Json -AsHashtable;$value.source.commit='malformed'
+        Write-SourcePinMetadata $pinRepo 'compatibility/target.lock.json' $value
+        Assert-Rejected { Get-PiSharpDistributionSourcePin -Repo $pinRepo -Version '1.5.0.1' } 'malformed source lock'
+    }
+    Test-Case 'published lock must match release upstream' {
+        $pinRepo=New-SourcePinFixture
+        $path=Join-Path $pinRepo 'compatibility/target.v1.5.0.lock.json'
+        $value=Get-Content $path -Raw|ConvertFrom-Json -AsHashtable;$value.source.commit=('a' * 40);$value.source.tagResolvedCommit=('a' * 40)
+        Write-SourcePinMetadata $pinRepo 'compatibility/target.v1.5.0.lock.json' $value
+        Assert-Rejected { Get-PiSharpDistributionSourcePin -Repo $pinRepo -Version '1.5.0.1' } 'preserved lock link differs'
+    }
     $tool = Write-Fixture -Files (New-FixtureFiles) -Name 'tool'
     $argsTool = @{ Repo = $Repo; Kind = 'tool'; Version = $version; SourceCommit = $commit }
     Test-Case 'tool metadata and documents' { $report = Assert-PiSharpDistribution -Path $tool @argsTool; if ($report.platformQualified) { throw 'Qualification overstated.' } }

@@ -31,6 +31,7 @@ internal static partial class Program
         cases.AddRange(LockfileCases());
         cases.AddRange(EntryCases());
         cases.AddRange(AuthCases());
+        cases.AddRange(Sync152AuthPackageCases());
         cases.AddRange(ExtensionEventCases());
         cases.AddRange(McpTrustCases());
         cases.AddRange(ToolsManagerCases());

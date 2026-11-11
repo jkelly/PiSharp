@@ -10,6 +10,13 @@ using System.Text.Json.Nodes;
 
 namespace PiSharp.Chord.Data;
 
+/// <summary>Errors a plugin may deliberately return to its caller.</summary>
+public static class Errors
+{
+    public static ChordError Invalid(string reason, string message, JsonNode? details = null) => new("invalid", message, reason, details);
+    public static ChordError Forbidden(string message, JsonNode? details = null) => new("forbidden", message, details: details);
+}
+
 /// <summary>A Chord failure (upstream <c>ChordError</c>): a code, a reason the code allows (required for <c>invalid</c>), a message and
 /// JSON details. Only these cross a link (<see cref="ToJson"/>): never a stack or a cause.</summary>
 public sealed class ChordError : Exception
@@ -105,7 +112,7 @@ internal static partial class DataInternal
         ["released"] = ["ended", "closed", "settled", "version", "discarded"],
         ["too_large"] = ["part"],
         // `undeclared`: a registry no plugin serves on this host.
-        ["unavailable"] = ["locked", "park_timeout", "busy", "storage_failed", "undeclared"],
+        ["unavailable"] = ["locked", "park_timeout", "busy", "storage_failed", "undeclared", "version", "reload_cycle"],
         ["aborted"] = [],
     };
 

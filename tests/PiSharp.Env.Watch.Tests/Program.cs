@@ -97,7 +97,7 @@ internal static class Program
                 Check(small["paths"]!.AsArray().Count == 2, "normal path payload");
                 return Task.CompletedTask;
             });
-            Console.WriteLine("PASS all 5 remote watch cases");
+            Console.WriteLine("All 5 remote watch cases passed.");
             return 0;
         }
         finally { Directory.Delete(root, true); }

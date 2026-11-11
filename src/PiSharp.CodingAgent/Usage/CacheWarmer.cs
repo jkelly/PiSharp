@@ -9,10 +9,10 @@ using PiSharp.Sessions.Serialization;
 namespace PiSharp.CodingAgent.Usage;
 
 /// <summary>settings-manager.ts <c>CACHE_WARMING_MODES</c> and <c>getCacheWarmingMode</c>: the global-only <c>cacheWarming</c>
-/// setting, default <c>"streaming"</c>; any other stored value reads as the default.</summary>
+/// setting, default <c>"idle"</c>; any other stored value reads as the default.</summary>
 public static class CacheWarmingModes
 {
-    public const string Off = "off", Streaming = "streaming", Idle = "idle", Default = Streaming;
+    public const string Off = "off", Streaming = "streaming", Idle = "idle", Default = Idle;
     public static IReadOnlyList<string> All { get; } = [Off, Streaming, Idle];
     public static string Resolve(string? value) => value is not null && All.Contains(value) ? value : Default;
 }
@@ -129,6 +129,7 @@ public sealed class CacheWarmer
     private readonly TimeProvider _time;
     private readonly Func<string, string?> _processEnv;
     private ActiveRun? _run;
+    private readonly HashSet<Task> _refreshes = [];
     private CacheWarmingStatus _inactive = new("inactive", "waiting for first request");
 
     /// <summary>Called with the persisted usage entry after each successful refresh.</summary>
@@ -224,6 +225,24 @@ public sealed class CacheWarmer
 
     public void Cancel() { lock (_gate) Stop("inactive"); }
 
+    /// <summary>Cancel timers and replay requests, then join their original tasks before disposing provider resources.</summary>
+    public Task CancelAndJoinAsync()
+    {
+        lock (_gate) { Stop("inactive"); return Task.WhenAll(_refreshes.ToArray()); }
+    }
+
+    private void TrackRefresh(ActiveRun run)
+    {
+        lock (_gate)
+        {
+            if (!ReferenceEquals(_run, run)) return;
+            var refresh = Refresh(run); LastRefresh = refresh;
+            _refreshes.Add(refresh);
+            _ = refresh.ContinueWith(completed => { lock (_gate) _refreshes.Remove(completed); },
+                CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
+        }
+    }
+
     private void ClearRun()
     {
         var run = _run;
@@ -252,7 +271,7 @@ public sealed class CacheWarmer
             Stop(run.Phase == "idle" ? "30-minute idle safety limit reached" : "one-hour safety limit reached");
             return;
         }
-        run.Timer = _time.CreateTimer(_ => LastRefresh = Refresh(run), null,
+        run.Timer = _time.CreateTimer(_ => TrackRefresh(run), null,
             TimeSpan.FromMilliseconds(Math.Max(0, run.NextWarmAt - Now)), Timeout.InfiniteTimeSpan);
     }
 

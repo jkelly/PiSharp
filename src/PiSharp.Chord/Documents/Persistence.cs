@@ -17,6 +17,7 @@ using System.Collections.Immutable;
 using System.Text.Json.Nodes;
 using PiSharp.Chord.Delta;
 using PiSharp.Chord.Store;
+using PiSharp.Chord.Contracts;
 
 namespace PiSharp.Chord.Documents;
 
@@ -30,7 +31,7 @@ internal sealed record Stored(long Id, long Revision, long Version, int DeltasSi
 
 /// <summary>A live document found without loading it (upstream <c>FoundDocument</c>): what is stored of it and the fingerprint it was
 /// stored with.</summary>
-internal sealed record FoundDocument(Stored Stored, string Fingerprint);
+internal sealed record FoundDocument(Stored Stored, string Fingerprint, string? Host = null);
 
 /// <summary>A loaded document (upstream <c>Loaded</c>): its value at the definition's version, and what is stored of it.</summary>
 internal sealed record Loaded(JsonObject Value, Stored Stored);
@@ -95,13 +96,15 @@ internal abstract record StoredChange
 internal sealed class Persistence
 {
     private readonly DocumentAddress address;
+    private readonly HostKind? host;
 
     /// <summary><paramref name="owner"/> is the object's type (R2); <paramref name="kind"/> the definition's or the job's name.</summary>
-    public Persistence(ChordStore store, string owner, string @namespace, string kind)
+    public Persistence(ChordStore store, string owner, string @namespace, string kind, HostKind? host = null)
     {
         ArgumentNullException.ThrowIfNull(store);
         Store = store;
         address = new DocumentAddress(owner, @namespace, kind);
+        this.host = host;
     }
 
     public ChordStore Store { get; }
@@ -133,6 +136,7 @@ internal sealed class Persistence
         ArgumentNullException.ThrowIfNull(document);
         ArgumentNullException.ThrowIfNull(definition);
         var record = document.Record;
+        CheckHost(record.Host, definition, record.Key);
         DocumentsInternal.CheckReadable(record.Version, record.Fingerprint, definition);
         // The engine stores what commits gave it: JSON objects of the record's version.
         var stored = (JsonObject)document.Value!;
@@ -150,7 +154,24 @@ internal sealed class Persistence
         var record = await Store.ReadAsync(executor => DocumentEngine.FindDocumentAsync(executor, at), context).ConfigureAwait(false);
         if (record is null) return null;
         // The change counter is all a retirement needs; DeltasSinceBase is not read for one.
-        return new FoundDocument(new Stored(record.Id, record.Revision, record.Version, 0), record.Fingerprint);
+        return new FoundDocument(new Stored(record.Id, record.Revision, record.Version, 0), record.Fingerprint, record.Host);
+    }
+
+    internal void CheckHost(string? storedHost, StateDefinition definition, string? key = null)
+    {
+        if (host is null && storedHost is null) return;
+        if (host is not null && storedHost is not null)
+        {
+            try
+            {
+                _ = ContractsInternal.AddressOfKey(host, storedHost);
+                if (key is null || key == storedHost) return;
+            }
+            catch (ArgumentException) { }
+        }
+        var stored = storedHost is null ? "string keys" : $"addresses of {ContractsInternal.KindOfKey(storedHost)}";
+        var declared = host is null ? "string keys" : $"addresses of {host.Kind}";
+        throw new InvalidOperationException($"{definition.Name}: stored with {stored}, declared with {declared} (convert it explicitly)");
     }
 
     /// <summary>Up to <paramref name="limit"/> keys of live documents after <paramref name="after"/> (from the first when null), in code
@@ -176,7 +197,8 @@ internal sealed class Persistence
         if (retires || stored is null)
         {
             var created = new CreatedId();
-            var write = StoreInternal.CreateDocument(At(key), new DocumentBase(version, fingerprint, prepared.Value), ChordJson.Stringify(prepared.Value),
+            var at = host is null ? At(key) : At(key) with { Host = key };
+            var write = StoreInternal.CreateDocument(at, new DocumentBase(version, fingerprint, prepared.Value), ChordJson.Stringify(prepared.Value),
                 id => created.Id = id);
             writes.Add(write);
             return new StoredChange.Create(version, created);

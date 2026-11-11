@@ -225,6 +225,7 @@ internal static partial class StoreInternal
         return new StagedWrite(WriteOrder.Write, async step =>
         {
             await step.RunAsync(sql, parameters).ConfigureAwait(false);
+            step.Rows++;
             return [write];
         });
     }
@@ -253,7 +254,12 @@ internal static partial class StoreInternal
     private static StagedWrite Counted(Statement statement, Func<long, TableWrite> record)
     {
         var parameters = statement.Params.ToArray();
-        return new StagedWrite(WriteOrder.Write, async step => [record(await step.RunCountedAsync(statement.Sql, parameters).ConfigureAwait(false))]);
+        return new StagedWrite(WriteOrder.Write, async step =>
+        {
+            var count = await step.RunCountedAsync(statement.Sql, parameters).ConfigureAwait(false);
+            step.Rows += count;
+            return [record(count)];
+        });
     }
 
     /// <summary>Applies a <c>table</c> write: <c>CREATE TABLE</c> when the store does not have the table yet, then its record (upstream

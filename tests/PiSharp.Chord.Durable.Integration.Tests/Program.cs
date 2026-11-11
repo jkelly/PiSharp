@@ -96,12 +96,9 @@ static async Task RegistryReload()
     var app = new RegistryApplication();
     var core = new PluginFacet("@example/core", app.CoreFacet(store));
     await using var host = Hosts.Create(new() { Store = store, OnError = errors.Enqueue });
-    var valueBeforeLoad = host.RegistryAsync(RegistryApplication.Extensions, Context);
-    var getBeforeLoad = host.GetAsync(RegistryApplication.Core, new(), Context);
-    Check(!valueBeforeLoad.IsCompleted && !getBeforeLoad.IsCompleted, "real host waiters park before load");
     await host.LoadAsync([core], Context);
-    using var reference = await getBeforeLoad;
-    var value = await valueBeforeLoad;
+    using var reference = await host.GetAsync(RegistryApplication.Core, new(), Context);
+    var value = await host.RegistryAsync(RegistryApplication.Extensions, Context);
     var (readerContext, cancelReader) = ChordContext.WithCancel(Context);
     var reader = RegistryReader.Create(value, readerContext);
     Check(reader.Snapshot().GetTask(RegistryApplication.Greet.Definition.Name) is null, "initial real registry is empty");

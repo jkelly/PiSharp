@@ -132,6 +132,11 @@ internal static partial class StoreInternal
     /// <c>encodeCell</c>).</summary>
     internal static Cell EncodeCell(Column column, JsonNode? value, string what)
     {
+        if (column.Host is { } host)
+        {
+            var key = host.Key(value, what);
+            return new Cell(key, JsonValue.Create(key));
+        }
         if (column.Type != ColumnType.Json)
         {
             var scalar = CheckScalar(column.Type, value, what);
@@ -286,7 +291,7 @@ internal sealed class RowCodec
             var where = $"{table}: {what}: key column \"{column.Name}\"";
             if (!fields.TryGetValue(column.Name, out var field)) throw DataInternal.Invalid("args", $"{where} is missing");
             if (column.Type == ColumnType.Json) throw DataInternal.Invalid("args", $"{where}: a json(...) column has no scalar value");
-            var scalar = StoreInternal.CheckScalar(column.Type, field, where);
+            var scalar = column.Host is { } host ? (Scalar)host.Key(field, where) : StoreInternal.CheckScalar(column.Type, field, where);
             parameters.Add(StoreInternal.ToSqlite(scalar));
             stored[column.Name] = scalar;
         }
@@ -311,11 +316,28 @@ internal sealed class RowCodec
                     row[column.Name] = column.Json!.Read((string)value, version, $"{table}.{column.Name}", context);
                     break;
                 default:
-                    row[column.Name] = value is string text ? JsonValue.Create(text) : JsonValue.Create(StoreInternal.SqliteNumber(value));
+                    row[column.Name] = column.Host is { } host ? host.Address((string)value)
+                        : value is string text ? JsonValue.Create(text) : JsonValue.Create(StoreInternal.SqliteNumber(value));
                     break;
             }
         }
         return row;
+    }
+
+    /// <summary>A decoded row with its host address converted back to the key used by expression evaluation.</summary>
+    internal IReadOnlyDictionary<string, JsonNode?> Stored(IReadOnlyDictionary<string, JsonNode?> row)
+    {
+        var host = columns.FirstOrDefault(column => column.Host is not null);
+        if (host is null || !row.TryGetValue(host.Name, out var value) || ChordJson.AsString(value) is not null) return row;
+        return new OrderedDictionary<string, JsonNode?>(row, StringComparer.Ordinal) { [host.Name] = host.Host!.Key(value, table) };
+    }
+
+    /// <summary>A stored row with its host key decoded to an address, for the transaction's read view.</summary>
+    internal IReadOnlyDictionary<string, JsonNode?> Read(IReadOnlyDictionary<string, JsonNode?> row)
+    {
+        var host = columns.FirstOrDefault(column => column.Host is not null);
+        if (host is null || !row.TryGetValue(host.Name, out var value) || ChordJson.AsString(value) is not { } key) return row;
+        return new OrderedDictionary<string, JsonNode?>(row, StringComparer.Ordinal) { [host.Name] = host.Host!.Address(key) };
     }
 
     /// <summary><paramref name="value"/>'s own fields when it is a plain object with only fields of <paramref name="allowed"/>;

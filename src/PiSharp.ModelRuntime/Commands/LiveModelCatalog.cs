@@ -155,8 +155,8 @@ internal sealed class LazyModelTransport(RegistryModel entry, ModelDescriptor mo
             var selection = LiveSessionSelection.FromEntry(registry().Find(entry.Provider, entry.Id) ?? entry, registry(), null, useModelMaximum: true);
             if (selection.Model.Provider == "anthropic" && selection.Model.Api == "anthropic-messages")
             {
-                var (authentication, handler, reresolve) = await selection.ResolveAnthropicRouteAsync(runtime, token).ConfigureAwait(false);
-                connection = await selection.ConnectResolvedAnthropicAsync(authentication, handler, token, reresolve).ConfigureAwait(false);
+                var (authentication, handler, reresolve, cacheRetention) = await selection.ResolveAnthropicRouteAsync(runtime, token).ConfigureAwait(false);
+                connection = await selection.ConnectResolvedAnthropicAsync(authentication, handler, token, reresolve, cacheRetention).ConfigureAwait(false);
             }
             else connection = selection.ConnectRoute(runtime);
             connection.ThinkingBudgets = runtime.ThinkingBudgets;

@@ -181,13 +181,32 @@ public sealed class CoercingJsonSchemaValidator : JsonSchemaValidator
     /// <paramref name="value"/> coerced towards the schema: numeric strings to numbers, "true" to true, a single value to a one-item array,
     /// an optional null dropped, the first union branch the value converts to. Values that cannot be coerced stay as they are.
     /// </summary>
-    public JsonNode? Coerce(JsonNode? value) => Js.ToNode(Inner.Coerce(Js.FromNode(value)));
+    /// <exception cref="JsonSchemaException">Coercion produced a JavaScript extension value (bigint or undefined) that JSON cannot represent.</exception>
+    public JsonNode? Coerce(JsonNode? value) => ToJsonResult(Inner.Coerce(Js.FromNode(value)));
 
     /// <summary>Coerces <paramref name="value"/>, then checks it.</summary>
+    /// <exception cref="JsonSchemaException">Coercion produced a JavaScript extension value (bigint or undefined) that JSON cannot represent.</exception>
     public JsonSchemaParseResult Parse(JsonNode? value)
     {
         var (ok, coerced, errors) = Inner.Parse(Js.FromNode(value));
-        return new JsonSchemaParseResult(ok, Js.ToNode(coerced), errors);
+        return new JsonSchemaParseResult(ok, ToJsonResult(coerced), errors);
+    }
+
+    // JavaScript extension types are available to the internal engine, but cannot be represented by this JSON API.
+    // Fail explicitly rather than turning a successfully coerced bigint/undefined into a different JSON value.
+    private static JsonNode? ToJsonResult(object? value)
+    {
+        static void CheckJson(object? current)
+        {
+            if (current is System.Numerics.BigInteger or JsUndefined)
+                throw new JsonSchemaException("Coercion produced bigint or undefined, which this JSON API cannot represent.");
+            if (current is JsObject obj)
+                foreach (var key in obj.Keys) CheckJson(obj.GetOwn(key));
+            if (current is JsArray array)
+                foreach (var item in array) CheckJson(item);
+        }
+        CheckJson(value);
+        return Js.ToNode(value);
     }
 }
 

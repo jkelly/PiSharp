@@ -151,12 +151,23 @@ internal static partial class Program
             var type = R1Type(); await using var host = R1Host(R1Server.Address()); await host.LoadAsync([R1Plugin(type)], ChordContext.Background);
             var pair = MemoryLinkPair.Create(); using var raw = new R1Peer(pair.Second); host.Accept(pair.First, new() { Principal = R1User }, ChordContext.Background);
             raw.Send(R1Hold(type)); await raw.Next<BoundMessage>();
-            raw.Send(new CallMessage(0, 0, 0)); await raw.Next<ResultMessage>(); await raw.Next<StateMessage>();
-            for (var i = 1; i <= 12; i++) { raw.Send(new CallMessage(i, 0, 0)); await raw.Next<ResultMessage>(); }
-            Check(!raw.All.OfType<StateMessage>().Any(), "K=2 blocks further state but never replies");
-            raw.Send(new AckMessage()); var pending = await raw.Next<StateMessage>();
-            var decoder = new WireDeltaDecoder(); var ops = decoder.Decode(Parts.Parse(pending.Holds[0].Members[0].Ops));
-            Equal(13, DeltaApply.Apply(new JsonObject { ["n"] = 1 }, new JsonArray(ops.Select(x => (JsonNode?)x.ToJson()).ToArray()))!["n"]!.GetValue<int>(), "folded final state");
+            raw.Send(new CallMessage(0, 0, 0)); await raw.Next<ResultMessage>();
+            var decoder = new WireDeltaDecoder();
+            JsonNode? state = new JsonObject { ["n"] = 0 };
+            void Apply(StateMessage message)
+            {
+                var ops = decoder.Decode(Parts.Parse(message.Holds[0].Members[0].Ops));
+                state = DeltaApply.Apply(state, new JsonArray(ops.Select(x => (JsonNode?)x.ToJson()).ToArray()));
+            }
+            Apply(await raw.Next<StateMessage>());
+            for (var i = 1; i <= 12; i++)
+            {
+                raw.Send(new CallMessage(i, 0, 0)); await raw.Next<ResultMessage>();
+                Apply(await raw.Next<StateMessage>());
+            }
+            Check(!raw.All.OfType<StateMessage>().Any(), "each answer flushed exactly one waiting state past K=2");
+            Equal(13, state!["n"]!.GetValue<int>(), "answer includes final state");
+            for (var i = 0; i < 14; i++) raw.Send(new AckMessage());
         }),
         Case("remote.runtime.frame-validation-is-all-or-none", async () =>
         {
@@ -300,8 +311,10 @@ internal static partial class Program
             var pair = MemoryLinkPair.Create(); using var raw = new R1Peer(pair.Second); host.Accept(pair.First, new() { Principal = R1User }, ChordContext.Background);
             raw.Send(R1Hold(type)); await raw.Next<BoundMessage>(); raw.Send(new CallMessage(0, 0, 0)); await raw.Next<ResultMessage>(); await raw.Next<StateMessage>();
             raw.Send(new CallMessage(1, 0, 1)); await started.Task;
-            await host.ReloadAsync([Plugin("new")], ChordContext.Background); Check(!raw.All.OfType<BoundMessage>().Any(), "new bound waits for slot");
+            var reload = host.ReloadAsync([Plugin("new")], ChordContext.Background);
+            Check(!reload.IsCompleted, "reload waits for old original callback");
             finish.TrySetResult(); Equal("old", Parts.Parse((await raw.Next<ResultMessage>(x => x.Call == 1)).Value!)!.GetValue<string>(), "old call drains");
+            await reload; Check(!raw.All.OfType<BoundMessage>().Any(), "new bound waits for slot");
             raw.Send(new CallMessage(2, 0, 1)); Equal("new", Parts.Parse((await raw.Next<ResultMessage>(x => x.Call == 2)).Value!)!.GetValue<string>(), "old indexed names dispatch new call");
             raw.Send(new AckMessage()); await raw.Next<BoundMessage>();
         }),
@@ -360,13 +373,18 @@ internal static partial class Program
             {
                 raw.Send(R1Hold(type)); await raw.Next<BoundMessage>(); raw.Send(new AckMessage());
                 raw.Send(new CallMessage(0, 0, 0)); await started.Task;
-                var reload = host.ReloadAsync([Plugin(true)], ChordContext.Background); await attaching.Task;
+                var reload = host.ReloadAsync([Plugin(true)], ChordContext.Background);
+                Check(!attaching.Task.IsCompleted, "successor waits for old call drain");
                 commit.TrySetResult(); await committed.Task;
                 var changed = await raw.Next<StateMessage>();
                 var ops = new WireDeltaDecoder().Decode(Parts.Parse(changed.Holds.Single().Members.Single().Ops));
-                Equal(1, DeltaApply.Apply(new JsonObject { ["n"] = 0 }, new JsonArray(ops.Select(op => (JsonNode?)op.ToJson()).ToArray()))!["n"]!.GetValue<int>(), "old admitted commit crosses parked swap");
+                Equal(1, DeltaApply.Apply(new JsonObject { ["n"] = 0 }, new JsonArray(ops.Select(op => (JsonNode?)op.ToJson()).ToArray()))!["n"]!.GetValue<int>(), "old admitted commit crosses reload drain");
                 Check(!raw.All.OfType<LoadingMessage>().Any(), "old bound instance remains attached while its admitted call runs");
-                finish.TrySetResult(); attached.TrySetResult(); await reload; await raw.Next<ResultMessage>(); await raw.Next<BoundMessage>();
+                finish.TrySetResult(); await attaching.Task;
+                var report = await reload;
+                Equal("restarted", report.Objects.Single().Fate, "reload reports restart before successor becomes live");
+                Check(!attached.Task.IsCompleted, "successor remains parked on its attachment after the report");
+                attached.TrySetResult(); await raw.Next<ResultMessage>(); await raw.Next<BoundMessage>();
             }
             finally { commit.TrySetResult(); finish.TrySetResult(); attached.TrySetResult(); }
         }),

@@ -32,6 +32,9 @@ internal sealed class TableChanges
     /// <summary>The table's handle.</summary>
     internal TableHandle Handle { get; }
 
+    /// <summary>Only successfully staged table mutations invalidate live queries.</summary>
+    internal bool HasWrites => bulk || byKey.Count != 0;
+
     /// <summary>Stages a <c>put</c> of <paramref name="row"/> (an upsert).</summary>
     internal void Put(object? row)
     {
@@ -109,14 +112,15 @@ internal sealed class TableChanges
         while (start > 0 && writes[start - 1].Set is not null) start--;
         // A committed row is decoded by the table's columns: scalars and JSON, what the evaluator takes.
         IReadOnlyDictionary<string, JsonNode?>? row = start == 0
-            ? await Handle.GetAsync(StoredKey(encoded.Key), context).ConfigureAwait(false)
+            ? await Handle.GetAsync(key, context).ConfigureAwait(false)
             : writes[start - 1].Row;
+        if (row is not null) row = definition.Rows.Stored(row);
         foreach (var write in writes.Skip(start))
         {
             // An update of an absent row changes nothing.
             if (row is not null) row = StoreInternal.ApplySet(write.Set!, row, definition.Name);
         }
-        return row;
+        return row is null ? null : definition.Rows.Read(row);
     }
 
     /// <summary>A recorded key as a key object (its scalars as JSON values).</summary>

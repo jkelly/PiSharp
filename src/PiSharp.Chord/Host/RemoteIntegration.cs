@@ -5,6 +5,7 @@ using PiSharp.Chord.Contracts;
 using PiSharp.Chord.Data;
 using PiSharp.Chord.Link;
 using PiSharp.Chord.Remote;
+using PiSharp.Telemetry;
 
 namespace PiSharp.Chord.Host;
 
@@ -40,16 +41,22 @@ public sealed partial class ChordHost
             var address = ContractsInternal.DataOf(contract).HostAddress!(parameters.Value);
             if (address.Equals(Address)) return null;
             var path = PathOf(new WireAddress(address.Kind, address.Params), caller, null);
-            return path is null ? null : new RemoteObject(this, contract, parameters, address, caller, path);
+            return path is null ? null : new RemoteObject(this, contract, parameters, address, caller, path, context);
         };
         Closing += CloseRemote;
-        var interval = Options.HeartbeatPing < Options.HeartbeatClose ? Options.HeartbeatPing : Options.HeartbeatClose;
+        var interval = TimeSpan.FromTicks(Math.Min(Options.HeartbeatPing.Ticks, Options.HeartbeatClose.Ticks) / 10);
         if (interval > TimeSpan.Zero)
+        {
+            var last = Options.TimeProvider.GetUtcNow().ToUnixTimeMilliseconds();
             heartbeatTimer = Options.TimeProvider.CreateTimer(_ => Dispatcher.Post(() =>
             {
                 var now = Options.TimeProvider.GetUtcNow().ToUnixTimeMilliseconds();
-                foreach (var link in remoteLinks.ToArray()) link.Tick(now);
+                var late = now - last - (long)interval.TotalMilliseconds;
+                var paused = late >= interval.TotalMilliseconds ? late : 0;
+                last = now;
+                foreach (var link in remoteLinks.ToArray()) link.Tick(now, paused);
             }), null, interval, interval);
+        }
     }
 
     /// <summary>Accepts a child. Identity fields sent by this peer cannot impersonate another caller.</summary>
@@ -110,18 +117,24 @@ public sealed partial class ChordHost
     {
         AssertOpen(); InitializeRemote(); context.AbortSignal?.ThrowIfCancellationRequested();
         var key = DataInternal.CanonicalJson(revocation, context);
-        var ownKey = Options.Principal is { } own ? DataInternal.PrincipalKey(own, context, Options.PrincipalKey) : null;
+        var ownKey = Options.Principal is { } own ? DataInternal.PrincipalKey(own, context) : null;
         bool Revoked(JsonObject principal) => Options.RevokedBy is not null &&
-            (ownKey is null || ownKey != DataInternal.PrincipalKey(principal, context, Options.PrincipalKey)) &&
+            (ownKey is null || ownKey != DataInternal.PrincipalKey(principal, context)) &&
             revocationKeys.GetValue(principal, p => Options.RevokedBy(p)
                 .Select(item => DataInternal.CanonicalJson(item, context)).ToHashSet(StringComparer.Ordinal)).Contains(key);
         var error = new ChordError("forbidden", "principal revoked", "revoked");
+        var count = Objects.Values.Count(obj => obj.Served.Contract.Kind == ContractKind.Remote && obj.Caller.Principal is { } principal && Revoked(principal));
         RevokeLocal(Revoked, error);
         foreach (var path in remoteRoutes.Values.SelectMany(route => route.Holders).Concat(parentPath.Holders).ToArray())
             if (path is RemoteObject remote && remote.Caller.Principal is { } principal && Revoked(principal)) remote.Revoke(error);
         foreach (var link in remoteLinks.ToArray()) link.RevokeUnbound(Revoked, error);
         foreach (var link in remoteLinks.ToArray()) if (link.Role == LinkRole.Route) link.Send(new RevokeMessage(revocation?.DeepClone()));
-        foreach (var link in remoteLinks.ToArray()) if (link.Role == LinkRole.Child && Revoked(link.Principal)) link.Close();
+        foreach (var link in remoteLinks.ToArray()) if (link.Role == LinkRole.Child && Revoked(link.Principal)) { count++; link.Close(); }
+        if (!ChordTelemetry.IsUntraced(context.Telemetry))
+        {
+            var span = new OpenSpan(context.Telemetry, "chord.revoke", Attributes());
+            span.Span.SetAttributes(new SpanAttributes { ["count"] = (double)count }); span.End();
+        }
     });
     private void CloseRemote()
     {

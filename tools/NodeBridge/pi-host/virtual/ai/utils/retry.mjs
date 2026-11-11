@@ -1,4 +1,4 @@
-// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/ai/src/utils/retry.ts.
+// Pi b4afdddf44e059c67ccf5097e5317d913521b470 (MIT): packages/ai/src/utils/retry.ts.
 // Ported to plain ESM for the PiSharp Node extension bridge (TypeScript types stripped mechanically; behaviour unchanged).
 function buildProviderErrorPattern(patterns) {
     return new RegExp(patterns.join("|"), "i");
@@ -59,6 +59,7 @@ const RETRYABLE_PROVIDER_ERROR_PATTERN = buildProviderErrorPattern([
     "stream ended before a terminal response event",
     "http2 request did not get a response",
     "stream disconnected before completion",
+    "cut short after the reply had begun",
     "pending stream has been canceled",
     "retry delay",
     "you can retry your request",

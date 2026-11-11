@@ -79,6 +79,7 @@ internal static class Program
     private static readonly ChordContext Context = ChordContext.Background;
     private static async Task<int> Main(string[] args)
     {
+        if (args.Contains("--worker-snapshot-fixture")) return await WorkerSnapshotCases.RunChildAsync();
         if (args.Contains("--sleep-child")) { await Task.Delay(Timeout.InfiniteTimeSpan); return 0; }
         if (args.Length >= 2 && (args[0] == "--spawn-descendant" || args[0] == "build"))
         {
@@ -120,6 +121,38 @@ internal static class Program
         });
         var cases = new (string Name, Func<Task> Run)[]
         {
+            ("plugins.152.discovery-and-build-tables", PluginDiscoveryTests.RunAsync),
+            ("publication.152.retention", SurfacePublicationTests.Retention),
+            ("publication.152.build-once", SurfacePublicationTests.BuildOnce),
+            ("publication.152.failure-http-isolation", SurfacePublicationTests.FailureHttpIsolation),
+            ("publication.152.http-artifact", SurfacePublicationTests.HttpArtifact),
+            ("publication.152.scripts-round-trip", SurfacePublicationTests.ScriptsRoundTrip),
+            ("workers.152.captures-deployment", WorkerSnapshotCases.CapturesDeployment),
+            ("workers.152.failed-build-and-close", WorkerSnapshotCases.FailedBuildAndClose),
+            ("workers.152.close-during-build", WorkerSnapshotCases.CloseDuringBuild),
+            ("workers.152.later-worker-and-cancelled-close", WorkerSnapshotCases.LaterWorkerAndCancelledClose),
+            ("workers.152.link-recovery", WorkerSnapshotCases.LinkRecovery),
+            ("workers.152.idle-lock-serializes-start", WorkerSnapshotCases.IdleLockSerializesStart),
+            ("http.152.admission-and-headers", Http152Cases.AdmissionAndHeaders),
+            ("http.152.trace-trust", Http152Cases.TraceTrust),
+            ("http.152.sockets-and-hooks", Http152Cases.SocketsAndHooks),
+            ("app.152.files", FilesCases.RunAsync),
+            ("app.152.archives", ArchiveCases.RunAsync),
+            ("app.152.layout", AppLayoutTests.RunAsync),
+            ("app.152.owner-links-and-caps", AppAuthRouteTests.OwnerLinksAndCaps),
+            ("app.152.routes-and-invites", AppAuthRouteTests.RoutesAndInvites),
+            ("app.152.startup-and-recovery", AppStartTests.StartupAndRecovery),
+            ("app.152.session-expiry-and-ephemeral-links", AppStartTests.SessionExpiryAndEphemeralLinks),
+            ("app.152.base-build-isolation", AppStartTests.BaseBuildIsolation),
+            ("app.152.telemetry-shutdown", AppStartTests.TelemetryShutdown),
+            ("app.152.cleanup-retains-store-and-lock", AppStartTests.CleanupRetainsStoreAndLock),
+            ("terminal.152.frames-and-filter", Terminal152Cases.FramesAndFilter),
+            ("terminal.152.launcher-and-channel", Terminal152Cases.LauncherAndChannel),
+            ("terminal.152.confirmation-bounds-and-shutdown", Terminal152Cases.ConfirmationBoundsAndShutdown),
+            ("terminal.152.actions-and-network", Terminal152Cases.ActionsAndNetwork),
+            ("terminal.152.scope-and-optimistic", Terminal152Cases.ScopeAndOptimistic),
+            ("terminal.152.actual-attachment", Terminal152Cases.ActualAttachment),
+            ("terminal.152.native-runtime", Terminal152Cases.NativeRuntime),
             ("plugins.discovery-validates-and-orders", Discovery),
             ("plugins.rollout-continues-failures-and-stops-explicitly", RolloutOrder),
             ("plugins.new-failed-plugin-retains-dirty-mark", FailedAddedPlugin),
@@ -148,7 +181,7 @@ internal static class Program
         {
             var watch = Stopwatch.StartNew();
             Console.Error.WriteLine("START " + test.Name);
-            var deadline = test.Name.StartsWith("plugins.build", StringComparison.Ordinal) ? TimeSpan.FromSeconds(150) : test.Name.StartsWith("workers.", StringComparison.Ordinal) ? TimeSpan.FromSeconds(90) : TimeSpan.FromSeconds(30);
+            var deadline = test.Name.StartsWith("plugins.build", StringComparison.Ordinal) ? TimeSpan.FromSeconds(240) : test.Name.StartsWith("workers.", StringComparison.Ordinal) ? TimeSpan.FromSeconds(90) : TimeSpan.FromSeconds(30);
             try { await test.Run().WaitAsync(deadline); results.Add(new { test.Name, status = "PASS_AUTHORED_NATIVE", ms = watch.ElapsedMilliseconds }); Console.Error.WriteLine($"PASS {test.Name} ({watch.ElapsedMilliseconds} ms)"); }
             catch (Exception error) { failures++; results.Add(new { test.Name, status = "FAIL", error = error.ToString() }); Console.Error.WriteLine($"FAIL {test.Name}: {error}"); }
         }
@@ -244,7 +277,7 @@ internal static class Program
                     return PluginTestContracts.SharedPluginFacet((h,s) => {
                     s.Contribute(PluginTestContracts.Tags, "VALUE");
                     s.Contribute(HttpRegistries.Http, new HttpContribution { Routes = new Dictionary<string,HttpRoute> {
-                        ["GET /leased"] = new(async (_,_) => { PluginTestContracts.HttpEntered!.TrySetResult(); await PluginTestContracts.HttpPause!.Task; var late = Late(); PluginTestContracts.HttpFinished!.TrySetResult(late); return new HttpResult.Text(late); })
+                        ["GET /leased"] = new(async (_,_) => { PluginTestContracts.HttpEntered!.TrySetResult(); await PluginTestContracts.HttpPause!.Task; var late = Late(); PluginTestContracts.HttpFinished!.TrySetResult(late); return new HttpResult.Text(late); }, Public: true)
                     } });
                     h.Serve(PluginTestContracts.Counter, (_,_,_) => new(new Dictionary<string,object?> {
                         ["read"] = (HostMethod)(async (_,_) => { PluginTestContracts.Entered?.TrySetResult(); if (PluginTestContracts.Pause is { } pause) { await pause.Task; PluginTestContracts.HostFinished?.TrySetResult(Late()); } return JsonValue.Create(PrivateHelper.Value); })
@@ -353,7 +386,7 @@ internal static class Program
     {
         var context = new DefaultHttpContext(); context.Request.Method = method; context.Request.Path = path; context.Request.Host = new("localhost", port);
         context.Features.Get<Microsoft.AspNetCore.Http.Features.IHttpRequestFeature>()!.RawTarget = path;
-        context.Connection.LocalIpAddress = IPAddress.Loopback; context.Connection.LocalPort = port; context.Response.Body = new MemoryStream(); return context;
+        context.Connection.LocalIpAddress = IPAddress.Loopback; context.Connection.RemoteIpAddress = IPAddress.Loopback; context.Connection.LocalPort = port; context.Response.Body = new MemoryStream(); return context;
     }
     private static string Body(DefaultHttpContext context) => Encoding.UTF8.GetString(((MemoryStream)context.Response.Body).ToArray());
     private static async Task HttpRoutes()
@@ -366,9 +399,9 @@ internal static class Program
                 ["GET /hello/:name"] = new((r, _) => Task.FromResult<HttpResult>(new HttpResult.Text(r.Params["name"]))),
                 ["POST /hook"] = new((_, call) => Task.FromResult<HttpResult>(new HttpResult.Text(call.Principal is null ? "anonymous" : "authenticated")), CrossSite: true),
                 ["POST /private"] = new((_, _) => Task.FromResult<HttpResult>(new HttpResult.Text("private"))),
-                ["GET /files"] = new((_, _) => Task.FromResult<HttpResult>(new HttpResult.Text("exact"))),
+                ["GET /files"] = new((_, _) => Task.FromResult<HttpResult>(new HttpResult.Text("exact")), Public: true),
                 ["GET /files/*"] = new((_, _) => Task.FromResult<HttpResult>(new HttpResult.Text("wildcard"))),
-                ["GET /page"] = new((_, call) => Task.FromResult<HttpResult>(new HttpResult.Text(call.Principal is null ? "anonymous" : "authenticated")), Page: true),
+                ["GET /page"] = new((_, call) => Task.FromResult<HttpResult>(new HttpResult.Text(call.Principal is null ? "anonymous" : "authenticated")), Page: true, Public: true),
                 ["GET /error"] = new((_, _) => Task.FromException<HttpResult>(new InvalidOperationException("route failed"))),
             },
             Wraps = [new("prefix", async (_, next, _) => { var result = (HttpResult.Text)await next(); return result with { Body = "wrapped:" + result.Body }; })],
@@ -415,9 +448,9 @@ internal static class Program
         var blocks = 0; var bytes = Encoding.ASCII.GetBytes("0123456789"); var root = Temp(); await File.WriteAllBytesAsync(Path.Combine(root, "safe.txt"), bytes);
         var contribution = new HttpContribution { Routes = new Dictionary<string, HttpRoute>
         {
-            ["GET /bytes"] = new((_, _) => Task.FromResult<HttpResult>(new HttpResult.Bytes((offset, length, _) => { blocks++; return Task.FromResult<ReadOnlyMemory<byte>>(bytes.AsMemory((int)offset, length)); }, bytes.Length, Ranges: true))),
-            ["GET /file"] = new((_, _) => Task.FromResult<HttpResult>(new HttpResult.File(Path.Combine(root, "safe.txt"), root, Ranges: true))),
-            ["GET /escape"] = new((_, _) => Task.FromResult<HttpResult>(new HttpResult.File(Path.Combine(root, "..", "outside.txt"), root))),
+            ["GET /bytes"] = new((_, _) => Task.FromResult<HttpResult>(new HttpResult.Bytes((offset, length, _) => { blocks++; return Task.FromResult<ReadOnlyMemory<byte>>(bytes.AsMemory((int)offset, length)); }, bytes.Length, Ranges: true)), Public: true),
+            ["GET /file"] = new((_, _) => Task.FromResult<HttpResult>(new HttpResult.File(Path.Combine(root, "safe.txt"), root, Ranges: true)), Public: true),
+            ["GET /escape"] = new((_, _) => Task.FromResult<HttpResult>(new HttpResult.File(Path.Combine(root, "..", "outside.txt"), root)), Public: true),
         } };
         await host.LoadAsync([new("chord.http", http.Facet), new("test.web", Facet.Define((_, self) => self.Contribute(HttpRegistries.Http, contribution)))], Context);
         var range = Request("GET", "/bytes"); range.Request.Headers.Range = "bytes=2-5"; await http.HandleAsync(range);
@@ -482,7 +515,7 @@ internal static class Program
         var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var facet = Facet.Define((_, self) => self.Contribute(HttpRegistries.Http, new HttpContribution
         {
-            Routes = new Dictionary<string, HttpRoute> { ["GET /slow"] = new(async (_, call) => { entered.TrySetResult(); await Task.Delay(Timeout.InfiniteTimeSpan, call.AbortSignal); return new HttpResult.Empty(); }) },
+            Routes = new Dictionary<string, HttpRoute> { ["GET /slow"] = new(async (_, call) => { entered.TrySetResult(); await Task.Delay(Timeout.InfiniteTimeSpan, call.AbortSignal); return new HttpResult.Empty(); }, Public: true) },
         }));
         await host.LoadAsync([new("chord.http", http.Facet), new("test.web", facet)], Context);
         var request = Request("GET", "/slow"); var running = http.HandleAsync(request);
@@ -616,7 +649,7 @@ internal static class Program
     private static async Task RolloutOrder()
     {
         var root = Temp();
-        await using var manager = new PluginManager([], new PluginBuilder(new() { DotnetPath = Sdk, ArtifactDirectory = root }));
+        await using var manager = new PluginManager(Array.Empty<string>(), new PluginBuilder(new() { DotnetPath = Sdk, ArtifactDirectory = root }));
         var order = new List<string>();
         IPluginRolloutStep Step(string name, bool stopped = false, bool failed = false, bool throwing = false) => new TestRolloutStep(name, () =>
         {

@@ -714,7 +714,8 @@ public sealed class McpServerManager
             using var client = dependencies.CreateClient();
             await Authentication.McpSignIn.SignInAsync(new(url, dependencies.Credentials.ForServer(slot.Entry.Name, url), settings,
                 new(prompt.ShowAuthorizationUrl, prompt.PromptForRedirectUrl), AdmittedHttpClientRequestFactory.Create(client))
-            { Challenge = dependencies.Challenge?.Invoke(slot.Entry.Name) }, linked.Token).ConfigureAwait(false);
+            { Challenge = dependencies.Challenge?.Invoke(slot.Entry.Name),
+                RefreshLock = McpOAuthRefreshLock.For(dependencies.AgentDirectory, slot.Entry.Name, url) }, linked.Token).ConfigureAwait(false);
         }
         catch (Exception error) when (error is Authentication.McpSignInCancelledException || error is OperationCanceledException && linked.IsCancellationRequested)
         { return "Sign-in cancelled."; }

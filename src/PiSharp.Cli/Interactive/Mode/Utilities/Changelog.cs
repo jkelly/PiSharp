@@ -149,11 +149,18 @@ internal static partial class Changelog
     /// do not repeat that release's notes; a value without major.minor.patch yields no entries.</summary>
     public static List<ChangelogEntry> GetNewEntries(IEnumerable<ChangelogEntry> entries, string lastVersion)
     {
-        var match = SeenVersion().Match(PiSharp.Tui.Pi.TextUtils.JsTrim(lastVersion));
-        if (!match.Success) return [];
-        var last = new ChangelogEntry(ParseInt(match.Groups[1].Value), ParseInt(match.Groups[2].Value), ParseInt(match.Groups[3].Value), "",
-            match.Groups[4].Success ? ParseInt(match.Groups[4].Value) : 0);
+        if (!TryParseVersion(lastVersion, out var last)) return [];
         return [.. entries.Where(entry => CompareVersions(entry, last) > 0)];
+    }
+
+    public static bool TryParseVersion(string version, out ChangelogEntry parsed)
+    {
+        var match = SeenVersion().Match(PiSharp.Tui.Pi.TextUtils.JsTrim(version));
+        parsed = new(0, 0, 0, "");
+        if (!match.Success) return false;
+        parsed = new ChangelogEntry(ParseInt(match.Groups[1].Value), ParseInt(match.Groups[2].Value), ParseInt(match.Groups[3].Value), "",
+            match.Groups[4].Success ? ParseInt(match.Groups[4].Value) : 0);
+        return true;
     }
 
     /// <summary>Source <c>getChangelogPath</c>: <c>CHANGELOG.md</c> in the package directory, which is <c>PI_PACKAGE_DIR</c>

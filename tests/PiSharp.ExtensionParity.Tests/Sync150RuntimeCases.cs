@@ -3,9 +3,10 @@ using PiSharp.Cli.Extensions.Pi;
 
 // Pi 1.5.0 sync, bridge.undici-gondolin-advisories (owner decision 2026-11-05, "Use safe defaults"): Pi 1.5.0's
 // packages/coding-agent/package.json (f9a26365568127461c47a07a37dcb42c140a3ac5) moves undici from 8.10.2 to 8.12.3 for security
-// advisories. The approved upgrade now uses Pi 1.5.0 with default attribution suppressed by pi-modules.mjs,
+// advisories. The approved upgrade now uses Pi 1.5.2 with default attribution suppressed by pi-modules.mjs,
 // and overrides undici to exactly 8.12.3. Offline: these cases read the manifest and a runtime folder written here; no
 // npm and no registry.
+// The original case IDs remain stable; current-package assertions follow the 1.5.2 candidate under decision 0014.
 internal static partial class Program
 {
     private static IEnumerable<(string, Func<Task>)> Sync150RuntimeCases() =>
@@ -16,7 +17,7 @@ internal static partial class Program
 
     private static void RuntimeManifestPins()
     {
-        Equal("1.5.0", PiNodeRuntime.PiVersion, "runtime Pi version");
+        Equal("1.5.2", PiNodeRuntime.PiVersion, "runtime Pi version");
         Equal("8.12.3", PiNodeRuntime.UndiciVersion, "undici version");
         var manifest = PiNodeRuntime.PackageJson();
         Equal("8.12.3", manifest["overrides"]!["undici"]!.GetValue<string>(), "undici override");
@@ -24,11 +25,11 @@ internal static partial class Program
         var pi = manifest["dependencies"]!.AsObject().Concat(manifest["overrides"]!.AsObject())
             .Where(item => item.Key.StartsWith("@earendil-works/", StringComparison.Ordinal)).ToList();
         Equal(10, pi.Count, "Pi packages pinned (4 dependencies, 6 overrides)");
-        Check(pi.All(item => item.Value!.GetValue<string>() == "1.5.0"), "every @earendil-works package at exactly 1.5.0: " + manifest.ToJsonString());
-        Equal("Pi 1.5.0 packages for PiSharp extensions, with undici 8.12.3 (installed by PiSharp; do not edit)", manifest["description"]!.GetValue<string>(), "description");
+        Check(pi.All(item => item.Value!.GetValue<string>() == "1.5.2"), "every @earendil-works package at exactly 1.5.2: " + manifest.ToJsonString());
+        Equal("Pi 1.5.2 packages for PiSharp extensions, with undici 8.12.3 (installed by PiSharp; do not edit)", manifest["description"]!.GetValue<string>(), "description");
     }
 
-    // IsInstalled compares the runtime's package.json with the current manifest: a verified 1.5.0 runtime an earlier PiSharp installed
+    // IsInstalled compares the runtime's package.json with the current manifest: a verified 1.5.2 runtime an earlier PiSharp installed
     // (no undici override) is not installed, so EnsureAsync installs it again; one installed from this manifest is.
     private static void RuntimeWithoutOverrideIsStale()
     {
@@ -36,10 +37,10 @@ internal static partial class Program
         try
         {
             Directory.CreateDirectory(Path.Combine(directory, "node_modules", "@earendil-works", "pi-coding-agent"));
-            File.WriteAllText(Path.Combine(directory, "node_modules", "@earendil-works", "pi-coding-agent", "package.json"), """{"name":"@earendil-works/pi-coding-agent","version":"1.5.0"}""");
-            File.WriteAllText(Path.Combine(directory, PiNodeRuntime.ProvenanceFile), """{"pi":"1.5.0","policy":"no-default-attribution-v1","verified":true,"packages":[]}""");
+            File.WriteAllText(Path.Combine(directory, "node_modules", "@earendil-works", "pi-coding-agent", "package.json"), """{"name":"@earendil-works/pi-coding-agent","version":"1.5.2"}""");
+            File.WriteAllText(Path.Combine(directory, PiNodeRuntime.ProvenanceFile), """{"pi":"1.5.2","policy":"no-default-attribution-v1","verified":true,"packages":[]}""");
             var earlier = PiNodeRuntime.PackageJson();
-            earlier["description"] = "Pi 1.5.0 packages for PiSharp extensions (installed by PiSharp; do not edit)";
+            earlier["description"] = "Pi 1.5.2 packages for PiSharp extensions (installed by PiSharp; do not edit)";
             earlier["overrides"]!.AsObject().Remove("undici");
             File.WriteAllText(Path.Combine(directory, "package.json"), earlier.ToJsonString() + "\n");
             Check(!PiNodeRuntime.IsInstalled(directory), "a runtime without the undici override is installed again");

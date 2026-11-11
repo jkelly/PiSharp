@@ -21,7 +21,7 @@ internal static partial class Program
             Equal(null, await manager.EnsureToolAsync("rg", null, CancellationToken.None), "no release found");
             Check(handler.UserAgents.Count > 0, "the manager asked for the latest release");
             foreach (var agent in handler.UserAgents) Equal(ClientIdentities.FormatUserAgent(null), agent, "download User-Agent");
-            Check(handler.UserAgents[0].StartsWith("pi/1.5.0 (", StringComparison.Ordinal), handler.UserAgents[0]);
+            Check(handler.UserAgents[0].StartsWith("pi/1.5.2 (", StringComparison.Ordinal), handler.UserAgents[0]);
         }),
         ("sync150.bug-report-user-agent-is-the-detailed-format", Sync(() =>
         {

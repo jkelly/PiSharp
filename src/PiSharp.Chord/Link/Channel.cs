@@ -1,5 +1,6 @@
 // Pi f9a26365568127461c47a07a37dcb42c140a3ac5 next/link/channel.ts.
 using PiSharp.Chord.Data;
+using PiSharp.Telemetry;
 
 namespace PiSharp.Chord.Link;
 
@@ -11,7 +12,7 @@ internal interface IChannelHandler
 }
 
 internal sealed record ChannelOptions(ICodec Codec, string Incarnation, long Calls, bool Trusted, Action<Exception> Report,
-    TimeProvider? TimeProvider = null, ChordContext? Context = null);
+    TimeProvider? TimeProvider = null, ChordContext? Context = null, ITelemetryMetrics? Metrics = null);
 
 /// <summary>Framing/checks and ordered handshake only. Reference lifetimes and per-origin windows belong to its owner.</summary>
 internal sealed class Channel
@@ -25,6 +26,9 @@ internal sealed class Channel
     private readonly Queue<ReadOnlyMemory<byte>> _incoming=new();
     private readonly CancellationTokenSource _closedToken=new();
     private readonly byte[] _hello;
+    private readonly SchemaTelemetryCounter _bytes;
+    private static readonly SpanAttributes Sent = new() { ["direction"] = "sent" };
+    private static readonly SpanAttributes Received = new() { ["direction"] = "received" };
     private bool _started, _opened, _closed, _processing, _pinged;
     private string _peer="";
     private long _peerCalls;
@@ -32,6 +36,7 @@ internal sealed class Channel
     internal Channel(ILink link,IChannelHandler handler,ChannelOptions options)
     {
         _link=link; _handler=handler; _options=options; _time=options.TimeProvider ?? TimeProvider.System;
+        _bytes=ChordTelemetry.Metrics(options.Metrics ?? options.Context?.Telemetry.Metrics).Counter("chord.link.bytes");
         _lastReceived=_time.GetUtcNow().ToUnixTimeMilliseconds();
         var hello=new HelloMessage(DataInternal.ProtocolVersion,options.Incarnation,options.Calls);
         MessageCheck.Check(hello); _hello=options.Codec.Encode(hello);
@@ -44,32 +49,35 @@ internal sealed class Channel
     internal void Start()
     {
         lock(_gate) { if(_started) return; _started=true; if(_closed) return; }
-        _link.Send(_hello); _link.OnMessage(Receive); _link.OnClose(Ended);
+        Write(_hello); _link.OnMessage(Receive); _link.OnClose(Ended);
     }
     internal void Send(Message message)
     {
         lock(_gate) { if(_closed) return; }
         var bytes=_options.Codec.Encode(message);
         lock(_gate) { if(_closed) return; if(!_opened) { _outgoing.Enqueue(bytes); return; } }
-        _link.Send(bytes);
+        Write(bytes);
     }
     internal void Close() { try { _link.Close(); } finally { Ended(); } }
-    internal void Tick(long now,long ping,long close)
+    internal void Tick(long now,long ping,long close) => Tick(now,0,ping,close);
+    internal void Tick(long now,long paused,long ping,long close)
     {
         bool expire,send;
         lock(_gate)
         {
             if(_closed) return;
+            if(paused>0) _lastReceived=Math.Min(_lastReceived+paused,now-ping);
             var silent=now-_lastReceived; expire=silent>=close; send=!expire && silent>=ping && !_pinged && _opened;
             if(send) _pinged=true;
         }
-        if(expire) Close(); else if(send) _link.Send(_options.Codec.Encode(new PingMessage()));
+        if(expire) Close(); else if(send) Write(_options.Codec.Encode(new PingMessage()));
     }
     private void Receive(ReadOnlyMemory<byte> bytes)
     {
         lock(_gate)
         {
             if(_closed) return; _lastReceived=_time.GetUtcNow().ToUnixTimeMilliseconds(); _pinged=false;
+            _bytes.Add(bytes.Length, Received);
             _incoming.Enqueue(bytes); if(_processing) return; _processing=true;
         }
         _=Drain();
@@ -99,13 +107,13 @@ internal sealed class Channel
                     if(hello.Protocol!=DataInternal.ProtocolVersion) throw new ArgumentException($"handshake: protocol {hello.Protocol}, this host speaks {DataInternal.ProtocolVersion}");
                     byte[][] queued;
                     lock(_gate) { if(_closed) return; _opened=true; _peer=hello.Incarnation; _peerCalls=hello.Calls; queued=_outgoing.ToArray(); _outgoing.Clear(); }
-                    foreach(var pending in queued) { if(Closed) return; _link.Send(pending); }
+                    foreach(var pending in queued) { if(Closed) return; Write(pending); }
                     if(!Closed) _handler.Opened();
                 }
                 else
                 {
                     if(message is HelloMessage) throw new ArgumentException("handshake: a second hello");
-                    if(message is PingMessage) _link.Send(_options.Codec.Encode(new PongMessage()));
+                    if(message is PingMessage) Write(_options.Codec.Encode(new PongMessage()));
                     else if(message is not PongMessage && !Closed) await _handler.MessageAsync(message);
                 }
             }
@@ -117,6 +125,7 @@ internal sealed class Channel
         if(Closed) return;
         try { _options.Report(error); } finally { Close(); }
     }
+    private void Write(ReadOnlyMemory<byte> bytes) { _bytes.Add(bytes.Length, Sent); _link.Send(bytes); }
     private void Ended()
     {
         lock(_gate) { if(_closed) return; _closed=true; _opened=false; _peer=""; _peerCalls=0; _incoming.Clear(); _outgoing.Clear(); }

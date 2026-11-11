@@ -15,8 +15,12 @@ namespace PiSharp.Cli.Commands;
 internal sealed partial class OfflineSessionProfile
 {
     private readonly ConditionalWeakTable<PersistentAgentSession, CacheWarmer> _cacheWarmers = new();
-    private IChatTransport? _cacheWarmReplay;
-    private readonly object _cacheWarmGate = new();
+    private sealed record WarmReplayPayload(ChatRequest Request, LiveSessionConnection Connection);
+    private sealed record WarmReplayRoute(IChatTransport Transport);
+    private readonly ConditionalWeakTable<LiveSessionConnection, WarmReplayRoute> _cacheWarmRoutes = new();
+
+    internal Task StopCacheWarmingAsync(AgentSessionAttachment attachment) =>
+        _cacheWarmers.TryGetValue(attachment.Session, out var warmer) ? warmer.CancelAndJoinAsync() : Task.CompletedTask;
 
     /// <summary>The cache warmer of the current session, if it has sent a request (backs <c>/session</c> warming status).</summary>
     internal CacheWarmer? CurrentCacheWarmer => Sessions?.Current.Session is { } session && _cacheWarmers.TryGetValue(session, out var warmer) ? warmer : null;
@@ -25,15 +29,15 @@ internal sealed partial class OfflineSessionProfile
     private IChatTransport WithCacheWarming(IChatTransport main, LiveSessionConnection live, JsonData modelWire) =>
         new CacheWarmingTransport(this, main, live, modelWire);
 
-    private CacheWarmer WarmerFor(PersistentAgentSession session, LiveSessionConnection live) => _cacheWarmers.GetValue(session, owned =>
+    private CacheWarmer WarmerFor(PersistentAgentSession session) => _cacheWarmers.GetValue(session, owned =>
     {
         var warmer = new CacheWarmer(
             async (request, overrides, token) =>
             {
-                IChatTransport replay;
-                lock (_cacheWarmGate) replay = _cacheWarmReplay ??= live.CreateCacheWarmTransport();
+                var payload = (WarmReplayPayload)request.Payload!;
+                var replay = _cacheWarmRoutes.GetValue(payload.Connection, connection => new(connection.CreateCacheWarmTransport())).Transport;
                 AssistantMessage? final = null;
-                await foreach (var observation in replay.StreamAsync(PiSharp.AI.ModelOperations.CacheWarmingPolicy.PrepareReplay((ChatRequest)request.Payload!), token).ConfigureAwait(false))
+                await foreach (var observation in replay.StreamAsync(PiSharp.AI.ModelOperations.CacheWarmingPolicy.PrepareReplay(payload.Request), token).ConfigureAwait(false))
                     if (observation is StreamTerminalEvent terminal) final = terminal.Message;
                 return final ?? throw new InvalidOperationException("Cache warming replay ended without a response.");
             },
@@ -87,13 +91,14 @@ internal sealed partial class OfflineSessionProfile
         {
             if (model is not null && profile.Sessions?.Current.Session is { } session)
             {
-                var warmer = profile.WarmerFor(session, live);
+                var warmer = profile.WarmerFor(session);
                 var captured = session.Snapshot.Agent.Messages; var selected = session.Snapshot.Agent.Model;
-                warmer.Start(new(model, new(Reasoning: request.ThinkingLevel is null or "off" ? null : request.ThinkingLevel), request), () =>
+                warmer.Start(new(model, live.CacheWarmingOptions(request), new WarmReplayPayload(request, live)), () =>
                 {
                     // Source cacheContextIsCurrent: same selected model, and the request's messages still prefix the transcript.
                     var current = session.Snapshot.Agent;
-                    if (current.Model != selected || current.Messages.Length < captured.Length) return false;
+                    if (!ReferenceEquals(profile.Sessions?.Current.Session, session) || current.IsDisposed ||
+                        current.Model != selected || current.Messages.Length < captured.Length) return false;
                     for (var index = 0; index < captured.Length; index++) if (!ReferenceEquals(captured[index], current.Messages[index])) return false;
                     return true;
                 });

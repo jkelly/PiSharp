@@ -11,7 +11,7 @@ using PiSharp.Cli.Pi;
 // Issue #5: /clear (new_session) crashed with "RPC command failed." on a model whose thinking cannot be turned off, because the new
 // session was refused at "off" instead of being clamped. anthropic/claude-sonnet-5-5 maps off and minimal to null (levels low..max);
 // anthropic/claude-haiku-4-5 has no map (levels off..high). Expectations were written from the pinned sources by reading.
-// C13 (upstream 7860ff52, reviewed at 7d073328): a prompt checkpoints a divergent effective selection before execution.
+// Pi 1.5.2 _recordThinkingLevel: a prompt checkpoints a divergent effective selection, comparing the recorded level after clamping.
 internal static partial class Program
 {
     private static IEnumerable<(string, Func<Task>)> ThinkingClampCases() =>
@@ -85,9 +85,9 @@ internal static partial class Program
                 Equal("claude-sonnet-5-5", sandbox.Requests[^1].Json.GetProperty("model").GetString(), "turn " + turn + " model");
             }
             var appended = File.ReadLines(session).Skip(seeded).Select(line => JsonNode.Parse(line)!).ToList();
-            // C13 (upstream 7860ff52): the first prompt checkpoints the effective level; reopening/another prompt must not duplicate it.
-            Names(["thinking_level_change", "message:system", "message:user", "message:assistant", "message:user", "message:assistant"], appended.Select(Kind), "one thinking checkpoint precedes both turns");
-            Equal("low", appended[0]["thinkingLevel"]!.GetValue<string>(), "effective clamped level is checkpointed");
+            // Pi 1.5.2 compares the recorded level after model clamping: off already runs as low, so ordinary prompts must
+            // not overwrite the requested off value. An actual live selection change still records a new branch entry below.
+            Names(["message:system", "message:user", "message:assistant", "message:user", "message:assistant"], appended.Select(Kind), "clamping alone does not add a thinking checkpoint");
             Equal("off", JsonNode.Parse(File.ReadLines(session).ElementAt(2))!["thinkingLevel"]!.GetValue<string>(), "original off record is retained");
             // An RPC run on the resumed session: setting the clamped level records nothing (it is not a change of the session's level),
             // another level is recorded, and a turn runs at it.

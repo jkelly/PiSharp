@@ -134,10 +134,12 @@ internal sealed class RegistryValueSource<V> : FollowedSource<V>, IRegistryValue
         var token = new WaiterToken(waiter);
         if (waiters.Count == 0) told = null;
         waiters.Add(token);
+        try { _ = Start(); }
+        catch { waiters.Remove(token); throw; }
         return () =>
         {
             waiters.Remove(token);
-            if (waiters.Count == 0) told = null;
+            if (waiters.Count == 0) { told = null; record?.Clock?.Stop(this); }
         };
     }
 
@@ -163,6 +165,7 @@ internal sealed class RegistryValueSource<V> : FollowedSource<V>, IRegistryValue
         {
             last = NativeStart<V>.Failure(error, hasLast: false);
         }
+        record?.Clock?.Stop(this);
         record = null;
         closedAt = last;
         readers.Clear();
@@ -188,6 +191,13 @@ internal sealed class RegistryValueSource<V> : FollowedSource<V>, IRegistryValue
         var usable = !start.Failed || start.HasLast;
         if (usable ? previous is { Usable: true } : previous is { Usable: false } && SameError(previous.Error, start.Error)) return;
         told = usable ? Told.UsableNow : new Told(false, start.Error);
+        if (usable) record?.Clock?.Stop(this);
+        else if (start.Error is { } failure)
+        {
+            var error = DataInternal.AsChordError(failure, Name);
+            if (previous is { Usable: false }) record?.Clock?.Failed(this, error);
+            else record?.Clock?.Start(this, "registry " + Name, error);
+        }
         // The first start of a wait wakes nobody: the waiter reads it itself.
         if (previous is null) return;
         foreach (var token in waiters.Items) token.Waiter.DependencyMoved();

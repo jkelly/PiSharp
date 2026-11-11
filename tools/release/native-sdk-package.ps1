@@ -68,7 +68,7 @@ function Assert-PiSharpNativeSdkPackage {
         # Decision 0013 (experimental, from 1.5.0): pi-telemetry has no dependencies, and pi-ai depends on it.
         'PiSharp.Telemetry'=@()
         'PiSharp.Chord'=@('PiSharp.Contracts','PiSharp.Telemetry','PiSharp.Tools')
-        'PiSharp.Chord.Hosting'=@('PiSharp.Chord','PiSharp.Tools')
+        'PiSharp.Chord.Hosting'=@('PiSharp.Chord','PiSharp.Tools','PiSharp.Durable.Store','PiSharp.Tui')
         'PiSharp.Durable.Store'=@('PiSharp.Durable','PiSharp.Chord','PiSharp.Durable.Sqlite')
         'PiSharp.Env.Protocol'=@()
         'PiSharp.Env'=@('PiSharp.Env.Protocol','PiSharp.Durable')

@@ -36,26 +36,20 @@ public sealed class McpStdioTransport : IMcpWireTransport
     {
         try
         {
-            var chunk = new byte[limits.ReadBufferBytes]; using var line = new MemoryStream();
+            var chunk = new byte[limits.ReadBufferBytes]; var lines = new McpJsonRpcLineReader(limits.MaximumFrameBytes);
             while (true)
             {
                 var count = await lease.Output.ReadAsync(chunk, token).ConfigureAwait(false); token.ThrowIfCancellationRequested();
                 if (count == 0)
                 {
-                    if (!string.IsNullOrWhiteSpace(McpWireJson.Utf8.GetString(line.GetBuffer(), 0, (int)line.Length))) throw new McpRuntimeProtocolException("MCP stdio incomplete final message");
+                    lines.End(error => throw error);
                     callbacks.Disconnected(new McpRuntimeDisconnectedException("MCP stdio EOF")); return;
                 }
-                for (var index = 0; index < count; index++)
-                {
-                    if (chunk[index] == 10)
-                    {
-                        var bytes = line.GetBuffer(); var length = (int)line.Length;
-                        if (length > 0 && bytes[length - 1] == 13) length--;
-                        if (!string.IsNullOrWhiteSpace(McpWireJson.Utf8.GetString(bytes, 0, length))) await callbacks.Receive(McpWireJson.Parse(bytes.AsSpan(0, length))).ConfigureAwait(false);
-                        line.SetLength(0);
-                    }
-                    else { if (line.Length >= limits.MaximumFrameBytes) throw new McpRuntimeProtocolException("MCP stdio frame byte limit exceeded"); line.WriteByte(chunk[index]); }
-                }
+                var events = new List<(JsonData? Message, Exception? Error)>();
+                lines.Read(chunk.AsSpan(0, count), message => events.Add((message, null)), error => events.Add((null, error)));
+                foreach (var item in events)
+                    if (item.Error is not null) throw item.Error;
+                    else await callbacks.Receive(item.Message!).ConfigureAwait(false);
             }
         }
         catch (OperationCanceledException) when (token.IsCancellationRequested) { }

@@ -310,6 +310,8 @@ internal sealed partial class InteractiveMode
                 break;
 
             case "agent_settled":
+                FlushPendingBashComponents();
+                ui.RequestRender();
                 await CheckShutdownRequestedAsync();
                 break;
 
@@ -437,8 +439,10 @@ internal sealed partial class InteractiveMode
         CompleteGenerationWaiters();
     }
 
-    private static string? ReadSessionCwd(string sessionFile)
+    private string? ReadSessionCwd(string sessionFile)
     {
+        if (context.Startup.Host.CurrentSession is { } current && PiSharp.Cli.Pi.PiPaths.PathsEqual(current.Path, sessionFile))
+            return current.WorkingDirectory;
         try
         {
             using var reader = new StreamReader(sessionFile);
@@ -501,6 +505,7 @@ internal sealed partial class InteractiveMode
             case "bashExecution":
             {
                 var component = new BashExecutionComponent(S(message["command"]) ?? "", ui, B(message["excludeFromContext"]), outputPad);
+                component.SetExpanded(toolOutputExpanded);
                 if (S(message["output"]) is { Length: > 0 } output) component.AppendOutput(output);
                 component.SetComplete(message["exitCode"] is JsonValue code && code.TryGetValue<int>(out var exit) ? exit : null, B(message["cancelled"]),
                     B(message["truncated"]) ? TruncatedOutput(null) : null, S(message["fullOutputPath"]));
@@ -511,7 +516,7 @@ internal sealed partial class InteractiveMode
                 if (B(message["display"]))
                 {
                     var renderer = context.GetMessageRenderer?.Invoke(S(message["customType"]) ?? "");
-                    var component = new CustomMessageComponent(message, renderer, GetMarkdownThemeWithSettings(), outputPad);
+                    var component = new CustomMessageComponent(message, renderer, GetMarkdownThemeWithSettings(), outputPad, GetMarkdownTransformers(), messageId, timestamp);
                     component.SetExpanded(toolOutputExpanded);
                     chatContainer.AddChild(component);
                 }
@@ -519,7 +524,7 @@ internal sealed partial class InteractiveMode
             case "compactionSummary":
             {
                 chatContainer.AddChild(new Spacer(1));
-                var component = new CompactionSummaryMessageComponent(message, GetMarkdownThemeWithSettings(), outputPad);
+                var component = new CompactionSummaryMessageComponent(message, GetMarkdownThemeWithSettings(), outputPad, GetMarkdownTransformers(), messageId, timestamp);
                 component.SetExpanded(toolOutputExpanded);
                 chatContainer.AddChild(component);
                 break;
@@ -527,7 +532,7 @@ internal sealed partial class InteractiveMode
             case "branchSummary":
             {
                 chatContainer.AddChild(new Spacer(1));
-                var component = new BranchSummaryMessageComponent(message, GetMarkdownThemeWithSettings(), outputPad);
+                var component = new BranchSummaryMessageComponent(message, GetMarkdownThemeWithSettings(), outputPad, GetMarkdownTransformers(), messageId, timestamp);
                 component.SetExpanded(toolOutputExpanded);
                 chatContainer.AddChild(component);
                 break;
@@ -539,7 +544,7 @@ internal sealed partial class InteractiveMode
                 if (chatContainer.Children.Count > 0) chatContainer.AddChild(new Spacer(1));
                 if (SessionEntries.ParseSkillBlock(textContent) is { } skillBlock)
                 {
-                    var component = new SkillInvocationMessageComponent(skillBlock, GetMarkdownThemeWithSettings(), outputPad);
+                    var component = new SkillInvocationMessageComponent(skillBlock, GetMarkdownThemeWithSettings(), outputPad, GetMarkdownTransformers(), messageId, timestamp);
                     component.SetExpanded(toolOutputExpanded);
                     chatContainer.AddChild(component);
                     if (skillBlock.UserMessage is { } userMessage)
@@ -641,12 +646,30 @@ internal sealed partial class InteractiveMode
         RenderSessionItems(items, updateFooter, populateHistory);
     }
 
+    private sealed record CacheWarmingNotice(ThemedText Component, JsonObject Entry, string? Note);
+    private CacheWarmingNotice? cacheWarmingNotice;
+
+    private Markdown GetChangelogMarkdown(string text) => new(text, 1, 1, GetMarkdownThemeWithSettings(),
+        options: new MarkdownOptions(Transform: MarkdownTransform.CreateMarkdownTransform(MarkdownMessageType.Changelog, () => false, GetMarkdownTransformers())));
+
     private void AddCacheWarmingUsage(JsonObject entry)
     {
         if (!settings.ShowCacheMissNotices) return;
+        var note = S(entry["note"]);
+        if (cacheWarmingNotice is { } previous && ReferenceEquals(chatContainer.Children.LastOrDefault(), previous.Component) && previous.Note == note)
+        {
+            var cost = (JsonObject)previous.Entry["usage"]!["cost"]!;
+            cost["total"] = N(cost["total"]) + N(entry["usage"]?["cost"]?["total"]);
+            previous.Component.Invalidate();
+            return;
+        }
+        var total = (JsonObject)entry.DeepClone();
+        if (total["usage"] is not JsonObject) total["usage"] = new JsonObject();
+        if (total["usage"]!["cost"] is not JsonObject) total["usage"]!["cost"] = new JsonObject();
+        var component = new ThemedText(() => theme.Fg("dim", context.FormatCacheWarmingUsage?.Invoke(total) ?? ""), 1, 0);
+        cacheWarmingNotice = new(component, total, note);
         chatContainer.AddChild(new Spacer(1));
-        var usage = context.FormatCacheWarmingUsage?.Invoke(entry) ?? "";
-        chatContainer.AddChild(new ThemedText(() => theme.Fg("dim", usage), 1, 0));
+        chatContainer.AddChild(component);
     }
 
     private void AddCompactionCostNotice(string kind, JsonObject usage)
@@ -751,6 +774,7 @@ internal sealed partial class InteractiveMode
 
     private void RenderCurrentSessionState()
     {
+        pendingBashComponents.Clear();
         loadedResourcesContainer.Clear();
         chatContainer.Clear();
         pendingMessagesContainer.Clear();
@@ -857,6 +881,7 @@ internal sealed partial class InteractiveMode
     private void UpdatePendingMessagesDisplay()
     {
         pendingMessagesContainer.Clear();
+        foreach (var component in pendingBashComponents) pendingMessagesContainer.AddChild(component);
         var (steering, followUp) = GetAllQueuedMessages();
         if (steering.Count == 0 && followUp.Count == 0) return;
         pendingMessagesContainer.AddChild(new Spacer(1));
@@ -877,7 +902,7 @@ internal sealed partial class InteractiveMode
             return 0;
         }
         var queuedText = string.Join("\n\n", allQueued);
-        currentText ??= editor.GetText();
+        currentText ??= editor.GetExpandedText();
         var combined = string.Join("\n\n", new[] { queuedText, currentText }.Where(text => TextUtils.JsTrim(text).Length > 0));
         editor.SetText(combined);
         UpdatePendingMessagesDisplay();

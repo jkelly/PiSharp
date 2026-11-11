@@ -754,7 +754,7 @@ public abstract partial class TuiBase : Container, ITui
     protected static List<string> ApplyLineResets(List<string> lines)
     {
         for (var i = 0; i < lines.Count; i++)
-            if (!TerminalImage.IsImageLine(lines[i])) lines[i] = TextUtils.NormalizeTerminalOutput(lines[i]) + SegmentReset;
+            if (!TerminalImage.IsImageLine(lines[i])) lines[i] = TextUtils.NormalizeTerminalOutput(lines[i].Replace(CursorMarker, "", StringComparison.Ordinal)) + SegmentReset;
         return lines;
     }
 
@@ -784,7 +784,7 @@ public abstract partial class TuiBase : Container, ITui
             var line = lines[row]; var index = line.IndexOf(CursorMarker, StringComparison.Ordinal);
             if (index == -1) continue;
             var col = TextUtils.VisibleWidth(line[..index]);
-            lines[row] = line[..index] + line[(index + CursorMarker.Length)..];
+            lines[row] = line.Replace(CursorMarker, "", StringComparison.Ordinal);
             return (row, col);
         }
         return null;

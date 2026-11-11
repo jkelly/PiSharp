@@ -19,6 +19,8 @@
 using PiSharp.Chord.Data;
 using PiSharp.Chord.State;
 using PiSharp.Chord.Store;
+using PiSharp.Telemetry;
+using System.Diagnostics;
 
 namespace PiSharp.Chord.Documents;
 
@@ -39,11 +41,17 @@ internal interface IDocumentsOwner
     /// <summary>The object's context: shared cold loads run under it (rule 11).</summary>
     ChordContext Context { get; }
 
+    /// <summary>The owning host's telemetry, independent of the caller's tracing choice.</summary>
+    ITelemetryContext Telemetry => NoopTelemetry.Context;
+
     /// <summary>The host's store and the object's owner name in it, when it has one.</summary>
     DocumentsStore? Store { get; }
 
     /// <summary>A document the code cannot read fails the live object <c>broken</c> (slice 6a §1.4); ignored when it is not live.</summary>
     void Fail(ChordError error);
+
+    /// <summary>Reports cancellation before a transaction was admitted.</summary>
+    void ReportTransactionCancelled(Exception error) { }
 }
 
 /// <summary>A declared slot as an object's documents hold it (upstream's <c>SingletonSlot | KeyedSlot</c>): one per declared name, kept
@@ -149,12 +157,13 @@ internal sealed class Documents
         ArgumentNullException.ThrowIfNull(declarer);
         var slot = slots.GetValueOrDefault(definition.Name);
         slot?.Definition.Check(definition);
-        var persistence = slot is null && definition.Persist ? PersistenceOf(definition.Name) : null;
+        var persistence = slot is null && definition.Persist ? PersistenceOf(definition.Name, definition.KeyHost) : null;
         // The definition's Keyed decides the slot's class and the handle's.
         if (definition.Keyed)
         {
             var keyed = slot ?? Add(new KeyedSlot(this, definition, persistence));
-            return new Keyed((KeyedSlot)keyed, token, definition.Version, declarer);
+            var handle = new Keyed((KeyedSlot)keyed, token, definition.Version, declarer);
+            return definition.KeyHost is { } host ? new HostKeyed(handle, host) : handle;
         }
         var singleton = slot ?? Add(new SingletonSlot(this, definition, persistence));
         return new Singleton((SingletonSlot)singleton, token, definition.Version);
@@ -272,14 +281,20 @@ internal sealed class Documents
                 tx.Returned();
             }
             var result = await call.ConfigureAwait(false);
+            var timed = !ChordTelemetry.IsUntraced(owner.Telemetry) || !ChordTelemetry.IsUntraced(context.Telemetry);
+            var startedAt = timed ? Stopwatch.GetTimestamp() : 0;
             // In-memory-only commits are synchronous (W12): no await unless the store's step is taken.
             var step = tx.Commit();
             if (step is not null) await step.ConfigureAwait(false);
+            if (timed) RecordCommit(tx, Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds, context);
             return result;
         }
-        catch
+        catch (Exception error)
         {
+            var cancelled = context.AbortSignal is { IsCancellationRequested: true } && !tx.Admitted;
             tx.Discard();
+            if (cancelled)
+                owner.ReportTransactionCancelled(error is OperationCanceledException ? error : new OperationCanceledException(context.AbortSignal!.Value));
             throw;
         }
         finally
@@ -288,6 +303,21 @@ internal sealed class Documents
             release();
             tx.Settle();
         }
+    }
+
+    private void RecordCommit(Transaction transaction, double duration, ChordContext context)
+    {
+        var committed = transaction.CommittedCounts();
+        if (committed.Documents == 0 && committed.Writes == 0) return;
+        if (!ChordTelemetry.IsUntraced(context.Telemetry) && context.Telemetry is ITelemetrySpan span)
+            span.AddEvent("chord.commit", new()
+            {
+                ["documents"] = (double)committed.Documents,
+                ["ops"] = (double)committed.Ops,
+                ["rows"] = (double)committed.Rows,
+                ["duration"] = duration,
+            });
+        ChordTelemetry.Metrics(owner.Telemetry.Metrics).Histogram("chord.commit.duration").Record(duration);
     }
 
     /// <summary>Seals <paramref name="token"/> (the seal fence): its transactions are refused from now on, and the one holding the line is
@@ -380,9 +410,12 @@ internal sealed class Documents
 
     /// <summary>The store side of persisted documents named <paramref name="name"/> (upstream <c>#persistence</c>); the attempt checked the
     /// store first (P3).</summary>
-    private Persistence PersistenceOf(string name)
+    internal IReadOnlyList<KeyedSlot> HostSlots(string kind) => [.. slots.Values.OfType<KeyedSlot>()
+        .Where(slot => slot.IsPersisted && slot.Definition.Current.KeyHost?.Kind == kind)];
+
+    private Persistence PersistenceOf(string name, Contracts.HostKind? host = null)
     {
         var store = owner.Store ?? throw new InvalidOperationException($"{Label}: persisted documents need a store");
-        return new Persistence(store.Store, store.Owner, "chord", name);
+        return new Persistence(store.Store, store.Owner, "chord", name, host);
     }
 }

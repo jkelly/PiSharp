@@ -28,11 +28,12 @@ internal static partial class Program
 
     private static void SchemasEmbedded()
     {
-        // git ls-tree v1.5.0 packages/coding-agent/schemas (keybindings and theme unchanged since v1.2.0)
+        // Current settings are pinned to v1.5.2; the frozen models baseline remains v1.5.0.
+        // Keybindings and theme are unchanged since v1.2.0.
         var blobs = new Dictionary<string, string>
         {
             [PiConfigurationSchemas.ModelsFileName] = "c51a82c358ef1d92d4b2a2481be1e9d37258057e", // v1.5.0
-            [PiConfigurationSchemas.SettingsFileName] = "c331ae27a714e2fca19f9bb7b95f67f7f2f6e367", // v1.5.0
+            [PiConfigurationSchemas.SettingsFileName] = "cc28afe3a71e57f933fffe7bcf9fc0ec399e5332", // v1.5.2: idle cache-warming default
             [PiConfigurationSchemas.KeybindingsFileName] = "aa3b3e9be501475ce465855ee676abe32b8b9c2e",
             [PiConfigurationSchemas.ThemeFileName] = "95350a58db931d116d982d3212dbfd2c5c946760",
         };

@@ -20,7 +20,13 @@ internal static partial class Program
         {
             using var map = JsonDocument.Parse(File.ReadAllText(Path.Combine(RepositoryRoot(), "compatibility", "durable-port-map.json")));
             var root = map.RootElement;
-            Equal(DurableUpstream.Commit, root.GetProperty("upstreamCommit").GetString(), "port map commit");
+            // The row-level map remains immutable v1.5.0 evidence. Its current candidate links the separately audited overlay.
+            Equal("f9a26365568127461c47a07a37dcb42c140a3ac5", root.GetProperty("upstreamCommit").GetString(), "historical port map commit");
+            Equal("1.5.0", root.GetProperty("upstreamVersion").GetString(), "historical port map version");
+            var candidate = root.GetProperty("currentImplementation").GetProperty("candidate");
+            Equal(DurableUpstream.Commit, candidate.GetProperty("source").GetProperty("commit").GetString(), "current candidate commit");
+            Equal("v1.5.2", candidate.GetProperty("source").GetProperty("tag").GetString(), "current candidate tag");
+            Equal("compatibility/durable-sync-1.5.2-overlay.json", candidate.GetProperty("overlay").GetString(), "current overlay");
             var statuses = root.GetProperty("statusMeaning").EnumerateObject().Select(property => property.Name).ToHashSet(StringComparer.Ordinal);
             var upstream = new HashSet<string>(StringComparer.Ordinal);
             foreach (var row in root.GetProperty("files").EnumerateArray())

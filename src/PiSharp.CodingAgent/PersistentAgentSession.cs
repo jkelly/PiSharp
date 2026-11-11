@@ -17,6 +17,8 @@ public sealed record PersistentAgentSessionOptions(bool UseLatestLeaf = true, st
     AgentOptions? AgentOptions = null, SessionLogStoreOptions? SessionLogStoreOptions = null,
     SessionContextProjectionOptions? ContextOptions = null)
 {
+    /// <summary>Run an existing session in this directory without changing its stored header.</summary>
+    public string? WorkingDirectoryOverride { get; init; }
     public PiSharp.CodingAgent.ToolSelection.AllowedToolSelection? LifetimeToolSelection { get; init; }
     /// <summary>agent-session.ts prompt: run for an idle prompt after input handlers and expansion, before anything is persisted or a
     /// run starts, with the session's current model. A <see cref="SessionPromptRejectedException"/> it throws rejects the prompt.</summary>
@@ -140,6 +142,8 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
     private sealed class Bridge : IAgentEventSink
     {
         public PersistentAgentSession? Owner;
+        public ValueTask<TranscriptEntry> NormalizeInput(ModelDescriptor model, TranscriptEntry message, CancellationToken token) =>
+            Owner?.InputNormalizer is { } normalize ? normalize(model, message, token) : ValueTask.FromResult(message);
         public ValueTask EmitAsync(AgentEvent observation, CancellationToken cancellationToken) =>
             Owner!.CommitAsync(observation);
     }
@@ -162,7 +166,7 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
     /// <summary>The configured local session path, including a lazy path not yet materialized.
     /// In-memory namespace identities are not filesystem session paths.</summary>
     public string? SessionFile => Snapshot.Log.StorageDurability == SessionLogStorageDurability.VolatileMemory ? null : Path;
-    public string WorkingDirectory { get; }
+    public string WorkingDirectory { get; private set; }
 
     /// <summary>Queries admitted native capabilities. A registry is required to query a different model.</summary>
     public ImmutableArray<string> GetSupportedThinkingLevels(ModelDescriptor? model = null)
@@ -255,7 +259,9 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
             agent.ReplaceMessages(SessionContextProjector.AgentMessages(context));
             cancellationToken.ThrowIfCancellationRequested();
             return new(path, store, agent, bridge, projector, codec, context, configuration, clock, nextEntryId,
-                configured.AgentOptions, configured.SessionLogStoreOptions?.ReaderOptions) { PromptPreflight = configured.PromptPreflight };
+                configured.AgentOptions, configured.SessionLogStoreOptions?.ReaderOptions)
+            { PromptPreflight = configured.PromptPreflight,
+                WorkingDirectory = configured.WorkingDirectoryOverride ?? store.Snapshot.Header.WireBody.Value.GetProperty("cwd").GetString()! };
         }
         catch
         {
@@ -337,7 +343,7 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
             var leaf = configured.UseLatestLeaf ? store.Snapshot.LeafId : configured.SelectedLeafId;
             var context = projector.Project(store.Snapshot.Entries, leaf, cancellationToken);
             cancellationToken.ThrowIfCancellationRequested();
-            var acquired = await runtimeForWorkingDirectory(store.Snapshot.Header.WireBody.Value.GetProperty("cwd").GetString()!, cancellationToken).ConfigureAwait(false)
+            var acquired = await runtimeForWorkingDirectory(configured.WorkingDirectoryOverride ?? store.Snapshot.Header.WireBody.Value.GetProperty("cwd").GetString()!, cancellationToken).ConfigureAwait(false)
                 ?? throw Error(PersistentAgentSessionFailure.InvalidConfiguration);
             acquired.Claim(); runtime = acquired;
             var registry = runtime.Registry.RetainToolSelection(configured.LifetimeToolSelection);
@@ -378,12 +384,13 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
             }
             var selection = loadout.Selection;
             var bridge = new Bridge();
-            agent = new(selection.Configuration, clock, bridge, configured.AgentOptions);
+            agent = new(selection.Configuration, clock, bridge, WithInputNormalizer(configured.AgentOptions, bridge));
             agent.ReplaceMessages(SessionContextProjector.AgentMessages(context));
             cancellationToken.ThrowIfCancellationRequested();
             opened = new(path, store, agent, bridge, projector, codec, context, selection.Configuration, clock, nextEntryId,
                 configured.AgentOptions, configured.SessionLogStoreOptions?.ReaderOptions)
             { _registry = registry, _runtimeLease = runtime, PromptPreflight = configured.PromptPreflight,
+                WorkingDirectory = configured.WorkingDirectoryOverride ?? store.Snapshot.Header.WireBody.Value.GetProperty("cwd").GetString()!,
                 _toleratedSelection = Divergent(context, selection.Configuration.Model),
                 // sdk.ts createAgentSession: a recorded level the model cannot run opens clamped (agent.state.thinkingLevel) and is not
                 // rewritten; the branch's level is tolerated, as after tree navigation, until a change names the session's.
@@ -970,7 +977,7 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
         var projector = new SessionContextProjector(configured.ContextOptions);
         var codec = new SessionEntryCodec(configured.SessionLogStoreOptions?.ReaderOptions?.CodecOptions);
         var bridge = new Bridge();
-        var agent = new NativeAgent(configuration, clock, bridge, configured.AgentOptions);
+        var agent = new NativeAgent(configuration, clock, bridge, WithInputNormalizer(configured.AgentOptions, bridge));
         return (configured, projector, codec, agent, bridge);
     }
 

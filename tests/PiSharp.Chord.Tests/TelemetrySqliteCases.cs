@@ -2,6 +2,7 @@
 using System.Globalization;
 using PiSharp.Chord.Sqlite;
 using PiSharp.Chord.TelemetrySqlite;
+using PiSharp.Chord.TelemetryIngest;
 using PiSharp.Telemetry;
 using PiSharp.Telemetry.Testing;
 
@@ -11,6 +12,96 @@ internal static partial class Program
     {
         foreach (var test in TelemetryAdapterConformance.Create(TelemetrySqliteFixture).Where(test => test.Group != "metrics"))
             yield return Case("telemetry-sqlite.conformance." + test.Group + "." + test.Name, test.RunAsync);
+
+        yield return Case("telemetry-sqlite.v1-migration-preserves-spans-events-metrics", async () =>
+        {
+            var db = new TestSqliteDatabase(":memory:");
+            await db.ExecAsync("""
+                CREATE TABLE telemetry_schema (singleton INTEGER PRIMARY KEY, version INTEGER NOT NULL);
+                INSERT INTO telemetry_schema VALUES (1, 1);
+                CREATE TABLE telemetry_spans (id TEXT PRIMARY KEY, trace_id TEXT NOT NULL, parent_id TEXT, name TEXT, started_ms REAL, ended_ms REAL NOT NULL, attributes TEXT, events TEXT, links TEXT, status TEXT);
+                CREATE INDEX telemetry_spans_ended_ms ON telemetry_spans(ended_ms);
+                CREATE INDEX telemetry_spans_trace_started ON telemetry_spans(trace_id, started_ms);
+                CREATE INDEX telemetry_spans_started_ms ON telemetry_spans(started_ms);
+                CREATE TABLE telemetry_metrics (interval_ms INTEGER, series_key TEXT, name TEXT, kind TEXT, unit TEXT, attributes TEXT, count INTEGER, sum REAL, min REAL, max REAL, PRIMARY KEY(interval_ms, series_key));
+                INSERT INTO telemetry_metrics VALUES (0, 'legacy', 'legacy', 'counter', NULL, '{}', 2, 7, 3, 4);
+                """);
+            await db.RunAsync("INSERT INTO telemetry_spans VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "scope:9", "trace", null, "root", 1.2345, 2.3456, "{\"original\":true}",
+                "[{\"name\":\"event\",\"time_ms\":0.125,\"attributes\":{}}]", "[]", "{\"status\":\"ok\"}");
+            await db.RunAsync("INSERT INTO telemetry_spans VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "scope:10", "trace", "scope:9", "child", 1.2345, 3, "{}", "[]", "[]", "{\"status\":\"ok\"}");
+            var recorder = await SqliteTelemetry.CreateAsync(db, timeProvider: new TelemetryClock());
+            Equal(2L, (long)(await db.GetAsync("SELECT version FROM telemetry_schema"))!["version"]!, "schema upgraded");
+            var units = (await db.GetAsync("SELECT started_us, ended_us, typeof(started_us) type FROM telemetry_spans WHERE id = 'scope:9'"))!;
+            Equal(1235L, (long)units["started_us"]!, "legacy start rounded to integer microseconds");
+            Equal(2346L, (long)units["ended_us"]!, "legacy end rounded to integer microseconds");
+            Equal("integer", (string)units["type"]!, "integer storage class");
+            var trace = (await recorder.GetTraceAsync("trace"))!;
+            Sequence(new[] { "scope:9", "scope:10" }, trace.Spans.Select(s => s.Id), "numeric suffix tie order");
+            Equal(1.235d, trace.Spans[0].StartedMs, "reader converts back to milliseconds");
+            Equal(0.125d, trace.Spans[0].Events.Single().TimeMs, "event time stays relative milliseconds");
+            Check(trace.Spans[0].Attributes["original"]!.GetBoolean(), "attributes preserved");
+            Equal(7d, (await recorder.FindMetricsAsync(new("legacy"))).Single().Sum, "metric rows preserved");
+            Equal(1, (await recorder.FindTracesAsync(new() { Name = "root" })).Traces.Count, "name filter uses numeric suffix tie order");
+            await recorder.CloseAsync(); await db.CloseAsync();
+        });
+
+        yield return Case("telemetry-sqlite.ingest-idempotent-microseconds-and-cursors", async () =>
+        {
+            var db = new TestSqliteDatabase(":memory:");
+            var recorder = await SqliteTelemetry.CreateAsync(db, timeProvider: new TelemetryClock());
+            StoredSpan Span(string id, string trace, string name, string? parent = null) =>
+                new(id, trace, parent, name, 1.0004, 1.2345, new(), [], [], SpanStatus.Ok);
+            var root = Span("scope:9", "trace-a", "root");
+            var batch = new TelemetryBatch([Span("scope:10", "trace-a", "child", root.Id), root,
+                Span("scope:11", "trace-b", "other")], []);
+            var statements = 0;
+            db.OnTransactionStatement = _ => statements++;
+            Equal(3, recorder.Ingest(batch), "ingest reports queued spans");
+            Equal(0, statements, "ingest executes no SQL");
+            await recorder.FlushAsync();
+            Equal(1, recorder.Ingest(new([root with { Name = "replacement" }], [])), "duplicate id accepted into queue");
+            await recorder.FlushAsync();
+            var trace = (await recorder.GetTraceAsync("trace-a"))!;
+            Equal(2, trace.Spans.Count, "duplicate id not inserted twice");
+            Equal("root", trace.Spans[0].Name, "first stored row not replaced");
+            Equal(1d, trace.Spans[0].StartedMs, "ingest start rounded to microsecond");
+            Equal(1.235d, trace.Spans[0].EndedMs, "ingest end rounded to microsecond");
+            var page = await recorder.FindTracesAsync(new() { Limit = 1, StartMin = 1, StartMax = 1 });
+            Equal("trace-a", page.Traces.Single().TraceId, "trace id breaks tied page order");
+            using var cursor = System.Text.Json.JsonDocument.Parse(page.Cursor!);
+            Equal(1000d, cursor.RootElement[0].GetDouble(), "cursor stores microseconds");
+            Equal("trace-b", (await recorder.FindTracesAsync(new() { Limit = 1, Cursor = page.Cursor })).Traces.Single().TraceId, "cursor advances tied traces");
+            Equal(0, (await recorder.FindTracesAsync(new() { StartMin = 1.001 })).Traces.Count, "bounds converted from milliseconds");
+            await recorder.CloseAsync(); await db.CloseAsync();
+        });
+
+        yield return Case("telemetry-sqlite.read-only-reader-checks-exact-schema-and-owns-connection", async () =>
+        {
+            foreach (var version in new[] { 0, 1, 3 })
+            {
+                var db = new TestSqliteDatabase(":memory:");
+                if (version != 0)
+                {
+                    await db.ExecAsync("CREATE TABLE telemetry_schema (singleton INTEGER PRIMARY KEY, version INTEGER NOT NULL)");
+                    await db.RunAsync("INSERT INTO telemetry_schema VALUES (1, ?)", version);
+                }
+                var guarded = new ReadOnlyTelemetryDatabase(db);
+                Check(await TelemetryFailure(SqliteTelemetry.OpenReaderAsync(guarded)) is InvalidOperationException, "missing, old and future schemas rejected");
+                Equal(0, guarded.Writes, "schema validation issues no writes");
+                Equal(1, guarded.Closes, "failed open closes owned connection");
+            }
+            var current = new TestSqliteDatabase(":memory:");
+            var recorder = await SqliteTelemetry.CreateAsync(current, timeProvider: new TelemetryClock());
+            await recorder.StartSpanAsync("persisted", _ => 1); await recorder.CloseAsync();
+            var readOnly = new ReadOnlyTelemetryDatabase(current);
+            var reader = await SqliteTelemetryStore.OpenReaderAsync(readOnly);
+            Equal("persisted", (await reader.FindTracesAsync()).Traces.Single().Spans.Single().Name, "reader sees committed data");
+            await reader.CloseAsync(); await reader.CloseAsync();
+            Equal(0, readOnly.Writes, "reader performs no writes");
+            Equal(1, readOnly.Closes, "reader close is idempotent");
+        });
 
         yield return Case("telemetry-sqlite.buffering-settlement-clock", async () =>
         {
@@ -155,8 +246,7 @@ internal static partial class Program
             {
                 await recorder.StartSpanAsync("root", span =>
                 {
-                    // Tie starts across traces, not within a trace: upstream breaks intra-trace ties by string ID,
-                    // which can place child :10 before parent :9. Its fixture also gives children a later wall time.
+                    // Exercise tied trace pagination while giving children a later start.
                     clock.Jump(1);
                     return span.StartSpanAsync("child", _ => 1);
                 });
@@ -237,6 +327,31 @@ internal static partial class Program
             },
             Dispose = async () => { await recorder.CloseAsync(); await db.CloseAsync(); }
         };
+    }
+
+    private sealed class ReadOnlyTelemetryDatabase(ISqliteDatabase inner) : ISqliteDatabase
+    {
+        internal int Writes { get; private set; }
+        internal int Closes { get; private set; }
+        private Task<T> Write<T>() { Writes++; throw new InvalidOperationException("read-only"); }
+        public Task ExecAsync(string sql) => Write<bool>();
+        public Task RunAsync(string sql, params object?[] parameters) => Write<bool>();
+        public Task<long> RunCountedAsync(string sql, params object?[] parameters) => Write<long>();
+        public Task<IReadOnlyDictionary<string, object?>?> GetAsync(string sql, params object?[] parameters) => inner.GetAsync(sql, parameters);
+        public Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> AllAsync(string sql, params object?[] parameters) => inner.AllAsync(sql, parameters);
+        public Task<T> TransactionAsync<T>(Func<ISqliteExecutor, Task<T>> callback) =>
+            inner.TransactionAsync(executor => callback(new ReadOnlyExecutor(executor, () => Writes++)));
+        public Task CloseAsync() { Closes++; return inner.CloseAsync(); }
+
+        private sealed class ReadOnlyExecutor(ISqliteExecutor inner, Action onWrite) : ISqliteExecutor
+        {
+            private Task<T> Write<T>() { onWrite(); throw new InvalidOperationException("read-only"); }
+            public Task ExecAsync(string sql) => Write<bool>();
+            public Task RunAsync(string sql, params object?[] parameters) => Write<bool>();
+            public Task<long> RunCountedAsync(string sql, params object?[] parameters) => Write<long>();
+            public Task<IReadOnlyDictionary<string, object?>?> GetAsync(string sql, params object?[] parameters) => inner.GetAsync(sql, parameters);
+            public Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> AllAsync(string sql, params object?[] parameters) => inner.AllAsync(sql, parameters);
+        }
     }
 
     private sealed class TelemetryClock : TimeProvider

@@ -1,4 +1,4 @@
-// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/tui/src/terminal-image.ts.
+// Pi b4afdddf44e059c67ccf5097e5317d913521b470 (MIT): packages/tui/src/terminal-image.ts.
 // Ported to plain ESM for the PiSharp Node extension bridge (TypeScript types stripped mechanically; behaviour unchanged).
 import { execSync } from "node:child_process";
 import { homedir } from "node:os";
@@ -116,7 +116,8 @@ function detectCapabilitiesFromEnvironment(tmuxForwardsHyperlink) {
             hyperlinks: true
         };
     }
-    if (termProgram === "alacritty" || termProgram === "vscode" || termProgram === "zed") {
+    const isAlacritty = termProgram === "alacritty" || term.startsWith("alacritty") || process.env.ALACRITTY_WINDOW_ID;
+    if (isAlacritty || termProgram === "vscode" || termProgram === "zed") {
         return {
             images: null,
             trueColor: true,

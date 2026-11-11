@@ -82,6 +82,9 @@ public static partial class Tables
 /// <param name="Adopt">After <c>COMMIT</c>: adopts the commit, the ids being its created documents' ids in the order of their writes.</param>
 internal sealed record CommitFence(Func<bool> Admit, Action<long, IReadOnlyList<long>> Adopt)
 {
+    /// <summary>The number of table rows changed by the successful commit, reported immediately before adoption.</summary>
+    internal Action<long>? Rows { get; init; }
+
     /// <summary>The fence of work no attempt owns (an activation's preparation, an adapter): every commit admitted, nothing adopted
     /// (upstream's <c>{ admit: () =&gt; true, adopt: () =&gt; {} }</c>).</summary>
     internal static CommitFence Open { get; } = new(() => true, (_, _) => { });
@@ -555,6 +558,7 @@ public sealed class ChordStore : IStore, IChordStore
             // An empty commit takes no seq; a throwing adopt stops the store as for any commit.
             try
             {
+                fence.Rows?.Invoke(0);
                 fence.Adopt(LastSeq, []);
             }
             catch (Exception error)
@@ -600,6 +604,7 @@ public sealed class ChordStore : IStore, IChordStore
         context.Count("chord.store.statements", done.Step.Statements);
         try
         {
+            fence.Rows?.Invoke(done.Step.Rows);
             fence.Adopt(seq, done.Step.Created);
         }
         catch (Exception error)

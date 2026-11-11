@@ -69,7 +69,7 @@ internal sealed partial class InteractiveMode
             byId[provider.Id] = new(provider.Id, provider.Name, [provider.AuthType], provider.Subscription);
             order.Add(provider.Id);
         }
-        return [.. order.Select(id => byId[id]).OrderBy(option => option.Name, StringComparer.Create(System.Globalization.CultureInfo.InvariantCulture, false))];
+        return [.. PreferredProviders.Sort(order.Select(id => byId[id]), option => option.Id, option => option.Name)];
     }
 
     private static string GetLoginProviderSearchText(LoginProviderCompletionOption provider) =>
@@ -181,8 +181,8 @@ internal sealed partial class InteractiveMode
                 done();
                 if (authType is not null) ShowLoginAuthTypeSelector();
                 else ui.RequestRender();
-            }, initialSearchInput);
-            return (selector, selector, null);
+            }, initialSearchInput, ui);
+            return (selector, selector, selector.Dispose);
         });
     }
 
@@ -195,12 +195,12 @@ internal sealed partial class InteractiveMode
             if (context.Login is null) throw new InvalidOperationException("Credential storage is unavailable.");
             using var timeout = new CancellationTokenSource(15_000);
             var stored = await context.Login.Store.ListAsync(timeout.Token);
-            providerOptions = [.. stored.Select(row =>
+            providerOptions = [.. PreferredProviders.Sort(stored.Select(row =>
             {
                 var provider = ProviderAuthCatalog.Find(row.Provider);
                 return new AuthSelectorProvider(row.Provider, provider?.Name ?? row.Provider, row.Type, null, new AuthCheck(row.Type, "stored credential"),
                     provider?.OAuth?.IsSubscription == true);
-            }).OrderBy(option => option.Name, StringComparer.Create(System.Globalization.CultureInfo.InvariantCulture, false))];
+            }), option => option.Id, option => option.Name)];
         }
         catch (Exception error)
         {
@@ -232,8 +232,8 @@ internal sealed partial class InteractiveMode
                         : $"Removed stored API key for {providerOption.Name}. Environment variables and models.json config are unchanged.");
                 }
                 catch (Exception error) { ShowError($"Logout failed: {error.Message}"); }
-            }), () => { done(); ui.RequestRender(); });
-            return (selector, selector, null);
+            }), () => { done(); ui.RequestRender(); }, tui: ui);
+            return (selector, selector, selector.Dispose);
         });
     }
 

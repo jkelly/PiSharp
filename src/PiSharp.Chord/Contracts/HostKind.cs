@@ -6,6 +6,8 @@
 // per kind (a weak table, as upstream's WeakMap), so it lives while the kind is referenced and a copy of a kind is refused. KindShape,
 // ParamsOfKind and the typed Address<K> are TypeScript types: an address's params are a JsonObject.
 using System.Runtime.CompilerServices;
+using System.Globalization;
+using System.Text;
 using System.Text.Json.Nodes;
 
 namespace PiSharp.Chord.Contracts;
@@ -28,6 +30,12 @@ public sealed class HostKind
 
     /// <summary>The kind's name.</summary>
     public string Kind { get; }
+
+    /// <summary>Checks the address's kind and exact parameter types, returning its canonical key; ignores its cached key.</summary>
+    public string? KeyOfAddress(Address? address) => ContractsInternal.KeyOfAddress(this, address);
+
+    /// <summary>Decodes a canonical stored address key, preserving integer and boolean parameter types.</summary>
+    public Address AddressOfKey(string key) => ContractsInternal.AddressOfKey(this, key);
 
     /// <summary>The address of the one host of a kind without params (<c>Server()</c>).</summary>
     public Address Address() => Address(new JsonObject());
@@ -78,6 +86,9 @@ public sealed class Address : IEquatable<Address>
 
     /// <inheritdoc/>
     public override string ToString() => Key;
+
+    /// <summary>The portable JSON representation of an address.</summary>
+    public JsonObject ToJson() => new() { ["kind"] = Kind, ["params"] = Params.DeepClone(), ["key"] = Key };
 }
 
 internal static partial class ContractsInternal
@@ -95,4 +106,94 @@ internal static partial class ContractsInternal
     /// (<see cref="JoinKey"/>).</summary>
     internal static string AddressKey(string kind, ParamsData @params, JsonObject values) =>
         JoinKey([kind, .. @params.Fields.Select(field => values.TryGetPropertyValue(field, out var value) ? ChordJson.ToJavaScriptString(value) : "undefined")]);
+
+    internal static string? KeyOfAddress(HostKind kind, object? value)
+    {
+        var data = KindParams(kind);
+        if (value is JsonValue wrapped && wrapped.TryGetValue<Address>(out var unwrapped)) value = unwrapped;
+        var (name, parameters) = value switch
+        {
+            Address address => (address.Kind, address.Params),
+            JsonObject json => (ChordJson.AsString(json["kind"]), json["params"] as JsonObject),
+            _ => (null, null),
+        };
+        if (name != kind.Kind || parameters is null || parameters.Count != data.Fields.Count) return null;
+        foreach (var pair in data.Normal.OfType<JsonArray>())
+        {
+            var field = ChordJson.AsString(pair[0])!;
+            if (!parameters.TryGetPropertyValue(field, out var each) || pair[1] is not JsonObject schema) return null;
+            if (schema["anyOf"] is JsonArray choices)
+            {
+                var text = ChordJson.AsString(each);
+                if (text is null || !choices.OfType<JsonObject>().Any(choice => ChordJson.AsString(choice["const"]) == text)) return null;
+            }
+            else switch (ChordJson.AsString(schema["type"]))
+            {
+                case "integer":
+                    if (ChordJson.AsNumber(each) is not { } number || !double.IsFinite(number) || !double.IsInteger(number) || Math.Abs(number) > 9007199254740991) return null;
+                    break;
+                case "boolean":
+                    if (!ChordJson.IsBoolean(each, true) && !ChordJson.IsBoolean(each, false)) return null;
+                    break;
+                case "string":
+                    if (ChordJson.AsString(each) is null) return null;
+                    break;
+                default: return null;
+            }
+        }
+        return AddressKey(kind.Kind, data, parameters);
+    }
+
+    internal static Address AddressOfKey(HostKind kind, string key)
+    {
+        ArgumentNullException.ThrowIfNull(key);
+        var data = KindParams(kind);
+        var parts = new List<string>();
+        var part = new StringBuilder();
+        for (var index = 0; index < key.Length; index++)
+        {
+            var character = key[index];
+            if (character == '\\')
+            {
+                if (++index >= key.Length || key[index] is not ('\\' or '|')) throw BadKey();
+                part.Append(key[index]);
+            }
+            else if (character == '|') { parts.Add(part.ToString()); part.Clear(); }
+            else part.Append(character);
+        }
+        parts.Add(part.ToString());
+        if (parts[0] != kind.Kind || parts.Count != data.Fields.Count + 1) throw BadKey();
+        var parameters = new JsonObject();
+        for (var index = 0; index < data.Normal.Count; index++)
+        {
+            var pair = (JsonArray)data.Normal[index]!;
+            var field = ChordJson.AsString(pair[0])!;
+            var schema = (JsonObject)pair[1]!;
+            var text = parts[index + 1];
+            switch (ChordJson.AsString(schema["type"]))
+            {
+                case "integer":
+                    if (!long.TryParse(text, NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out var integer)) throw BadKey();
+                    parameters[field] = integer;
+                    break;
+                case "boolean":
+                    if (text is not ("true" or "false")) throw BadKey();
+                    parameters[field] = text == "true";
+                    break;
+                default: parameters[field] = text; break;
+            }
+        }
+        var address = new Address(kind.Kind, parameters, key);
+        if (KeyOfAddress(kind, address) != key) throw BadKey();
+        return address;
+
+        ArgumentException BadKey() => new($"\"{key}\": not an address key of {kind.Kind}");
+    }
+
+    internal static string KindOfKey(string key)
+    {
+        ArgumentNullException.ThrowIfNull(key);
+        var end = key.IndexOf('|');
+        return end < 0 ? key : key[..end];
+    }
 }

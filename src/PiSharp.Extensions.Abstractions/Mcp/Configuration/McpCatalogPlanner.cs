@@ -139,7 +139,7 @@ public static class McpCatalogPlanner
                 if (string.IsNullOrEmpty(description)) description = tool.Title ?? tool.AnnotationTitle;
                 if (string.IsNullOrEmpty(description)) description = $"MCP tool {tool.Name} from server {entry.Name}";
                 tools.Add(new(entry.Name, tool.Name, name, entry.Name + "/" + tool.Name, description,
-                    Parameters(tool.InputSchema), group, exposure, ToToolExposure(exposure), entry.Config.TimeoutSeconds * 1000,
+                    NormalizeInputSchema(tool.InputSchema), group, exposure, ToToolExposure(exposure), entry.Config.TimeoutSeconds * 1000,
                     snapshot.Instructions) { Annotations = tool.Annotations, OutputSchema = tool.OutputSchema });
             }
         }
@@ -150,7 +150,7 @@ public static class McpCatalogPlanner
             exposures.Contains(McpExposure.Deferred), autoEnableCodemode, resources);
     }
 
-    private static JsonData Parameters(JsonData schema)
+    public static JsonData NormalizeInputSchema(JsonData schema)
     {
         if (schema.Value.ValueKind != JsonValueKind.Object) throw new ArgumentException("MCP input schema must be an object.", nameof(schema));
         using var buffer = new MemoryStream();

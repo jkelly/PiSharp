@@ -129,6 +129,21 @@ internal sealed class LlamaClient
         if (!string.IsNullOrEmpty(apiKey)) request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
     }
 
+    /// <summary>Names the configured server and the underlying network failure for both ordinary and SSE requests.</summary>
+    private async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken token, bool streaming = false)
+    {
+        try
+        {
+            return await (streaming && http is HttpClient client
+                ? client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, token)
+                : http.SendAsync(request, token)).ConfigureAwait(false);
+        }
+        catch (HttpRequestException error) when (!token.IsCancellationRequested)
+        {
+            throw new LlamaConnectionException($"Could not reach llama.cpp server at {ServerUrl}: {error.InnerException?.Message ?? error.Message}", error);
+        }
+    }
+
     private async Task<JsonNode?> RequestAsync(HttpMethod method, string path, JsonObject? body, CancellationToken token)
     {
         using var timeout = new CancellationTokenSource(RequestTimeout);
@@ -139,7 +154,7 @@ internal sealed class LlamaClient
         Authorize(request);
         try
         {
-            using var response = await http.SendAsync(request, linked.Token).ConfigureAwait(false);
+            using var response = await SendAsync(request, linked.Token).ConfigureAwait(false);
             JsonNode? payload;
             try { payload = JsonNode.Parse(await response.Content.ReadAsStringAsync(linked.Token).ConfigureAwait(false)); }
             catch (JsonException) { payload = null; }
@@ -148,7 +163,6 @@ internal sealed class LlamaClient
         }
         catch (OperationCanceledException error) when (timeout.IsCancellationRequested && !token.IsCancellationRequested)
         { throw new LlamaConnectionException("The operation was aborted due to timeout", error); }
-        catch (HttpRequestException error) { throw new LlamaConnectionException("fetch failed", error); }
     }
 
     /// <summary><c>GET /models</c> (<c>?reload=1</c> rescans the model directory). Every entry must be router model info.</summary>
@@ -190,7 +204,7 @@ internal sealed class LlamaClient
     {
         using var request = new HttpRequestMessage(HttpMethod.Get, ServerUrl + "/models/sse");
         Authorize(request);
-        using var response = await (http is HttpClient client ? client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, token) : http.SendAsync(request, token)).ConfigureAwait(false);
+        using var response = await SendAsync(request, token, streaming: true).ConfigureAwait(false);
         if (!response.IsSuccessStatusCode) throw new InvalidOperationException($"llama.cpp SSE returned HTTP {(int)response.StatusCode}");
         await using var stream = await response.Content.ReadAsStreamAsync(token).ConfigureAwait(false);
         var decoder = Encoding.UTF8.GetDecoder();

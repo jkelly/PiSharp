@@ -203,7 +203,7 @@ internal static partial class Program
     }
 
     // No fallback without a preferred tool sent strict, for other rejections, for a second rejection, a hook failure, cancellation
-    // before the fallback, or an error event after the response started; later requests start strict again.
+    // before the fallback, or an error event after the response started; requests without a session start strict again.
     private static async Task AnthropicStrictFallbackRefusals()
     {
         foreach (var (name, tools) in new (string, string[])[]
@@ -269,7 +269,7 @@ internal static partial class Program
             var (_, message) = await StrictRun(StrictKeyRoute(endpoint, StrictOptions()), StrictTranscript(StrictTool("lookup", "prefer"))).WaitAsync(Deadline);
             Equal(StopReason.Error, message.StopReason); Equal(1, endpoint.Payloads.Count);
         }
-        // The fallback applies to its own request only: the next request is strict again.
+        // Without a session ID, the fallback applies only to its own request; the next request is strict again.
         {
             var endpoint = new StrictEndpoint(attempt => attempt == 1 ? StrictRejection() : StrictSuccess());
             var transport = StrictKeyRoute(endpoint, StrictOptions()); var transcript = StrictTranscript(StrictTool("lookup", "prefer"));

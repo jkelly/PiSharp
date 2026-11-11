@@ -1,0 +1,15 @@
+# SYNC-C codec implementation
+
+- Status: implementation complete; awaiting parent integration and validation coordinator build/test.
+- Requested execution: gpt-6.1-sol, high reasoning, ultrafast tier. Effective tier unverified because the tool exposes no tier control.
+- Sources: exact Pi v1.5.2 `b4afdddf44e059c67ccf5097e5317d913521b470` `packages/chord/src/sync/batch.ts`, `lines.ts`, `test/sync/lines.test.ts`, and approved discovery contract.
+- Owned changes: `src/PiSharp.Chord/Sync/Codec.cs`, `src/PiSharp.Chord/Sync/BodyStreams.cs`, `tests/PiSharp.Chord.Tests/Sync/CodecCases.cs`.
+- Work: version-2 log envelopes with JavaScript-compatible JSON, safe integer validation, deferred write validation, monotonically increasing batch sequences, mandatory batch newlines, fatal streaming UTF-8/BOM behavior, UTF-16 line accounting, snapshot reuse of existing Tables JSONL APIs.
+- Streaming: one-slot bounded output channel and 64 KiB compressed chunks, cancellable upstream iteration, producer cancellation/join on output disposal, read adapter disposing its upstream enumerator. No production whole-body buffering or MemoryStream. Single-member gzip CRC/ISIZE trailer verification supplements GZipStream's lenient premature EOF handling.
+- Authored native tests: envelope ordering/duplicate keys/invalid fields; gzip roundtrips at arbitrary chunk boundaries; UTF-8/BOM/truncation/CRC failures; sequence/newline errors; lazy decoding and upstream release; bounded encoding/source failure/cancellation; snapshot roundtrip and early export release. These are source-derived native cases, not captured upstream execution.
+- Commands: read approved report/upstream/current Store/JSON/test harness sources; apply patches; `git diff --check` and targeted `git status --short`. The diff command reported existing repository-wide CRLF conversion warnings, no whitespace errors. New files were untracked and thus outside that diff's tracked-file check. No dotnet builds or tests run, as required by coordinator ownership.
+- Blockers: none known. Build/test remains explicitly unverified. Multi-member gzip archives are outside the upstream encoder's single-member output contract; trailer verification intentionally treats the body as one member.
+
+## Empty-body follow-up
+
+The coordinated `sync152-chord-full-r3-8e4f1f6555654f2b9287ee6db8f4f144` run reached the empty-batch assertion at `CodecCases.cs:54`; the preceding nonempty/chunked roundtrips passed, while the empty output failed trailer validation. An unused native GZipStream emits no bytes. The producer now lazily creates GZipStream for actual nonempty input and emits the canonical 20-byte empty gzip member after successfully enumerating a source with no bytes. This also handles sources yielding only empty chunks and empty snapshot exports without relaxing decoder validation. Added a dedicated empty-body case covering batch, snapshot, all-empty chunks, one-byte compressed chunking, and rejection of an absent compressed member. No dotnet commands run by this worker; coordinator retest pending.

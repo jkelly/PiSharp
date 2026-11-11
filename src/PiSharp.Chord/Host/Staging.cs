@@ -16,6 +16,11 @@ namespace PiSharp.Chord.Host;
 internal static class PluginStaging
 {
     private static readonly Regex PluginName = new("^(?:@[a-z0-9~-][a-z0-9._~-]*/)?[a-z0-9~-][a-z0-9._~-]*$", RegexOptions.CultureInvariant);
+    internal static void CheckNames(IEnumerable<PluginFacet> facets)
+    {
+        foreach (var facet in facets)
+            if (facet.Name is null || !PluginName.IsMatch(facet.Name)) throw new ArgumentException($"\"{facet.Name}\" is not a valid plugin name");
+    }
 
     internal static LoadedPlugin Stage(PluginFacet plugin, ChordHost host)
     {
@@ -75,9 +80,16 @@ internal static class PluginStaging
         foreach (var member in shape.State.Keys)
             if (!members.TryGetValue(member, out var value) || value is not IWatchable<JsonNode?>)
                 throw new ArgumentException($"{contract.Name}.{member}: expected a state source");
-        foreach (var member in shape.Keyed.Keys)
-            if (!members.TryGetValue(member, out var value) || value is not IKeyedHandle)
-                throw new ArgumentException($"{contract.Name}.{member}: expected a keyed handle");
+        foreach (var (member, snapshot) in shape.Keyed)
+        {
+            members.TryGetValue(member, out var value);
+            if (snapshot.KeyHost is { } expected)
+            {
+                if (value is not IHostKeyedHandle hostKeyed || hostKeyed.KeyHost.Kind != expected.Kind)
+                    throw new ArgumentException($"{contract.Name}.{member}: expected a handle keyed by {expected.Kind}");
+            }
+            else if (value is not IKeyedHandle) throw new ArgumentException($"{contract.Name}.{member}: expected a string-keyed handle");
+        }
         foreach (var member in shape.Methods.Keys)
             if (!members.TryGetValue(member, out var value) || value is not HostMethod)
                 throw new ArgumentException($"{contract.Name}.{member}: expected a method");
@@ -129,7 +141,7 @@ internal sealed record RecordedRequest(string Name, long Version, Contract? Cont
 internal sealed record RecordedFactory(int Natives, IReadOnlyList<StateDefinition> Documents, IReadOnlyList<TableDefinition> Tables,
     IReadOnlyList<RecordedRequest> Requests, IReadOnlyList<ContributionDeclaration> Contributions, IReadOnlyList<JobDefinition> Jobs);
 
-internal sealed class RecordingSelf(ChordObject owner, ServedType served, ChordContext context) : IStoreSelf, IJobDeclarer
+internal sealed partial class RecordingSelf(ChordObject owner, ServedType served, ChordContext context) : IStoreSelf, IJobDeclarer
 {
     internal bool Declaring = true;
     private int natives;
@@ -185,7 +197,7 @@ internal sealed class RecordingSelf(ChordObject owner, ServedType served, ChordC
         var store = Persistable($"table \"{definition.Name}\"");
         if (!tables.TryAdd(definition.Name, definition)) throw new ArgumentException($"{owner.Label}: table \"{definition.Name}\" is declared twice");
         store.Claims.AssertTable(StoreInternal.TableSqlName(served.Contract.Name, definition.Name), owner);
-        return new RecordingTable();
+        return new RecordingTable(definition);
     }
     public void Contribute<C, V>(Registry<C, V> registry, object? value)
     {
@@ -254,8 +266,9 @@ internal sealed class RecordingJob : IJobHandle
     public Task<JobOutcome> OutcomeAsync(string id, ChordContext context) => throw Inert();
     public Task<AbortResult> AbortAsync(string id, ChordContext context) => throw Inert();
 }
-internal sealed class RecordingTable : ITable
+internal sealed class RecordingTable(TableDefinition? definition = null) : ITable
 {
+    internal TableDefinition? Definition { get; } = definition;
     private static InvalidOperationException Inert() => new("a recording table cannot be used before activation");
     public Task<Page> PageAsync(Query query, long limit, ChordContext context, PageOptions? options = null) => throw Inert();
     public IAsyncEnumerable<IReadOnlyDictionary<string, JsonNode?>> Rows(Query query, ChordContext context) => throw Inert();

@@ -235,7 +235,7 @@ internal static partial class Program
                 new DurableStreamOptions { Identity = new PiSharp.AI.ClientIdentity { UserAgent = PiSharp.AI.ClientUserAgent.Custom("acme-agent/2") } },
                 CancellationToken.None);
             var detailed = PiSharp.AI.ClientIdentities.FormatUserAgent(null);
-            Check(detailed.StartsWith("pi/1.5.0 (", StringComparison.Ordinal), "the default user agent: " + detailed);
+            Check(detailed.StartsWith("pi/1.5.2 (", StringComparison.Ordinal), "the default user agent: " + detailed);
             // RecordingHandler joins a header's values with commas, and HttpHeaders splits User-Agent into its products and comment.
             static string Recorded(string userAgent)
             {

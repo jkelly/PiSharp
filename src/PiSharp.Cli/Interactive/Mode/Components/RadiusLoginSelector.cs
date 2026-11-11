@@ -1,10 +1,9 @@
 // Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): coding-agent/src/modes/interactive/components/radius-login-selector.ts.
 // The `/login` menu with the animated "Sign in with Radius" option. Internal to the interactive mode: the shimmer
-// is Radius-only and is not exposed to other selectors. Upstream subclasses ExtensionSelectorComponent; here
+// is shared with the provider selector through ProviderBrand. Upstream subclasses ExtensionSelectorComponent; here
 // RadiusLoginMenuComponent wraps one (its Dispose is not virtual, so a subclass could not stop the animation timer when
 // disposed through the base type) and post-processes its rendered lines the same way.
 using System.Diagnostics;
-using System.Text;
 using PiSharp.Tui.Pi;
 using static PiSharp.Cli.Interactive.Mode.ThemeGlobals;
 
@@ -19,13 +18,6 @@ internal sealed record RadiusOption(string Label, string Text);
 /// </summary>
 internal sealed class RadiusLoginMenuComponent : IComponent, IInputHandler, IMouseHandler, IDisposableComponent, IDisposable
 {
-    /// <summary>The four colors of the Radius logo, in the order they stream across the text.</summary>
-    private static readonly Color[] RadiusColors = [.. new[] { "#4d9abf", "#83ccd2", "#f1be57", "#f09082" }.Select(Colors.ParseColor)];
-    /// <summary>Width of each color band, in characters.</summary>
-    private const int CharsPerColor = 4;
-    private const int CharsPerSecond = 10;
-    private const int AnimationFrameMs = 50;
-
     private readonly ExtensionSelectorComponent selector;
     private readonly RadiusOption radiusOption;
     private readonly Func<double> now;
@@ -49,37 +41,14 @@ internal sealed class RadiusLoginMenuComponent : IComponent, IInputHandler, IMou
             onCancel();
         });
         this.radiusOption = radiusOption;
-        animationTimer = tui.Loop.SetInterval(() =>
-        {
-            if (animating) tui.RequestRender();
-        }, AnimationFrameMs);
+        animationTimer = ProviderBrand.StartAnimation(tui, () => animating);
     }
 
     /// <summary>Whether the last render found and animated the selected Radius line.</summary>
     internal bool Animating => animating;
 
     /// <summary>Color <paramref name="text"/> with the Radius logo colors flowing left to right; <paramref name="elapsedMs"/> is the animation time.</summary>
-    internal static string RadiusShimmer(string text, double elapsedMs)
-    {
-        var mode = theme.GetColorMode();
-        var cycle = RadiusColors.Length * CharsPerColor;
-        var offset = elapsedMs / 1000 * CharsPerSecond;
-        var result = new StringBuilder();
-        var index = 0;
-        foreach (var rune in text.EnumerateRunes())
-        {
-            var position = ((index - offset) % cycle + cycle) % cycle;
-            var band = (int)Math.Floor(position / CharsPerColor);
-            var t = position / CharsPerColor - band;
-            // Smoothstep keeps each band recognizable while still blending into the next one.
-            var amount = t * t * (3 - 2 * t);
-            var from = RadiusColors[band];
-            var to = RadiusColors[(band + 1) % RadiusColors.Length];
-            result.Append(Colors.ForegroundAnsi(Colors.Mix(from, to, amount, srgb: true), mode)).Append(rune.ToString());
-            index++;
-        }
-        return result + "\u001b[39m";
-    }
+    internal static string RadiusShimmer(string text, double elapsedMs) => ProviderBrand.RadiusShimmer(text, elapsedMs);
 
     public List<string> Render(int width)
     {

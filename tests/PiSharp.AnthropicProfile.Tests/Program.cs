@@ -3,6 +3,7 @@ using System.Text.Json;
 
 if (args.Length != 2 || args[0] != "--report") throw new ArgumentException("Supply --report fresh-path.");
 var outcomes = new List<object>();
+var caseResults = new List<object>();
 var failures = 0;
 var originals = new List<OriginalTaskRecord>();
 var reportingOriginals = new List<OriginalTaskRecord>();
@@ -19,7 +20,7 @@ var report = JsonSerializer.Serialize(new
 {
     source = "d86654abb8862e201933517d6f1fce9f88dd117f", sourceVersion = "0.99.1",
     expectationKind = "SOURCE-DERIVED SYNTHETIC; NO SDK CAPTURE", groups = outcomes.Count,
-    failures, outcomes,
+    failures, outcomes, results = caseResults,
     heldOriginalTasks = ProfileTests.Originals.Select(record => new
     {
         record.Name, status = record.Task?.Status.ToString(), completed = record.Task?.IsCompleted == true, originalTaskCaptured = record.Task is not null,
@@ -71,6 +72,7 @@ async Task Check(string name, Func<Task> invoke)
     catch (Exception error) { direct = error; failures++; }
     if (original is { IsCompleted: false }) throw new InvalidOperationException("Original group remained pending.");
     originals.Add(new OriginalTaskRecord(name) { Task = original, Direct = direct });
+    caseResults.Add(new { Id = name, status = direct is null && original is { IsCompletedSuccessfully: true } ? "PASS_AUTHORED_NATIVE_ONLY" : "FAIL" });
     outcomes.Add(new
     {
         name, passed = direct is null && original is { IsCompletedSuccessfully: true },

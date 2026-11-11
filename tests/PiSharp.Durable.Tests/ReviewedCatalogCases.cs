@@ -9,37 +9,22 @@ internal static partial class Program
     [
         Case("models.catalog.reviewed-corrections-apply-without-maintained-file", () =>
         {
-            var changed = 0;
-            foreach (var provider in DurableBuiltinCatalog.ShardHashes.Keys)
+            Equal(43, DurableBuiltinCatalog.Providers.Length, "all released providers");
+            var count = 0;
+            foreach (var provider in CurrentModelCatalog.Providers)
             {
-                var original = FrozenModelCatalog.ReadProviderJson(provider, DurableBuiltinCatalog.ReadShard(provider));
+                var expected = CurrentModelCatalog.Get(provider)!;
                 var current = DurableBuiltinCatalog.Get(provider)!;
-                foreach (var old in original.Models)
-                {
-                    var actual = current.Models.Single(m => m.Type == old.Type && m.Id == old.Id);
-                    var expected = JsonNode.Parse(old.Raw.ToString())!.AsObject();
-                    if (provider == "azure" && new[] { "gpt-6-astra", "gpt-6-luna", "gpt-6-sol", "gpt-6.1-sol", "gpt-6.1-terra" }.Contains(old.Id))
-                        expected["contextWindow"] = 1050000;
-                    if (old.DeclaredApi == "anthropic-messages")
-                    {
-                        var compat = expected["compat"] as JsonObject ?? new JsonObject();
-                        if ((provider is "opencode" or "opencode-go") && new[] { "claude-fable-5-1", "claude-haiku-5-5", "claude-opus-5", "claude-opus-5-5", "claude-sonnet-5-5" }.Contains(old.Id))
-                        {
-                            compat["supportsMidConvoEffort"] = true;
-                            if (old.Id is not ("claude-opus-5" or "claude-haiku-5-5"))
-                            {
-                                var levels = expected["thinkingLevelMap"]!.AsObject(); levels["off"] = null;
-                            }
-                        }
-                        if (old.Id.Contains("sonnet-5") || old.Id.Contains("sonnet.5")) compat["supportsTemperature"] = false;
-                        if (compat.Count > 0) expected["compat"] = compat;
-                    }
-                    Check(JsonNode.DeepEquals(expected, JsonNode.Parse(actual.Raw.ToString())), provider + "/" + old.Id + " scope");
-                    if (!JsonNode.DeepEquals(expected, JsonNode.Parse(old.Raw.ToString()))) changed++;
-                }
+                Equal(expected.ProviderJsonSha256, current.ProviderJsonSha256, provider + " exact released snapshot");
+                count += current.Models.Length;
             }
-            Equal(18, changed, "exact C19 changed rows in default durable path");
+            Equal(1773, count, "released entries of all model types");
+            var fable = DurableBuiltinCatalog.Get("anthropic")!.Models.Single(m => m.Id == "claude-fable-5-2");
+            Equal(1_000_000, fable.Raw.Value.GetProperty("contextWindow").GetInt32(), "Fable 5.2 context");
+            Equal(40m, fable.Cost.Value.GetProperty("output").GetDecimal(), "Fable 5.2 output rate");
+            Check(fable.Raw.Value.GetProperty("compat").GetProperty("supportsMidConvoEffort").GetBoolean(), "Fable 5.2 finalization");
             using var models = new NativeDurableModels();
+            Check(models.GetModel("anthropic", "claude-fable-5-2") is not null, "Fable 5.2 available to durable callers");
             Equal(10, models.GetModels("qwen-token-plan-individual-cn").Count, "CN individual allowlist");
             Check(models.GetModel("qwen-token-plan-individual", "glm-5.3") is not null, "international individual GLM 5.3");
             Equal(1, models.GetModelsOfType("classifier", "github-copilot").Length, "Copilot classifier advertised separately");

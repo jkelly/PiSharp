@@ -1,4 +1,4 @@
-// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/tui/src/tui-alt-screen.ts.
+// Pi b4afdddf44e059c67ccf5097e5317d913521b470 (MIT): packages/tui/src/tui-alt-screen.ts.
 // Ported to plain ESM for the PiSharp Node extension bridge (TypeScript types stripped mechanically; behaviour unchanged).
 import { AltScreenSearchComponent, AltScreenSearchIndex, getAltScreenSearchMatchKey } from "./alt-screen-search.mjs";
 import { AltScreenFlashContainer } from "./components/alt-screen-flash.mjs";
@@ -1385,8 +1385,7 @@ export class TuiAltScreen extends TuiBase {
         const fullRedraw = this.previousScreen.length === 0 || this.previousScreenWidth !== width || this.previousScreenHeight !== height;
         const changedRows = screen.map((line, row)=>line !== this.previousScreen[row]);
         const imageAnchorsNeedRedraw = screen.some((line, row)=>changedRows[row] && (isImageLine(line) || isImageLine(this.previousScreen[row] ?? "")));
-        const isWezTerm = Boolean(process.env.WEZTERM_PANE) || process.env.TERM_PROGRAM?.toLowerCase() === "wezterm";
-        const imageCellsNeedRedraw = !imageAnchorsNeedRedraw && isWezTerm && this.imageProtocol === "kitty" && changedRows.some(Boolean) && screen.some((line, row)=>{
+        const imageCellsNeedRedraw = !imageAnchorsNeedRedraw && this.imageProtocol === "kitty" && changedRows.some(Boolean) && screen.some((line, row)=>{
             const placementRows = getKittyImagePlacementRows(line);
             if (placementRows === undefined) return false;
             for(let coveredRow = row; coveredRow < row + placementRows; coveredRow++){
@@ -1411,7 +1410,7 @@ export class TuiAltScreen extends TuiBase {
             else if (this.imageProtocol === "kitty") buffer += deleteAllKittyPlacements();
         }
         buffer += preparedKittyScreen.evictedImageDeletion;
-        const drawKittyImagesLast = redrawImages && this.imageProtocol === "kitty" && screen.some(isImageLine) && isWezTerm;
+        const drawKittyImagesLast = redrawImages && this.imageProtocol === "kitty" && screen.some(isImageLine);
         if (drawKittyImagesLast) {
             for(let row = 0; row < height; row++){
                 if (!fullRedraw && !imagesNeedRedraw && screen[row] === this.previousScreen[row]) continue;

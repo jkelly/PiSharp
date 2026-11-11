@@ -1,4 +1,4 @@
-// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/coding-agent/src/core/keybindings.ts.
+// Pi b4afdddf44e059c67ccf5097e5317d913521b470 (MIT): packages/coding-agent/src/core/keybindings.ts.
 // Ported to plain ESM for the PiSharp Node extension bridge (TypeScript types stripped mechanically; behaviour unchanged).
 import { TUI_KEYBINDINGS, KeybindingsManager as TuiKeybindingsManager } from "../../pi-tui.mjs";
 import { existsSync, readFileSync } from "fs";
@@ -77,7 +77,10 @@ const APP_KEYBINDINGS = {
         description: "Restore queued messages"
     },
     "app.clipboard.pasteImage": {
-        defaultKeys: windowsKeybindings ? "alt+v" : "ctrl+v",
+        defaultKeys: windowsKeybindings ? [
+            "alt+v",
+            "ctrl+v"
+        ] : "ctrl+v",
         description: "Paste files on macOS, images, or text from clipboard"
     },
     "app.session.new": {

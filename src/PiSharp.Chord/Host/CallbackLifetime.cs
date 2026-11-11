@@ -5,6 +5,41 @@ namespace PiSharp.Chord.Host;
 public sealed partial class ChordHost
 {
     private readonly Followers<CallbackLifetimeRegistration> callbackLifetimes = new();
+    private readonly object originalGate = new();
+    private int originalLeases;
+    private TaskCompletionSource? originalsCompleted;
+
+    /// <summary>Waits for actual callback and native-resource ownership to end, including work past public close deadlines.
+    /// Call after CloseAsync when an enclosing owner must retain a store, files or process snapshot until late cleanup finishes.</summary>
+    public Task JoinOriginalsAsync(ChordContext context)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        Task waiting;
+        lock (originalGate) waiting = originalsCompleted?.Task ?? Task.CompletedTask;
+        return waiting.WaitAsync(context.AbortSignal ?? CancellationToken.None);
+    }
+    private IDisposable RetainOriginal()
+    {
+        lock (originalGate)
+        {
+            if (originalLeases++ == 0) originalsCompleted = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        }
+        return new OriginalLease(this);
+    }
+    private void ReleaseOriginal()
+    {
+        TaskCompletionSource? done = null;
+        lock (originalGate)
+        {
+            if (--originalLeases == 0) { done = originalsCompleted; originalsCompleted = null; }
+        }
+        done?.TrySetResult();
+    }
+    private sealed class OriginalLease(ChordHost owner) : IDisposable
+    {
+        private ChordHost? retained = owner;
+        public void Dispose() => Interlocked.Exchange(ref retained, null)?.ReleaseOriginal();
+    }
 
     /// <summary>
     /// Registers an optional owner of callback code (for example a collectible plugin generation). The resolver
@@ -34,7 +69,7 @@ public sealed partial class ChordHost
 
     internal IDisposable? RetainCallback(Delegate callback, Facet? declaringFacet = null)
     {
-        List<IDisposable>? leases = null;
+        List<IDisposable>? leases = [RetainOriginal()];
         try
         {
             foreach (var registration in callbackLifetimes.Items)

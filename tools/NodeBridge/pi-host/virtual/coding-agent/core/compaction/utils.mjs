@@ -1,6 +1,7 @@
-// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/coding-agent/src/core/compaction/utils.ts.
+// Pi b4afdddf44e059c67ccf5097e5317d913521b470 (MIT): packages/coding-agent/src/core/compaction/utils.ts.
 // Ported to plain ESM for the PiSharp Node extension bridge (TypeScript types stripped mechanically; behaviour unchanged).
 import { contentText } from "../../../pi-ai.mjs";
+import { sliceHead } from "../tools/truncate.mjs";
 export function createFileOps() {
     return {
         read: new Set(),
@@ -68,7 +69,7 @@ const TOOL_RESULT_MAX_CHARS = 2000;
 function truncateForSummary(text, maxChars) {
     if (text.length <= maxChars) return text;
     const truncatedChars = text.length - maxChars;
-    return `${text.slice(0, maxChars)}\n\n[... ${truncatedChars} more characters truncated]`;
+    return `${sliceHead(text, maxChars)}\n\n[... ${truncatedChars} more characters truncated]`;
 }
 export function serializeConversation(messages) {
     const parts = [];

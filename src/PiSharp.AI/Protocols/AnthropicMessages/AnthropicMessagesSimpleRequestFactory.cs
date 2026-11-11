@@ -39,11 +39,11 @@ public sealed class AnthropicMessagesSimpleRequestFactory : IChatTransport
             _modelMaxTokens = metadata.GetUtf16Property("maxTokens").GetInt32();
             _reasoning = metadata.GetUtf16Property("reasoning").GetBoolean();
             if (_modelMaxTokens <= 0) throw Fail(AnthropicMessagesSimpleFailure.InvalidConfiguration);
-            _adaptive = metadata.TryGetUtf16Property("compat", out var compat) && compat.ValueKind != JsonValueKind.Null &&
-                compat.TryGetUtf16Property("forceAdaptiveThinking", out var adaptive) && adaptive.GetBoolean();
+            var bound = AnthropicCatalogCompatibility.Apply(options.ProjectionOptions, options.ModelMetadata);
+            _adaptive = bound.ForceAdaptiveThinking == true;
             // Managed per-turn effort: buildParams then always sends adaptive thinking with effort markers.
-            _midEffort = compat.ValueKind == JsonValueKind.Object && compat.TryGetUtf16Property("supportsMidConvoEffort", out var midEffort) && midEffort.GetBoolean();
-            _supportsTemperature = !(compat.ValueKind == JsonValueKind.Object && compat.TryGetUtf16Property("supportsTemperature", out var temperature) && temperature.ValueKind == JsonValueKind.False);
+            _midEffort = bound.SupportsMidConversationEffort == true;
+            _supportsTemperature = bound.SupportsTemperature != false;
             if (metadata.TryGetUtf16Property("thinkingLevelMap", out var map) && map.ValueKind != JsonValueKind.Null)
             {
                 if (map.ValueKind != JsonValueKind.Object) throw Fail(AnthropicMessagesSimpleFailure.InvalidConfiguration);
@@ -126,9 +126,9 @@ public sealed class AnthropicMessagesSimpleRequestFactory : IChatTransport
             MaximumTokens = (int)Math.Clamp(Math.Ceiling(resolved.MaxTokens), 1, int.MaxValue), ModelReasoning = _reasoning, ThinkingEnabled = resolved.ThinkingEnabled,
             ForceAdaptiveThinking = _adaptive, SupportsThinkingOff = _supportsOff, ThinkingBudgetTokens = resolved.ThinkingBudgetTokens,
             SupportsMidConversationEffort = _midEffort,
-            SupportsTemperature = _options.ProjectionOptions.SupportsTemperature && _supportsTemperature,
+            SupportsTemperature = _supportsTemperature,
             Effort = resolved.Effort, ToolChoice = _options.ToolChoice ?? _options.ProjectionOptions.ToolChoice
-        }, _options.KeyAuthOptions with { MaxTokens = resolved.MaxTokens });
+        }, AnthropicCatalogCompatibility.Apply(_options.KeyAuthOptions, _options.ModelMetadata, _model, _baseUri) with { MaxTokens = resolved.MaxTokens });
     private void AdmitKey(string? key)
     {
         if (string.IsNullOrEmpty(key) || key.Any(character => character is < '!' or > '~'))

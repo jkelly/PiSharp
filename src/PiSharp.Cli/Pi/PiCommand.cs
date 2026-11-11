@@ -50,6 +50,7 @@ internal sealed record PiHost
     /// <summary>Source promptForMissingSessionCwd (interactive mode): the prompt text and the current cwd; the cwd to continue in, or
     /// null when cancelled.</summary>
     internal Func<string, string, CancellationToken, Task<string?>>? PromptMissingSessionCwd { get; init; }
+    internal Func<string, string, CancellationToken, Task<MissingSessionCwdChoice?>>? ChooseMissingSessionCwd { get; init; }
     /// <summary>Extensions loaded before project trust is resolved (IMPL-E: user and CLI extensions); their project_trust and
     /// resources_discover handlers take part in the run. Null without extensions.</summary>
     internal Func<string, CancellationToken, Task<PiLoadedExtensions?>>? LoadExtensions { get; init; }
@@ -255,12 +256,21 @@ internal static class PiCommand
         {
             // Source getMissingSessionCwdIssue: interactive mode asks to continue in the current cwd (SessionManager.open with the cwd
             // override; Cancel exits 0); the other modes stop with the error.
-            if (appMode == PiAppMode.Interactive && host.PromptMissingSessionCwd is { } promptCwd)
+            if (appMode == PiAppMode.Interactive && (host.ChooseMissingSessionCwd is not null || host.PromptMissingSessionCwd is not null))
             {
-                var selectedCwd = await promptCwd(PiSessions.MissingCwdPrompt(plan.Cwd, cwd), cwd, token).ConfigureAwait(false);
-                if (selectedCwd is null) return 0;
-                sessionCwdOverride = selectedCwd;
-                plan = plan with { Cwd = selectedCwd };
+                var prompt = PiSessions.MissingCwdPrompt(plan.Cwd, cwd);
+                var legacyCwd = host.ChooseMissingSessionCwd is null
+                    ? await host.PromptMissingSessionCwd!(prompt, cwd, token).ConfigureAwait(false) : null;
+                var choice = host.ChooseMissingSessionCwd is { } choose
+                    ? await choose(prompt, cwd, token).ConfigureAwait(false)
+                    : legacyCwd is null ? (MissingSessionCwdChoice?)null : MissingSessionCwdChoice.Continue;
+                if (choice is null) return 0;
+                if (choice == MissingSessionCwdChoice.Fork)
+                {
+                    var fork = PiSessions.ForkFrom(plan.SessionFile, cwd, sessionDir, agentDir, now: host.Now());
+                    plan = plan with { SessionPath = fork, Cwd = cwd, SessionDirectory = Path.GetDirectoryName(fork) };
+                }
+                else { sessionCwdOverride = legacyCwd ?? cwd; plan = plan with { Cwd = sessionCwdOverride }; }
             }
             else
             {

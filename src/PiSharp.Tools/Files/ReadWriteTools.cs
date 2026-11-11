@@ -227,19 +227,34 @@ public sealed class ReadWriteTools
         byte[] owned;
         try
         {
-            if (_operations is IStreamingFileOperations streaming)
+            if (_operations is IStreamingFileOperations streaming &&
+                (input.Offset is null || input.Offset == Math.Truncate(input.Offset.Value)) &&
+                (input.Limit is null || input.Limit >= 0 && input.Limit == Math.Truncate(input.Limit.Value)))
             {
                 await using var stream = await streaming.OpenReadAsync(target, token).ConfigureAwait(false);
-                if (!stream.CanRead || !stream.CanSeek) throw new IOException("Streaming adapter must return a readable seekable stream.");
-                if (stream.Length > _options.MaximumReadBytes)
+                if (!stream.CanRead) throw new IOException("Streaming adapter must return a readable stream.");
+                // Snapshot the opened file length. A stream reporting zero or no length is read until EOF.
+                long? length = null;
+                if (stream.CanSeek)
                 {
-                    var prefix = new byte[ImageMime.SniffBytes];
-                    var count = await stream.ReadAtLeastAsync(prefix, prefix.Length, throwOnEndOfStream: false, cancellationToken: token).ConfigureAwait(false);
-                    if (ImageMime.DetectSupportedImageMimeType(prefix.AsSpan(0, count)) is not null)
-                        throw new FileToolException(FileToolFailure.ResourceLimit);
-                    stream.Position = 0;
-                    return await ReadStreamingTextAsync(stream, input, token).ConfigureAwait(false);
+                    var reportedLength = stream.Length;
+                    if (reportedLength > 0) length = reportedLength;
                 }
+                var prefix = new byte[ImageMime.SniffBytes];
+                var count = await stream.ReadAtLeastAsync(prefix.AsMemory(0, (int)Math.Min(prefix.Length, length ?? prefix.Length)),
+                    (int)Math.Min(prefix.Length, length ?? prefix.Length), false, token).ConfigureAwait(false);
+                await using var inputStream = new PrefixReadStream(prefix.AsMemory(0, count), stream,
+                    length is { } size ? Math.Max(0, size - count) : null);
+                if (ImageMime.DetectSupportedImageMimeType(prefix.AsSpan(0, count)) is not { } imageMime)
+                    return await ReadStreamingTextAsync(inputStream, input, token).ConfigureAwait(false);
+                using var image = new MemoryStream();
+                var buffer = new byte[81920]; int read;
+                while ((read = await inputStream.ReadAsync(buffer, token).ConfigureAwait(false)) != 0)
+                {
+                    if (image.Length + read > _options.MaximumReadBytes) throw new FileToolException(FileToolFailure.ResourceLimit);
+                    image.Write(buffer, 0, read);
+                }
+                return await ReadImageAsync(image.ToArray(), imageMime, token).ConfigureAwait(false);
             }
             var supplied = await _operations.ReadAsync(target, _options.MaximumReadBytes, token).ConfigureAwait(false);
             token.ThrowIfCancellationRequested();
@@ -308,50 +323,65 @@ public sealed class ReadWriteTools
 
     private async ValueTask<ToolResult> ReadStreamingTextAsync(Stream stream, Input input, CancellationToken token)
     {
-        // Counting retains only a decoder buffer. A second pass selects text without ever materializing skipped lines.
+        // One pass counts every line while retaining only enough text to decide head truncation.
         using var reader = new StreamReader(stream, LenientUtf8, detectEncodingFromByteOrderMarks: false, bufferSize: 8192, leaveOpen: true);
-        var buffer = new char[8192]; long total = 1;
-        int read;
-        while ((read = await reader.ReadAsync(buffer.AsMemory(), token).ConfigureAwait(false)) != 0)
-            for (var i = 0; i < read; i++) if (buffer[i] == '\n') total++;
-        if (total > int.MaxValue) throw new FileToolException(FileToolFailure.ResourceLimit);
         var start = input.Offset is { } offset && offset != 0 ? Math.Max(0, offset - 1) : 0;
-        if (start >= total) return ToolResult.Error(ToolFailureKind.InvalidArguments,
-            $"Offset {Js(input.Offset!.Value)} is beyond end of file ({total} lines total)");
-        var range = Slice((int)total, start, input.Limit is { } limit ? Math.Min(start + limit, total) : total);
-        stream.Position = 0; reader.DiscardBufferedData();
-        var selected = new StringBuilder(); var current = 0; long bytes = 0, firstBytes = 0;
-        var pendingHigh = false; var firstLine = true; char last = '\0';
+        var endLine = input.Limit is { } limit ? start + limit : double.PositiveInfinity;
+        var stored = new List<string>(); var piece = new StringBuilder();
+        long current = 0, selectedLines = 0, bytes = 0, lineBytes = 0, firstBytes = 0, storedBytes = 0;
+        var storing = true; var lastLineEmpty = true; var lineHasText = false; var pendingHigh = false;
         void Count(char c)
         {
             if (pendingHigh)
             {
                 pendingHigh = false;
-                if (char.IsLowSurrogate(c)) { bytes += 4; if (firstLine) firstBytes += 4; return; }
-                bytes += 3; if (firstLine) firstBytes += 3;
+                if (char.IsLowSurrogate(c)) { lineBytes += 4; return; }
+                lineBytes += 3;
             }
-            if (char.IsHighSurrogate(c)) { pendingHigh = true; return; }
-            var size = c < 0x80 ? 1 : c < 0x800 ? 2 : 3;
-            bytes += size; if (firstLine && c != '\n') firstBytes += size;
+            if (char.IsHighSurrogate(c)) pendingHigh = true;
+            else lineBytes += c < 0x80 ? 1 : c < 0x800 ? 2 : 3;
         }
-        while (current < range.From + range.Count && (read = await reader.ReadAsync(buffer.AsMemory(), token).ConfigureAwait(false)) != 0)
+        void FinishLine()
         {
-            for (var i = 0; i < read && current < range.From + range.Count; i++)
+            if (pendingHigh) { lineBytes += 3; pendingHigh = false; }
+            if (selectedLines == 0) firstBytes = lineBytes;
+            bytes += lineBytes + (selectedLines > 0 ? 1 : 0);
+            selectedLines++; lastLineEmpty = !lineHasText;
+            if (storing)
             {
-                var c = buffer[i];
-                if (current >= range.From && !(c == '\n' && current == range.From + range.Count - 1))
+                var pastCaps = stored.Count > 2000 || storedBytes > 51200;
+                var text = piece.ToString();
+                storedBytes += LenientUtf8.GetByteCount(text) + (stored.Count > 0 ? 1 : 0);
+                stored.Add(text);
+                if (pastCaps) storing = false;
+            }
+            piece.Clear(); lineBytes = 0; lineHasText = false;
+        }
+        var buffer = new char[8192]; int read;
+        while ((read = await reader.ReadAsync(buffer.AsMemory(), token).ConfigureAwait(false)) != 0)
+        {
+            token.ThrowIfCancellationRequested();
+            for (var i = 0; i < read; i++)
+            {
+                var c = buffer[i]; var selected = current >= start && current < endLine;
+                if (c == '\n') { if (selected) FinishLine(); current++; }
+                else if (selected)
                 {
-                    Count(c); last = c;
-                    if (selected.Length < 51202) selected.Append(c);
-                    if (c == '\n') firstLine = false;
+                    Count(c); lineHasText = true;
+                    // One extra character beyond the byte cap is sufficient even for an enormous single line.
+                    if (storing && piece.Length < 51202) piece.Append(c);
                 }
-                if (c == '\n') current++;
             }
         }
-        if (pendingHigh) { bytes += 3; if (firstLine) firstBytes += 3; }
-        var truncation = ToolOutputTruncator.Head(selected.ToString());
-        var selectedLines = bytes == 0 ? 0 : range.Count - (last == '\n' ? 1 : 0);
-        truncation = truncation with { TotalLines = selectedLines, TotalBytes = (int)Math.Min(int.MaxValue, bytes) };
+        if (current >= start && current < endLine) FinishLine();
+        var total = current + 1;
+        if (start >= total) return ToolResult.Error(ToolFailureKind.InvalidArguments,
+            $"Offset {Js(input.Offset!.Value)} is beyond end of file ({total} lines total)");
+        var truncation = ToolOutputTruncator.Head(string.Join('\n', stored)) with
+        {
+            TotalLines = (int)Math.Min(int.MaxValue, bytes == 0 ? 0 : selectedLines - (lastLineEmpty ? 1 : 0)),
+            TotalBytes = (int)Math.Min(int.MaxValue, bytes)
+        };
         string output; var details = JsonData.Null;
         if (truncation.FirstLineExceedsLimit)
         {

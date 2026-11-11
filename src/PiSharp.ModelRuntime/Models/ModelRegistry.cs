@@ -64,13 +64,13 @@ internal sealed class ModelRegistry
         Values = new(options.Environment, options.RunCommand);
         config = ModelsJsonConfig.Load(options.ModelsPath);
         var client = options.CreateCatalogClient ?? (() => new HttpClient());
-        foreach (var provider in BuiltinProviders.All.Where(provider => provider.Id != "radius"))
+        foreach (var provider in BuiltinProviders.All.Where(provider => provider.Id != "radius" && CurrentModelCatalog.Providers.Contains(provider.Id)))
             overlays[provider.Id] = provider.Id == "openrouter"
                 // model-runtime.ts: OpenRouter narrows the catalog to the models, limits and prices of the user's key (Pi 1.2.0).
                 ? new PersonalizedCatalogOverlay(provider.Id, client, () => BuiltinModels(provider.Id),
                     (catalog, context) => OpenRouterUserModels.PersonalizeAsync(catalog, context.CredentialKey, context.BaseUrl, client, context.CancellationToken),
-                    options.CatalogBaseUrl, BuiltinModelCatalog.GeneratedAtUnixMilliseconds, options.Now)
-                : new RemoteCatalogOverlay(provider.Id, client, options.CatalogBaseUrl, BuiltinModelCatalog.GeneratedAtUnixMilliseconds, options.Now);
+                    options.CatalogBaseUrl, CurrentModelCatalog.GeneratedAtUnixMilliseconds, options.Now)
+                : new RemoteCatalogOverlay(provider.Id, client, options.CatalogBaseUrl, CurrentModelCatalog.GeneratedAtUnixMilliseconds, options.Now);
         Rebuild();
     }
 
@@ -106,7 +106,7 @@ internal sealed class ModelRegistry
         return loaded;
     }
 
-    private IEnumerable<string> ProviderIds(IEnumerable<string> layers) => BuiltinProviders.All.Select(provider => provider.Id).Concat(layers)
+    private IEnumerable<string> ProviderIds(IEnumerable<string> layers) => CurrentModelCatalog.Providers.Concat(layers)
         .Concat(config.ProviderIds).Concat(extensionProviders.Keys).Concat(virtualModels.Keys).Distinct(StringComparer.Ordinal);
 
     // model-runtime.ts registerProvider/unregisterProvider: an extension's provider layer over the built-in and models.json layers.
@@ -186,6 +186,8 @@ internal sealed class ModelRegistry
         CancellationToken cancellationToken)
     {
         config = ModelsJsonConfig.Load(options.ModelsPath);
+        // Refresh auth checks must see this models.json and current environment, not a previous availability snapshot.
+        Rebuild();
         var errors = new Dictionary<string, Exception>(StringComparer.Ordinal);
         var store = options.ModelsStore;
         if (store is not null)
@@ -197,9 +199,10 @@ internal sealed class ModelRegistry
                 {
                     var stored = await store.ReadAsync(id, cancellationToken).ConfigureAwait(false);
                     stored = stored is null ? null : stored with { Models = new([.. stored.Models.OfType<JsonObject>().Where(KnownType).Select(model => (JsonNode?)model.DeepClone())]) };
-                    // models.ts refresh: the network phase runs only with a resolved credential (for the layers that use it).
+                    // models.ts refreshModelsAuth: public catalogs need only configured auth; personalized catalogs need
+                    // a resolved credential. In particular, public catalog refresh must not refresh expired OAuth tokens.
                     var key = allowNetwork && overlay.RequiresCredential ? await RefreshKeyAsync(id, cancellationToken).ConfigureAwait(false) : null;
-                    var network = allowNetwork && (!overlay.RequiresCredential || key is not null);
+                    var network = allowNetwork && (overlay.RequiresCredential ? key is not null : CheckAuth(id) is not null);
                     await overlay.RefreshAsync(new(stored, network, network ? force : null, async publication =>
                     {
                         cancellationToken.ThrowIfCancellationRequested();

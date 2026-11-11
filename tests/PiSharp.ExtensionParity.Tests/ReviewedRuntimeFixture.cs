@@ -9,21 +9,21 @@ internal static partial class Program
     private static string? FindReviewedPiRuntime()
     {
         var repository = new DirectoryInfo(AppContext.BaseDirectory);
-        while (repository is not null && !File.Exists(Path.Combine(repository.FullName, "tools", "NodeBridge", "runtime-fixture-150", "package.json")))
+        while (repository is not null && !File.Exists(Path.Combine(repository.FullName, "tools", "NodeBridge", "runtime-fixture-152", "package.json")))
             repository = repository.Parent;
-        var configured = Environment.GetEnvironmentVariable("PISHARP_TEST_PI150_NODE_MODULES");
+        var configured = Environment.GetEnvironmentVariable("PISHARP_TEST_PI152_NODE_MODULES");
         if (repository is null)
         {
             if (configured is not null) throw new InvalidDataException("Reviewed runtime fixture manifest is unavailable.");
             return null;
         }
-        var modules = Path.GetFullPath(configured ?? Path.Combine(repository.FullName, "artifacts", "node-runtime-150", "node_modules"));
+        var modules = Path.GetFullPath(configured ?? Path.Combine(repository.FullName, "artifacts", "node-runtime-152", "node_modules"));
         if (!Directory.Exists(modules))
         {
             if (configured is not null) throw new InvalidDataException("Explicit test runtime fixture does not exist: " + modules);
             return null;
         }
-        var reviewed = Path.Combine(repository.FullName, "tools", "NodeBridge", "runtime-fixture-150");
+        var reviewed = Path.Combine(repository.FullName, "tools", "NodeBridge", "runtime-fixture-152");
         var manifest = JsonNode.Parse(File.ReadAllText(Path.Combine(reviewed, "package.json")))!;
         if (!JsonNode.DeepEquals(PiNodeRuntime.PackageJson(), manifest))
             throw new InvalidDataException("Reviewed runtime fixture manifest differs from the production package pins.");

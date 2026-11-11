@@ -46,7 +46,7 @@ internal static class AppKeybindings
         Add("app.message.copy", ["ctrl+x"], "Copy selection or last assistant message");
         Add("app.message.followUp", [windows ? "ctrl+q" : "alt+enter"], "Queue follow-up message");
         Add("app.message.dequeue", [windows ? "alt+q" : "alt+up"], "Restore queued messages");
-        Add("app.clipboard.pasteImage", [windows ? "alt+v" : "ctrl+v"], "Paste files on macOS, images, or text from clipboard");
+        Add("app.clipboard.pasteImage", windows ? ["alt+v", "ctrl+v"] : ["ctrl+v"], "Paste files on macOS, images, or text from clipboard");
         Add("app.session.new", [], "Start a new session");
         Add("app.session.tree", [], "Open session tree");
         Add("app.session.fork", [], "Fork current session");

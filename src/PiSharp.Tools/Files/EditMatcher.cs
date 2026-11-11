@@ -14,7 +14,7 @@ public static class EditMatcher
         var crlf = text.IndexOf("\r\n", StringComparison.Ordinal); var lf = text.IndexOf('\n');
         return crlf >= 0 && lf >= 0 && crlf < lf ? "\r\n" : "\n";
     }
-    public static string RestoreLineEndings(string text, string ending) => ending == "\r\n" ? text.Replace("\n", "\r\n", StringComparison.Ordinal) : text;
+    public static string RestoreLineEndings(string text, string ending) => ending == "\n" ? text : text.Replace("\n", ending, StringComparison.Ordinal);
     public static string NormalizeForFuzzyMatch(string text)
     {
         var lines = text.Normalize(NormalizationForm.FormKC).Split('\n');

@@ -1,0 +1,14 @@
+{
+  "library": "lovely-mermaid@0.3.3",
+  "capture": "actual npm dist/index.js execution; authored inputs",
+  "runtime": "Node v24.22.0; ICU 78.3; Unicode 17.0",
+  "integrity": "sha512-EMLJS934qwt2MLO/a5o+T/89HGbuXZPwmCpHIhHO+DVrm+y5tHlEHgpZzlC2o4yW/rFPHRFO9xSMafzqH4wH5A==",
+  "corpusFile": "tests/PiSharp.InteractiveParity.Tests/Mermaid/lovely-0.3.3-corpus.json",
+  "corpusSha256": "6b5b70aaf1f11bc8f2d8a1ae1e0cbfd3b0ebdf47413fd88e9706a31eb8e5da75",
+  "output": "tests/PiSharp.InteractiveParity.Tests/Mermaid/lovely-0.3.3-goldens.json",
+  "outputSha256": "d49dde191fcfbc01503a208fd80a111f5e8b2c98044da0a2cf8ec4c85304a0f6",
+  "diagramCases": 541,
+  "styleCases": 163,
+  "rendered": 470,
+  "referenceFilesHashVerified": true
+}

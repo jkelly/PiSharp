@@ -27,6 +27,8 @@ const canonical = value => Array.isArray(value) ? value.map(canonical) : value &
 function checkHistoricalEvidence() {
   for(const [path,expected] of Object.entries(historicalDigests)) {
     const value=read(path); delete value.currentImplementation; delete value.currentGapStatus;
+    // Candidate metadata does not rewrite the historical implementation evidence this hash protects.
+    if (path === 'compatibility/implementation-status.json') delete value.pi152Candidate;
     for(const row of value.rows??value.files??[]) {
       delete row.currentImplementation;
       if('historicalPisharp' in row) {row.pisharp=row.historicalPisharp;delete row.historicalPisharp;}
@@ -201,7 +203,7 @@ export function attachCurrentMappings(status) {
     row.pisharp=entry.sourcePaths;
     row.currentImplementation={mapping:statusPath,id:entry.id,sourceStatus:entry.sourceStatus,runtimeStatus:entry.runtimeStatus,note:entry.disposition||'Source and authored tests are present; final integrated validation is pending.',...(entry.testReplacements?{testReplacements:entry.testReplacements}:{})};
   }
-  map.currentImplementation={mapping:statusPath,statusScope:explanation};
+  map.currentImplementation={...map.currentImplementation,mapping:statusPath,statusScope:explanation};
   for(const entry of status.durableFiles) {
     const row=map.files.find(row=>row.upstream===entry.upstream);
     row.historicalPisharp??=row.pisharp;

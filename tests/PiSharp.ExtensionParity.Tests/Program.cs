@@ -25,6 +25,7 @@ internal static partial class Program
         }
         var cases = new List<(string Id, Func<Task> Run)>();
         cases.AddRange(PackageCases());
+        cases.AddRange(Sync152PackageCases());
         cases.AddRange(DiscoveryCases());
         cases.AddRange(BridgeCases());
         cases.AddRange(CliCases());

@@ -133,7 +133,7 @@ public sealed class BashTool : IToolArgumentSchemaAdapter
             var valid = action.ToolName == Name && action.Operation == Name && action.Kind == PreparedToolActionKind.Command &&
                 action.Target == _options.Executable && (_options.UnavailableShellError is not null || ShellExists(action.Target)) &&
                 shellCommand is not null && Text(shellCommand, allowNul: StdinTransport) &&
-                (_options.SpawnHook is not null || shellCommand == Resolve(input.Command)) &&
+                (_options.SpawnHook is not null || shellCommand == Shell.PrepareCommand(Resolve(input.Command))) &&
                 !action.CommandArguments.IsDefault && action.CommandArguments.SequenceEqual(Shell.CommandArguments(shellCommand)) &&
                 (input.StandardInput is null) == (_options.CommandTransport == ShellCommandTransport.Argv) &&
                 Absolute(action.WorkingDirectory) && EnvironmentValid(action.Environment) && SpillPath(input.OutputPath);

@@ -1,4 +1,4 @@
-// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/tui/src/components/editor.ts.
+// Pi b4afdddf44e059c67ccf5097e5317d913521b470 (MIT): packages/tui/src/components/editor.ts.
 // Ported to plain ESM for the PiSharp Node extension bridge (TypeScript types stripped mechanically; behaviour unchanged).
 import { getKeybindings } from "../keybindings.mjs";
 import { decodePrintableKey, matchesKey } from "../keys.mjs";
@@ -987,7 +987,7 @@ export class Editor {
                 this.state.lines = this.state.lines.map((line)=>line.replace(PASTE_MARKER_REGEX, (fullMatch, idGroup, suffixGroup)=>{
                         const x = Number(idGroup);
                         if (x <= targetId) return fullMatch;
-                        return `[paste #${x - 1}${suffixGroup}]`;
+                        return `[paste #${x - 1}${suffixGroup ?? ""}]`;
                     }));
             }
             line = this.state.lines[this.state.cursorLine] || "";

@@ -11,6 +11,13 @@ using System.Text.Json.Nodes;
 // layers' files of one name (contracts/params.test.ts, data/params.test.ts) stay apart. Case ids are <layer>.<file>.<case>.
 internal static partial class Program
 {
+    private static readonly HashSet<string> AuthoredSchema3Cases = new(StringComparer.Ordinal)
+    {
+        "schema.corpus.first.sqlite-stopped-export",
+        "schema.corpus.second.sqlite-stopped-export",
+    };
+    private static bool IsUpstreamCapture(string id) => id.StartsWith("schema.corpus.", StringComparison.Ordinal) && !AuthoredSchema3Cases.Contains(id);
+
     private static async Task<int> Main(string[] args)
     {
         string? reportPath = null, only = null;
@@ -32,14 +39,15 @@ internal static partial class Program
         foreach (var test in cases)
         {
             var started = System.Diagnostics.Stopwatch.StartNew();
+            Console.Error.WriteLine("start " + test.Id);
             try
             {
                 await test.Run().WaitAsync(TimeSpan.FromSeconds(120));
-                results.Add(new { test.Id, status = test.Id.StartsWith("schema.corpus.", StringComparison.Ordinal) ? "PASS_UPSTREAM_CAPTURE" : "PASS_AUTHORED_NATIVE_ONLY", ms = started.ElapsedMilliseconds });
+                results.Add(new { test.Id, status = IsUpstreamCapture(test.Id) ? "PASS_UPSTREAM_CAPTURE" : "PASS_AUTHORED_NATIVE_ONLY", ms = started.ElapsedMilliseconds });
             }
-            catch (Exception error) { failures++; results.Add(new { test.Id, status = "FAIL", failure = error.ToString() }); }
+            catch (Exception error) { failures++; results.Add(new { test.Id, status = "FAIL", failure = error.ToString() }); Console.Error.WriteLine($"FAIL {test.Id}: {error}"); }
         }
-        var capturedCases = cases.Count(test => test.Id.StartsWith("schema.corpus.", StringComparison.Ordinal));
+        var capturedCases = cases.Count(test => IsUpstreamCapture(test.Id));
         var report = new { sourceSha = PiSharp.Chord.ChordNext.Commit, status = capturedCases == 0 ? "AUTHORED NATIVE; NO UPSTREAM CAPTURE" : "MIXED: SEE INDIVIDUAL CASE STATUS", cases = cases.Count, failures,
             genuineSourceCasesCaptured = capturedCases, results };
         var json = JsonSerializer.Serialize(report, new JsonSerializerOptions { WriteIndented = true });

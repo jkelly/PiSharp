@@ -9,10 +9,11 @@ namespace PiSharp.Telemetry;
 
 /// <summary>index.ts <c>TelemetryAttributeType</c>: the JSON type of an attribute value.</summary>
 [JsonConverter(typeof(AttributeTypeConverter))]
-public enum TelemetryAttributeType { String, Number, Boolean, StringArray, NumberArray, BooleanArray }
+public enum TelemetryAttributeType { String, Number, Boolean, StringArray, NumberArray, BooleanArray, StringNumberArray }
 
-/// <summary>index.ts <c>AttributeValue</c>: a string, a number (a JavaScript binary64), a boolean, or an array of one of them. Values
-/// are immutable: arrays are copied when converted. Null stands for <c>undefined</c> wherever an attribute may be absent.</summary>
+/// <summary>index.ts <c>AttributeValue</c>: a string, a number (a JavaScript binary64), a boolean, or an array of one of them. The
+/// worker-ingest wire schema also permits mixed string/number arrays. Values are immutable: arrays are copied when converted.
+/// Null stands for <c>undefined</c> wherever an attribute may be absent.</summary>
 [JsonConverter(typeof(AttributeValueJsonConverter))]
 public sealed class AttributeValue : IEquatable<AttributeValue>
 {
@@ -21,7 +22,7 @@ public sealed class AttributeValue : IEquatable<AttributeValue>
     private AttributeValue(TelemetryAttributeType type, object value) { Type = type; _value = value; }
 
     public TelemetryAttributeType Type { get; }
-    public bool IsArray => Type is TelemetryAttributeType.StringArray or TelemetryAttributeType.NumberArray or TelemetryAttributeType.BooleanArray;
+    public bool IsArray => Type is TelemetryAttributeType.StringArray or TelemetryAttributeType.NumberArray or TelemetryAttributeType.BooleanArray or TelemetryAttributeType.StringNumberArray;
 
     [return: NotNullIfNotNull(nameof(value))]
     public static implicit operator AttributeValue?(string? value) => value is null ? null : new(TelemetryAttributeType.String, value);
@@ -39,12 +40,25 @@ public sealed class AttributeValue : IEquatable<AttributeValue>
     public static implicit operator AttributeValue(ImmutableArray<double> values) => new(TelemetryAttributeType.NumberArray, values.IsDefault ? [] : values);
     public static implicit operator AttributeValue(ImmutableArray<bool> values) => new(TelemetryAttributeType.BooleanArray, values.IsDefault ? [] : values);
 
+    /// <summary>Preserves the worker-ingest schema's ordered string/number array. Homogeneous arrays keep their existing types.</summary>
+    public static AttributeValue FromStringNumberArray(IEnumerable<AttributeValue> values)
+    {
+        ArgumentNullException.ThrowIfNull(values);
+        var copy = values.ToImmutableArray();
+        if (copy.Any(value => value is null || value.Type is not (TelemetryAttributeType.String or TelemetryAttributeType.Number)))
+            throw new ArgumentException("Expected only string and number scalar values", nameof(values));
+        if (copy.All(value => value.Type == TelemetryAttributeType.String)) return copy.Select(value => value.GetString()).ToImmutableArray();
+        if (copy.All(value => value.Type == TelemetryAttributeType.Number)) return copy.Select(value => value.GetNumber()).ToImmutableArray();
+        return new(TelemetryAttributeType.StringNumberArray, copy);
+    }
+
     public string GetString() => Type == TelemetryAttributeType.String ? (string)_value : throw WrongType();
     public double GetNumber() => Type == TelemetryAttributeType.Number ? (double)_value : throw WrongType();
     public bool GetBoolean() => Type == TelemetryAttributeType.Boolean ? (bool)_value : throw WrongType();
     public ImmutableArray<string> GetStrings() => Type == TelemetryAttributeType.StringArray ? (ImmutableArray<string>)_value : throw WrongType();
     public ImmutableArray<double> GetNumbers() => Type == TelemetryAttributeType.NumberArray ? (ImmutableArray<double>)_value : throw WrongType();
     public ImmutableArray<bool> GetBooleans() => Type == TelemetryAttributeType.BooleanArray ? (ImmutableArray<bool>)_value : throw WrongType();
+    public ImmutableArray<AttributeValue> GetStringNumbers() => Type == TelemetryAttributeType.StringNumberArray ? (ImmutableArray<AttributeValue>)_value : throw WrongType();
 
     /// <summary>The scalar elements of an array value, each as its own attribute value; a scalar returns itself.</summary>
     public IEnumerable<AttributeValue> Elements() => Type switch
@@ -52,6 +66,7 @@ public sealed class AttributeValue : IEquatable<AttributeValue>
         TelemetryAttributeType.StringArray => GetStrings().Select(static item => (AttributeValue)item!),
         TelemetryAttributeType.NumberArray => GetNumbers().Select(static item => (AttributeValue)item),
         TelemetryAttributeType.BooleanArray => GetBooleans().Select(static item => (AttributeValue)item),
+        TelemetryAttributeType.StringNumberArray => GetStringNumbers(),
         _ => [this]
     };
 
@@ -65,6 +80,7 @@ public sealed class AttributeValue : IEquatable<AttributeValue>
         TelemetryAttributeType.Boolean => GetBoolean() == other.GetBoolean(),
         TelemetryAttributeType.StringArray => GetStrings().SequenceEqual(other.GetStrings(), StringComparer.Ordinal),
         TelemetryAttributeType.NumberArray => GetNumbers().SequenceEqual(other.GetNumbers()),
+        TelemetryAttributeType.StringNumberArray => GetStringNumbers().SequenceEqual(other.GetStringNumbers()),
         _ => GetBooleans().SequenceEqual(other.GetBooleans())
     };
 

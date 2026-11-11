@@ -8,7 +8,19 @@
   "worklist": "compatibility/durable-sync-1.5.0-worklist.json",
   "currentImplementation": {
     "mapping": "compatibility/gap-status-2026-11-08.json",
-    "statusScope": "Release-baseline status/notes and immutable upstream pins are retained; currentImplementation points to the current source mapping. Source implementation is not runtime acceptance."
+    "statusScope": "Release-baseline status/notes and immutable upstream pins are retained; currentImplementation points to the current source mapping. Source implementation is not runtime acceptance.",
+    "candidate": {
+      "source": {
+        "tag": "v1.5.2",
+        "commit": "b4afdddf44e059c67ccf5097e5317d913521b470",
+        "tree": "ed418d79cb44d3690f110e1077c4612db033f2c9"
+      },
+      "status": "tested-with-limitations",
+      "overlay": "compatibility/durable-sync-1.5.2-overlay.json",
+      "preservedMap": "compatibility/durable-port-map.v1.5.0.json",
+      "note": "Top-level source pin, rows, status counts and notes remain historical v1.5.0 evidence. The candidate overlay carries the 1.5.2 source disposition and no completed-port assertion.",
+      "acceptance": "compatibility/sync-1.5.2-acceptance.json"
+    }
   },
   "statusMeaning": {
     "planned": "Not started.",

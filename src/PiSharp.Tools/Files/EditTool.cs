@@ -11,7 +11,7 @@ namespace PiSharp.Tools.Files;
 
 /// <summary>Memory bounds for the edit tool. Pi has no size or replacement-count limits; the defaults are the largest admitted values
 /// (the number of edits is bounded only by the argument size). The display
-/// diff is bounded separately: an edit whose diff exceeds <see cref="DiffOptions"/> still succeeds, with the diff omitted.</summary>
+/// diff is bounded separately: an edit whose diff exceeds <see cref="DiffOptions"/> fails before writing.</summary>
 public sealed record EditToolOptions(int MaximumInputBytes = 64 * 1024 * 1024, int MaximumOutputBytes = 64 * 1024 * 1024,
     int MaximumArgumentCharacters = 8 * 1024 * 1024, int MaximumPathCharacters = 4096, int MaximumEdits = int.MaxValue,
     DiffFormatterOptions? DiffOptions = null)
@@ -166,18 +166,9 @@ public sealed class EditTool : IToolArgumentSchemaAdapter, IInitialToolArgumentP
                 operationToken.ThrowIfCancellationRequested();
                 var replacement = Utf8.GetBytes(plan.Content);
                 if (replacement.Length > _options.MaximumOutputBytes) throw EditPlan.Limit();
-                JsonData details;
-                try
-                {
-                    var formatted = DiffFormatter.Format(input.DisplayPath, plan.BaseContent, plan.NewContent, _diffOptions, operationToken);
-                    // Construct/own result metadata before the only write; bounds/finalization failures cannot follow a successful effect here.
-                    details = JsonData.Parse(JsonSerializer.Serialize(new { diff = formatted.Diff, patch = formatted.Patch, firstChangedLine = formatted.FirstChangedLine }));
-                }
-                catch (EditPlanException error) when (error.Failure == EditPlanFailure.ResourceLimit)
-                {
-                    // Pi always edits; only the display diff is bounded natively. Keep the edit and omit the oversized diff.
-                    details = JsonData.Parse(JsonSerializer.Serialize(new { diff = "", patch = "", firstChangedLine = FirstChangedLine(plan.BaseContent, plan.NewContent) }));
-                }
+                var formatted = DiffFormatter.FormatEdit(input.DisplayPath, plan, _diffOptions, operationToken);
+                // Diff bounds and metadata finalization settle before the only admitted write.
+                var details = JsonData.Parse(JsonSerializer.Serialize(new { diff = formatted.Diff, patch = formatted.Patch, firstChangedLine = formatted.FirstChangedLine }));
                 var current = await ReadOwnedAsync(action.Target, operationToken).ConfigureAwait(false);
                 operationToken.ThrowIfCancellationRequested();
                 if (!current.AsSpan().SequenceEqual(original)) return Failure(ToolFailureKind.ExecutionError, "File changed outside the edit operation; no edit write was attempted.", "OutsideChange", false, false);

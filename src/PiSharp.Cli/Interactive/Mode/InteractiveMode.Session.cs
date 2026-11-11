@@ -383,10 +383,10 @@ internal sealed partial class InteractiveMode
     {
         if (state.ScopedModels.Count > 0)
         {
-            if (state.ScopedModels.Count <= 1) return null;
             var index = state.ScopedModels.FindIndex(scoped => SameModel(scoped.Model, state.Model));
-            var step = direction == "backward" ? -1 : 1;
-            var next = state.ScopedModels[((index < 0 ? 0 : index) + step + state.ScopedModels.Count) % state.ScopedModels.Count];
+            var nextIndex = NextCycleIndex(index, state.ScopedModels.Count, direction);
+            if (nextIndex is null) return null;
+            var next = state.ScopedModels[nextIndex.Value];
             await SetModelAsync(next.Model, persist: false);
             if (next.ThinkingLevel is { } level) await SetThinkingLevelAsync(level, persist: false);
             return (state.Model ?? next.Model, state.ThinkingLevel ?? "off");
@@ -399,10 +399,17 @@ internal sealed partial class InteractiveMode
             return (model, SessionEntries.Str(result["thinkingLevel"]) ?? "off");
         }
         var currentIndex = state.AvailableModels.FindIndex(model => SameModel(model, state.Model));
-        var delta = direction == "backward" ? -1 : 1;
-        var target = state.AvailableModels[((currentIndex < 0 ? 0 : currentIndex) + delta + state.AvailableModels.Count) % state.AvailableModels.Count];
+        var target = state.AvailableModels[NextCycleIndex(currentIndex, state.AvailableModels.Count, direction)!.Value];
         await SetModelAsync(target, persist: false);
         return (state.Model ?? target, state.ThinkingLevel ?? "off");
+    }
+
+    internal static int? NextCycleIndex(int currentIndex, int count, string direction)
+    {
+        if (count == 0) return null;
+        if (currentIndex < 0) return direction == "backward" ? count - 1 : 0;
+        if (count == 1) return null;
+        return (currentIndex + (direction == "backward" ? -1 : 1) + count) % count;
     }
 
     internal static bool SameModel(JsonObject? left, JsonObject? right) => left is not null && right is not null &&
