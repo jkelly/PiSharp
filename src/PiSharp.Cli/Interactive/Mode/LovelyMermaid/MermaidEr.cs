@@ -159,7 +159,7 @@ internal static class MermaidEr
         if (parts.Count == 0) return;
         var line = DecodeHtmlEntities(string.Join(" ", parts));
         if (attrs.Count < MermaidGraph.MaxMembers) attrs.Add(line);
-        else if (attrs.Count == MermaidGraph.MaxMembers) attrs.Add("…");
+        else if (attrs.Count == MermaidGraph.MaxMembers) attrs.Add("â€¦");
     }
 
 }

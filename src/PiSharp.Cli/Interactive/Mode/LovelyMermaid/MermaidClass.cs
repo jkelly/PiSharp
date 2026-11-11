@@ -147,7 +147,7 @@ internal static class MermaidClass
     }
 
     private static void SetAnnotation(MermaidNode node, string annotation)
-        => node.Sections![0] = [$"«{annotation}»", DisplayGenerics(node.Label)];
+        => node.Sections![0] = [$"Â«{annotation}Â»", DisplayGenerics(node.Label)];
 
     public static void PushMember(MermaidNode node, string raw)
     {
@@ -159,7 +159,7 @@ internal static class MermaidClass
         var member = DecodeHtmlEntities(DisplayGenerics(Trim(raw)));
         var list = node.Sections![member.Contains('(') ? 2 : 1];
         if (list.Count < MermaidGraph.MaxMembers) list.Add(member);
-        else if (list.Count == MermaidGraph.MaxMembers) list.Add("…");
+        else if (list.Count == MermaidGraph.MaxMembers) list.Add("â€¦");
     }
 
     /// <summary>Relation operators, longest-first so <c>--|&gt;</c> wins over <c>--</c>.</summary>
