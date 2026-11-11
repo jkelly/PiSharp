@@ -37,6 +37,14 @@ internal static class AppLayoutTests
                 Require(!Secrets.MatchesHash(token + "x", Secrets.HashToken(token)) && !Secrets.MatchesHash(token, new string('g', 64)), "mismatched and malformed hashes fail closed");
                 var values = await Task.WhenAll(Enumerable.Range(0, 8).Select(_ => Secrets.SecretFileAsync(layout.CookieSecretFile)));
                 Require(values.Distinct(StringComparer.Ordinal).Count() == 1, "concurrent create-only secret writers use the same winner");
+                for (var round = 0; round < 8; round++)
+                {
+                    var concurrentPath = Path.Combine(layout.ServerDirectory, "create-only-" + round);
+                    var concurrent = await Task.WhenAll(Enumerable.Range(0, 16).Select(_ => Secrets.SecretFileAsync(concurrentPath)));
+                    Require(concurrent.All(value => value.Length == 43) && concurrent.Distinct(StringComparer.Ordinal).Count() == 1,
+                        "repeated concurrent creators returned different or incomplete secrets");
+                    Require(await Secrets.ReadSecretAsync(concurrentPath) == concurrent[0], "create-only winner differs from persisted secret");
+                }
                 Require(await Secrets.ReadSecretAsync(layout.CookieSecretFile) == values[0], "secret persisted completely");
                 Require(!await Secrets.WriteSecretAsync(layout.CookieSecretFile, "replacement", replace: false), "create-only never overwrites");
                 await Secrets.WriteSecretAsync(layout.CookieSecretFile, token);

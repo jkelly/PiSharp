@@ -492,13 +492,20 @@ internal static class Program
         using var reference = await host.GetAsync(PluginTestContracts.Remote, new() { ["id"] = "a" }, Context);
         var first = ((JsonNode)(await reference.CallAsync("pid", null, Context))!).GetValue<int>(); Check(first != Environment.ProcessId, "worker method ran in parent");
         await workers.RolloutAsync(new([], []), Context);
-        using (var crashed = Process.GetProcessById(first)) { crashed.Kill(true); await crashed.WaitForExitAsync(); }
-        await Eventually(() => workers.State.Values.Any(state => state.Status == "failed"));
-        await Eventually(() => reference.State.Value.Kind == "failed");
-        var recovery = await workers.RolloutAsync(new([], []), Context);
-        Check(recovery.Hosts.Count > 0 && recovery.Hosts.All(result => result.Error is null && !result.Stopped), "rollout did not retry failed held worker");
-        await Eventually(() => reference.State.Value.Kind == "live");
-        var recovered = ((JsonNode)(await reference.CallAsync("pid", null, Context))!).GetValue<int>(); Check(recovered != first, "crashed worker did not restart after Retry");
+        var recovered = first;
+        for (var attempt = 0; attempt < 4; attempt++)
+        {
+            using (var crashed = Process.GetProcessById(recovered)) { crashed.Kill(true); await crashed.WaitForExitAsync(); }
+            await Eventually(() => workers.State.Values.Any(state => state.Status == "failed"));
+            await Eventually(() => reference.State.Value.Kind == "failed");
+            var recovery = await workers.RolloutAsync(new([], []), Context);
+            Check(recovery.Hosts.Count > 0 && recovery.Hosts.All(result => result.Error is null && !result.Stopped),
+                "rollout did not retry failed held worker: " + JsonSerializer.Serialize(recovery));
+            await Eventually(() => reference.State.Value.Kind == "live");
+            var previous = recovered;
+            recovered = ((JsonNode)(await reference.CallAsync("pid", null, Context))!).GetValue<int>();
+            Check(recovered != previous, "crashed worker did not restart after Retry");
+        }
         reference.Release(); await workers.StopAsync(address); workers.Retry(address);
         using var second = await host.GetAsync(PluginTestContracts.Remote, new() { ["id"] = "a" }, Context);
         var next = ((JsonNode)(await second.CallAsync("pid", null, Context))!).GetValue<int>(); Check(next != recovered, "worker did not restart after stop");

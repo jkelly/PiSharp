@@ -2,6 +2,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Buffers;
+using PiSharp.Chord.Hosting.Workers;
 
 namespace PiSharp.Chord.Hosting.App;
 
@@ -54,7 +55,13 @@ public static class Secrets
         path = Path.GetFullPath(path);
         var parent = Path.GetDirectoryName(path)!;
         Layout.PrivateDirectory(parent);
+        // File.Move(overwrite: false) can use check-then-rename on Unix. Serialize
+        // cooperating creators across threads and processes before checking the target.
+        var lockParent = OperatingSystem.IsWindows() ? parent.ToUpperInvariant() : parent;
+        var lockName = "secret:" + (OperatingSystem.IsWindows() ? Path.GetFileName(path).ToUpperInvariant() : Path.GetFileName(path));
+        using var writing = await ProcessAddressLock.AcquireAsync(lockName, lockParent).ConfigureAwait(false);
         Layout.RefuseLinks(path);
+        if (!replace && (File.Exists(path) || Directory.Exists(path))) return false;
         if (replace && File.Exists(path)) Layout.PrivateFile(path);
         var temporary = Path.Combine(parent, "." + NewToken(12) + ".tmp");
         try

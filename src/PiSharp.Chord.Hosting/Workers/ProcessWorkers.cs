@@ -51,6 +51,7 @@ public sealed class ProcessWorkers : IAsyncDisposable, IPluginRolloutStep
         internal Child? Child;
         internal string? Failure;
         internal Task? Previous;
+        internal bool Retrying;
         internal DateTimeOffset? Recovered;
         internal TaskCompletionSource? IdleLease;
     }
@@ -270,6 +271,7 @@ public sealed class ProcessWorkers : IAsyncDisposable, IPluginRolloutStep
             if (current)
             {
                 entry.Child = null;
+                entry.Previous = child.Finished.Task;
                 if (!child.LinkClosed) entry.Starting = null;
                 if (child.Lost && !closing.IsCancellationRequested)
                 {
@@ -297,7 +299,7 @@ public sealed class ProcessWorkers : IAsyncDisposable, IPluginRolloutStep
             lock (sync)
             {
                 children.Remove(child);
-                if (entry.Child is null && entry.Starting is null && entry.Failure is null && entry.IdleLease is null && entries.TryGetValue(entry.Address.Key, out var registered) && ReferenceEquals(registered, entry)) entries.Remove(entry.Address.Key);
+                if (!entry.Retrying && entry.Child is null && entry.Starting is null && entry.Failure is null && entry.IdleLease is null && entries.TryGetValue(entry.Address.Key, out var registered) && ReferenceEquals(registered, entry)) entries.Remove(entry.Address.Key);
             }
             child.Finished.TrySetResult();
         }
@@ -335,8 +337,13 @@ public sealed class ProcessWorkers : IAsyncDisposable, IPluginRolloutStep
                 else if (message.Kind == "reloaded" && child.Replies.TryRemove(message.Id, out var reply)) reply.TrySetResult(message);
                 else if (message.Kind == "fatal")
                 {
-                    lock (sync) { child.Faulted = true; entry.Failure = message.Error ?? "worker failed"; }
-                    throw new IOException(entry.Failure);
+                    var failure = message.Error ?? "worker failed";
+                    lock (sync)
+                    {
+                        child.Faulted = true;
+                        if (ReferenceEquals(entry.Child, child)) { entry.Failure = failure; entry.Previous = child.Finished.Task; }
+                    }
+                    throw new IOException(failure);
                 }
                 else throw new IOException("unexpected worker control message");
             }
@@ -347,7 +354,12 @@ public sealed class ProcessWorkers : IAsyncDisposable, IPluginRolloutStep
             child.Ready.TrySetException(new IOException("worker control disconnected", error));
             if (!child.Stopping && !closing.IsCancellationRequested && !child.LinkClosed)
             {
-                lock (sync) { child.Faulted = true; entry.Failure ??= "worker control disconnected"; }
+                lock (sync)
+                {
+                    child.Faulted = true;
+                    if (ReferenceEquals(entry.Child, child))
+                    { entry.Failure ??= "worker control disconnected"; entry.Previous = child.Finished.Task; }
+                }
                 ReportChild(entry.Address, child, error); await KillAsync(child.Process).ConfigureAwait(false);
             }
         }
@@ -368,9 +380,25 @@ public sealed class ProcessWorkers : IAsyncDisposable, IPluginRolloutStep
     }
     public void Retry(Address address)
     {
+        Entry? retrying = null;
         lock (sync) if (entries.TryGetValue(address.Key, out var entry) && entry.Failure is not null)
-        { entry.Failure = null; entry.Starting = null; }
-        Route.Retry(address);
+        {
+            retrying = entry; entry.Retrying = true;
+            if (entry.Child is { } previous)
+            { entry.Previous = previous.Finished.Task; entry.Child = null; }
+            entry.Failure = null; entry.Starting = null;
+        }
+        try { Route.Retry(address); }
+        finally
+        {
+            lock (sync) if (retrying is { } entry)
+            {
+                entry.Retrying = false;
+                if (entry.Child is null && entry.Starting is null && entry.Failure is null && entry.IdleLease is null &&
+                    (entry.Previous is null || entry.Previous.IsCompleted) && entries.TryGetValue(address.Key, out var current) && ReferenceEquals(current, entry))
+                    entries.Remove(address.Key);
+            }
+        }
     }
     /// <summary>Reserves an idle address while an archive operation holds its cross-process lock.
     /// Returns null if a worker is already starting, running, or stopping. Routed starts wait until disposal.</summary>
@@ -392,7 +420,7 @@ public sealed class ProcessWorkers : IAsyncDisposable, IPluginRolloutStep
                 if (ReferenceEquals(entry.IdleLease, gate)) entry.IdleLease = null;
                 gate.TrySetResult();
                 idleLeases.Remove(gate.Task);
-                if (entry.Child is null && entry.Starting is null && entry.Failure is null && entries.TryGetValue(address.Key, out var current) && ReferenceEquals(current, entry)) entries.Remove(address.Key);
+                if (!entry.Retrying && entry.Child is null && entry.Starting is null && entry.Failure is null && entries.TryGetValue(address.Key, out var current) && ReferenceEquals(current, entry)) entries.Remove(address.Key);
             }
         }
         using var waited = new CancellationTokenSource(TimeSpan.FromSeconds(2));
@@ -428,24 +456,54 @@ public sealed class ProcessWorkers : IAsyncDisposable, IPluginRolloutStep
     }
     public async Task<PluginRolloutStepReport> RolloutAsync(PluginBuildSet build, ChordContext context)
     {
-        Address[] failed;
-        lock (sync) { currentBuild = build; failed = entries.Values.Where(entry => entry.Failure is not null).Select(entry => entry.Address).ToArray(); }
-        foreach (var address in failed) Retry(address);
-        Entry[] targets; lock (sync) targets = entries.Values.Where(entry => entry.Starting is not null).ToArray();
-        var hosts = await Task.WhenAll(targets.Select(async entry =>
+        Entry[] failed;
+        (Entry Entry, Task<Child> Starting)[] targets;
+        lock (sync)
         {
-            // The underlying reply still owns its slot when the rollout caller stops waiting.
-            try { return await ShipAsync(entry).WaitAsync(context.AbortSignal ?? CancellationToken.None).ConfigureAwait(false); }
-            catch (Exception error) { return new PluginRolloutHost(entry.Address.Key, Error: error.Message); }
-        })).ConfigureAwait(false);
-        return new(Name, hosts);
+            currentBuild = build;
+            failed = entries.Values.Where(entry => entry.Failure is not null).ToArray();
+            targets = entries.Values.Where(entry => entry.Failure is null && entry.Starting is not null)
+                .Select(entry => (entry, entry.Starting!)).ToArray();
+        }
+        var hosts = await Task.WhenAll(failed.Select(entry => BoundedAsync(entry, () => RetryFailedAsync(entry)))
+            .Concat(targets.Select(target => BoundedAsync(target.Entry, async () => await ShipAsync(target.Entry, target.Starting).ConfigureAwait(false)))))
+            .ConfigureAwait(false);
+        return new(Name, hosts.OfType<PluginRolloutHost>().ToArray());
 
-        async Task<PluginRolloutHost> ShipAsync(Entry entry)
+        async Task<PluginRolloutHost?> BoundedAsync(Entry entry, Func<Task<PluginRolloutHost?>> work)
+        {
+            // The owned retry/reply continues when the rollout caller stops waiting.
+            try { return await work().WaitAsync(context.AbortSignal ?? CancellationToken.None).ConfigureAwait(false); }
+            catch (Exception error) { return new PluginRolloutHost(entry.Address.Key, Error: error.Message); }
+        }
+
+        async Task<PluginRolloutHost?> RetryFailedAsync(Entry entry)
+        {
+            try
+            {
+                // Failure can be visible before the old control reader and route have closed.
+                // Join that generation before retrying and capture the new start exactly once.
+                Task? previous;
+                lock (sync) previous = entry.Previous ?? entry.Child?.Finished.Task;
+                if (previous is not null) await previous.WaitAsync(closing.Token).ConfigureAwait(false);
+                Retry(entry.Address);
+                Task<Child>? starting;
+                lock (sync)
+                {
+                    if (!entries.TryGetValue(entry.Address.Key, out entry!)) return null;
+                    starting = entry.Starting;
+                }
+                return starting is null ? null : await ShipAsync(entry, starting).ConfigureAwait(false);
+            }
+            catch (Exception error) { return new(entry.Address.Key, Error: error.Message); }
+        }
+
+        async Task<PluginRolloutHost> ShipAsync(Entry entry, Task<Child> starting)
         {
             Child? child = null;
             try
             {
-                child = await entry.Starting!.ConfigureAwait(false);
+                child = await starting.ConfigureAwait(false);
                 Interlocked.Increment(ref child.RolloutOwners);
                 try
                 {
