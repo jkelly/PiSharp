@@ -1,4 +1,4 @@
-// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/tui/src/components/markdown.ts.
+// Pi b4afdddf44e059c67ccf5097e5317d913521b470 (MIT): packages/tui/src/components/markdown.ts.
 // Ported to plain ESM for the PiSharp Node extension bridge (TypeScript types stripped mechanically; behaviour unchanged).
 import { Marked, Tokenizer } from "../../vendor/marked.mjs";
 import markedCjkFriendly from "../../vendor/marked-cjk-friendly.mjs";
@@ -181,6 +181,27 @@ function trimPartialClosingFences(tokens) {
     }
     token.text = token.text.slice(0, -lastLine.length).replace(/\n$/, "");
 }
+const HTML_COMMENT_REGEX = /<!--[\s\S]*?(?:-->|$)/g;
+function stripHtmlComments(html) {
+    return html.replace(HTML_COMMENT_REGEX, "");
+}
+function removeHtmlCommentBlocks(tokens) {
+    for(let i = tokens.length - 1; i >= 0; i--){
+        const token = tokens[i];
+        if (token.type === "list") {
+            for (const item of token.items)removeHtmlCommentBlocks(item.tokens);
+        } else if (token.type === "blockquote") {
+            removeHtmlCommentBlocks(token.tokens ?? []);
+        } else if (token.type === "html" && stripHtmlComments(token.raw).trim() === "") {
+            tokens.splice(i, 1);
+            if (tokens[i]?.type === "space" && (i === 0 || tokens[i - 1]?.type === "space")) {
+                tokens.splice(i, 1);
+            } else if (i === tokens.length && tokens[i - 1]?.type === "space") {
+                tokens.splice(--i, 1);
+            }
+        }
+    }
+}
 const markdownParser = new Marked();
 markdownParser.setOptions({
     tokenizer: new MarkdownTokenizer()
@@ -251,6 +272,7 @@ export class Markdown {
         if (!tokens) {
             tokens = markdownParser.lexer(normalizedText);
             trimPartialClosingFences(tokens);
+            removeHtmlCommentBlocks(tokens);
             this.cachedTokens = new WeakRef({
                 source: normalizedText,
                 tokens
@@ -535,7 +557,7 @@ export class Markdown {
                 break;
             case "html":
                 if ("raw" in token && typeof token.raw === "string") {
-                    lines.push(this.applyDefaultStyle(token.raw.trim()));
+                    lines.push(this.applyDefaultStyle(stripHtmlComments(token.raw).trim()));
                 }
                 break;
             case "space":
@@ -556,7 +578,16 @@ export class Markdown {
             const segments = text.split("\n");
             return segments.map((segment)=>applyText(segment)).join("\n");
         };
-        for (const token of tokens){
+        let dropLeadingSpace = false;
+        for(let i = 0; i < tokens.length; i++){
+            let token = tokens[i];
+            if (dropLeadingSpace && token.type === "text" && !token.tokens?.length && /^[ \t]/.test(token.text)) {
+                token = {
+                    ...token,
+                    text: token.text.replace(/^[ \t]+/, "")
+                };
+            }
+            dropLeadingSpace = false;
             switch(token.type){
                 case "latex":
                     {
@@ -619,7 +650,9 @@ export class Markdown {
                         break;
                     }
                 case "html":
-                    if ("raw" in token && typeof token.raw === "string") {
+                    if (token.raw.startsWith("<!--")) {
+                        dropLeadingSpace = i === 0 || /[ \t]$/.test(tokens[i - 1].raw);
+                    } else {
                         result += applyTextWithNewlines(token.raw);
                     }
                     break;

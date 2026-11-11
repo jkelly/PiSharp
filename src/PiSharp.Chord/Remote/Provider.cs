@@ -17,7 +17,12 @@ internal interface IIncomingHold
 }
 internal sealed class ProviderSide(HostLink link, long origin)
 {
-    private sealed record Running(IIncomingHold Hold, CancellationTokenSource? Abort);
+    private sealed class Running(IIncomingHold hold, CancellationTokenSource? abort)
+    {
+        internal IIncomingHold Hold { get; } = hold;
+        internal CancellationTokenSource? Abort { get; } = abort;
+        internal OpenSpan? Span;
+    }
     internal HostLink Link => link;
     internal long Origin => origin;
     private readonly Dictionary<long, IIncomingHold> entries = [];
@@ -26,9 +31,13 @@ internal sealed class ProviderSide(HostLink link, long origin)
     private readonly HashSet<IncomingHold> bindings = [], waiting = [], touched = [];
     private readonly HashSet<HostLink> relayLinks = [];
     private long? relayOrigin;
+    private long ownSent, ownAcked;
+    private long? waitingSince;
     private int inFlight;
     private bool bindingTurn, closed;
     private bool Free => bindings.Count == 0 && waiting.Count == 0 && inFlight < 2;
+    internal long NextOwn => ownSent + 1;
+    internal bool Acknowledged(long own) => ownAcked >= own;
     internal async Task MessageAsync(Message message)
     {
         if (closed) return;
@@ -40,7 +49,7 @@ internal sealed class ProviderSide(HostLink link, long origin)
             case RetryMessage retry: entries.GetValueOrDefault(retry.Hold)?.Retry(retry.Hops); break;
             case AbortMessage abort:
                 if (calls.Remove(abort.Call, out var aborted))
-                { if (aborted.Hold is RelayedHold relay) relay.Abort(abort.Call); else aborted.Abort!.Cancel(); }
+                { if (aborted.Hold is RelayedHold relay) { relay.Abort(abort.Call); RelayedHold.EndCall(aborted.Span, null); } else aborted.Abort!.Cancel(); }
                 break;
             case AckMessage: Ack(); break;
             case CallMessage call: await Call(call); break;
@@ -74,10 +83,11 @@ internal sealed class ProviderSide(HostLink link, long origin)
         if (hold is RelayedHold relayed)
         {
             if (message.Args is { } part && Parts.Oversized(part, link.Limits.Part) is { } tooLarge) { Refuse(message.Call, tooLarge); return; }
-            calls.Add(message.Call, new(hold, null)); relayed.Call(message); return;
+            var forwarded = new Running(hold, null);
+            calls.Add(message.Call, forwarded); forwarded.Span = relayed.Call(message); return;
         }
         var local = (IncomingHold)hold;
-        if (!local.Callable) { Refuse(message.Call, HostErrors.NotReady("hold " + local.Id)); return; }
+        if (!local.Callable) { Refuse(message.Call, local.Refusal); return; }
         var (name, bytes) = local.Method(message.Method);
         await link.InflateOwned(message.Args, local.Limits);
         if (!link.Open || !entries.TryGetValue(message.Hold, out var current) || !ReferenceEquals(current, hold)) return;
@@ -85,14 +95,16 @@ internal sealed class ProviderSide(HostLink link, long origin)
         try { args = message.Args is null ? null : ToHostValue(Parts.ParsePayload(link.OpenPart(message.Args, local.Limits), message.Segments)); }
         catch (ChordError error) when (error.Code == "too_large") { Refuse(message.Call, error); return; }
         var abort = new CancellationTokenSource(); var running = new Running(hold, abort); calls.Add(message.Call, running);
-        _ = Run(message.Call, local, name, args, bytes, abort);
+        var scope = message.Old == true && link.Trusted ? OldWork.AsRemote(link.Context) : link.Context;
+        scope = ChordHost.WithTelemetryParent(ChordTelemetry.ParentOf(message.Trace, link.Host.Telemetry), scope);
+        _ = Run(message.Call, local, name, args, bytes, abort, scope);
     }
-    private async Task Run(long id, IncomingHold hold, string method, object? args, bool bytes, CancellationTokenSource abort)
+    private async Task Run(long id, IncomingHold hold, string method, object? args, bool bytes, CancellationTokenSource abort, ChordContext scope)
     {
         Message reply;
         try
         {
-            var value = await hold.CallAsync(method, args, ChordContext.WithAbortSignal(abort.Token, link.Context));
+            var value = await hold.CallAsync(method, args, ChordContext.WithAbortSignal(abort.Token, scope));
             if (value is null) reply = new ResultMessage(id);
             else { var payload = Parts.Payload(value, bytes); reply = new ResultMessage(id, link.Part(payload.Json), payload.Segments); }
         }
@@ -113,7 +125,11 @@ internal sealed class ProviderSide(HostLink link, long origin)
     internal void Reply(long id, Message reply)
     {
         if (!calls.Remove(id, out var call)) return;
-        call.Abort?.Dispose(); Send(reply); Settle();
+        call.Abort?.Dispose();
+        // One state message may pass the window before each answer. Its ACK precedes any
+        // next call admitted by this answer, keeping messages plus calls bounded together.
+        if (waiting.Count > 0) SendWaiting();
+        Send(reply); RelayedHold.EndCall(call.Span, reply); Settle();
     }
     internal void Send(Message message) { if (!closed) link.Send(message with { Origin = origin == 0 ? null : origin }); }
     internal void Replace(IncomingHold local, RelayedHold relay) { entries[local.Id] = relay; local.Drop(); relay.Start(); }
@@ -121,11 +137,15 @@ internal sealed class ProviderSide(HostLink link, long origin)
     {
         if (entries.GetValueOrDefault(hold.Id) == hold) entries.Remove(hold.Id);
         foreach (var (id, call) in calls.Where(x => ReferenceEquals(x.Value.Hold, hold)).ToArray())
-        { calls.Remove(id); call.Abort?.Cancel(); call.Abort?.Dispose(); }
+        { calls.Remove(id); call.Abort?.Cancel(); call.Abort?.Dispose(); RelayedHold.EndCall(call.Span, null); }
         if (hold is IncomingHold local) Unbind(local);
         Settle();
     }
-    internal void Unbind(IncomingHold hold) { waiting.Remove(hold); bindings.Remove(hold); touched.Remove(hold); }
+    internal void Unbind(IncomingHold hold)
+    {
+        waiting.Remove(hold); bindings.Remove(hold); touched.Remove(hold);
+        if (waiting.Count == 0) waitingSince = null;
+    }
     internal void Unbound(IncomingHold hold, ChordError error)
     {
         Unbind(hold);
@@ -151,13 +171,16 @@ internal sealed class ProviderSide(HostLink link, long origin)
             var batch = changed.Where(x => x.Bound).Select(x => x.StateEntry()).ToArray();
             if (batch.Length > 0) SendOwn(new StateMessage(batch));
         }
-        else foreach (var hold in changed.Where(x => x.Bound)) { hold.Queue(); waiting.Add(hold); }
+        else foreach (var hold in changed.Where(x => x.Bound))
+        {
+            hold.Queue(); waiting.Add(hold); waitingSince ??= link.Host.Options.TimeProvider.GetTimestamp();
+        }
     }
     private void Ack()
     {
         if (!sent.TryDequeue(out var sender)) return;
         if (sender is not null) { if (relayOrigin is { } id) sender.Send(new AckMessage { Origin = id }); return; }
-        inFlight--;
+        inFlight--; ownAcked++;
         while (inFlight < 2)
         {
             if (bindings.Count > 0 && (waiting.Count == 0 || bindingTurn))
@@ -167,13 +190,28 @@ internal sealed class ProviderSide(HostLink link, long origin)
             }
             else if (waiting.Count > 0)
             {
-                var next = waiting.ToArray(); waiting.Clear(); bindingTurn = bindings.Count > 0;
-                SendOwn(new StateMessage(next.Select(x => x.PendingEntry()).ToArray()));
+                SendWaiting();
             }
             else break;
         }
     }
-    private void SendOwn(Message message) { inFlight++; sent.Enqueue(null); Send(message); }
+    private void SendWaiting()
+    {
+        var next = waiting.ToArray(); waiting.Clear(); bindingTurn = bindings.Count > 0;
+        if (waitingSince is { } since)
+        {
+            ChordTelemetry.Metrics(link.Host.Telemetry.Metrics).Histogram("chord.backpressure.wait")
+                .Record(link.Host.Options.TimeProvider.GetElapsedTime(since).TotalMilliseconds);
+            waitingSince = null;
+        }
+        SendOwn(new StateMessage(next.Select(x => x.PendingEntry()).ToArray()));
+    }
+    private void SendOwn(Message message)
+    {
+        inFlight++; ownSent++; sent.Enqueue(null);
+        if (message is StateMessage) ChordTelemetry.Metrics(link.Host.Telemetry.Metrics).Counter("chord.link.state_messages").Add(1);
+        Send(message);
+    }
     private void Settle() { if (!closed && entries.Count == 0 && calls.Count == 0 && sent.Count == 0) link.Drop(this); }
     internal long RelayTo(HostLink upstream)
     {
@@ -219,7 +257,7 @@ internal sealed class ProviderSide(HostLink link, long origin)
     internal void Close()
     {
         if (closed) return; closed = true;
-        foreach (var call in calls.Values) { call.Abort?.Cancel(); call.Abort?.Dispose(); }
+        foreach (var call in calls.Values) { call.Abort?.Cancel(); call.Abort?.Dispose(); RelayedHold.EndCall(call.Span, null); }
         calls.Clear(); var previous = entries.Values.ToArray(); entries.Clear();
         foreach (var hold in previous) hold.Drop();
         touched.Clear(); waiting.Clear(); bindings.Clear(); sent.Clear();

@@ -14,9 +14,9 @@ internal static partial class Program
     private static Task CommittedRuntimeFixture()
     {
         var root = new DirectoryInfo(AppContext.BaseDirectory);
-        while (root is not null && !File.Exists(Path.Combine(root.FullName, "tools", "NodeBridge", "runtime-fixture-150", "package.json"))) root = root.Parent;
+        while (root is not null && !File.Exists(Path.Combine(root.FullName, "tools", "NodeBridge", "runtime-fixture-152", "package.json"))) root = root.Parent;
         if (root is null) throw new SkipException("NO_RUNTIME_FIXTURE", "Repository runtime fixture manifest unavailable.");
-        var directory = Path.Combine(root.FullName, "tools", "NodeBridge", "runtime-fixture-150");
+        var directory = Path.Combine(root.FullName, "tools", "NodeBridge", "runtime-fixture-152");
         var manifest = System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(Path.Combine(directory, "package.json")));
         Check(System.Text.Json.Nodes.JsonNode.DeepEquals(PiNodeRuntime.PackageJson(), manifest), "committed fixture matches production manifest exactly");
         var locked = System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(Path.Combine(directory, "package-lock.json")))!;
@@ -44,10 +44,10 @@ internal static partial class Program
         var root = new DirectoryInfo(AppContext.BaseDirectory);
         while (root is not null && !File.Exists(Path.Combine(root.FullName, "tools", "NodeBridge", "installed-runtime-abi.mjs"))) root = root.Parent;
         if (root is null) throw new SkipException("NO_RUNTIME_FIXTURE", "Repository ABI fixture script unavailable.");
-        var modules = Environment.GetEnvironmentVariable("PISHARP_TEST_PI150_NODE_MODULES")
-            ?? Path.Combine(root.FullName, "artifacts", "node-runtime-150", "node_modules");
+        var modules = Environment.GetEnvironmentVariable("PISHARP_TEST_PI152_NODE_MODULES")
+            ?? Path.Combine(root.FullName, "artifacts", "node-runtime-152", "node_modules");
         if (!File.Exists(Path.Combine(modules, "@earendil-works", "pi-coding-agent", "package.json")))
-            throw new SkipException("NO_RUNTIME_FIXTURE", "Install the exact published Pi1.5 runtime fixture to execute this ABI test.");
+            throw new SkipException("NO_RUNTIME_FIXTURE", "Install the exact published Pi 1.5.2 runtime fixture to execute this ABI test.");
         var start = new ProcessStartInfo(Environment.GetEnvironmentVariable("PISHARP_NODE") ?? "node")
         { RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false };
         start.ArgumentList.Add(Path.Combine(root.FullName, "tools", "NodeBridge", "installed-runtime-abi.mjs"));

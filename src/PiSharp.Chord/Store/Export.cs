@@ -11,6 +11,7 @@
 // CancellationToken, which carries no reason: an aborted export's error has the token's OperationCanceledException as its cause, and
 // awaitWithContext (context/index.ts) is Task.WaitAsync on the token.
 using System.Text.Json.Nodes;
+using PiSharp.Chord.Contracts;
 using PiSharp.Chord.Data;
 using PiSharp.Chord.Sqlite;
 using PiSharp.Contracts;
@@ -34,10 +35,10 @@ public sealed class StoreExport : IAsyncEnumerable<JsonObject>, IAsyncEnumerator
     private CancellationTokenRegistration abort;
     private JsonObject? current;
 
-    internal StoreExport(ChordStore store, ChordContext context)
+    internal StoreExport(ChordStore store, ChordContext context, string? host = null)
     {
         this.context = context;
-        parts = StoreInternal.ExportParts(store, context, Hold, () => End(ExportState.Closed)).GetAsyncEnumerator();
+        parts = StoreInternal.ExportParts(store, context, Hold, () => End(ExportState.Closed), host).GetAsyncEnumerator();
     }
 
     private enum ExportState { Open, Aborted, Closed, Ended }
@@ -217,7 +218,7 @@ internal static partial class StoreInternal
 
     /// <summary>The parts in archive order, after taking the queue (handed to <paramref name="hold"/>; the store's close calls
     /// <paramref name="end"/>); the queue is given back when they end (upstream <c>parts</c>).</summary>
-    internal static async IAsyncEnumerable<JsonObject> ExportParts(ChordStore store, ChordContext context, Action<Action> hold, Action end)
+    internal static async IAsyncEnumerable<JsonObject> ExportParts(ChordStore store, ChordContext context, Action<Action> hold, Action end, string? host = null)
     {
         var release = await store.TakeAsync(end).ConfigureAwait(false);
         hold(release);
@@ -225,14 +226,15 @@ internal static partial class StoreInternal
         {
             if (context.AbortSignal is { IsCancellationRequested: true }) throw ExportAborted(context);
             var (lastSeq, nextId) = (store.LastSeq, store.NextId);
-            yield return new ArchiveManifest(ArchiveFormat, StoreSchema, lastSeq, nextId).ToJson();
+            yield return new ArchiveManifest(ArchiveFormat, StoreSchema, lastSeq, nextId, host).ToJson();
             long writes = 0;
-            var tables = store.Catalog.Values.OrderBy(record => record.Table, StringComparer.Ordinal).ToList();
+            var tables = store.Catalog.Values.Where(record => host is null || HostColumn(record, ContractsInternal.KindOfKey(host)) is not null)
+                .OrderBy(record => record.Table, StringComparer.Ordinal).ToList();
             foreach (var record in tables)
             {
                 yield return new TableWrite.Definition(record.Table, record.Version, record.State, record.Columns, record.Key, record.Fingerprint).ToJson();
                 writes++;
-                await foreach (var put in ExportPuts(store, record, context).ConfigureAwait(false))
+                await foreach (var put in ExportPuts(store, record, context, host).ConfigureAwait(false))
                 {
                     yield return put;
                     writes++;
@@ -243,7 +245,7 @@ internal static partial class StoreInternal
                     writes++;
                 }
             }
-            await foreach (var part in ExportDocuments(store, context).ConfigureAwait(false))
+            await foreach (var part in ExportDocuments(store, context, host).ConfigureAwait(false))
             {
                 yield return part;
                 writes++;
@@ -258,7 +260,7 @@ internal static partial class StoreInternal
 
     /// <summary>The <c>put</c>s of a recorded table in key order, a page per read: the stored values and their versions (upstream
     /// <c>puts</c>).</summary>
-    private static async IAsyncEnumerable<JsonObject> ExportPuts(ChordStore store, TableRecord record, ChordContext context)
+    private static async IAsyncEnumerable<JsonObject> ExportPuts(ChordStore store, TableRecord record, ChordContext context, string? host)
     {
         var (table, columns, key) = (record.Table, record.Columns, record.Key);
         var select = string.Join(", ", RecordedPut(table, columns).Physical.Select(Quote));
@@ -267,9 +269,14 @@ internal static partial class StoreInternal
         do
         {
             var page = after;
-            var from = page is null ? "" : $" WHERE ({order}) > ({string.Join(", ", page.Select(_ => "?"))})";
+            var conditions = new List<string>();
+            if (host is not null) conditions.Add($"{Quote(HostColumn(record, ContractsInternal.KindOfKey(host))!)} = ?");
+            if (page is not null) conditions.Add($"({order}) > ({string.Join(", ", page.Select(_ => "?"))})");
+            var from = conditions.Count == 0 ? "" : $" WHERE {string.Join(" AND ", conditions)}";
             var sql = $"SELECT {select} FROM {Quote(table)}{from} ORDER BY {order} LIMIT ?";
-            var rows = await store.ReadAsync(executor => executor.AllAsync(sql, [.. page ?? [], ExportPage]), context).ConfigureAwait(false);
+            object?[] hostParameters = host is null ? [] : [host];
+            object?[] parameters = [.. hostParameters, .. page ?? [], ExportPage];
+            var rows = await store.ReadAsync(executor => executor.AllAsync(sql, parameters), context).ConfigureAwait(false);
             foreach (var stored in rows) yield return PutOf(record, stored);
             after = rows.Count < ExportPage ? null : [.. key.Select(name => rows[^1][name])];
         } while (after is not null);
@@ -305,13 +312,13 @@ internal static partial class StoreInternal
     /// <summary>Every stored record by id, live and retired, as its creation without a base, then its kept revisions in seq order: a
     /// <c>none</c> or <c>latest</c> record's current base and its deltas, a retired <c>latest</c> one none, a <c>rewindable</c> one all
     /// (upstream <c>documents</c>).</summary>
-    private static async IAsyncEnumerable<JsonObject> ExportDocuments(ChordStore store, ChordContext context)
+    private static async IAsyncEnumerable<JsonObject> ExportDocuments(ChordStore store, ChordContext context, string? host)
     {
         long after = 0;
         while (true)
         {
             var from = after;
-            var records = await store.ReadAsync(executor => ListRecordsAsync(executor, from, ExportPage), context).ConfigureAwait(false);
+            var records = await store.ReadAsync(executor => host is null ? ListRecordsAsync(executor, from, ExportPage) : ListHostRecordsAsync(executor, host, from, ExportPage), context).ConfigureAwait(false);
             foreach (var record in records)
             {
                 yield return new DocumentWrite.Create(record, null).ToJson();

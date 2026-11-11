@@ -1,10 +1,12 @@
 // Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): next/remote/path.ts.
 using PiSharp.Chord.Data;
+using PiSharp.Telemetry;
 
 namespace PiSharp.Chord.Remote;
 
 internal interface IUpstream
 {
+    ITelemetrySpan? Span => null;
     void Attach(HostLink link);
     void Dropped(ChordError error);
     void Unreachable(ChordError error);

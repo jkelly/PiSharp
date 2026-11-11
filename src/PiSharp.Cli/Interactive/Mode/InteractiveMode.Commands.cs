@@ -387,7 +387,7 @@ internal sealed partial class InteractiveMode
         if (expanded == toolOutputExpanded) return;
         toolOutputExpanded = expanded;
         if ((customHeader ?? builtInHeader) is IExpandable header) header.SetExpanded(expanded);
-        foreach (var container in new[] { loadedResourcesContainer, chatContainer })
+        foreach (var container in new[] { loadedResourcesContainer, chatContainer, pendingMessagesContainer })
             foreach (var child in container.Children) SetExpandedIfSupported(child, expanded);
         ShowStatus($"Tool output: {(expanded ? "expanded" : "collapsed")}");
     }
@@ -541,17 +541,34 @@ internal sealed partial class InteractiveMode
         if (inputPath is null) { ShowError("Usage: /import <path.jsonl>"); return; }
         var confirmed = await ShowExtensionConfirmAsync("Import session", $"Replace current session with {inputPath}?");
         if (!confirmed) { ShowStatus("Import cancelled"); return; }
+        string? ownedCopy = null;
+        string? trackedImport = null;
+        var committed = false;
         try
         {
             ClearStatusIndicator();
             var resolved = Path.GetFullPath(PiSharp.Cli.Pi.PiPaths.ResolvePath(inputPath, Cwd, context.Startup.Home));
             if (!File.Exists(resolved)) { ShowError($"Failed to import session: File not found: {resolved}"); return; }
             var target = context.ImportSessionFile(resolved);
+            trackedImport = target;
+            if (!PiSharp.Cli.Pi.PiPaths.PathsEqual(target, resolved)) ownedCopy = target;
             var data = await ReplaceSessionAsync(new JsonObject { ["type"] = "switch_session", ["sessionPath"] = target });
             if (data is JsonObject result && B(result["cancelled"])) { ShowStatus("Import cancelled"); return; }
+            committed = true;
+            // Forking a missing-cwd import installs a different file; the temporary import was never attached.
+            if (ownedCopy is not null && data?["sessionFile"] is JsonValue installed && installed.TryGetValue<string>(out var installedPath) &&
+                !PiSharp.Cli.Pi.PiPaths.PathsEqual(ownedCopy, installedPath))
+            { File.Delete(ownedCopy); ownedCopy = null; }
             ShowStatus($"Session imported from: {inputPath}");
         }
         catch (Exception error) { ShowError($"Failed to import session: {error.Message}"); }
+        finally
+        {
+            if (trackedImport is not null) context.Startup.Host.ReleaseImport(trackedImport);
+            if (!committed && ownedCopy is not null &&
+                !PiSharp.Cli.Pi.PiPaths.PathsEqual(ownedCopy, context.Startup.Host.CurrentSession?.Path ?? state.SessionFile ?? ""))
+                File.Delete(ownedCopy);
+        }
     }
 
     private async Task HandleShareCommandAsync()
@@ -712,7 +729,7 @@ internal sealed partial class InteractiveMode
         chatContainer.AddChild(new DynamicBorder());
         chatContainer.AddChild(new ThemedText(() => theme.Bold(theme.Fg("accent", "What's New")), 1, 0));
         chatContainer.AddChild(new Spacer(1));
-        chatContainer.AddChild(new Markdown(markdown, 1, 1, GetMarkdownThemeWithSettings()));
+        chatContainer.AddChild(GetChangelogMarkdown(markdown));
         chatContainer.AddChild(new DynamicBorder());
         ui.RequestRender();
     }
@@ -861,6 +878,7 @@ internal sealed partial class InteractiveMode
     {
         var isDeferred = state.IsStreaming;
         bashComponent = new BashExecutionComponent(command, ui, excludeFromContext, outputPad);
+        bashComponent.SetExpanded(toolOutputExpanded);
         if (isDeferred)
         {
             pendingMessagesContainer.AddChild(bashComponent);

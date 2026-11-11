@@ -1,4 +1,4 @@
-// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/coding-agent/src/core/tools/truncate.ts.
+// Pi b4afdddf44e059c67ccf5097e5317d913521b470 (MIT): packages/coding-agent/src/core/tools/truncate.ts.
 // Ported to plain ESM for the PiSharp Node extension bridge (TypeScript types stripped mechanically; behaviour unchanged).
 export const DEFAULT_MAX_LINES = 2000;
 export const DEFAULT_MAX_BYTES = 50 * 1024;
@@ -170,35 +170,22 @@ export function truncateLine(line, maxChars = GREP_MAX_LINE_LENGTH) {
         };
     }
     return {
-        text: `${line.slice(0, maxChars)}... [truncated]`,
+        text: `${sliceHead(line, maxChars)}... [truncated]`,
         wasTruncated: true
     };
 }
-export function truncateMiddle(content, maxBytes) {
-    const buf = Buffer.from(content, "utf-8");
-    const totalLines = splitLinesForCounting(content).length;
-    if (buf.length <= maxBytes) {
-        return {
-            content,
-            truncated: false,
-            removedChars: 0,
-            totalBytes: buf.length,
-            totalLines
-        };
-    }
-    const isBoundary = (index)=>index >= buf.length || (buf[index] & 0xc0) !== 0x80;
-    let headEnd = Math.floor(maxBytes / 2);
-    while(headEnd > 0 && !isBoundary(headEnd))headEnd--;
-    let tailStart = buf.length - (maxBytes - Math.floor(maxBytes / 2));
-    while(tailStart < buf.length && !isBoundary(tailStart))tailStart++;
-    const head = buf.subarray(0, headEnd).toString("utf-8");
-    const tail = buf.subarray(tailStart).toString("utf-8");
-    const removedChars = Array.from(buf.subarray(headEnd, tailStart).toString("utf-8")).length;
-    return {
-        content: `${head}…${removedChars} chars truncated…${tail}`,
-        truncated: true,
-        removedChars,
-        totalBytes: buf.length,
-        totalLines
-    };
+export function sliceHead(text, maxUnits) {
+    const end = Math.max(0, maxUnits);
+    return isHighSurrogate(text.charCodeAt(end - 1)) && isLowSurrogate(text.charCodeAt(end)) ? text.slice(0, end - 1) : text.slice(0, end);
+}
+export function sliceTail(text, maxUnits) {
+    if (maxUnits <= 0) return "";
+    const start = Math.max(0, text.length - maxUnits);
+    return isLowSurrogate(text.charCodeAt(start)) && isHighSurrogate(text.charCodeAt(start - 1)) ? text.slice(start + 1) : text.slice(start);
+}
+function isHighSurrogate(code) {
+    return code >= 0xd800 && code <= 0xdbff;
+}
+function isLowSurrogate(code) {
+    return code >= 0xdc00 && code <= 0xdfff;
 }

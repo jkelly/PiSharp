@@ -1136,7 +1136,7 @@ internal static partial class Program
         Equal("error: pisharp cannot self-update this installation.\nUpdate pisharp using the package manager, wrapper, or source checkout that provides this installation.\n" +
             "To make `pisharp update` run your own update command, set PI_SELF_UPDATE_COMMAND or the selfUpdateCommand setting.\n", stderr, "self update unavailable");
         (code, stdout, _) = await sandbox.Run("update", "--extensions");
-        Equal(0, code, "offline extension update"); Equal("Skipped npm:pi-formatter [user]: offline mode.\n", stdout, "nothing to do offline");
+        Equal(0, code, "offline extension update"); Equal("Skipped package updates (offline mode)\n", stdout, "nothing to do offline");
     }
 
     private static async Task PackageCliUpdateTrust()
@@ -1146,13 +1146,13 @@ internal static partial class Program
         sandbox.Write(Path.Combine(sandbox.Cwd, ".pi", "settings.json"), """{"packages":["npm:fake-package"],"npmCommand":["fake-npm","--flag"]}""");
         var processes = new FakeProcesses { OnCapture = (_, _, _) => "\"1.0.0\"" };
         var (code, stdout, stderr) = await RunPackages(sandbox, (_, _) => processes, "update", "--extensions");
-        Equal(0, code, "update; " + stderr); Equal("No packages configured for update.\n", stdout, "nothing updated");
+        Equal(0, code, "update; " + stderr); Equal("Packages are already up to date\n", stdout, "nothing updated");
         Equal(0, processes.Runs.Count + processes.Captures.Count, "update ignores defaultProjectTrust (saved trust only)");
         new ProjectTrustStore(sandbox.AgentDir, sandbox.Home).Set(sandbox.Cwd, true);
         (code, stdout, stderr) = await RunPackages(sandbox, (_, _) => processes, "update", "--extensions");
         Equal(0, code, "trusted update; " + stderr);
         Check(processes.Ran("fake-npm", ["--flag", "install", "fake-package@latest", "--prefix", Path.Combine(sandbox.Cwd, ".pi", "npm"), "--legacy-peer-deps", "--no-audit", "--no-fund"]), "project npmCommand used");
-        Equal("Updating npm:fake-package...\nWarning: npm:fake-package [project]: Could not determine the installed version.\n", stdout, "progress line and unverifiable install warning");
+        Equal("Updating npm:fake-package...\nWarning: npm:fake-package: Could not determine the installed version.\nNo packages were updated, see the warnings above\n", stdout, "progress line and unverifiable install warning");
         (code, _, stderr) = await RunPackages(sandbox, (_, _) => new FakeProcesses { OnRun = (_, _, _) => throw new PiPackageException("npm install fake-package@latest failed with code 1") }, "update", "npm:fake-package");
         Equal(1, code, "failure exit"); Equal("Error: npm install fake-package@latest failed with code 1\n", stderr, "failure message");
     }

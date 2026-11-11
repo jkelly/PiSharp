@@ -383,7 +383,8 @@ internal static class Themes
         ["yml"] = "yaml", ["toml"] = "toml", ["xml"] = "xml", ["md"] = "markdown", ["markdown"] = "markdown", ["dockerfile"] = "dockerfile",
         ["makefile"] = "makefile", ["cmake"] = "cmake", ["lua"] = "lua", ["perl"] = "perl", ["r"] = "r", ["scala"] = "scala", ["clj"] = "clojure",
         ["ex"] = "elixir", ["exs"] = "elixir", ["erl"] = "erlang", ["hs"] = "haskell", ["ml"] = "ocaml", ["vim"] = "vim", ["graphql"] = "graphql",
-        ["proto"] = "protobuf", ["tf"] = "hcl", ["hcl"] = "hcl"
+        ["proto"] = "protobuf", ["tf"] = "hcl", ["hcl"] = "hcl",
+        ["dart"] = "dart", ["nix"] = "nix", ["groovy"] = "groovy", ["gradle"] = "groovy"
     };
 
     public static string? GetLanguageFromPath(string filePath)

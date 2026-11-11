@@ -34,7 +34,11 @@ public sealed record McpHttpProfile(bool OpenGetStream, bool DeleteSessionOnClos
     int InitialReconnectMilliseconds = 1000, int MaximumReconnectMilliseconds = 30000, int DeleteTimeoutMilliseconds = 1000);
 public sealed record McpHttpBinding(Uri Endpoint, ImmutableDictionary<string, string> Headers, McpHttpProfile Profile);
 /// <summary>Receiver is a bounded quick dispatch, not an awaited lifecycle callback. Owner retains dispatched originals.</summary>
-public sealed record McpWireCallbacks(Func<JsonData, ValueTask> Receive, Action<Exception> Disconnected);
+public sealed record McpWireCallbacks(Func<JsonData, ValueTask> Receive, Action<Exception> Disconnected)
+{
+    /// <summary>Optional nonfatal framing/error notification. Disconnected retains terminal semantics.</summary>
+    public Action<Exception>? Error { get; init; }
+}
 public interface IMcpWireTransport
 {
     Task StartAsync(McpWireCallbacks callbacks, CancellationToken cancellationToken);
@@ -52,8 +56,21 @@ public sealed class McpRequestTimeoutException(double milliseconds) : TimeoutExc
 {
     public double TimeoutMilliseconds { get; } = milliseconds;
 }
-public sealed class McpHttpStatusException(int statusCode, bool sessionExpired = false) : IOException("MCP HTTP status " + statusCode)
+public sealed class McpHttpStatusException(int statusCode, bool sessionExpired = false, string responseText = "",
+    bool responseTruncated = false) : IOException(Describe(statusCode, responseText))
 {
     public int StatusCode { get; } = statusCode;
     public bool SessionExpired { get; } = sessionExpired;
+    public string ResponseText { get; } = responseText;
+    public bool ResponseTruncated { get; } = responseTruncated;
+    private static string Describe(int status, string body)
+    {
+        var text = body.Trim();
+        if (text.Length > 200)
+        {
+            var length = char.IsHighSurrogate(text[196]) ? 196 : 197;
+            text = text[..length] + "...";
+        }
+        return "MCP HTTP status " + status + (text.Length == 0 ? "" : ": " + text);
+    }
 }

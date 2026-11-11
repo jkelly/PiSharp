@@ -7,6 +7,7 @@
 #pragma warning disable PISHARP_SCHEMA001 // the engine uses its own experimental types
 
 using System.Runtime.CompilerServices;
+using System.Numerics;
 
 namespace PiSharp.Contracts.Schema;
 
@@ -242,11 +243,11 @@ internal sealed class SchemaCompiler
 
     private static SchemaCheck? NumberGroup(JsObject node)
     {
-        var min = Number(node, "minimum");
-        var max = Number(node, "maximum");
-        var xmin = Number(node, "exclusiveMinimum");
-        var xmax = Number(node, "exclusiveMaximum");
-        var multipleOf = Number(node, "multipleOf");
+        var min = Bound(node, "minimum");
+        var max = Bound(node, "maximum");
+        var xmin = Bound(node, "exclusiveMinimum");
+        var xmax = Bound(node, "exclusiveMaximum");
+        var multipleOf = Bound(node, "multipleOf");
         if (min is null && max is null && xmin is null && xmax is null && multipleOf is null) return null;
         return SchemaChecks.NumberCheck(min ?? double.NegativeInfinity, max ?? double.PositiveInfinity, xmin ?? double.NegativeInfinity,
             xmax ?? double.PositiveInfinity, multipleOf);
@@ -464,6 +465,8 @@ internal sealed class SchemaCompiler
 
     /// <summary>A keyword's value when it is a number.</summary>
     public static double? Number(JsObject node, string key) => node.GetOwn(key) is double d ? d : null;
+
+    public static object? Bound(JsObject node, string key) => node.GetOwn(key) is double or BigInteger ? node.GetOwn(key) : null;
 
     /// <summary><c>Object.entries(value)</c> of a schema object (not an array), else nothing.</summary>
     public static IEnumerable<KeyValuePair<string, object?>> Entries(object? value) =>

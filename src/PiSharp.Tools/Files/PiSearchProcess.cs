@@ -33,6 +33,7 @@ public static class PiSearchProcess
             foreach (var (name, value) in environment) start.Environment[name] = value;
         }
         using var process = new Process { StartInfo = start };
+        cancellationToken.ThrowIfCancellationRequested();
         try { if (!process.Start()) throw new IOException("The process did not start."); }
         catch (Exception error) when (error is System.ComponentModel.Win32Exception or InvalidOperationException) { throw new IOException(error.Message, error); }
         // Source stdio "ignore": the child gets no input.

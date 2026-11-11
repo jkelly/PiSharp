@@ -5,6 +5,7 @@ using PiSharp.Chord.Data;
 using PiSharp.Chord.Registries;
 using PiSharp.Chord.State;
 using PiSharp.Chord.Store;
+using PiSharp.Telemetry;
 
 namespace PiSharp.Chord.Host;
 
@@ -12,6 +13,10 @@ public sealed partial class ChordHost : IAsyncDisposable
 {
     internal readonly HostDispatcher Dispatcher = new();
     internal readonly HostOptions Options;
+    internal readonly OldWork OldWork = new();
+    internal readonly ReloadCycles ReloadCycles = new();
+    internal readonly UnboundClock UnboundClock;
+    internal TimeSpan ReloadDrainTimeout => Options.ReloadDrainTimeout < Options.CloseTimeout ? Options.ReloadDrainTimeout : Options.CloseTimeout;
     internal readonly Batch Batch;
     internal readonly ChordStore? Store;
     internal readonly OrderedDictionary<string, LoadedPlugin> Plugins = new(StringComparer.Ordinal);
@@ -42,8 +47,9 @@ public sealed partial class ChordHost : IAsyncDisposable
         ArgumentNullException.ThrowIfNull(options.OnError);
         if (options.Principal is { } principal && ChordJson.AsString(principal["kind"]) is null)
             throw new ArgumentException("A host principal needs a kind", nameof(options));
-        if (options.ReadyTimeout < TimeSpan.Zero || options.CloseTimeout < TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(options));
+        if (options.ReadyTimeout < TimeSpan.Zero || options.CloseTimeout < TimeSpan.Zero || options.ReloadDrainTimeout < TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(options));
         Options = options;
+        UnboundClock = new(options.TimeProvider, Dispatcher.Post, Report);
         Dispatcher.Unhandled = error => Report(new("runtime_failed", error));
         Store = options.Store as ChordStore;
         if (options.Store is not null && Store is null) throw new ArgumentException("Store must be opened by Chord", nameof(options));
@@ -62,11 +68,13 @@ public sealed partial class ChordHost : IAsyncDisposable
     }
 
     public string Incarnation { get; } = Guid.CreateVersion7().ToString();
+    public bool IsLoaded => LoadStarted;
     public Address? Address => Options.Address;
     public INativeWatchable<ActivityCounts> Activity => activity;
     internal Caller OwnCaller => new(Options.Principal, Incarnation);
     internal ChordContext Context => ChordContext.Background;
     internal void AssertOpen() { if (Closed) throw HostErrors.Closed(); }
+    internal void AssertLoaded() { if (!LoadStarted) throw new ChordError("not_ready", "call host.load first"); }
     internal void Report(HostError error) { try { Options.OnError(error); } catch { /* Diagnostic callbacks do not tear down host state. */ } }
     internal RegistryRecord RegistryRecord(string name)
     {
@@ -78,8 +86,9 @@ public sealed partial class ChordHost : IAsyncDisposable
                 RegistryFailedError failed => new("registry_failed", failed.Error, Registry: failed.Registry),
                 ContributionFailedError failed => new("contribution_failed", failed.Error, Object: failed.Type, Registry: failed.Registry, Plugin: failed.Plugin),
                 ContributionRefusedError refused => new("contribution_refused", Object: refused.Type, Registry: refused.Registry, Plugin: refused.Plugin, Version: refused.Version),
+                RegistryUndeclaredError undeclared => new("registry_undeclared", Registry: undeclared.Registry, Plugins: undeclared.Plugins),
                 _ => new("registry_failed", Registry: error.Registry),
-            }));
+            }), UnboundClock);
             RegistryRecords.Add(name, record);
         }
         return record;
@@ -115,14 +124,22 @@ public sealed partial class ChordHost : IAsyncDisposable
             Published = true;
         }, Context);
         Publication.TrySetResult();
+        ReportUndeclared();
         if (wake) WakePublication();
     }
     internal void WakePublication() { ResolveUnbound(); PublishedChanged?.Invoke(); }
-    internal ChordObject[] EnsureHostObjects()
+    internal void ReportUndeclared() { foreach (var record in RegistryRecords.Values) record.ReportUndeclared(); }
+    internal IReadOnlyList<string> UnservedNames() => bindings.Where(binding => binding.Target is null && !binding.Ended)
+        .Select(binding => binding.Contract.Name).Where(name => !Types.ContainsKey(name)).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToArray();
+    internal IReadOnlyList<(string Name, long Version)> UndeclaredRegistries() => RegistryRecords.Values
+        .Where(record => record.ProvidedVersion is null && record.NewestContribution is not null)
+        .Select(record => (record.Name, record.NewestContribution!.Value)).OrderBy(record => record.Name, StringComparer.Ordinal).ToArray();
+    internal int ActivationsUnderWay() => Objects.Values.Count(obj => obj.Current is { Live: false, Sealed: false });
+    internal ChordObject[] EnsureHostObjects(ChordContext? context = null)
     {
         var made = new List<ChordObject>();
         foreach (var served in Types.Values.Where(x => x.HostLifetime))
-            made.Add(LocalObject(served, new CheckedParams(new JsonObject(), ""), OwnCaller));
+            made.Add(LocalObject(served, new CheckedParams(new JsonObject(), ""), OwnCaller, context));
         return [.. made];
     }
     internal static ContributionContent ContentOf(object? value) => ResolveSource(value) switch
@@ -142,13 +159,13 @@ public sealed partial class ChordHost : IAsyncDisposable
     {
         foreach (var binding in bindings.ToArray()) if (binding.Target is null) Place(binding);
     }
-    internal ChordObject LocalObject(ServedType served, CheckedParams parameters, Caller caller)
+    internal ChordObject LocalObject(ServedType served, CheckedParams parameters, Caller caller, ChordContext? context = null)
     {
         var key = served.Contract.Kind == ContractKind.Local ? DataInternal.IdentityKey(served.Contract, parameters.Key)
             : DataInternal.IdentityKey(served.Contract, parameters.Key, DataInternal.PrincipalKey(caller.Principal!, Context, Options.PrincipalKey));
         if (!Objects.TryGetValue(key, out var result) || result.State.Kind == "ended")
         {
-            result = new ChordObject(this, key, served, parameters, caller);
+            result = new ChordObject(this, key, served, parameters, caller, context);
             Objects[key] = result;
             result.BeginAttempt();
         }
@@ -159,6 +176,7 @@ public sealed partial class ChordHost : IAsyncDisposable
         AssertOpen(); Batch.AssertOutside("get"); context.AbortSignal?.ThrowIfCancellationRequested();
         var (value, key) = DataInternal.CheckParams(type, parameters, context);
         var binding = new Binding(this, type, new(value, key), caller, options?.ReadyTimeout ?? Options.ReadyTimeout, dependent);
+        binding.AcquisitionContext = context;
         bindings.Add(binding);
         Place(binding);
         return binding;
@@ -173,32 +191,45 @@ public sealed partial class ChordHost : IAsyncDisposable
             var here = type.Kind == ContractKind.Local || data.HostAddress!(binding.Parameters.Value).Equals(Address);
             if (here && Types.TryGetValue(type.Name, out var served))
             {
-                if (!DataInternal.Binds(served.Provider, type.Version, type.Fingerprint))
-                { binding.Waiting(new ChordError("contract_mismatch", $"{type.Name} v{type.Version} is not served")); return; }
                 if (type.Kind == ContractKind.Remote && binding.Caller.Principal is null)
                     throw new ChordError("forbidden", "a remote object requires a principal");
-                binding.Bind(LocalObject(served, binding.Parameters, binding.Caller));
+                if (!DataInternal.Binds(served.Provider, type.Version, type.Fingerprint))
+                {
+                    var identity = type.Kind == ContractKind.Local ? DataInternal.IdentityKey(type, binding.Parameters.Key)
+                        : DataInternal.IdentityKey(type, binding.Parameters.Key, DataInternal.PrincipalKey(binding.Caller.Principal!, Context, Options.PrincipalKey));
+                    var old = Objects.GetValueOrDefault(identity);
+                    if (OldWork.Of(binding.AcquisitionContext))
+                    {
+                        if (old?.OldServes(type.Version, type.Fingerprint) == true) { binding.Bind(old); return; }
+                        binding.Failed(new(FailureKind.Broken, new ChordError("contract_mismatch", $"{type.Name} v{type.Version} is not served"))); return;
+                    }
+                    binding.Waiting(new ChordError("contract_mismatch", $"{type.Name} v{type.Version} is not served")); return;
+                }
+                if (type.Kind == ContractKind.Remote && binding.Caller.Principal is null)
+                    throw new ChordError("forbidden", "a remote object requires a principal");
+                binding.Bind(LocalObject(served, binding.Parameters, binding.Caller, binding.AcquisitionContext));
                 return;
             }
-            var remote = RemoteTarget?.Invoke(type, binding.Parameters, binding.Caller, Context);
+            var remote = RemoteTarget?.Invoke(type, binding.Parameters, binding.Caller, binding.AcquisitionContext);
             if (remote is not null) { binding.Bind(remote); return; }
             binding.Waiting(new ChordError("unavailable", $"{type.Name}: no provider"));
         }
         catch (Exception error) { binding.Failed(new FailureCause(FailureKind.Broken, DataInternal.AsChordError(error, binding.Contract.Name))); }
     }
     public IReference Hold(Contract type, JsonObject parameters, ChordContext context, GetOptions? options = null) =>
-        Dispatcher.Invoke(() => Acquire(type, parameters, OwnCaller, context, options));
+        Dispatcher.Invoke(() => { AssertLoaded(); return Acquire(type, parameters, OwnCaller, context, options); });
     public Task<IReference> GetAsync(Contract type, JsonObject parameters, ChordContext context, GetOptions? options = null) =>
         Dispatcher.RunAsync(async () =>
         {
+            AssertLoaded();
             var binding = Acquire(type, parameters, OwnCaller, context, options);
-            try { await binding.ReadyAsync(context); return (IReference)binding; }
+            try { await binding.ReadyAsOldWorkAsync(context); return (IReference)binding; }
             catch { binding.Release(); throw; }
         });
     public Task<IRegistryValue<V>> RegistryAsync<C, V>(Registry<C, V> registry, ChordContext context, GetOptions? options = null) =>
         Dispatcher.RunAsync(async () =>
         {
-            AssertOpen(); Batch.AssertOutside("registry");
+            AssertOpen(); AssertLoaded(); Batch.AssertOutside("registry");
             var timeout = options?.ReadyTimeout ?? Options.ReadyTimeout;
             var started = Options.TimeProvider.GetUtcNow();
             try { await Publication.Task.WaitAsync(timeout, Options.TimeProvider, context.AbortSignal ?? CancellationToken.None); }
@@ -226,7 +257,7 @@ public sealed partial class ChordHost : IAsyncDisposable
     });
     private IReadOnlyList<Presence> CurrentPresence(string name) =>
         Objects.Values.Where(obj => obj.State.Kind == "live" && obj.Served.Contract.Name == name)
-            .SelectMany(obj => obj.Holders.Select(holder => new Presence(obj.Parameters.Value, holder.Caller.Principal, holder.Caller.Incarnation))).ToArray();
+            .SelectMany(obj => obj.Holders.Where(holder => holder.Listed).Select(holder => new Presence(obj.Parameters.Value, holder.Caller.Principal, holder.Caller.Incarnation))).ToArray();
     internal void ChangedPresence()
     {
         activity.SetCurrent(new(incomingReferences, runningCalls, runningJobs, lingering));
@@ -238,7 +269,7 @@ public sealed partial class ChordHost : IAsyncDisposable
         }, Context);
     }
     internal void Forget(Binding binding) { bindings.Remove(binding); ChangedPresence(); }
-    internal void CountCall(int by) { runningCalls += by; ChangedPresence(); }
+    internal void CountCall(int by) { runningCalls += by; ChordTelemetry.Metrics(Telemetry.Metrics).UpDownCounter("chord.calls.in_flight").Add(by); ChangedPresence(); }
     internal void CountJob(int by) { runningJobs += by; ChangedPresence(); }
     internal void CountReference(int by) { incomingReferences += by; ChangedPresence(); }
     internal void CountLinger(int by) { lingering += by; ChangedPresence(); }
@@ -254,10 +285,20 @@ public sealed partial class ChordHost : IAsyncDisposable
     {
         AssertOpen(); Batch.AssertOutside("root");
         var caller = new Caller(options?.HasPrincipal == true ? options.Principal : Options.Principal, Incarnation);
-        using var scope = new CallContext(this, caller, context);
-        roots.Add(scope);
-        try { return await work(scope).WaitAsync(scope.AbortSignal); }
-        finally { roots.Remove(scope); }
+        async Task<T> Run(ChordContext inside)
+        {
+            using var scope = new CallContext(this, caller, Counted(inside));
+            roots.Add(scope);
+            try { return await InvokeCallbackAsync(work, () => work(scope)).WaitAsync(scope.AbortSignal); }
+            finally { roots.Remove(scope); }
+        }
+        if (options?.Trace is not { } trace || ChordTelemetry.IsUntraced(Telemetry)) return await Run(context);
+        var attributes = Attributes(); if (trace.Attributes is { } extra) foreach (var each in extra) attributes[each.Key] = each.Value;
+        return await Telemetry.StartSpanAsync(new PiSharp.Telemetry.SpanOptions(trace.Name) { Attributes = attributes }, async span =>
+        {
+            try { return await Run(ChordContext.WithTelemetry(span, context)); }
+            catch (Exception error) { ChordTelemetry.Ended(span, "trace_failed", error, context.AbortSignal); throw; }
+        });
     });
     public Task CloseAsync(ChordContext context) => Dispatcher.Invoke(() =>
     {
@@ -276,6 +317,7 @@ public sealed partial class ChordHost : IAsyncDisposable
     private async Task CloseCoreAsync(ChordContext context)
     {
         Closed = true;
+        UnboundClock.Close();
         Closing?.Invoke();
         Publication.TrySetException(HostErrors.Closed());
         foreach (var root in roots.ToArray()) root.Dispose();

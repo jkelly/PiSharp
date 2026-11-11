@@ -159,15 +159,22 @@ public sealed class McpAdmittedOAuthOrchestrator : IAsyncDisposable
     private async Task<McpOAuthOrchestrationResult> AuthorizeCore(McpOAuthOrchestrationOptions options, CancellationToken token)
     {
         var originals = new List<McpOAuthOrchestrationOriginal>();
+        var use = new FlowUse();
         try
         {
             McpOAuthAuthorizationOutcome outcome;
-            try { outcome = await RunFlow(options, originals, token).ConfigureAwait(false); }
+            try { outcome = await RunFlow(options, originals, token, use).ConfigureAwait(false); }
             catch (Exception error) when (Selected(error) is McpOAuthTokenOperationFailure { Category: McpOAuthTokenFailureCategory.WireOAuthError, Code: "invalid_client" or "unauthorized_client" or "invalid_grant" })
             {
                 var selected = (McpOAuthTokenOperationFailure)Selected(error);
                 if (dependencies.Invalidate is { } invalidate)
-                    await Work("invalidate", () => invalidate(selected.Code == "invalid_grant" ? McpOAuthInvalidation.Tokens : McpOAuthInvalidation.All, token), originals, token).ConfigureAwait(false);
+                {
+                    if (selected.Code == "invalid_grant" || !options.RefreshOnly)
+                        await Work("invalidate", () => invalidate(selected.Code == "invalid_grant" ? McpOAuthInvalidation.Tokens : McpOAuthInvalidation.All, token), originals, token).ConfigureAwait(false);
+                    else if ((await Work("read-current-client", () => dependencies.ReadClient(token), originals, token).ConfigureAwait(false))?.ClientId == use.StoredClientId)
+                        foreach (var kind in new[] { McpOAuthInvalidation.Client, McpOAuthInvalidation.Tokens, McpOAuthInvalidation.Discovery })
+                            await Work("invalidate", () => invalidate(kind, token), originals, token).ConfigureAwait(false);
+                }
                 // The original second run is outside the retry catch. A second failure never loops.
                 outcome = await RunFlow(options, originals, token).ConfigureAwait(false);
             }
@@ -180,8 +187,9 @@ public sealed class McpAdmittedOAuthOrchestrator : IAsyncDisposable
         catch (Exception error)
         { throw new McpOAuthOrchestrationException("authorize", originals.ToImmutableArray(), error); }
     }
+    private sealed class FlowUse { internal string? StoredClientId; }
     private async Task<McpOAuthAuthorizationOutcome> RunFlow(McpOAuthOrchestrationOptions options,
-        List<McpOAuthOrchestrationOriginal> originals, CancellationToken token)
+        List<McpOAuthOrchestrationOriginal> originals, CancellationToken token, FlowUse? use = null)
     {
         // A configured metadata document is trusted as configured, so it must not travel in clear text.
         if (options.AuthorizationServerMetadataUrl is { } configuredMetadata && !SecureEndpoint(configuredMetadata))
@@ -197,6 +205,7 @@ public sealed class McpAdmittedOAuthOrchestrator : IAsyncDisposable
             McpAdmittedOAuthDiscovery.Strings(resourceMetadata.Value, "scopes_supported", false) is { } scopes ? string.Join(' ', scopes) : null;
         var scope = !string.IsNullOrEmpty(options.Scope) ? options.Scope : !string.IsNullOrEmpty(supportedScopes) ? supportedScopes : options.ClientMetadataScope;
         var client = await Work("read-client", () => dependencies.ReadClient(token), originals, token).ConfigureAwait(false);
+        if (use is not null) use.StoredClientId = client?.ClientId;
         var metadata = discovered.AuthorizationServerMetadata;
         McpOAuthClientMetadataDocument? document = null;
         if (client is null && options.ClientMetadataDocument is { } describe)
@@ -208,8 +217,12 @@ public sealed class McpAdmittedOAuthOrchestrator : IAsyncDisposable
             // The document identifies the client; it is not stored.
             if (document is not null) client = new(document.Url);
         }
+        var redirectUrl = document?.RedirectUrl ?? options.RedirectUrl;
+        if (options.AuthorizationCode is { Length: > 0 } && options.AuthorizationRedirectUrl is { } expected && redirectUrl != expected)
+            throw new McpOAuthProtocolException("redirect_mismatch", $"The code exchange would use the redirect URI {redirectUrl}, but the authorization request used {expected}");
         if (client is null)
         {
+            if (options.RefreshOnly) return McpOAuthAuthorizationOutcome.Redirect;
             if (options.AuthorizationCode is { Length: > 0 }) throw new McpOAuthProtocolException("client_missing", "OAuth client information is missing during code exchange.");
             var saveRegisteredClient = dependencies.SaveClient ?? throw new McpOAuthProtocolException("client_persistence_missing", "OAuth client information cannot be persisted.");
             client = await Work("register-client", () => dependencies.RegisterClient(options, discovered, scope, token), originals, token).ConfigureAwait(false);
@@ -253,6 +266,7 @@ public sealed class McpAdmittedOAuthOrchestrator : IAsyncDisposable
                 Fence(token); // Preserve genuine cancellation and closing; only ordinary refresh errors may redirect.
             }
         }
+        if (options.RefreshOnly) return McpOAuthAuthorizationOutcome.Redirect;
         if (dependencies.ReadAuthorizationState is { } readState)
             context = context with { State = await Work("read-authorization-state", () => readState(token), originals, token).ConfigureAwait(false) };
         var authorization = await Work("begin-authorization", () => dependencies.BeginAuthorization(context, token), originals, token).ConfigureAwait(false);

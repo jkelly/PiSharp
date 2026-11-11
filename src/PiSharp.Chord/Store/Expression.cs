@@ -9,6 +9,7 @@
 // plain values). Upstream's Expression<T, K>, ColumnRef<T, K> and SetOf<C, K> carry TypeScript types of the value and column type; here
 // the classes are untyped and what those types refuse is refused when the expression is compiled.
 using System.Text.Json.Nodes;
+using PiSharp.Chord.Contracts;
 using PiSharp.Chord.Data;
 
 namespace PiSharp.Chord.Store;
@@ -234,10 +235,10 @@ public readonly struct Operand
 public static class Expressions
 {
     /// <summary>The column equals <paramref name="value"/> (<c>NULL</c> never matches).</summary>
-    public static Condition Eq(ColumnRef column, JsonNode? value) => new("eq", [column, value]);
+    public static Condition Eq(ColumnRef column, object? value) => new("eq", [column, value]);
 
     /// <summary>The column differs from <paramref name="value"/> (<c>NULL</c> never matches).</summary>
-    public static Condition Ne(ColumnRef column, JsonNode? value) => new("ne", [column, value]);
+    public static Condition Ne(ColumnRef column, object? value) => new("ne", [column, value]);
 
     /// <summary>The column is below <paramref name="value"/>.</summary>
     public static Condition Lt(ColumnRef column, JsonNode? value) => new("lt", [column, value]);
@@ -253,6 +254,9 @@ public static class Expressions
 
     /// <summary>The column equals one of <paramref name="values"/> (<c>[]</c> matches nothing).</summary>
     public static Condition InArray(ColumnRef column, IEnumerable<JsonNode?> values) => new("inArray", [column, values]);
+
+    /// <summary>The host column equals one of the addresses.</summary>
+    public static Condition InArray(ColumnRef column, IEnumerable<Address> values) => new("inArray", [column, values.Select(value => (JsonNode?)value.ToJson())]);
 
     /// <summary>The column is <c>NULL</c> (an <c>Opt(...)</c> column without a value).</summary>
     public static Condition IsNull(ColumnRef column) => new("isNull", [column]);
@@ -352,10 +356,10 @@ internal static partial class StoreInternal
             case "not":
                 return new WhereNode.Not(CompileWhere(table, Arg(0), what));
             case "isNull":
-                return new WhereNode.IsNull(ScalarColumn(table, Arg(0), what).Name);
+                return new WhereNode.IsNull(OrderedColumn(table, Arg(0), what, "isNull").Name);
             case "prefix":
             {
-                var column = ScalarColumn(table, Arg(0), what);
+                var column = OrderedColumn(table, Arg(0), what, "prefix");
                 if (column.Type != ColumnType.Str) throw DataInternal.Invalid("args", $"{table.Name}: {what}: prefix needs a str() column");
                 return new WhereNode.Prefix(column.Name, (string)OperandOf(column, Arg(1), what).Value);
             }
@@ -370,6 +374,8 @@ internal static partial class StoreInternal
                 if (!Comparisons.TryGetValue(built.Op, out var op)) throw new ArgumentException($"An unknown condition operator \"{built.Op}\".");
                 var column = ScalarColumn(table, Arg(0), what);
                 // One of the six comparisons: the node's shape is { [op]: [column, value] }.
+                if (op is not (Comparison.Eq or Comparison.Ne) && column.Host is not null)
+                    throw DataInternal.Invalid("args", $"{table.Name}: {what}: {built.Op} on host(...) column \"{column.Name}\" (eq, ne, inArray only)");
                 return new WhereNode.Compare(op, column.Name, OperandOf(column, Arg(1), what));
             }
         }
@@ -408,14 +414,14 @@ internal static partial class StoreInternal
             }
             else if (value.Expression is not null)
             {
-                if (column.Type == ColumnType.Json) throw DataInternal.Invalid("args", $"{table.Name}: {where}: json(...) columns take plain values");
+                if (column.Type == ColumnType.Json || column.Host is not null) throw DataInternal.Invalid("args", $"{table.Name}: {where}: {(column.Host is null ? "json" : "host")}(...) columns take plain values");
                 var compiled = CompileExpr(table, value, column.Type, where);
                 if (compiled.Nullable && !column.Optional)
                     throw DataInternal.Invalid("args", $"{table.Name}: {where}: the expression may be NULL; the column is not opt(...)");
                 node[name] = compiled.Node;
             }
             else if (column.Type == ColumnType.Json) node[name] = new ExprNode.Json(EncodeCell(column, value.Value, $"{table.Name}: {where}").Stored);
-            else node[name] = new ExprNode.Literal(CheckScalar(column.Type, value.Value, $"{table.Name}: {where}"));
+            else node[name] = new ExprNode.Literal(column.Host is { } host ? (Scalar)host.Key(value.Value, $"{table.Name}: {where}") : CheckScalar(column.Type, value.Value, $"{table.Name}: {where}"));
         }
         return node;
     }
@@ -439,6 +445,7 @@ internal static partial class StoreInternal
             {
                 var name = args.Count > 0 ? args[0] as string : null;
                 if (name is null || !table.ByName.TryGetValue(name, out var column)) throw Refuse($"no column \"{name ?? "undefined"}\"");
+                if (column.Host is not null) throw Refuse($"host(...) column \"{column.Name}\" holds addresses");
                 if (column.Type != type) throw Refuse($"column \"{column.Name}\" is {Name(column.Type)}, not {Name(type)}");
                 return new Compiled(new ExprNode.Col(column.Name), column.Optional);
             }
@@ -500,7 +507,15 @@ internal static partial class StoreInternal
     private static Scalar OperandOf(Column column, object? value, string what)
     {
         if (value is null) throw DataInternal.Invalid("args", $"{what}: column \"{column.Name}\" compared with null; ask with isNull");
+        if (column.Host is { } host) return host.Key(value, $"{what}: column \"{column.Name}\"");
         // ScalarColumn refused json columns.
         return CheckScalar(column.Type, value as JsonNode ?? JsonValue.Create(value), $"{what}: column \"{column.Name}\"");
+    }
+
+    private static Column OrderedColumn(TableDefinition table, object? reference, string what, string operation)
+    {
+        var column = ScalarColumn(table, reference, what);
+        if (column.Host is not null) throw DataInternal.Invalid("args", $"{table.Name}: {what}: {operation} on host(...) column \"{column.Name}\" (eq, ne, inArray only)");
+        return column;
     }
 }

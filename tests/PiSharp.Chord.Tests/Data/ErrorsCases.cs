@@ -73,12 +73,12 @@ internal static partial class Program
         Case("data.errors.protocol-table-is-pinned-together-with-protocol-version", () =>
         {
             const string pinned = """
-                {"invalid":["args","params","member","host_address","reentrant","read_after_bulk","cycle"],"contract_mismatch":["updating"],"forbidden":["revoked"],"gone":[],"not_ready":[],"released":["ended","closed","settled","version","discarded"],"too_large":["part"],"unavailable":["locked","park_timeout","busy","storage_failed","undeclared"],"aborted":[]}
+                {"invalid":["args","params","member","host_address","reentrant","read_after_bulk","cycle"],"contract_mismatch":["updating"],"forbidden":["revoked"],"gone":[],"not_ready":[],"released":["ended","closed","settled","version","discarded"],"too_large":["part"],"unavailable":["locked","park_timeout","busy","storage_failed","undeclared","version","reload_cycle"],"aborted":[]}
                 """;
             var table = new JsonObject();
             foreach (var (code, reasons) in DataInternal.ChordErrorReasons) table[code] = new JsonArray([.. reasons.Select(reason => (JsonNode?)reason)]);
             var changed = DataInternal.ProtocolVersion != 1 || ChordJson.Stringify(table) != pinned;
-            Check(!changed, "the error table changed: bump PROTOCOL_VERSION and update this pin");
+            Check(!changed, "the current v1.5.2 error table and protocol1 must match the frozen source");
         }),
         Case("data.errors.is-chord-error-checks-the-class-and-optionally-the-code", () =>
         {

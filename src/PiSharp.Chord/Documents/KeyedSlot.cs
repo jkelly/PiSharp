@@ -22,6 +22,14 @@ namespace PiSharp.Chord.Documents;
 /// <summary>Whom a read is for (upstream <c>Access</c>): a handle's seal token and the version it was declared with (R15).</summary>
 internal sealed record Access(SealToken Token, long Version);
 
+internal abstract record ChangedDocument
+{
+    internal sealed record Absent : ChangedDocument;
+    internal sealed record Unchanged : ChangedDocument;
+    internal sealed record Present(Loaded Loaded) : ChangedDocument;
+    internal sealed record Failed(ChordError Error) : ChangedDocument;
+}
+
 /// <summary>A keyed slot (upstream <c>KeyedSlot</c>): one resident per document in memory, one source per pinned key.</summary>
 internal sealed class KeyedSlot : IDocumentSlot, IPersistedSlot, IDeclaredSlot, IResidentSlot
 {
@@ -58,6 +66,46 @@ internal sealed class KeyedSlot : IDocumentSlot, IPersistedSlot, IDeclaredSlot, 
     public Persistence Persistence => persistence!;
 
     public bool IsPersisted => persistence is not null;
+
+    internal bool Holds(string key)
+    {
+        lock (gate) return residents.ContainsKey(key) || sources.ContainsKey(key);
+    }
+
+    internal async Task<ChangedDocument> ReadChangedAsync(string key, Step step, ChordContext context)
+    {
+        var record = await DocumentEngine.FindDocumentAsync(step, Persistence.At(key)).ConfigureAwait(false);
+        if (record is null) return new ChangedDocument.Absent();
+        var stored = Stored(key);
+        if (stored?.Id == record.Id && stored.Revision == record.Revision) return new ChangedDocument.Unchanged();
+        var document = await DocumentEngine.LoadDocumentAsync(step, record).ConfigureAwait(false);
+        try { return new ChangedDocument.Present(Persistence.Decode(document, Definition.Current, context)); }
+        catch (Exception error) { return new ChangedDocument.Failed(DataInternal.AsChordError(error, Owner.Label)); }
+    }
+
+    internal void AdoptChanged(string key, ChangedDocument changed)
+    {
+        if (changed is ChangedDocument.Unchanged or ChangedDocument.Failed) return;
+        Resident? before;
+        KeySource? source;
+        lock (gate)
+        {
+            residents.Remove(key, out before);
+            sources.TryGetValue(key, out source);
+        }
+        if (before is not null) Owner.Residency.Forget(before);
+        if (changed is ChangedDocument.Absent)
+        {
+            if (before is not null) source?.Retire();
+            if (source is not null) source.Ready = true;
+            return;
+        }
+        var loaded = ((ChangedDocument.Present)changed).Loaded;
+        var resident = new Resident(this, key, Tracker.Track(loaded.Value), loaded.Stored, Definition.Current.Version);
+        lock (gate) residents[key] = resident;
+        if (source is null) Touch(resident);
+        else { source.Ready = true; source.Replaced(); }
+    }
 
     /// <summary>
     /// The value at <paramref name="raw"/>, null when absent. A document in memory is read at once (also through a sealed handle); a cold

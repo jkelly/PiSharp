@@ -39,6 +39,7 @@ internal static partial class Program
         if (cases.GroupBy(test => test.Id, StringComparer.Ordinal).Where(group => group.Count() > 1).Select(group => group.Key).ToList() is { Count: > 0 } duplicates)
             throw new InvalidOperationException("Duplicate case ids: " + string.Join(", ", duplicates));
         if (only?.Split(',') is { } prefixes) cases = [.. cases.Where(test => prefixes.Any(prefix => test.Id.StartsWith(prefix, StringComparison.Ordinal)))];
+        Console.Error.WriteLine($"Durable cases selected: {cases.Count}.");
         var results = new List<object>(); var failures = 0; var authored = 0; var captured = 0; var skipped = 0;
         foreach (var test in cases)
         {
@@ -55,7 +56,7 @@ internal static partial class Program
                 results.Add(new { test.Id, status = upstreamCapture ? "PASS_UPSTREAM_CAPTURE" : "PASS_AUTHORED_NATIVE_ONLY", ms = started.ElapsedMilliseconds });
             }
             catch (CaseSkippedException skip) { skipped++; results.Add(new { test.Id, status = "SKIPPED_NO_UPSTREAM", reason = skip.Message }); }
-            catch (Exception error) { failures++; results.Add(new { test.Id, status = "FAIL", failure = error.ToString() }); }
+            catch (Exception error) { failures++; results.Add(new { test.Id, status = "FAIL", failure = error.ToString() }); Console.Error.WriteLine($"FAIL {test.Id}: {error}"); }
         }
         // The storage.mssql.* groups' database (Storage/SqlServerStorageCases.cs).
         await MssqlServer.DropAsync();

@@ -22,6 +22,7 @@ internal static class SessionReplacementTests
         ("session-replacement own command switches and checkpoints without self-wait", InputCallback),
         ("session-replacement abort and disposal cancel the retired originating callback", AbortRetiredCallback),
         ("session-replacement target failure veto and precommit cancellation roll back", Rollback),
+        ("session-replacement prepared relocation rolls back only uncommitted copies", PreparedRelocation),
         ("session-replacement held writes order switches and retain truthful storage faults", HeldWrites),
         ("session-replacement busy staged and initial attachments reject before publication", BusyAttachment),
         ("session-replacement preflight target checkpoint rejects with source still usable", TargetPreflightCheckpoint),
@@ -128,6 +129,34 @@ internal static class SessionReplacementTests
         await owner.DisposeAsync();
         await using var reopenedA = await Open(files.A); await using var reopenedB = await Open(files.B);
         Check(Customs(reopenedA).SequenceEqual(new[] { "first A", "fresh A" }) && Customs(reopenedB).SequenceEqual(new[] { "B" }), "Independent reopens found wrong branch state.");
+    }
+    private static async Task PreparedRelocation()
+    {
+        using var files = new Files(); await Seed(files); var initial = await Open(files.A);
+        await using var owner = Owner(initial); var source = owner.Current;
+        var target = Path.Combine(files.Directory, "relocated.jsonl"); var preparations = 0; var rollbacks = 0;
+        owner.PrepareSwitch = (request, token) =>
+        {
+            token.ThrowIfCancellationRequested(); preparations++;
+            Check(source.Session.Snapshot.IsProcessingOperation == false, "Preparation ran during a source operation.");
+            File.Copy(request.Path, target);
+            return ValueTask.FromResult<AgentSessionSwitchPreparation?>(new(request with { Path = target }, () =>
+            {
+                // The staged writer must be closed before cleanup; exclusive access is our evidence.
+                using (new FileStream(target, FileMode.Open, FileAccess.ReadWrite, FileShare.None)) { }
+                File.Delete(target); rollbacks++; return ValueTask.CompletedTask;
+            }));
+        };
+        var canceled = await owner.SwitchAsync(source, new(files.B), (_, _, _) => ValueTask.FromResult(false));
+        Check(canceled is null && preparations == 1 && rollbacks == 1 && !File.Exists(target) && ReferenceEquals(owner.Current, source),
+            "Veto retained the prepared copy or changed the source.");
+        var committed = await owner.SwitchAsync(source, new(files.B));
+        Check(committed is not null && committed.Current.Session.Path == target && File.Exists(target) && rollbacks == 1,
+            "A committed relocation was rolled back.");
+        owner.PrepareSwitch = (_, _) => ValueTask.FromResult<AgentSessionSwitchPreparation?>(null);
+        var current = owner.Current;
+        Check(await owner.SwitchAsync(current, new(files.A)) is null && ReferenceEquals(current, owner.Current),
+            "Canceling preparation changed the active attachment.");
     }
     private static async Task InputCallback()
     {

@@ -7,6 +7,7 @@ namespace PiSharp.Chord.Hosting.Http;
 /// <summary>Server-side HMAC-SHA256 cookies, including a signed expiry and constant-time signature comparison.</summary>
 public static class SignedCookies
 {
+    public sealed record SignedValue(string Value, DateTimeOffset? Expires);
     public static string Create(string name, string value, ReadOnlySpan<byte> secret, bool secure, TimeSpan? maxAge = null, bool lax = false, TimeProvider? clock = null)
     {
         CheckName(name); if (secret.IsEmpty) throw new ArgumentException("a signing secret is required", nameof(secret));
@@ -18,6 +19,8 @@ public static class SignedCookies
         return result;
     }
     public static string? Read(string cookieHeader, string name, ReadOnlySpan<byte> secret, TimeProvider? clock = null)
+        => ReadSigned(cookieHeader, name, secret, clock)?.Value;
+    public static SignedValue? ReadSigned(string cookieHeader, string name, ReadOnlySpan<byte> secret, TimeProvider? clock = null)
     {
         CheckName(name); if (secret.IsEmpty) return null;
         foreach (var pair in cookieHeader.Split(';'))
@@ -28,8 +31,13 @@ public static class SignedCookies
             var signature = signed[(last + 1)..]; var expected = Sign(name, payload, secret);
             if (!CryptographicOperations.FixedTimeEquals(Encoding.ASCII.GetBytes(signature), Encoding.ASCII.GetBytes(expected))) return null;
             var expires = payload[(split + 1)..];
-            if (expires.Length > 0 && (!long.TryParse(expires, NumberStyles.None, CultureInfo.InvariantCulture, out var unix) || (clock ?? TimeProvider.System).GetUtcNow().ToUnixTimeSeconds() >= unix)) return null;
-            try { return Uri.UnescapeDataString(payload[..split]); } catch (UriFormatException) { return null; }
+            DateTimeOffset? expiry = null;
+            if (expires.Length > 0)
+            {
+                if (!long.TryParse(expires, NumberStyles.None, CultureInfo.InvariantCulture, out var unix) || (clock ?? TimeProvider.System).GetUtcNow().ToUnixTimeSeconds() >= unix) return null;
+                try { expiry = DateTimeOffset.FromUnixTimeSeconds(unix); } catch (ArgumentOutOfRangeException) { return null; }
+            }
+            try { return new(Uri.UnescapeDataString(payload[..split]), expiry); } catch (UriFormatException) { return null; }
         }
         return null;
     }

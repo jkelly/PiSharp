@@ -1,9 +1,9 @@
-// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/schema/src/resolver.ts.
+// Pi b4afdddf44e059c67ccf5097e5317d913521b470 (MIT): packages/schema/src/resolver.ts.
 // Ported to plain ESM for the PiSharp Node extension bridge (TypeScript types stripped mechanically; behaviour unchanged).
 export const DEFAULT_BASE = "https://json-schema.invalid/root.json";
 export class Resolver {
     draft;
-    rootBase;
+    rootBase = DEFAULT_BASE;
     baseOf = new Map();
     dynamicAnchors = new Map();
     root;
@@ -19,13 +19,17 @@ export class Resolver {
         this.root = root;
         this.options = options;
         this.rejectUnresolved = options.unresolvedRefs === "reject";
-        this.rootBase = isSchemaObject(root) ? this.baseFor(root, DEFAULT_BASE) : DEFAULT_BASE;
     }
     baseFor(node, base) {
-        const indexed = this.baseOf.get(node);
+        let indexed = this.baseOf.get(node);
         if (indexed !== undefined) return indexed;
         const id = node.$id;
         if (typeof id !== "string") return base;
+        if (!this.indexed) {
+            this.ensureIndexed();
+            indexed = this.baseOf.get(node);
+            if (indexed !== undefined) return indexed;
+        }
         if (this.draft === "7" && (typeof node.$ref === "string" || id.startsWith("#"))) return base;
         return documentOf(resolveUri(id, base));
     }

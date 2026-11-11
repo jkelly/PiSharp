@@ -15,7 +15,20 @@ public static class McpConfigurationReader
     private static readonly string[] OverrideKeys = ["enabled", "exposure", "toolExposure"];
 
     /// <summary>Validates one server entry and returns a copy with exposure aliases (`codemode-deferred`) resolved.</summary>
-    public static McpConfigurationValidation Validate(string name, JsonElement raw)
+    public static McpConfigurationValidation Validate(string name, JsonElement raw) =>
+        ValidateCore(name, raw, true, callback => IsClientMetadataDocumentCallback(callback is null ? null : new Uri(callback))
+            ? null : "oauth.clientRegistration \"cimd\" requires oauth.callbackUrl on localhost or 127.0.0.1 with path /callback");
+
+    /// <summary>Shared MCP fields, preserving unrecognized application fields unchanged.</summary>
+    public static McpServerFieldsValidation ValidateServer(string name, JsonElement raw,
+        Func<string?, string?>? checkMetadataDocumentCallback = null)
+    {
+        var result = ValidateCore(name, raw, false, checkMetadataDocumentCallback);
+        return new(result.Config?.Transport, result.Config?.Raw, result.Error);
+    }
+
+    private static McpConfigurationValidation ValidateCore(string name, JsonElement raw, bool application,
+        Func<string?, string?>? checkMetadataDocumentCallback)
     {
         ArgumentNullException.ThrowIfNull(name);
         McpConfigurationValidation Invalid(string message) => new(null, message);
@@ -23,12 +36,12 @@ public static class McpConfigurationReader
         if (!Regex.IsMatch(name, @"\A[A-Za-z0-9_-]+\z", RegexOptions.CultureInvariant))
             return Invalid($"invalid server name \"{name}\" (use letters, digits, \"_\" and \"-\")");
         if (raw.ValueKind != JsonValueKind.Object) return Invalid($"server \"{name}\" must be an object");
-        var resolved = McpJson.Clone(raw, resolveExposureAliases: true); var value = resolved.Value;
+        var resolved = McpJson.Clone(raw, resolveExposureAliases: application); var value = resolved.Value;
         var exposure = McpExposure.Codemode;
-        if (value.TryGetProperty("exposure", out var suppliedExposure) && !TryExposure(suppliedExposure, out exposure))
+        if (application && value.TryGetProperty("exposure", out var suppliedExposure) && !TryExposure(suppliedExposure, out exposure))
             return Error($"exposure must be one of {Exposures}");
         var overrides = ImmutableArray.CreateBuilder<KeyValuePair<string, McpExposure>>();
-        if (value.TryGetProperty("toolExposure", out var tools))
+        if (application && value.TryGetProperty("toolExposure", out var tools))
         {
             if (tools.ValueKind != JsonValueKind.Object) return Error("toolExposure must map tool names to exposures");
             foreach (var property in McpJson.Properties(tools))
@@ -65,8 +78,8 @@ public static class McpConfigurationReader
             if (!Uri.TryCreate(url.GetString(), UriKind.Absolute, out var uri) || uri.Scheme is not ("http" or "https"))
                 return Error("url must be an http or https URL");
             if (value.TryGetProperty("headers", out var headers) && !StringRecord(headers)) return Error("headers must map names to strings");
-            if (value.TryGetProperty("oauth", out var oauth) && ValidateOAuth(oauth) is { } oauthError) return Error(oauthError);
-            if (value.TryGetProperty("auth", out var auth))
+            if (value.TryGetProperty("oauth", out var oauth) && ValidateOAuth(oauth, checkMetadataDocumentCallback) is { } oauthError) return Error(oauthError);
+            if (application && value.TryGetProperty("auth", out var auth))
             {
                 if (auth.ValueKind != JsonValueKind.Object || !auth.TryGetProperty("provider", out var provider) ||
                     provider.ValueKind != JsonValueKind.String || provider.GetString()!.Length == 0)
@@ -214,10 +227,10 @@ public static class McpConfigurationReader
     /// callback is such a URI. Upstream's `auto` also reads it; PiSharp's `auto` never offers the document, so only `cimd` does.</summary>
     private static bool IsClientMetadataDocumentCallback(Uri? callback) => callback is null || callback.Host != "[::1]" && callback.AbsolutePath == "/callback";
 
-    private static bool IsOverride(JsonElement value) =>
+    public static bool IsOverride(JsonElement value) =>
         !value.TryGetProperty("command", out _) && !value.TryGetProperty("url", out _) && !value.TryGetProperty("type", out _);
 
-    private static string? ValidateOAuth(JsonElement value)
+    private static string? ValidateOAuth(JsonElement value, Func<string?, string?>? checkMetadataDocumentCallback)
     {
         if (value.ValueKind != JsonValueKind.Object) return "oauth must be an object";
         if (value.TryGetProperty("clientId", out var id) && id.ValueKind != JsonValueKind.String) return "oauth.clientId must be a string";
@@ -248,8 +261,10 @@ public static class McpConfigurationReader
             if (!(registration.ValueKind == JsonValueKind.String && registration.GetString() == "cimd")) return "oauth.clientRegistration must be \"auto\", \"dcr\", or \"cimd\"";
             if (value.TryGetProperty("clientId", out _) || named)
                 return "oauth.clientRegistration \"cimd\" cannot be combined with oauth.clientId or oauth.clientName";
-            if (!IsClientMetadataDocumentCallback(callback))
-                return "oauth.clientRegistration \"cimd\" requires oauth.callbackUrl on localhost or 127.0.0.1 with path /callback";
+            if (checkMetadataDocumentCallback is null)
+                return "oauth.clientRegistration \"cimd\" is not supported: there are no Client ID Metadata Documents";
+            var callbackError = checkMetadataDocumentCallback(callback?.OriginalString);
+            if (callbackError is not null) return callbackError;
         }
         if (value.TryGetProperty("authServerMetadataUrl", out var metadataUrl))
         {

@@ -71,12 +71,16 @@ internal class ExtensionSelectorComponent : Container, IInputHandler
     private void UpdateList()
     {
         listContainer.Clear();
-        for (var i = 0; i < options.Count; i++)
+        var start = Math.Max(0, Math.Min(selectedIndex - 5, options.Count - 10));
+        var end = Math.Min(start + 10, options.Count);
+        for (var i = start; i < end; i++)
         {
             var isSelected = i == selectedIndex;
             var text = isSelected ? theme.Fg("accent", "→ ") + theme.Fg("accent", options[i]) : $"  {theme.Fg("text", options[i])}";
             listContainer.AddChild(new Text(text, 1, 0));
         }
+        if (start > 0 || end < options.Count)
+            listContainer.AddChild(new Text(theme.Fg("muted", $"  ({selectedIndex + 1}/{options.Count})"), 1, 0));
     }
 
     public void HandleInput(string keyData)

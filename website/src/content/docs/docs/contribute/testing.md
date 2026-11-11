@@ -88,7 +88,7 @@ The release and the macOS workflow run these. Each covers one area of Pi, with e
 | `PiSharp.McpParity.Tests` | MCP configuration and completion. |
 | `PiSharp.SessionParity.Tests` | Events, session features, export and extension events. |
 | `PiSharp.InteractiveParity.Tests` | Interactive mode, slash commands, and the `CHANGELOG.md` sync. |
-| `PiSharp.ExtensionParity.Tests` | Extensions, the Node bridge and packages. It builds and loads the sample extensions, and needs Node.js 22.13 or later and npm. Use the committed `tools/NodeBridge/runtime-fixture-150` manifest/lock with `npm ci` and set `PISHARP_TEST_PI150_NODE_MODULES` to its installed `node_modules`. Ordinary sandbox startup does not install packages. The separate production installer provenance case requires `PISHARP_TEST_INSTALL_PI_RUNTIME=1` and a fresh private runtime cache. |
+| `PiSharp.ExtensionParity.Tests` | Extensions, the Node bridge and packages. It builds and loads the sample extensions and needs Node.js 22.19 or later and npm for the current 1.5.2 source candidate. Use the committed `tools/NodeBridge/runtime-fixture-152` manifest/lock with `npm ci` and set `PISHARP_TEST_PI152_NODE_MODULES` to its installed `node_modules`. CI directly verifies that runtime's ABI before running the suites. Ordinary sandbox startup does not install packages. The separate production installer provenance case requires `PISHARP_TEST_INSTALL_PI_RUNTIME=1` and a fresh private runtime cache. |
 | `PiSharp.Durable.Tests` | The [durable](/docs/guides/durable/) port, with cases ported from upstream's tests. The `compat.*` cases read sessions upstream wrote. |
 | `PiSharp.DurableCli.Tests` | `pisharp durable`, including the device server commands. |
 | `PiSharp.CustomAgents.Tests` | [Custom agents](/docs/custom-agents/overview/), from 1.2.0.2. See [Custom agents](#custom-agents). |
@@ -108,6 +108,8 @@ The macOS workflow runs all of them except `Durable` and `DurableCli`, which the
 Most of these test one library each. `core.yml` runs all ten as Windows console jobs, including the Tools process fixtures and TUI ConPTY cases. It builds the CLI child host for CodingAgent and publishes all ten native extension fixtures for CodingAgent and Extensions.ContractTests. Build/fixture failure, missing reports, incomplete execution and skipped core cases fail the lane. Each job uploads the raw report, prerequisite stage results and a current-checkout manifest.
 
 This hosted source-build lane uses the exact SDK from `global.json` and explicitly restores from nuget.org. It is separate from `tools/test-native.ps1`, whose reviewed source manifest, pinned products, Node-absent launch boundary and companion admission remain required for that native qualification workflow. Hosted CI does not issue those admission receipts.
+
+The current-source checks target Pi **1.5.2** and verify the complete frozen inventory, applicability map and Durable candidate overlay. Separate historical checks retain the v1.5.0/v1.2.0 source objects and the preserved `durable-port-map.v1.5.0.json`; they do not relabel old acceptance as 1.5.2 coverage. The published release remains **1.5.0.1** until a new release is separately qualified and published.
 
 | Suite | Covers |
 | --- | --- |

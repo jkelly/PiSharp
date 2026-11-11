@@ -3,6 +3,7 @@ using System.Text.Json;
 
 if (args.Length != 2 || args[0] != "--report") throw new ArgumentException("Supply --report fresh-path.");
 var outcomes = new List<object>();
+var caseResults = new List<object>();
 var failures = 0;
 await Check("azure-simple.context-budget-and-bounds", AzureSimpleTests.Budget);
 await Check("azure-simple.usage-prefix-and-trailing-estimate", AzureSimpleTests.Usage);
@@ -17,7 +18,7 @@ var report = JsonSerializer.Serialize(new
 {
     source = "d86654abb8862e201933517d6f1fce9f88dd117f", sourceVersion = "0.99.1",
     expectationKind = "SOURCE-DERIVED SYNTHETIC; NO SDK CAPTURE", groups = outcomes.Count,
-    failures, outcomes,
+    failures, outcomes, results = caseResults,
     heldOriginalTasks = AzureSimpleTests.HeldOriginals.Select(record => new
     {
         record.Name, status = record.Original.Status.ToString(), completed = record.Original.IsCompleted,
@@ -36,6 +37,7 @@ async Task Check(string name, Func<Task> invoke)
     try { original = invoke(); await original; }
     catch (Exception error) { direct = error; failures++; }
     if (original is { IsCompleted: false }) throw new InvalidOperationException("Original group remained pending.");
+    caseResults.Add(new { Id = name, status = direct is null && original is { IsCompletedSuccessfully: true } ? "PASS_AUTHORED_NATIVE_ONLY" : "FAIL" });
     outcomes.Add(new
     {
         name, passed = direct is null && original is { IsCompletedSuccessfully: true },

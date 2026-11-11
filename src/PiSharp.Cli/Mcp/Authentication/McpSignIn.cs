@@ -18,7 +18,8 @@ namespace PiSharp.Cli.Mcp.Authentication;
 /// <summary>A server's `oauth` settings; <see cref="ClientSecret"/> is already resolved.</summary>
 public sealed record McpOAuthSettings(string? ClientId = null, string? ClientSecret = null, int? CallbackPort = null,
     string? CallbackUrl = null, string? Scope = null, string? ClientName = null, string? ClientRegistration = null,
-    Uri? AuthServerMetadataUrl = null)
+    Uri? AuthServerMetadataUrl = null) : McpOAuthClientSettings(ClientId, ClientSecret, CallbackPort, CallbackUrl,
+        Scope, ClientName, ClientRegistration, AuthServerMetadataUrl)
 {
     /// <summary>The validated `oauth` object of an HTTP server. <paramref name="resolveSecret"/> resolves
     /// `oauth.clientSecret` (value, description) and is only called when one is configured.</summary>
@@ -55,6 +56,9 @@ public sealed record McpSignInOptions(Uri ServerUrl, IMcpAdmittedOAuthStateStore
     /// <summary>The challenge that asked for this sign-in (the connection's last one): its resource metadata URL starts discovery,
     /// its scope is requested, and `insufficient_scope` asks for more scope through the browser.</summary>
     public McpOAuthChallenge? Challenge { get; init; }
+    public Func<CancellationToken, Task<IAsyncDisposable>>? RefreshLock { get; init; }
+    public string ClientName { get; init; } = McpDefaultOAuthClientMetadata.DefaultClientName;
+    public McpClientMetadataDocuments? ClientMetadataDocuments { get; init; }
 }
 
 /// <summary>Sign-in to an MCP server: the stored refresh token when possible, otherwise the browser authorization code
@@ -108,113 +112,30 @@ public static class McpSignIn
     {
         ArgumentNullException.ThrowIfNull(options);
         if (token.IsCancellationRequested) throw new McpSignInCancelledException();
-        var settings = options.Settings; var store = options.Store;
-        var stored = await store.LoadAsync().ConfigureAwait(false);
+        var settings = options.Settings;
+        var stored = await options.Store.LoadAsync().ConfigureAwait(false);
         var callbackOptions = Callback(settings);
-        // Reuse the port of the registered redirect URI so the registered client stays valid.
         var registered = RegisteredRedirectUrls(stored?.ClientInformation).FirstOrDefault();
-        var preferredPort = callbackOptions.Port ?? (registered is not null && Uri.TryCreate(registered, UriKind.Absolute, out var registeredUri) &&
-            !registeredUri.IsDefaultPort ? registeredUri.Port : null);
-        var offersDocument = OffersClientMetadataDocument(settings);
-        var callback = Listen(callbackOptions,
-            // The redirect URI of a server-specific Client ID Metadata Document.
-            offersDocument ? [$"{CallbackPath}/{McpOAuthClientMetadataDocuments.CallbackId(options.ServerUrl)}"] : [],
+        var preferredPort = callbackOptions.Port ?? (registered is not null && Uri.TryCreate(registered, UriKind.Absolute, out var uri) && !uri.IsDefaultPort ? uri.Port : null);
+        var client = McpSignInClient.Create(options);
+        var offers = McpOAuthSignIn.OffersDocument(settings, client.ClientMetadataDocuments, settings.CallbackUrl ?? "http://127.0.0.1/callback");
+        await using var callback = Listen(callbackOptions, offers
+            ? [McpOAuthClientMetadataDocuments.ServerSpecificPath(callbackOptions.Path, options.ServerUrl)] : [],
             preferredPort, callbackOptions.Port is not null);
-        var redirectUrl = callbackOptions.FixedRedirectUrl ?? callback.RedirectUrl;
-        McpDefaultOAuthHost? host = null; Exception? failure = null;
-        Uri? authorizationUrl = null; string? state = null;
-        var triedStoredRefresh = false;
+        var redirect = callbackOptions.FixedRedirectUrl ?? callback.RedirectUrl;
+        var signIn = new McpOAuthSignIn();
+        var startOptions = new PiSharp.Extensions.Mcp.Authentication.McpSignInOptions(client, redirect, options.Challenge);
         try
         {
-            // A refresh belongs to the registered client and its original redirect URI. The
-            // callback listener may have moved to a free port; only the browser step needs it.
-            if (stored?.Tokens?.RefreshToken is { Length: > 0 } && stored.ClientInformation is not null &&
-                string.IsNullOrEmpty(settings.ClientId) && settings.ClientRegistration != "cimd" &&
-                options.Challenge?.IsStepUp != true)
-            {
-                host = CreateHost(registered ?? redirectUrl);
-                host.UseChallenge(options.Challenge?.ResourceMetadataUrl);
-                triedStoredRefresh = true;
-                if ((await host.AuthorizeAsync(host.Options(scope: MergeScopes(settings.Scope, options.Challenge?.Scope)), token)
-                    .ConfigureAwait(false)).Outcome == McpOAuthAuthorizationOutcome.Authorized) return;
-                await host.DisposeAsync().ConfigureAwait(false);
-                host = null;
-                token.ThrowIfCancellationRequested();
-                stored = await store.LoadAsync().ConfigureAwait(false);
-                authorizationUrl = null; state = null;
-            }
-            if (stored is not null)
-            {
-                // Every sign-in gets a fresh `state` parameter.
-                var next = stored with { OAuthState = null };
-                // A registered client cannot use another redirect URI, and its tokens belong to it. `cimd` replaces a registered
-                // client; `auto` keeps it. A Client ID Metadata Document is not stored, so tokens without a stored client belong to
-                // the document, and are kept only while the document is offered (in PiSharp, only under `cimd`).
-                var keepClient = !string.IsNullOrEmpty(settings.ClientId) || (stored.ClientInformation is not null
-                    ? settings.ClientRegistration != "cimd" && RegisteredRedirectUrls(stored.ClientInformation).Contains(redirectUrl)
-                    : offersDocument);
-                if (!keepClient) next = next with { ClientInformation = null, Tokens = null, TokensExpireAt = null };
-                await store.SaveAsync(next).ConfigureAwait(false);
-            }
-            if (!string.IsNullOrEmpty(settings.ClientId))
-            {
-                // A configured client is used as is; the native orchestrator reads it from the store.
-                var current = await store.LoadAsync().ConfigureAwait(false) ?? new McpOAuthState(options.ServerUrl.AbsoluteUri);
-                var client = JsonSerializer.Serialize(settings.ClientSecret is { Length: > 0 } secret
-                    ? new Dictionary<string, string> { ["client_id"] = settings.ClientId, ["client_secret"] = secret }
-                    : new Dictionary<string, string> { ["client_id"] = settings.ClientId });
-                await store.SaveAsync(current with { ClientInformation = JsonData.Parse(client) }).ConfigureAwait(false);
-            }
-
-            McpDefaultOAuthHost CreateHost(string hostRedirectUrl) => McpDefaultOAuthHost.Install(new(options.ServerUrl, new Uri(hostRedirectUrl),
-                McpDefaultOAuthClientMetadata.Create(settings.ClientName, hostRedirectUrl, !string.IsNullOrEmpty(settings.ClientSecret)), store,
-                options.UnixMilliseconds, _ => ValueTask.FromResult(options.RandomBytes(32)),
-                (url, _) => { authorizationUrl = url; return ValueTask.CompletedTask; },
-                (returned, _) => returned is not null && returned == state ? ValueTask.CompletedTask
-                    : ValueTask.FromException(new InvalidOperationException("The redirect URL belongs to a different sign-in")),
-                options.Http, (endpoint, _) => endpoint.Scheme is "http" or "https", new(),
-                AuthorizationState: async _ =>
-                {
-                    // provider.state(): a stored state, or 32 random bytes as hex, stored for the response.
-                    var current = await store.LoadAsync().ConfigureAwait(false);
-                    if (current?.OAuthState is { Length: > 0 } existing) return state = existing;
-                    state = Convert.ToHexString(options.RandomBytes(32)).ToLowerInvariant();
-                    await store.SaveAsync((current ?? new McpOAuthState(options.ServerUrl.AbsoluteUri)) with { OAuthState = state }).ConfigureAwait(false);
-                    return state;
-                },
-                // Upstream's createProvider: the document when offered; an explicit `cimd` fails without server support
-                // (McpOAuthClientMetadataDocuments.Create), and `auto` never reaches it in PiSharp.
-                ClientMetadataDocumentBase: offersDocument ? ClientMetadataBaseUrl : null,
-                AuthorizationServerMetadataUrl: settings.AuthServerMetadataUrl, RequestTimeout: options.RequestTimeout));
-            host = CreateHost(redirectUrl);
-            // A server asking for more scope gets it on top of the configured scope and, since the challenge may list only the
-            // missing scopes, on top of the scope granted so far. A refresh keeps the granted scope, so a step-up skips it.
-            var challenge = options.Challenge; var stepUp = challenge?.IsStepUp == true;
-            var scope = MergeScopes(settings.Scope, stepUp ? McpOAuthScope.StepUp(stored?.Tokens?.Scope, challenge!.Scope) : challenge?.Scope);
-            host.UseChallenge(challenge?.ResourceMetadataUrl);
-            if ((await host.AuthorizeAsync(host.Options(scope: scope, skipRefresh: stepUp || triedStoredRefresh), token).ConfigureAwait(false)).Outcome == McpOAuthAuthorizationOutcome.Authorized) return;
-            if (authorizationUrl is null || state is null) throw new InvalidOperationException("OAuth flow did not produce an authorization URL");
-            // The flow picks the redirect URI, which may be specific to the MCP server.
-            var authorizationRedirectUrl = new Uri(McpOAuthCallbackServer.Query(authorizationUrl.Query.TrimStart('?'), "redirect_uri") ?? redirectUrl);
-            options.Prompt.ShowAuthorizationUrl(authorizationUrl);
-            var response = await WaitForAuthorizationResponseAsync(callback, state, authorizationRedirectUrl, options.Prompt, token).ConfigureAwait(false);
-            await host.CompleteAuthorizationAsync(response.Code, response.State, scope, token, response.Iss).ConfigureAwait(false);
+            var start = await signIn.StartAsync(startOptions, token).ConfigureAwait(false);
+            if (start.Redirect is not { } authorization) return;
+            options.Prompt.ShowAuthorizationUrl(new Uri(authorization.AuthorizationUrl));
+            var response = await WaitForAuthorizationResponseAsync(callback, authorization.State,
+                new Uri(authorization.RedirectUrl), options.Prompt, token).ConfigureAwait(false);
+            await signIn.CompleteAsync(startOptions, authorization, new(response.Code, response.State, response.Iss), token).ConfigureAwait(false);
         }
-        catch (Exception error)
-        {
-            // Aborted requests fail with the cancellation; report them as the cancellation they are.
-            failure = token.IsCancellationRequested ? new McpSignInCancelledException() : error;
-            if (ReferenceEquals(failure, error)) throw;
-            throw failure;
-        }
-        finally
-        {
-            await callback.DisposeAsync().ConfigureAwait(false);
-            // The host's close re-reports its last failed operation, which the caller already has.
-            if (host is not null)
-                try { await host.DisposeAsync().ConfigureAwait(false); }
-                catch (Exception) when (failure is not null) { }
-        }
+        catch (OperationCanceledException) when (token.IsCancellationRequested) { throw new McpSignInCancelledException(); }
+        finally { await signIn.SettledAsync().ConfigureAwait(false); }
     }
 
     /// <summary>Listen on the port, or on a free port when it is taken and not required.</summary>
@@ -226,7 +147,7 @@ public static class McpSignIn
     }
 
     /// <summary>The browser callback or a pasted redirect URL, whichever comes first.</summary>
-    private static async Task<McpOAuthCallback> WaitForAuthorizationResponseAsync(McpOAuthCallbackServer callback, string state,
+    public static async Task<McpOAuthCallback> WaitForAuthorizationResponseAsync(McpOAuthCallbackServer callback, string state,
         Uri redirectUrl, McpSignInPrompt prompt, CancellationToken token)
     {
         using var controller = CancellationTokenSource.CreateLinkedTokenSource(token);
@@ -249,7 +170,7 @@ public static class McpSignIn
         }
     }
 
-    internal static McpOAuthCallback ResponseFromRedirectUrl(string input, string state, Uri redirectUrl)
+    public static McpOAuthCallback ResponseFromRedirectUrl(string input, string state, Uri redirectUrl)
     {
         if (!Uri.TryCreate(input.Trim(), UriKind.Absolute, out var url)) throw new InvalidOperationException("Expected the full redirect URL from the browser address bar");
         // A server-specific redirect URI tells authorization servers apart, so it must match exactly.

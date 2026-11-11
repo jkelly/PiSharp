@@ -932,8 +932,7 @@ public sealed partial class TuiAltScreen : TuiBase, IViewportTui
         var fullRedraw = previousScreen.Count == 0 || previousScreenWidth != width || previousScreenHeight != height;
         var changed = screen.Select((line, row) => row >= previousScreen.Count || !string.Equals(line, previousScreen[row], StringComparison.Ordinal)).ToList();
         var anchorsRedraw = screen.Where((line, row) => changed[row] && (TerminalImage.IsImageLine(line) || TerminalImage.IsImageLine(Previous(row)))).Any();
-        var isWezTerm = env("WEZTERM_PANE") is { Length: > 0 } || (env("TERM_PROGRAM") ?? "").Equals("wezterm", StringComparison.OrdinalIgnoreCase);
-        var cellsRedraw = !anchorsRedraw && isWezTerm && imageProtocol == ImageProtocol.Kitty && changed.Any(c => c) && screen.Select((line, row) =>
+        var cellsRedraw = !anchorsRedraw && imageProtocol == ImageProtocol.Kitty && changed.Any(c => c) && screen.Select((line, row) =>
         {
             if (TerminalImage.GetKittyImagePlacementRows(line) is not { } rows) return false;
             for (var covered = row; covered < row + rows; covered++) if (covered < changed.Count && changed[covered]) return true;
@@ -957,7 +956,8 @@ public sealed partial class TuiAltScreen : TuiBase, IViewportTui
         }
         buffer.Append(prepared.Item2);
         bool Skip(int row) => !fullRedraw && !imagesRedraw && string.Equals(Line(screen, row), Previous(row), StringComparison.Ordinal);
-        if (redrawImages && imageProtocol == ImageProtocol.Kitty && screen.Any(TerminalImage.IsImageLine) && isWezTerm)
+        // Cell-backed image implementations (including Orca) erase placements on later row writes.
+        if (redrawImages && imageProtocol == ImageProtocol.Kitty && screen.Any(TerminalImage.IsImageLine))
         {
             for (var row = 0; row < height; row++) if (!Skip(row)) buffer.Append($"\u001b[{row + 1};1H\u001b[2K");
             for (var row = 0; row < height; row++) if (!Skip(row) && !TerminalImage.IsImageLine(Line(prepared.Item1, row))) buffer.Append($"\u001b[{row + 1};1H").Append(Line(prepared.Item1, row));

@@ -76,7 +76,7 @@ internal static class FoundationCases
             Equal(5, settings.AutocompleteMaxVisible, "autocompleteMaxVisible");
             Equal("tree", settings.DoubleEscapeAction, "doubleEscapeAction");
             Equal(false, settings.QuietStartup, "quietStartup");
-            Equal("streaming", settings.CacheWarmingMode, "cacheWarming");
+            Equal("idle", settings.CacheWarmingMode, "cacheWarming");
             Equal(true, settings.ShowImages, "showImages");
             Equal(60, settings.ImageWidthCells, "imageWidthCells");
             Equal("one-at-a-time", settings.SteeringMode, "steeringMode");

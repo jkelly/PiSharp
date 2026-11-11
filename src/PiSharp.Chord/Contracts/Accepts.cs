@@ -144,7 +144,7 @@ internal static partial class ContractsInternal
         OrderedDictionary<string, MethodNeed> Methods,
         OrderedDictionary<string, StateNeed> Keyed);
 
-    private enum StateNeed { Changed, Removed }
+    private enum StateNeed { Changed, Removed, Rekeyed }
 
     /// <summary>A removed method, or a changed one with the sides that changed.</summary>
     private sealed record MethodNeed(bool Removed, bool Args, bool Result);
@@ -163,6 +163,7 @@ internal static partial class ContractsInternal
             foreach (var member in members.Keyed.Keys)
             {
                 if (!now.Keyed.ContainsKey(member)) keyed[member] = StateNeed.Removed;
+                else if (members.Keyed[member].KeyHost?.Kind != now.Keyed[member].KeyHost?.Kind) keyed[member] = StateNeed.Rekeyed;
                 else if (Changed(variant, member, ChangeSide.Keyed)) keyed[member] = StateNeed.Changed;
             }
             var variantNeeds = new OrderedDictionary<string, StateNeed>(StringComparer.Ordinal);
@@ -235,7 +236,8 @@ internal static partial class ContractsInternal
     private static void CheckKeyedMapping(StateMapping mapping, StateNeed need, string path)
     {
         if (mapping.Refuses || (need == StateNeed.Changed && mapping.Map is not null)) return;
-        throw new ArgumentException($"{path}: expected {(need == StateNeed.Changed ? "a function or \"refuse\"" : "\"refuse\"")}");
+        var because = need == StateNeed.Rekeyed ? " (its key kind changed: a value mapping cannot map keys)" : "";
+        throw new ArgumentException($"{path}: expected {(need == StateNeed.Changed ? "a function or \"refuse\"" : "\"refuse\"")}{because}");
     }
 
     private static void CheckMethodMapping(MethodMapping? mapping, MethodNeed need, string path)

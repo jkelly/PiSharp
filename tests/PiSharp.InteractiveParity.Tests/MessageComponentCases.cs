@@ -626,6 +626,50 @@ internal static class MessageComponentCases
             Equal("same", MarkdownTransform.CreateMarkdownTransform("user", () => false, [])("same", 1), "no transformers");
         }));
 
+        yield return ("sync152.markdown-custom-and-summary-payload-metadata", Sync(() =>
+        {
+            var calls = new List<(string Text, MarkdownTransformContext Context)>();
+            MarkdownTransformer capture = (text, context) => { calls.Add((text, context)); return "rewritten payload"; };
+            const string stamp = "2026-11-10T00:00:00.000Z";
+            var custom = new CustomMessageComponent(Custom("note", "custom payload"), null, null, 1, [capture], "custom-id", stamp);
+            var rendered = string.Join("\n", Strip(custom.Render(40)));
+            Contains(rendered, "[note]", "custom header retained");
+            Contains(rendered, "rewritten payload", "custom transformed");
+            Equal(("custom payload", new MarkdownTransformContext("custom", false, 38, "custom-id", stamp)), calls.Single(), "custom context");
+            calls.Clear();
+            var owned = new CustomMessageComponent(Custom("note", "private payload"), (_, _, _) => new Text("owned", 0, 0), null, 1, [capture]);
+            owned.Render(40);
+            Equal(0, calls.Count, "custom renderer owns its rendering");
+
+            var branch = new BranchSummaryMessageComponent(new JsonObject { ["summary"] = "branch payload" }, null, 1, [capture], "branch-id", stamp);
+            var compaction = new CompactionSummaryMessageComponent(new JsonObject { ["summary"] = "compaction payload", ["tokensBefore"] = 100 }, null, 1, [capture], "compaction-id", stamp);
+            var skill = new SkillInvocationMessageComponent(new ParsedSkillBlock("skill-name", "/skill.md", "skill payload", null), null, 1, [capture], "skill-id", stamp);
+            branch.Render(40); compaction.Render(40); skill.Render(40);
+            Equal(0, calls.Count, "collapsed components bypass transforms");
+            branch.SetExpanded(true); compaction.SetExpanded(true); skill.SetExpanded(true);
+            Contains(string.Join("\n", Strip(branch.Render(40))), "Branch Summary", "branch header retained");
+            Contains(string.Join("\n", Strip(compaction.Render(40))), "Compacted from 100 tokens", "compaction header retained");
+            Contains(string.Join("\n", Strip(skill.Render(40))), "skill-name", "skill header retained");
+            Equal(3, calls.Count, "each expanded payload transforms once");
+            Equal(("branch payload", new MarkdownTransformContext("summary", false, 38, "branch-id", stamp)), calls[0], "branch payload excludes header");
+            Equal(("compaction payload", new MarkdownTransformContext("summary", false, 38, "compaction-id", stamp)), calls[1], "compaction payload excludes header");
+            Equal(("skill payload", new MarkdownTransformContext("custom", false, 38, "skill-id", stamp)), calls[2], "skill payload excludes header");
+        }));
+
+        yield return ("sync152.markdown-six-surface-contexts", Sync(() =>
+        {
+            foreach (var type in new[] { MarkdownMessageType.User, MarkdownMessageType.Assistant, MarkdownMessageType.AssistantThinking,
+                MarkdownMessageType.Custom, MarkdownMessageType.Summary, MarkdownMessageType.Changelog })
+            {
+                MarkdownTransformContext? seen = null;
+                var transform = MarkdownTransform.CreateMarkdownTransform(type, () => false,
+                    [(text, context) => { seen = context; return text + " first"; }, (_, _) => throw new Exception("expected"),
+                     (_, _) => null, (text, _) => text + " last"], "entry", "timestamp");
+                Equal("payload first last", transform("payload", 23), type + " pipeline preserves current text");
+                Equal(new MarkdownTransformContext(type, false, 23, "entry", "timestamp"), seen!, type + " context");
+            }
+        }));
+
         // ---------------------------------------------------------------- earendil-announcement.ts
         yield return ("msg.earendil-announcement.render", Sync(() =>
         {

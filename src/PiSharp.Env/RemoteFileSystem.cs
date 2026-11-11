@@ -171,7 +171,7 @@ public sealed partial class RemoteExecutionEnv
     public Task<Result<Unit, FileError>> RemoveAsync(string path, RemoveOptions? options, DurableContext context) => Mutation("rm", path, context, new() { ["recursive"] = options?.Recursive ?? false, ["force"] = options?.Force ?? false });
     public Task<Result<Unit, FileError>> RenameFileAsync(string sourcePath, string destinationPath, DurableContext context) => FileOp(sourcePath, context, async source =>
     {
-        var destination = await ResolveAsync(destinationPath).ConfigureAwait(false);
+        var destination = await ResolveAsync(destinationPath, context.CancellationToken).ConfigureAwait(false);
         CheckCancellation(context, destination);
         await Connection.RequestAsync("rename", new() { ["path"] = source, ["to"] = destination }).ConfigureAwait(false);
         return Unit.Value;
@@ -192,7 +192,7 @@ public sealed partial class RemoteExecutionEnv
         if (!directory.IsOk) return directory.Error;
         return await FileOp(directory.Value, context, async resolved =>
         {
-            var info = await Connection.InfoAsync().ConfigureAwait(false);
+            var info = await Connection.InfoAsync(context.CancellationToken).ConfigureAwait(false);
             var path = RemotePaths.Join(info, [resolved, (options?.Prefix ?? "") + Guid.NewGuid().ToString() + (options?.Suffix ?? "")]);
             await Connection.RequestAsync("write", new() { ["path"] = path, ["append"] = false, ["parents"] = false }).ConfigureAwait(false);
             return path;

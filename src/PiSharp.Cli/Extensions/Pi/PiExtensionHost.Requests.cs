@@ -1093,7 +1093,8 @@ internal sealed partial class PiExtensionHost
         return [.. value.GetProperty("lines").EnumerateArray().Select(line => line.GetString() ?? "")];
     }
 
-    /// <summary>Source getMarkdownTransformers: the extensions' markdown transformers applied in load order.</summary>
+    /// <summary>Source getMarkdownTransformers: the extensions' markdown transformers applied in load order. The descriptor reports
+    /// registration presence; Node retains the callback and exact message-type set, and filters using the supplied context.</summary>
     internal async Task<string> TransformMarkdownAsync(string markdown, JsonObject? context, CancellationToken token)
     {
         if (!Extensions.Any(extension => extension.Descriptor["markdownTransformer"]?.GetValue<bool>() == true)) return markdown;

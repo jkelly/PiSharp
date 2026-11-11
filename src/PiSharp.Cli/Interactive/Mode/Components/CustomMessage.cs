@@ -33,14 +33,21 @@ internal sealed class CustomMessageComponent : Container
     private readonly Box box;
     private IComponent? customComponent;
     private readonly MarkdownTheme markdownTheme;
+    private readonly IReadOnlyList<MarkdownTransformer> markdownTransformers;
+    private readonly string? messageId;
+    private readonly string? timestamp;
     private bool expanded;
     private int outputPad;
 
-    public CustomMessageComponent(JsonObject message, MessageRenderer? customRenderer = null, MarkdownTheme? markdownTheme = null, int outputPad = 1)
+    public CustomMessageComponent(JsonObject message, MessageRenderer? customRenderer = null, MarkdownTheme? markdownTheme = null, int outputPad = 1,
+        IReadOnlyList<MarkdownTransformer>? markdownTransformers = null, string? messageId = null, string? timestamp = null)
     {
         this.message = message;
         this.customRenderer = customRenderer;
         this.markdownTheme = markdownTheme ?? Themes.GetMarkdownTheme();
+        this.markdownTransformers = markdownTransformers ?? [];
+        this.messageId = messageId;
+        this.timestamp = timestamp;
         this.outputPad = outputPad;
 
         AddChild(new Spacer(1));
@@ -129,7 +136,8 @@ internal sealed class CustomMessageComponent : Container
                 .Select(c => Str(c, "text") ?? ""));
         }
 
-        box.AddChild(new Markdown(text, 0, 0, markdownTheme, new DefaultTextStyle(Color: t => theme.Fg("customMessageText", t))));
+        box.AddChild(new Markdown(text, 0, 0, markdownTheme, new DefaultTextStyle(Color: t => theme.Fg("customMessageText", t)),
+            new MarkdownOptions(Transform: MarkdownTransform.CreateMarkdownTransform(MarkdownMessageType.Custom, () => false, markdownTransformers, messageId, timestamp))));
     }
 
     private static string? Str(JsonObject? obj, string key) =>

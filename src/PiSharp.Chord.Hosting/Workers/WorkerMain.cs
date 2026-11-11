@@ -12,6 +12,9 @@ public sealed class WorkerContext
     private readonly ILink link;
     private readonly PluginRuntimeOptions runtimeOptions;
     private readonly Func<Task> started;
+    private readonly object cleanupGate = new();
+    private readonly List<Func<ChordContext, Task>> closingCallbacks = [];
+    private readonly List<Func<ChordContext, Task>> closedCallbacks = [];
     internal PluginRuntime? Runtime;
     internal bool Connected;
     internal ChordHost? ConnectedHost;
@@ -20,6 +23,20 @@ public sealed class WorkerContext
     { Start = start; this.link = link; Context = context; this.runtimeOptions = runtimeOptions; this.started = started; }
     public WorkerStart Start { get; }
     public ChordContext Context { get; }
+    /// <summary>Registers cleanup before the parent link and host close, in reverse registration order.</summary>
+    public void OnClosing(Func<ChordContext, Task> callback) { ArgumentNullException.ThrowIfNull(callback); lock (cleanupGate) closingCallbacks.Add(callback); }
+    /// <summary>Registers resource disposal after the host and plugin runtime have actually closed.</summary>
+    public void OnClosed(Func<ChordContext, Task> callback) { ArgumentNullException.ThrowIfNull(callback); lock (cleanupGate) closedCallbacks.Add(callback); }
+    internal async Task CleanupAsync(bool afterHost, ChordContext context)
+    {
+        Func<ChordContext, Task>[] callbacks;
+        lock (cleanupGate) callbacks = (afterHost ? closedCallbacks : closingCallbacks).AsEnumerable().Reverse().ToArray();
+        foreach (var callback in callbacks)
+        {
+            try { await callback(context).ConfigureAwait(false); }
+            catch (Exception error) { Console.Error.WriteLine($"worker cleanup failed: {error.Message}"); }
+        }
+    }
     public Address Address(HostKind kind)
     {
         if (kind.Kind != Start.Address.Kind) throw new ArgumentException("worker address belongs to another host kind", nameof(kind));
@@ -62,7 +79,7 @@ public static class WorkerMain
         if (first.Kind != "start" || first.Start is null) throw new InvalidDataException("worker expected start");
         using var addressLock = await ProcessAddressLock.AcquireAsync(first.Start.Address.Key, first.Start.LockDirectory, lifetime.Token).ConfigureAwait(false);
         using var link = new FramedPipeLink(data, data, leaveOpen: true);
-        var observed = new ObservedLink(link); observed.Observe(lifetime.Cancel);
+        var observed = new ObservedLink(link); observed.Observe(() => lifetime.Cancel());
         ChordHost? host = null; WorkerContext? worker = null;
         Task<ChordHost>? initialization = null;
         var shutdownRequested = false;
@@ -124,12 +141,20 @@ public static class WorkerMain
         {
             lifetime.Cancel();
             using var cleanup = new CancellationTokenSource(TimeSpan.FromSeconds(3));
+            var cleanupContext = ChordContext.WithAbortSignal(cleanup.Token, ChordContext.Background);
+            if (worker is not null) await worker.CleanupAsync(false, cleanupContext).ConfigureAwait(false);
             foreach (var connected in new[] { host, worker?.ConnectedHost }.OfType<ChordHost>().Distinct())
-                try { await connected.CloseAsync(ChordContext.Background).WaitAsync(cleanup.Token).ConfigureAwait(false); } catch (Exception) { }
+            {
+                // Original closers may still need the store/private DLLs. The supervisor's process grace is the
+                // hard bound; do not dispose their resources merely because an inner public wait expired.
+                try { await connected.CloseAsync(ChordContext.Background).ConfigureAwait(false); } catch (Exception) { }
+                try { await connected.JoinOriginalsAsync(ChordContext.Background).ConfigureAwait(false); } catch (Exception) { }
+            }
             if (initialization is not null) try { await initialization.WaitAsync(cleanup.Token).ConfigureAwait(false); } catch (Exception) { }
             // Noncooperative startup is owned by this process until its bounded exit; never unload underneath its original task.
             if (initialization?.IsCompleted != false && worker?.Runtime is { } runtime)
-                try { await runtime.DisposeAsync().AsTask().WaitAsync(cleanup.Token).ConfigureAwait(false); } catch (Exception) { }
+                try { await runtime.JoinOriginalsAsync().ConfigureAwait(false); } catch (Exception) { }
+            if (initialization?.IsCompleted != false && worker is not null) await worker.CleanupAsync(true, cleanupContext).ConfigureAwait(false);
             await pump.ConfigureAwait(false);
         }
     }

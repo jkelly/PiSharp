@@ -22,8 +22,9 @@ internal static class GapFileToolsTests
         Check(rejected.IsError && rejected.Details.ToString().Contains("ResourceLimit"), "Legacy adapter must retain bounded fallback.");
         var small = Path.Combine(temp.Root, "small"); await File.WriteAllTextAsync(small, "zero\r\none\n\ntwo\n");
         var streaming = new ReadWriteTools(temp.Root, temp.Root, options: new(MaximumReadBytes: 1));
+        var fallback = new ReadWriteTools(temp.Root, temp.Root, new Legacy());
         foreach (var offset in new[] { -2d, 0d, 1d, 1.5, 2d, 3d, 4d, 5d }) foreach (var limit in new[] { -2d, 0d, 1d, 1.5, 2d, 20d })
-        { var args = new { path = small, offset, limit }; Equal(Text(await Invoke(tools.CreateInvoker(new Allow()), "read", args)), Text(await Invoke(streaming.CreateInvoker(new Allow()), "read", args))); }
+        { var args = new { path = small, offset, limit }; var selected = offset == Math.Truncate(offset) && limit >= 0 && limit == Math.Truncate(limit) ? streaming : fallback; Equal(Text(await Invoke(tools.CreateInvoker(new Allow()), "read", args)), Text(await Invoke(selected.CreateInvoker(new Allow()), "read", args))); }
         using var canceled = new CancellationTokenSource(); canceled.Cancel();
         try { await new LocalFileOperations().OpenReadAsync(path, canceled.Token); throw new Exception("Cancellation ignored"); } catch (OperationCanceledException) { }
     }
@@ -48,6 +49,11 @@ internal static class GapFileToolsTests
             var exact = await Invoke(new ToolInvoker([find], new Allow()), "find", new { pattern = "*.txt", limit });
             Equal("src/utf16.txt", Text(exact));
             Check(!exact.HasProperty("details"), "Exact find limit reported truncation.");
+        }
+        foreach (var pattern in OperatingSystem.IsWindows() ? new[] { "src/**/*.txt", @"src\**\*.txt" } : new[] { "src/**/*.txt" })
+        {
+            var pathMatch = await Invoke(new ToolInvoker([find], new Allow()), "find", new { pattern, limit = 1 });
+            Equal("src/utf16.txt", Text(pathMatch)); Check(!pathMatch.HasProperty("details"), "Path-glob exact limit reported truncation.");
         }
         await File.WriteAllTextAsync(Path.Combine(directory, "other.txt"), "needle");
         foreach (var limit in new[] { 0d, -2d, 1.9 })

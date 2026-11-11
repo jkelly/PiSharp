@@ -16,6 +16,7 @@ using PiSharp.Chord.Host;
 using PiSharp.Chord.Link;
 using PiSharp.Chord.Registries;
 using PiSharp.Chord.Hosting.Plugins;
+using PiSharp.Telemetry;
 
 namespace PiSharp.Chord.Hosting.Http;
 
@@ -26,7 +27,7 @@ public sealed class ChordHttp : IAsyncDisposable
     private readonly ChordHttpOptions options;
     private readonly object sync = new();
     private readonly Dictionary<CancellationTokenSource, TaskCompletionSource> running = [];
-    private sealed record SocketAdmission(WebSocket Socket, HttpRequestContext Request, HttpSocket? Handler);
+    private sealed record SocketAdmission(WebSocket Socket, HttpRequestContext Request, HttpSocket? Handler, bool Anonymous = false);
     private readonly Dictionary<WebSocket, SocketAdmission> sockets = [];
     private readonly CancellationTokenSource stopped = new();
     private Task? routerWatching;
@@ -98,8 +99,11 @@ public sealed class ChordHttp : IAsyncDisposable
         var context = ChordContext.WithAbortSignal(cancellation.Token, ChordContext.Background);
         HttpRequestContext? request = null;
         HttpRouter? responseRouter = null;
+        OpenSpan? span = null;
+        var aborted = false;
         try
         {
+            if (!host.IsLoaded) throw new HttpFailure(503);
             if (native.Request.Method is "TRACE" or "TRACK" or "CONNECT") throw new HttpFailure(501);
             var registry = await host.RegistryAsync(HttpRegistries.Http, context).ConfigureAwait(false);
             lock (sync) routerWatching ??= WatchRouterAsync(registry);
@@ -115,6 +119,19 @@ public sealed class ChordHttp : IAsyncDisposable
             var socketRoute = native.WebSockets.IsWebSocketRequest ? router.Sockets.OrderByDescending(x => x.Path.Rank, StringComparer.Ordinal).Select(x => (Route: x, Args: x.Path.Match(native.Request.Path.Value ?? "/"))).FirstOrDefault(x => x.Args is not null) : default;
             if (socketRoute.Args is not null) parameters = socketRoute.Args;
             request = new(native, origin, provenance, parameters, framer);
+            if (route is not null && !native.WebSockets.IsWebSocketRequest && options.Telemetry is { } adapter && !ChordTelemetry.IsUntraced(adapter))
+            {
+                IReadOnlyDictionary<string, string>? carrier = null;
+                if (provenance.Kind == "relayed" && TraceHeader(native.Request, "traceparent", 256) is { } parent)
+                {
+                    var headers = new Dictionary<string, string> { ["traceparent"] = parent };
+                    if (TraceHeader(native.Request, "tracestate", 512) is { } state) headers["tracestate"] = state;
+                    carrier = headers;
+                }
+                span = new OpenSpan(ChordTelemetry.ParentOf(carrier, adapter), "chord.http", new SpanAttributes
+                { ["chord.host"] = ChordTelemetry.HostAttribute(host.Address), ["method"] = native.Request.Method, ["route"] = route.Pattern });
+                context = ChordContext.WithTelemetry(span.Span, context);
+            }
             var foreign = IsForeign(native.Request, origin);
             var crossSite = route?.Value.CrossSite == true && !native.WebSockets.IsWebSocketRequest;
             var destination = native.Request.Headers["Sec-Fetch-Dest"].ToString();
@@ -138,19 +155,28 @@ public sealed class ChordHttp : IAsyncDisposable
             ApplyDefaults(native, request, router);
             if (native.WebSockets.IsWebSocketRequest)
             {
-                if (principal is null || (!isLink && socketRoute.Route is null)) throw new HttpFailure(principal is null ? 403 : 404);
+                if ((isLink || socketRoute.Route?.Public != true) && principal is null) throw new HttpFailure(401);
+                if (!isLink && socketRoute.Route is null) throw new HttpFailure(404);
                 await host.RootAsync(async call =>
                 {
                     var current = registry.Value;
-                    if (!StillAdmitted(new(null!, request, isLink ? null : socketRoute.Route!.Value), current)) throw new HttpFailure(403);
+                    if (!StillAdmitted(new(null!, request, isLink ? null : socketRoute.Route!.Value, principal is null), current)) throw new HttpFailure(403);
                     using var socket = await native.WebSockets.AcceptWebSocketAsync().ConfigureAwait(false);
-                    lock (sync) sockets.Add(socket, new(socket, request, isLink ? null : socketRoute.Route!.Value));
+                    lock (sync) sockets.Add(socket, new(socket, request, isLink ? null : socketRoute.Route!.Value, principal is null));
+                    Func<Task>? cleanup = null;
                     try
                     {
                         if (isLink)
                         {
+                            if (options.LinksOpened is { } opened)
+                            {
+                                try { cleanup = await opened(request, principal!).ConfigureAwait(false); }
+                                catch (Exception error) { Report(new("hook_failed", error, Pattern: "links.opened")); }
+                            }
                             var link = WebSocketLink.FromWebSocket(socket, 1024 * 1024);
-                            var linkOptions = options.LinkOptions?.Invoke(request, principal) ?? new LinkOptions { Principal = principal };
+                            LinkOptions linkOptions;
+                            try { linkOptions = options.LinkOptions?.Invoke(request, principal!) ?? new LinkOptions { Principal = principal! }; }
+                            catch (Exception error) { Report(new("hook_failed", error, Pattern: "links.options")); throw; }
                             host.Accept(link, linkOptions, call.Context);
                             while (socket.State is WebSocketState.Open or WebSocketState.CloseSent) await Task.Delay(100, call.AbortSignal).ConfigureAwait(false);
                         }
@@ -160,14 +186,19 @@ public sealed class ChordHttp : IAsyncDisposable
                             await PluginCallbacks.InvokeAsync(socketRoute.Route.Value, () => socketRoute.Route.Value(limited, request, call), routerCallbacks, router.CallbackOwners).WaitAsync(call.AbortSignal).ConfigureAwait(false);
                         }
                     }
-                    catch (OperationCanceledException) { socket.Abort(); }
-                    catch (Exception error) { Report(new("socket_failed", error, socketRoute.Route?.Plugin, socketRoute.Route?.Pattern)); socket.Abort(); }
-                    finally { lock (sync) sockets.Remove(socket); }
+                    catch (OperationCanceledException) { if (socket.State is WebSocketState.Open or WebSocketState.Connecting) socket.Abort(); }
+                    catch (Exception error) { Report(new("socket_failed", error, socketRoute.Route?.Plugin, socketRoute.Route?.Pattern)); if (socket.State is WebSocketState.Open or WebSocketState.Connecting) socket.Abort(); }
+                    finally
+                    {
+                        lock (sync) sockets.Remove(socket);
+                        if (cleanup is not null) try { await cleanup().ConfigureAwait(false); } catch (Exception error) { Report(new("hook_failed", error, Pattern: "links.opened")); }
+                    }
                     return true;
                 }, context, new RootOptions { Principal = principal }).ConfigureAwait(false);
                 return;
             }
             if (route is null) throw new HttpFailure(404);
+            if (principal is null && !route.Value.Public && !route.Value.CrossSite) throw new HttpFailure(401);
             await host.RootAsync(async call =>
             {
                 Func<Task<HttpResult>> next = () => PluginCallbacks.InvokeAsync(route.Value.Handler, () => route.Value.Handler(request, call));
@@ -193,9 +224,24 @@ public sealed class ChordHttp : IAsyncDisposable
             }, context, new RootOptions { Principal = principal }).ConfigureAwait(false);
         }
         catch (HttpFailure error) { if (!native.Response.HasStarted) { native.Response.StatusCode = error.Status; ApplyDefaults(native, request, responseRouter); } else native.Abort(); }
-        catch (OperationCanceledException) { if (!native.Response.HasStarted) { native.Response.StatusCode = 503; ApplyDefaults(native, request, responseRouter); } else native.Abort(); }
+        catch (OperationCanceledException) { aborted = true; if (!native.Response.HasStarted) { native.Response.StatusCode = 503; ApplyDefaults(native, request, responseRouter); } else native.Abort(); }
         catch (Exception error) { Report(new("response_failed", error)); if (!native.Response.HasStarted) { native.Response.StatusCode = error is ChordError ? 503 : 500; ApplyDefaults(native, request, responseRouter); } else native.Abort(); }
-        finally { lock (sync) running.Remove(cancellation); done.TrySetResult(); }
+        finally
+        {
+            if (span is not null)
+            {
+                span.Span.SetAttributes(new SpanAttributes { ["status"] = native.Response.StatusCode });
+                if (!aborted && native.Response.StatusCode >= 500) ChordTelemetry.SpanFailed(span.Span, "http_failed", new HttpFailure(native.Response.StatusCode));
+                span.End();
+            }
+            lock (sync) running.Remove(cancellation); done.TrySetResult();
+        }
+    }
+    private static string? TraceHeader(HttpRequest request, string name, int limit)
+    {
+        var values = request.Headers[name];
+        if (values.Count != 1 || values[0] is not { Length: > 0 } value || value.Length > limit || value.Any(c => c is < ' ' or > '~')) return null;
+        return value;
     }
     private async Task<(string Origin, HttpProvenance Provenance, string? Framer)> AdmitAsync(HttpContext native, HttpRouter router, IReadOnlyList<Delegate> dependencies, ChordContext context)
     {
@@ -260,7 +306,7 @@ public sealed class ChordHttp : IAsyncDisposable
     {
         if (admission.Request.Provenance.Kind == "remote" && (admission.Request.Native.Request.Host.Value is not { Length: > 0 } hostValue || !router.Hosts.Contains(hostValue))) return false;
         if (admission.Request.Provenance.Kind == "relayed" && !router.Relays.Any(x => x.Value.Name == admission.Request.Provenance.Relay)) return false;
-        return admission.Handler is null || router.Sockets.Any(x => ReferenceEquals(x.Value, admission.Handler) && x.Path.Match(admission.Request.Path) is not null);
+        return admission.Handler is null || router.Sockets.Any(x => ReferenceEquals(x.Value, admission.Handler) && (!admission.Anonymous || x.Public) && x.Path.Match(admission.Request.Path) is not null);
     }
     private static void ApplyDefaults(HttpContext native, HttpRequestContext? request, HttpRouter? router)
     {
@@ -269,7 +315,8 @@ public sealed class ChordHttp : IAsyncDisposable
         headers.CacheControl = "no-store"; headers.XContentTypeOptions = "nosniff"; headers["Referrer-Policy"] = "no-referrer";
         var framers = (router?.Framers.AsEnumerable() ?? []).Concat(request?.Framer is { } framer ? [framer] : []).Distinct().ToArray();
         if (framers.Length == 0) headers.XFrameOptions = "DENY"; else headers.Remove("X-Frame-Options");
-        var csp = new Dictionary<string, string> { ["default-src"] = "'none'", ["script-src"] = $"'self' 'nonce-{request?.Nonce ?? Convert.ToBase64String(RandomNumberGenerator.GetBytes(18))}'", ["connect-src"] = "'self'", ["base-uri"] = "'none'", ["form-action"] = "'self'", ["frame-ancestors"] = framers.Length > 0 ? string.Join(' ', framers) : "'none'" };
+        var scripts = request is not null && router?.ScriptPaths.Count > 0 ? string.Join(' ', router.ScriptPaths.Select(path => request.Origin + path)) : "'self'";
+        var csp = new Dictionary<string, string> { ["default-src"] = "'none'", ["script-src"] = $"{scripts} 'nonce-{request?.Nonce ?? Convert.ToBase64String(RandomNumberGenerator.GetBytes(18))}'", ["connect-src"] = "'self'", ["base-uri"] = "'none'", ["form-action"] = "'self'", ["frame-ancestors"] = framers.Length > 0 ? string.Join(' ', framers) : "'none'" };
         if (router is not null) foreach (var (name, sources) in router.Csp) csp[name] = csp.GetValueOrDefault(name, "") + " " + string.Join(' ', sources);
         headers.ContentSecurityPolicy = string.Join("; ", csp.Select(x => x.Key + " " + x.Value));
     }

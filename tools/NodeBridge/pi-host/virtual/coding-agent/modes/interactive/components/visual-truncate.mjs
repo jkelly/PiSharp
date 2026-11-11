@@ -1,4 +1,4 @@
-// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/coding-agent/src/modes/interactive/components/visual-truncate.ts.
+// Pi b4afdddf44e059c67ccf5097e5317d913521b470 (MIT): packages/coding-agent/src/modes/interactive/components/visual-truncate.ts.
 // Ported to plain ESM for the PiSharp Node extension bridge (TypeScript types stripped mechanically; behaviour unchanged).
 import { Text, truncateToWidth } from "../../../../pi-tui.mjs";
 export function truncateToVisualLines(text, maxVisualLines, width, paddingX = 0, keep = "end") {

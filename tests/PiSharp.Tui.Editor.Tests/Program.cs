@@ -534,7 +534,10 @@ internal static class EditorTests
         editor.Clear(); var literal = string.Concat(Enumerable.Repeat("$&$1$$", 170)); editor.HandleInput(new TerminalPaste(literal)); editor.InsertText("[paste #1 +123 lines]"); Equal(literal + literal, editor.GetExpandedText());
         editor.Clear(); editor.HandleInput(new TerminalPaste(new string('a', 1001))); editor.HandleInput(new TerminalPaste(new string('b', 1002))); editor.InsertText("[paste #99][paste #2]");
         editor.HandleInput(new TerminalKey("Home")); editor.HandleInput(new TerminalKey("Right")); editor.HandleInput(new TerminalKey("Backspace"));
-        Equal("[paste #1 1002 chars][paste #98undefined][paste #1undefined]", editor.Snapshot.Text); Equal(new string('b', 1002) + "[paste #98undefined][paste #1undefined]", editor.GetExpandedText());
+        // Pi 1.5.2 (#11923): an absent size suffix remains empty during renumbering. The unknown marker stays
+        // literal, while the short marker for the remaining registered paste expands normally.
+        Equal("[paste #1 1002 chars][paste #98][paste #1]", editor.Snapshot.Text);
+        Equal(new string('b', 1002) + "[paste #98]" + new string('b', 1002), editor.GetExpandedText());
     }
 
     private static void UndoGrouping()

@@ -487,6 +487,7 @@ internal sealed partial class InteractiveMode
         private IReadOnlyList<HuggingFaceModel> results = [];
         private List<HuggingFaceModel> filteredResults = [];
         private int selectedIndex;
+        private bool selectionTouched;
         private string query = "";
         private string status = "Type at least 2 characters";
         private CancellationTokenSource? debounce;
@@ -539,7 +540,7 @@ internal sealed partial class InteractiveMode
             mode.ui.RequestRender();
         }
 
-        private void FilterResults()
+        private void FilterResults(string? preferredId = null)
         {
             if (query.Length > 0)
             {
@@ -547,7 +548,8 @@ internal sealed partial class InteractiveMode
                 filteredResults = [.. results.Where(model => matches.Contains(model.Id))];
             }
             else filteredResults = [.. results];
-            selectedIndex = Math.Min(selectedIndex, Math.Max(0, filteredResults.Count - 1));
+            var preferredIndex = preferredId is null ? -1 : filteredResults.FindIndex(model => model.Id == preferredId);
+            selectedIndex = preferredIndex >= 0 ? preferredIndex : Math.Min(selectedIndex, Math.Max(0, filteredResults.Count - 1));
             UpdateResults();
         }
 
@@ -584,10 +586,11 @@ internal sealed partial class InteractiveMode
                 var found = await searchModels(text, current.Token);
                 cache[text.ToLowerInvariant()] = found;
                 if (closed || current.IsCancellationRequested || query != text) return;
+                var selectedId = selectionTouched && selectedIndex >= 0 && selectedIndex < filteredResults.Count ? filteredResults[selectedIndex].Id : null;
                 results = found;
                 selectedIndex = 0;
                 status = found.Count == 0 ? "No GGUF models found" : "";
-                FilterResults();
+                FilterResults(selectedId);
             }
             catch (Exception error)
             {
@@ -613,17 +616,17 @@ internal sealed partial class InteractiveMode
             var keys = KeybindingsManager.Global;
             if (keys.Matches(data, "tui.select.up"))
             {
-                if (filteredResults.Count > 0) { selectedIndex = selectedIndex == 0 ? filteredResults.Count - 1 : selectedIndex - 1; UpdateResults(); }
+                if (filteredResults.Count > 0) { selectedIndex = selectedIndex == 0 ? filteredResults.Count - 1 : selectedIndex - 1; selectionTouched = true; UpdateResults(); }
                 return;
             }
             if (keys.Matches(data, "tui.select.down"))
             {
-                if (filteredResults.Count > 0) { selectedIndex = selectedIndex == filteredResults.Count - 1 ? 0 : selectedIndex + 1; UpdateResults(); }
+                if (filteredResults.Count > 0) { selectedIndex = selectedIndex == filteredResults.Count - 1 ? 0 : selectedIndex + 1; selectionTouched = true; UpdateResults(); }
                 return;
             }
             if (KeybindingsManager.GetSelectPageIndex(keys, data, selectedIndex, filteredResults.Count, SearchMaxVisible) is { } pageIndex)
             {
-                if (filteredResults.Count > 0) { selectedIndex = pageIndex; UpdateResults(); }
+                if (filteredResults.Count > 0) { selectedIndex = pageIndex; selectionTouched = true; UpdateResults(); }
                 return;
             }
             if (keys.Matches(data, "tui.select.confirm"))
@@ -638,6 +641,7 @@ internal sealed partial class InteractiveMode
             var next = TextUtils.JsTrim(input.GetValue());
             if (next == query) return;
             query = next;
+            selectionTouched = false;
             ScheduleSearch();
         }
     }

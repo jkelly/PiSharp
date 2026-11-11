@@ -10,7 +10,7 @@ $version='1.5.0.77'; $commit='1111111111111111111111111111111111111111'
 $results=[Collections.Generic.List[object]]::new()
 $maps=@{
     'PiSharp.Chord'=@('PiSharp.Contracts','PiSharp.Telemetry','PiSharp.Tools')
-    'PiSharp.Chord.Hosting'=@('PiSharp.Chord','PiSharp.Tools')
+    'PiSharp.Chord.Hosting'=@('PiSharp.Chord','PiSharp.Tools','PiSharp.Durable.Store','PiSharp.Tui')
     'PiSharp.Durable.Store'=@('PiSharp.Durable','PiSharp.Chord','PiSharp.Durable.Sqlite')
     'PiSharp.Env.Protocol'=@()
     'PiSharp.Env'=@('PiSharp.Env.Protocol','PiSharp.Durable')

@@ -132,6 +132,7 @@ internal sealed class ProfileRuntimeViewOwnership : IAsyncDisposable
     private Task? close;
     private bool bound;
     private Action? retire;
+    private AgentSessionAttachment? attachment;
     internal ProfileRuntimeViewOwnership(OfflineSessionProfile profile, IAsyncDisposable? native,
         ProfileViewLifetime.Hold hold, Func<ProfileRuntimeView> capture, long generation, Action? retire = null)
     { this.profile = profile; this.native = native; this.hold = hold; this.capture = capture; this.generation = generation; this.retire = retire; }
@@ -143,6 +144,7 @@ internal sealed class ProfileRuntimeViewOwnership : IAsyncDisposable
             if (bound || close is not null || attachment.Generation != generation)
                 throw new InvalidOperationException("View binding requires its exact unreleased generation.");
             bound = true;
+            this.attachment = attachment;
         }
         var view = capture();
         retire = () => profile.ForgetRuntimeView(attachment, view);
@@ -160,6 +162,11 @@ internal sealed class ProfileRuntimeViewOwnership : IAsyncDisposable
         var failures = new List<Exception>();
         try
         {
+            // A background warm belongs to this exact session, not whichever view is current after publication.
+            // Join it before either its transport or extension activation can be disposed.
+            if (attachment is { } ownedAttachment)
+                try { await profile.StopCacheWarmingAsync(ownedAttachment).ConfigureAwait(false); }
+                catch (Exception error) { failures.Add(error); }
             var nativeOriginal = native is null ? Task.CompletedTask : ProfileViewOriginal.Join(native);
             var viewOriginal = ProfileViewOriginal.Join(hold);
             try { await nativeOriginal.ConfigureAwait(false); } catch (Exception error) { failures.Add(error); }

@@ -5,6 +5,7 @@ using PiSharp.Chord.Data;
 using PiSharp.Chord.Documents;
 using PiSharp.Chord.Store;
 using PiSharp.Chord.State;
+using PiSharp.Telemetry;
 
 namespace PiSharp.Chord.Host;
 
@@ -15,8 +16,11 @@ internal sealed partial class ChordObject : ITarget, IDocumentsOwner, ITableOwne
     internal ServedType Served;
     internal readonly CheckedParams Parameters;
     internal readonly Caller Caller;
+    internal readonly ITelemetryContext Trigger;
     internal Attempt? Current;
     internal readonly Documents.Documents Documents;
+    internal readonly LiveQueries LiveQueries = new();
+    LiveQueries ITableOwner.Queries => LiveQueries;
     internal readonly List<Attempt> OldAttempts = [];
     internal long LiveOrder;
     internal readonly HashSet<IHolder> Holders = new(ReferenceEqualityComparer.Instance);
@@ -31,16 +35,19 @@ internal sealed partial class ChordObject : ITarget, IDocumentsOwner, ITableOwne
     private bool retryPending;
     private Task previousClose = Task.CompletedTask;
     private readonly List<Action> retryDetach = [];
-    internal ChordObject(ChordHost host, string identity, ServedType served, CheckedParams parameters, Caller caller)
+    internal ChordObject(ChordHost host, string identity, ServedType served, CheckedParams parameters, Caller caller, ChordContext? context = null)
     {
         Host = host; Identity = identity; Served = served; Parameters = parameters;
         Caller = served.Contract.Kind == ContractKind.Local ? host.OwnCaller : caller;
+        Trigger = context is null ? host.Telemetry : ChordHost.ParentOf(context);
         Label = parameters.Key.Length == 0 ? served.Contract.Name : $"{served.Contract.Name}({parameters.Key})";
         Documents = new(this, host.Options.TimeProvider);
     }
     public string Label { get; }
     public RefState State => state;
-    public bool Hydrated => Current?.Live == true;
+    public bool Hydrated => Current?.Live == true || OpenOldAttempt is not null;
+    public RefState StateFor(long version, string fingerprint) => state.Kind == "loading" && OldServes(version, fingerprint) ? RefState.Live : state;
+    internal bool OldServes(long version, string fingerprint) => OpenOldAttempt is { } old && DataInternal.Binds(old.Served.Provider, version, fingerprint);
     public string? Variant => FollowingAttempt?.Implementation?.Variant;
     public ChordError? LastFailure => state.Cause?.Error;
     public string? ActivationId => Current is { Live: false, Sealed: false } attempt ? attempt.InstanceId : null;
@@ -50,6 +57,7 @@ internal sealed partial class ChordObject : ITarget, IDocumentsOwner, ITableOwne
     internal Task EndCompletion => endingTask ?? Task.CompletedTask;
     public Batch Batch => Host.Batch;
     public ChordContext Context => Host.Context;
+    ITelemetryContext IDocumentsOwner.Telemetry => Host.Telemetry;
     public DocumentsStore? Store => Host.Store is { } store && Served.HostLifetime ? new(store, Served.Contract.Name) : null;
     object ITableOwner.Scope => Documents;
     internal void BeginAttempt()
@@ -72,6 +80,9 @@ internal sealed partial class ChordObject : ITarget, IDocumentsOwner, ITableOwne
     {
         if (state == next) return;
         state = next;
+        if (next.Kind == "failed" && OpenOldAttempt is null)
+            foreach (var previous in OldAttempts) previous.WithdrawContributions();
+        var before = stateChanged; stateChanged = new(TaskCreationOptions.RunContinuationsAsynchronously); before.TrySetResult();
         Host.Batch.Within(() => { foreach (var holder in Holders.ToArray()) holder.Retarget(); }, Context);
         foreach (var holder in Holders.ToArray()) holder.Moved();
         Host.ChangedPresence();
@@ -140,8 +151,40 @@ internal sealed partial class ChordObject : ITarget, IDocumentsOwner, ITableOwne
         try { await Task.Delay(duration, Host.Options.TimeProvider, token); if (!ending && Holders.Count == 0 && runs == 0) await EndAsync(new("released", $"{Label}: ended", "ended"), NativeCloseReason.End); }
         catch (OperationCanceledException) { }
     }
-    public Task<object?> CallAsync(string method, object? args, ChordContext context, Caller caller, long version) =>
-        Current?.CallAsync(method, args, context, caller, version) ?? Task.FromException<object?>(HostErrors.NotReady(Label));
+    private TaskCompletionSource stateChanged = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private readonly HashSet<ChordObject> gateWaits = new(ReferenceEqualityComparer.Instance);
+    internal IEnumerable<ChordObject> WaitEdges() => gateWaits
+        .Concat(Current?.Self.Dependencies.Select(binding => binding.Target).OfType<ChordObject>() ?? [])
+        .Concat(readiness?.Targets ?? []);
+    public async Task<object?> CallAsync(string method, object? args, ChordContext context, Caller caller, long version)
+    {
+        if (Host.OldWork.Of(context) && OpenOldAttempt is { } old)
+            return await old.CallAsync(method, args, context, caller, version);
+        var waiting = GateAsync(context);
+        if (Host.OldWork.Of(context))
+            await Host.ReloadCycles.WaitAsync(waiting, this, Current?.Served.Contract ?? Served.Contract, context);
+        else await waiting;
+        if (state.Kind == "ended") throw state.Error!;
+        if (state.Cause is { } failure) throw failure.Error;
+        return await (Current ?? throw HostErrors.NotReady(Label)).CallAsync(method, args, context, caller, version);
+    }
+    private async Task GateAsync(ChordContext context)
+    {
+        var opener = context.Value(OldWork.Opening);
+        if (opener is not null) { opener.gateWaits.Add(this); Host.ReloadCycles.Recheck(); }
+        var due = Host.Options.TimeProvider.GetUtcNow() + Host.Options.ReadyTimeout;
+        try
+        {
+            while (state.Kind == "loading")
+            {
+                var left = due - Host.Options.TimeProvider.GetUtcNow();
+                if (left <= TimeSpan.Zero) throw new ChordError("unavailable", $"{Label}: a call waited for its object to go live", "park_timeout");
+                try { await stateChanged.Task.WaitAsync(left, Host.Options.TimeProvider, context.AbortSignal ?? CancellationToken.None); }
+                catch (TimeoutException) { throw new ChordError("unavailable", $"{Label}: a call waited for its object to go live", "park_timeout"); }
+            }
+        }
+        finally { opener?.gateWaits.Remove(this); }
+    }
     public Followed Followed(string member, long version)
     {
         var current = FollowingAttempt;
@@ -156,12 +199,18 @@ internal sealed partial class ChordObject : ITarget, IDocumentsOwner, ITableOwne
         }
         return new(state.Kind == "failed" ? "failed" : "loading", Error: state.Cause?.Error, Instance: current);
     }
-    public IKeyedHandle KeyedMember(string member, long version) =>
-        FollowingAttempt is { HasSources: true } current && current.Members.GetValueOrDefault(member) is IKeyedHandle handle ? current.AdaptedKeyed(member, handle, version) : throw HostErrors.InvalidMember(member);
+    public IKeyedHandle KeyedMember(string member, long version)
+    {
+        if (FollowingAttempt is not { HasSources: true } current) throw HostErrors.InvalidMember(member);
+        var value = current.Members.GetValueOrDefault(member);
+        var handle = value is HostKeyed hostKeyed ? hostKeyed.Inner : value as IKeyedHandle;
+        return handle is not null ? current.AdaptedKeyed(member, handle, version) : throw HostErrors.InvalidMember(member);
+    }
     internal (IWatchable<JsonNode?> Source, Action Release, Task Loaded) PinKey(string member, string key, long version)
     {
         var current = FollowingAttempt;
         if (current?.HasSources != true || !current.Members.TryGetValue(member, out var memberValue)) throw HostErrors.NotReady(Label);
+        if (memberValue is HostKeyed hostKeyed) memberValue = hostKeyed.Inner;
         if (memberValue is Keyed own)
         {
             var release = own.Slot.Pin(key, Context);
@@ -193,6 +242,7 @@ internal sealed partial class ChordObject : ITarget, IDocumentsOwner, ITableOwne
         (visited.Add(this) && Current is { } attempt && attempt.Self.Dependencies.Any(d => d.Target?.Reaches(target, visited) == true));
     public void AssertLive() => Documents.AssertLive();
     public void Fail(ChordError error) { if (Current is { Live: true } attempt) Failed(attempt, new(FailureKind.Broken, error)); }
+    public void ReportTransactionCancelled(Exception error) => Host.Report(new("transaction_cancelled", error, Object: Label));
     internal void InstallRetrySources(IEnumerable<object> sources)
     {
         foreach (var detach in retryDetach) detach();
@@ -234,6 +284,8 @@ internal sealed partial class ChordObject : ITarget, IDocumentsOwner, ITableOwne
         foreach (var detach in retryDetach) detach(); retryDetach.Clear();
         if (linger is not null) { linger.Cancel(); linger.Dispose(); linger = null; Host.CountLinger(-1); }
         Documents.Seal(); Current?.Seal(error, keepSources: true);
+        openOld?.Seal(error, keepSources: true); readiness?.Release();
+        foreach (var previous in OldAttempts) previous.WithdrawContributions();
         SetState(RefState.Ended(error)); firstOutcome.TrySetResult();
         foreach (var holder in Holders.ToArray()) holder.End(error);
         Holders.Clear();

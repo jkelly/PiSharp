@@ -100,6 +100,14 @@ internal static class InteractiveModeHost
                 ModelFallbackMessage = options.Selection.FallbackMessage
             }));
             createExportToolRenderer = mode.CreateExportToolRenderer;
+            startup.Host.ChooseMissingSessionCwd = (stored, fallback, cancellation) =>
+                loop.InvokeAsync(async () =>
+                {
+                    var choices = PiSessions.MissingCwdOptions(fallback);
+                    var selected = await mode.ShowExtensionSelectorAsync(PiSessions.MissingCwdPrompt(stored, fallback),
+                        choices.Select(choice => choice.Label).ToArray(), signal: cancellation);
+                    return choices.FirstOrDefault(choice => choice.Label == selected).Value;
+                }).Unwrap();
             observeMode?.Invoke(mode);
             host = Task.Run(() => RpcSessionCommand.RunWithPresentationAsync(rpcArgs, connection.Input, connection.Output, hostDiagnostics, mode,
                 hostCancellation.Token, userShutdown: () => Volatile.Read(ref userQuit) != 0 && !token.IsCancellationRequested, mcpHost: mcpHost,
@@ -188,7 +196,7 @@ internal static class InteractiveModeHost
         // agent-session-runtime.ts: a file already in the session directory (with any casing on Windows) is not copied onto itself.
         var alreadyStored = PiPaths.PathsEqual(target, path);
         if (!alreadyStored && File.Exists(target)) target = Path.Join(directory, $"{Path.GetFileNameWithoutExtension(path)}-{Guid.NewGuid():N}.jsonl");
-        if (!alreadyStored) File.Copy(path, target);
+        if (!alreadyStored) { File.Copy(path, target); startup.Host.TrackImport(target, path); }
         return target;
     }
 

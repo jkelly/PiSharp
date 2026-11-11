@@ -1,4 +1,4 @@
-// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/schema/src/explain.ts.
+// Pi b4afdddf44e059c67ccf5097e5317d913521b470 (MIT): packages/schema/src/explain.ts.
 // Ported to plain ESM for the PiSharp Node extension bridge (TypeScript types stripped mechanically; behaviour unchanged).
 import { newAnnotations } from "./annotations.mjs";
 import { codePoints, constCheck, containsCheck, enumCheck, isMultiple, isObject, NEVER, TYPE_CHECKS, uniqueCheck } from "./checks.mjs";
@@ -69,7 +69,7 @@ export class Explainer {
         if (Object.hasOwn(node, "const") && !constCheck(node.const)(v)) push("const", `expected ${JSON.stringify(node.const)}`);
         if (typeof v === "string" && node.type !== "bytes") this.walkString(node, v, push);
         if (v instanceof Uint8Array && node.type === "bytes") this.walkBytes(node, v, push);
-        if (typeof v === "number") this.walkNumber(node, v, push);
+        if (typeof v === "number" || typeof v === "bigint") this.walkNumber(node, v, push);
         if (isObject(v)) this.walkObject(node, b, v, path, out, push);
         if (Array.isArray(v)) this.walkArray(node, b, v, path, out, push);
         if (Array.isArray(node.allOf)) for (const s of node.allOf)this.walk(s, b, v, path, out);
@@ -145,23 +145,20 @@ export class Explainer {
         }
     }
     walkNumber(node, v, push) {
-        if (typeof node.minimum === "number" && v < node.minimum) push("minimum", `expected >= ${node.minimum}`);
-        if (typeof node.maximum === "number" && v > node.maximum) push("maximum", `expected <= ${node.maximum}`);
-        if (typeof node.exclusiveMinimum === "number" && v <= node.exclusiveMinimum) {
-            push("exclusiveMinimum", `expected > ${node.exclusiveMinimum}`);
-        }
-        if (typeof node.exclusiveMaximum === "number" && v >= node.exclusiveMaximum) {
-            push("exclusiveMaximum", `expected < ${node.exclusiveMaximum}`);
-        }
-        if (typeof node.multipleOf === "number" && !isMultiple(v, node.multipleOf)) {
-            push("multipleOf", `expected a multiple of ${node.multipleOf}`);
-        }
+        const { minimum, maximum, exclusiveMinimum, exclusiveMaximum, multipleOf } = node;
+        if (isBound(minimum) && v < minimum) push("minimum", `expected >= ${minimum}`);
+        if (isBound(maximum) && v > maximum) push("maximum", `expected <= ${maximum}`);
+        if (isBound(exclusiveMinimum) && v <= exclusiveMinimum) push("exclusiveMinimum", `expected > ${exclusiveMinimum}`);
+        if (isBound(exclusiveMaximum) && v >= exclusiveMaximum) push("exclusiveMaximum", `expected < ${exclusiveMaximum}`);
+        if (isBound(multipleOf) && !isMultiple(v, multipleOf)) push("multipleOf", `expected a multiple of ${multipleOf}`);
     }
     walkObject(node, b, v, path, out, push) {
         const properties = isSchemaObject(node.properties) ? node.properties : {};
         const required = Array.isArray(node.required) ? node.required : [];
         for (const k of required){
-            if (typeof k === "string" && (!Object.hasOwn(v, k) || v[k] === undefined)) push("required", "missing", pointer(path, k));
+            if (typeof k !== "string") continue;
+            const accepted = v[k] === undefined && Object.hasOwn(properties, k) && this.ok(properties[k], b, undefined);
+            if (!Object.hasOwn(v, k) || v[k] === undefined && !accepted) push("required", "missing", pointer(path, k));
         }
         for (const k of Object.keys(properties)){
             if (Object.hasOwn(v, k) && v[k] !== undefined) this.walk(properties[k], b, v[k], pointer(path, k), out);
@@ -277,12 +274,12 @@ export class Explainer {
         ]);
     }
     declaredKeys(s, b, v) {
-        const node = isSchemaObject(s) && typeof s.$ref === "string" ? this.c.r.resolve(s.$ref, b).node : s;
+        const node = isSchemaObject(s) && typeof s.$ref === "string" ? this.c.r.resolve(s.$ref, this.c.r.baseFor(s, b)).node : s;
         const properties = isSchemaObject(node) && isSchemaObject(node.properties) ? node.properties : {};
         return Object.keys(v).filter((k)=>Object.hasOwn(properties, k)).length;
     }
     tagOf(branches, b) {
-        const resolved = branches.map((s)=>isSchemaObject(s) && typeof s.$ref === "string" ? this.c.r.resolve(s.$ref, b).node : s);
+        const resolved = branches.map((s)=>isSchemaObject(s) && typeof s.$ref === "string" ? this.c.r.resolve(s.$ref, this.c.r.baseFor(s, b)).node : s);
         const first = resolved[0];
         if (!isSchemaObject(first) || !isSchemaObject(first.properties)) return undefined;
         for (const key of Object.keys(first.properties)){
@@ -299,7 +296,7 @@ export class Explainer {
         return undefined;
     }
     walkUnevaluated(node, b, v, path, out) {
-        const { unevaluatedProperties, unevaluatedItems, ...rest } = node;
+        const { unevaluatedProperties, unevaluatedItems, $id: _id, ...rest } = node;
         const a = newAnnotations();
         this.c.annotating(rest, b)(v, a);
         if (isObject(v) && unevaluatedProperties !== undefined && !a.allProps) {
@@ -339,6 +336,9 @@ function containsMessage(min, max) {
     if (min === 0) return `expected at most ${max} matching ${max === 1 ? "item" : "items"}`;
     return `expected between ${min} and ${max} matching items`;
 }
+function isBound(value) {
+    return typeof value === "number" || typeof value === "bigint";
+}
 function pointer(path, key) {
     return `${path}/${String(key).replace(/~/g, "~0").replace(/\//g, "~1")}`;
 }
@@ -346,6 +346,8 @@ function typeName(v) {
     if (v === null) return "null";
     if (Array.isArray(v)) return "array";
     if (v instanceof Uint8Array) return "bytes";
+    if (typeof v === "bigint") return "bigint";
     if (typeof v === "number" && Number.isInteger(v)) return "integer";
+    if (typeof v === "number" && !Number.isFinite(v)) return String(v);
     return typeof v;
 }

@@ -1,4 +1,4 @@
-// Pi 7d073328e44337d3292a7db9b0f0308f679c5e97 (MIT): packages/durable/src/storage/sqlite/commit.ts and statements.ts.
+// Pi b4afdddf44e059c67ccf5097e5317d913521b470 (MIT): packages/durable/src/storage/sqlite/commit.ts and statements.ts.
 // Bounded prefetch, sequential semantic checks, and per-table pending writes. Copies flush pending writes before reading.
 using System.Collections.Immutable;
 using System.Text;
@@ -48,7 +48,6 @@ public sealed partial class SqliteStorage
             {
                 var record = DocumentRecord.FromJson(Record(row));
                 state.documents.Add(record.Id.Value, record);
-                addresses[StorageRules.AddressKey(record)] = AddressParts.Of(record.Kind, record.Scope, record.Key);
             }
             foreach (var row in await ReadRows(executor, $"""
                 SELECT requested.value AS document_id, (SELECT version FROM {tables.DocumentRevisions}
@@ -82,9 +81,37 @@ public sealed partial class SqliteStorage
         public void Check(IReadOnlyList<StorageWrite> writes, OrderedDictionary<long, DocumentBatchAction> actions)
         {
             StorageRules.CheckGlobalIds(writes, id => owners.TryGetValue(id, out var owner) ? owner : null);
-            StorageRules.CheckDocumentActions(actions, id => documents.TryGetValue(id, out var record)
-                ? new DocumentCheckState(record, versions.TryGetValue(id, out var version) ? version : null) : null,
-                key => current.GetValueOrDefault(key));
+            CheckDocuments(actions);
+        }
+
+        // Only creation/copy addresses are prefetched. Plain changes cannot increase their live count,
+        // and an existing retirement reduces it even when that address was not prefetched.
+        private void CheckDocuments(OrderedDictionary<long, DocumentBatchAction> actions)
+        {
+            var liveCounts = new Dictionary<string, int>(StringComparer.Ordinal);
+            foreach (var (id, action) in actions)
+            {
+                if (action.Copy is { } copy && actions.ContainsKey(copy.Id.Value))
+                    throw new InvalidOperationException($"Document copy {id} source is changed in the copy batch");
+                documents.TryGetValue(id, out var existing);
+                if (action.Create is null && existing is null) throw new InvalidOperationException($"Unknown document: {id}");
+                if (action.Create is not null && existing is not null) throw new InvalidOperationException($"Document {id} already exists");
+                if (existing?.RetiredAt is not null) throw new InvalidOperationException($"Document {id} is retired");
+                if (action.Content is DocumentDelta delta)
+                {
+                    if (!versions.TryGetValue(id, out var previous)) throw new InvalidOperationException($"Document {id} delta has no base");
+                    if (previous != delta.Version) throw new InvalidOperationException($"Document {id} version transition requires a base");
+                }
+                if (action.Create is null && !action.Retire) continue;
+                IDocumentDescriptor descriptor = action.Create is not null ? action.Create : existing!;
+                var key = StorageRules.AddressKey(descriptor);
+                if (!liveCounts.TryGetValue(key, out var live)) live = current.GetValueOrDefault(key) is null ? 0 : 1;
+                if (action.Retire && existing is not null) live--;
+                if (action.Create is not null && !action.Retire) live++;
+                liveCounts[key] = live;
+            }
+            foreach (var live in liveCounts.Values)
+                if (live > 1) throw new InvalidOperationException("Document address already has a current incarnation");
         }
 
         public DocumentRecord Document(long id) => documents[id];

@@ -62,7 +62,7 @@ internal static class ProviderAuthCatalog
         Key("openai", "OpenAI", "OpenAI API key", "OPENAI_API_KEY") with
         { OAuth = new("OpenAI (ChatGPT subscription)", true, "Sign in with ChatGPT", context => new OpenAIChatGPTOAuth(context.Http, context.Environment, context.Time)) },
         // openai-codex has OAuth only (no api-key auth).
-        new("openai-codex", "OpenAI Codex (legacy)", "", [], ApiKeyLoginKind.Secret,
+        new("openai-codex", "OpenAI Codex", "", [], ApiKeyLoginKind.Secret,
             new("OpenAI (ChatGPT Plus/Pro)", true, null, context => new OpenAICodexOAuth(context.Http, context.Environment, context.Time))),
         Key("opencode", "OpenCode Zen", "OpenCode API key", "OPENCODE_API_KEY"),
         Key("opencode-go", "OpenCode Go", "OpenCode API key", "OPENCODE_API_KEY"),

@@ -68,7 +68,9 @@ public sealed class EditPlan
         for (var index = 1; index < ordered.Length; index++)
             if (ordered[index - 1].MatchIndex + ordered[index - 1].MatchLength > ordered[index].MatchIndex)
                 throw Failure(EditPlanFailure.Overlap, $"edits[{ordered[index - 1].EditIndex}] and edits[{ordered[index].EditIndex}] overlap in {displayPath}. Merge them into one edit or target disjoint regions.");
-        var preserved = fuzzy ? ApplyFuzzyOriginal(withoutBom, before, basis, ordered, normalized.ToImmutable(), ending) : ApplyOriginal(withoutBom, ordered, ending);
+        string preserved;
+        if (fuzzy) preserved = ApplyFuzzyOriginal(withoutBom, before, basis, ordered, normalized.ToImmutable(), ending, out ordered);
+        else preserved = ApplyOriginal(withoutBom, ordered, ending);
         var after = EditMatcher.NormalizeToLF(preserved);
         if (before == after) throw Failure(EditPlanFailure.NoChange, normalized.Count == 1
             ? $"No changes made to {displayPath}. The replacement produced identical content. This might indicate an issue with special characters or the text not existing as expected."
@@ -95,11 +97,18 @@ public sealed class EditPlan
         foreach (var replacement in replacements)
         {
             var start = replacement.MatchIndex - baseOffset;
-            result.Append(content.AsSpan(copied, start - copied)); result.Append(replacement.NewText); copied = start + replacement.MatchLength;
+            Append(content.AsSpan(copied, start - copied)); Append(replacement.NewText); copied = start + replacement.MatchLength;
         }
-        result.Append(content.AsSpan(copied)); return result.ToString();
+        Append(content.AsSpan(copied)); return result.ToString();
+        void Append(ReadOnlySpan<char> part)
+        {
+            // Do not merge separate normalized line breaks into a CRLF at a replacement seam.
+            if (part.Length == 0) return;
+            if (result.Length > 0 && result[^1] == '\r' && part[0] == '\n') result.Append('\n');
+            result.Append(part);
+        }
     }
-    private static string ApplyFuzzyOriginal(string original, string before, string basis, ImmutableArray<EditReplacement> edits, ImmutableArray<TextEdit> requested, string ending)
+    private static string ApplyFuzzyOriginal(string original, string before, string basis, ImmutableArray<EditReplacement> edits, ImmutableArray<TextEdit> requested, string ending, out ImmutableArray<EditReplacement> mappedReplacements)
     {
         // Map each normalized text element back to its source span. Characters outside a matched span, including
         // trailing whitespace, compatibility characters and mixed line terminators, are copied verbatim.
@@ -142,23 +151,37 @@ public sealed class EditPlan
         for (var i = 1; i < mappedEdits.Length; i++)
             if (mappedEdits[i - 1].MatchIndex + mappedEdits[i - 1].MatchLength > mappedEdits[i].MatchIndex)
                 throw Failure(EditPlanFailure.Overlap, "Edits overlap in their original Unicode text elements.");
+        mappedReplacements = mappedEdits;
         return ApplyOriginal(original, mappedEdits, ending);
     }
     private static string ApplyOriginal(string original, ImmutableArray<EditReplacement> replacements, string ending)
     {
-        // Every normalized boundary maps back to the same original character boundary, including CRLF pairs.
-        var offsets = new List<int> { 0 };
-        for (var i = 0; i < original.Length; i++)
+        // Map only replacement boundaries while walking the source once; no per-character offset array.
+        var originalOffset = 0; var normalizedOffset = 0;
+        int ToOriginal(int boundary)
         {
-            if (original[i] == '\r' && i + 1 < original.Length && original[i + 1] == '\n') i++;
-            offsets.Add(i + 1);
+            while (normalizedOffset < boundary)
+            {
+                if (original[originalOffset++] == '\r' && originalOffset < original.Length && original[originalOffset] == '\n') originalOffset++;
+                normalizedOffset++;
+            }
+            return originalOffset;
         }
-        return Apply(original, replacements.Select(edit => edit with
+        var mapped = ImmutableArray.CreateBuilder<EditReplacement>(replacements.Length);
+        foreach (var edit in replacements)
         {
-            MatchIndex = offsets[edit.MatchIndex],
-            MatchLength = offsets[edit.MatchIndex + edit.MatchLength] - offsets[edit.MatchIndex],
-            NewText = EditMatcher.RestoreLineEndings(edit.NewText, ending)
-        }), 0);
+            var start = ToOriginal(edit.MatchIndex); var end = ToOriginal(edit.MatchIndex + edit.MatchLength);
+            mapped.Add(edit with { MatchIndex = start, MatchLength = end - start,
+                NewText = EditMatcher.RestoreLineEndings(edit.NewText, LocalLineEnding(original, start)) });
+        }
+        return Apply(original, mapped, 0);
+    }
+    private static string LocalLineEnding(string original, int start)
+    {
+        var lf = original.IndexOf('\n', start);
+        if (lf < 0) lf = original.LastIndexOf('\n', Math.Min(start, original.Length - 1));
+        if (lf < 0) return original.Contains('\r') ? "\r" : "\n";
+        return lf > 0 && original[lf - 1] == '\r' ? "\r\n" : "\n";
     }
     private static EditPlanException Failure(EditPlanFailure kind, string message) => new(kind, message);
     internal static EditPlanException Limit() => Failure(EditPlanFailure.ResourceLimit, "Edit plan exceeds a configured logical limit.");

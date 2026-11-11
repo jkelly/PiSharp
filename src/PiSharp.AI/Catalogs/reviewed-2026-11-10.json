@@ -1,0 +1,391 @@
+{
+  "schemaVersion": 1,
+  "provenance": {
+    "commit": "b4afdddf44e059c67ccf5097e5317d913521b470",
+    "version": "1.5.2",
+    "sources": [
+      {
+        "path": "packages/ai/catalog/providers/anthropic.ts",
+        "sha256": "b4e09f431218c6fcf5a7643cb79cc82e93e0cd77db7a1a497c3c4178666bb665"
+      },
+      {
+        "path": "packages/ai/catalog/families/anthropic.ts",
+        "sha256": "2814d3dec7cfff9fcd37297c3a2a470779a5fc97f295fadb563285c765165a67"
+      },
+      {
+        "path": "packages/ai/catalog/providers/azure.ts",
+        "sha256": "c499da85e16dcc81173e285d3998ac67fd18938a4d3bde11f0c5af810862596c"
+      },
+      {
+        "path": "packages/ai/catalog/build.ts",
+        "sha256": "b26671f56a7774541c48847e30afe5bded49535c5d1e8e91882434b41b78de48"
+      }
+    ],
+    "baselines": [
+      {
+        "path": "src/PiSharp.Cli/Models/anthropic.json",
+        "sha256": "e462beb2e6d227b4dd1a8df22152cdebc9f3768d5dcf0939e1bf35e359129753"
+      },
+      {
+        "path": "src/PiSharp.Cli/Models/openai.json",
+        "sha256": "df2fe1f312051bbe29801ef903ab370c701a74a680f1370e96eb465eacd1d82d"
+      }
+    ],
+    "note": "Authored reviewed projection of pinned provider/family finalization. Pricing uses immutable native OpenAI and Anthropic baseline metadata, not a fresh models.dev retrieval."
+  },
+  "corrections": {
+    "azure": {
+      "gpt-5.4": {
+        "metadata": {
+          "id": "gpt-5.4",
+          "provider": "azure",
+          "type": "chat",
+          "cost": {
+            "input": 2.5,
+            "output": 15,
+            "cacheRead": 0.25,
+            "cacheWrite": 0,
+            "tiers": [
+              {
+                "inputTokensAbove": 272000,
+                "input": 5,
+                "output": 22.5,
+                "cacheRead": 0.5,
+                "cacheWrite": 0
+              }
+            ]
+          }
+        }
+      },
+      "gpt-5.4-pro": {
+        "metadata": {
+          "id": "gpt-5.4-pro",
+          "provider": "azure",
+          "type": "chat",
+          "cost": {
+            "input": 30,
+            "output": 180,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "tiers": [
+              {
+                "inputTokensAbove": 272000,
+                "input": 60,
+                "output": 270,
+                "cacheRead": 0,
+                "cacheWrite": 0
+              }
+            ]
+          }
+        }
+      },
+      "gpt-5.5": {
+        "metadata": {
+          "id": "gpt-5.5",
+          "provider": "azure",
+          "type": "chat",
+          "cost": {
+            "input": 5,
+            "output": 30,
+            "cacheRead": 0.5,
+            "cacheWrite": 0,
+            "tiers": [
+              {
+                "inputTokensAbove": 272000,
+                "input": 10,
+                "output": 45,
+                "cacheRead": 1,
+                "cacheWrite": 0
+              }
+            ]
+          }
+        }
+      },
+      "gpt-5.5-pro": {
+        "metadata": {
+          "id": "gpt-5.5-pro",
+          "provider": "azure",
+          "type": "chat",
+          "cost": {
+            "input": 30,
+            "output": 180,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "tiers": [
+              {
+                "inputTokensAbove": 272000,
+                "input": 60,
+                "output": 270,
+                "cacheRead": 0,
+                "cacheWrite": 0
+              }
+            ]
+          }
+        }
+      },
+      "gpt-5.6-luna": {
+        "metadata": {
+          "id": "gpt-5.6-luna",
+          "provider": "azure",
+          "type": "chat",
+          "cost": {
+            "input": 0.2,
+            "output": 1.2,
+            "cacheRead": 0.02,
+            "cacheWrite": 0.25,
+            "tiers": [
+              {
+                "inputTokensAbove": 272000,
+                "input": 0.4,
+                "output": 1.8,
+                "cacheRead": 0.04,
+                "cacheWrite": 0.5
+              }
+            ]
+          }
+        }
+      },
+      "gpt-5.6-sol": {
+        "metadata": {
+          "id": "gpt-5.6-sol",
+          "provider": "azure",
+          "type": "chat",
+          "cost": {
+            "input": 4,
+            "output": 20,
+            "cacheRead": 0.4,
+            "cacheWrite": 5,
+            "tiers": [
+              {
+                "inputTokensAbove": 272000,
+                "input": 8,
+                "output": 30,
+                "cacheRead": 0.8,
+                "cacheWrite": 10
+              }
+            ]
+          }
+        }
+      },
+      "gpt-5.6-terra": {
+        "metadata": {
+          "id": "gpt-5.6-terra",
+          "provider": "azure",
+          "type": "chat",
+          "cost": {
+            "input": 2,
+            "output": 12,
+            "cacheRead": 0.2,
+            "cacheWrite": 2.5,
+            "tiers": [
+              {
+                "inputTokensAbove": 272000,
+                "input": 4,
+                "output": 18,
+                "cacheRead": 0.4,
+                "cacheWrite": 5
+              }
+            ]
+          }
+        }
+      },
+      "gpt-6-astra": {
+        "metadata": {
+          "id": "gpt-6-astra",
+          "provider": "azure",
+          "type": "chat",
+          "cost": {
+            "input": 10,
+            "output": 50,
+            "cacheRead": 1,
+            "cacheWrite": 12.5,
+            "tiers": [
+              {
+                "inputTokensAbove": 272000,
+                "input": 20,
+                "output": 75,
+                "cacheRead": 2,
+                "cacheWrite": 25
+              }
+            ]
+          }
+        }
+      },
+      "gpt-6-luna": {
+        "metadata": {
+          "id": "gpt-6-luna",
+          "provider": "azure",
+          "type": "chat",
+          "cost": {
+            "input": 0.1,
+            "output": 0.5,
+            "cacheRead": 0.01,
+            "cacheWrite": 0.125,
+            "tiers": [
+              {
+                "inputTokensAbove": 272000,
+                "input": 0.2,
+                "output": 0.75,
+                "cacheRead": 0.02,
+                "cacheWrite": 0.25
+              }
+            ]
+          }
+        }
+      },
+      "gpt-6-sol": {
+        "metadata": {
+          "id": "gpt-6-sol",
+          "provider": "azure",
+          "type": "chat",
+          "cost": {
+            "input": 2,
+            "output": 10,
+            "cacheRead": 0.2,
+            "cacheWrite": 2.5,
+            "tiers": [
+              {
+                "inputTokensAbove": 272000,
+                "input": 4,
+                "output": 15,
+                "cacheRead": 0.4,
+                "cacheWrite": 5
+              }
+            ]
+          }
+        }
+      },
+      "gpt-6.1-sol": {
+        "metadata": {
+          "id": "gpt-6.1-sol",
+          "provider": "azure",
+          "type": "chat",
+          "cost": {
+            "input": 2,
+            "output": 10,
+            "cacheRead": 0.1,
+            "cacheWrite": 2.5,
+            "tiers": [
+              {
+                "inputTokensAbove": 272000,
+                "input": 4,
+                "output": 15,
+                "cacheRead": 0.2,
+                "cacheWrite": 5
+              }
+            ]
+          }
+        }
+      },
+      "gpt-6.1-terra": {
+        "metadata": {
+          "id": "gpt-6.1-terra",
+          "provider": "azure",
+          "type": "chat",
+          "cost": {
+            "input": 1,
+            "output": 5,
+            "cacheRead": 0.05,
+            "cacheWrite": 1.25,
+            "tiers": [
+              {
+                "inputTokensAbove": 272000,
+                "input": 2,
+                "output": 7.5,
+                "cacheRead": 0.1,
+                "cacheWrite": 2.5
+              }
+            ]
+          }
+        }
+      },
+      "gpt-daybreak-blue-latest": {
+        "metadata": {
+          "id": "gpt-daybreak-blue-latest",
+          "provider": "azure",
+          "type": "chat",
+          "cost": {
+            "input": 4,
+            "output": 20,
+            "cacheRead": 0.4,
+            "cacheWrite": 5,
+            "tiers": [
+              {
+                "inputTokensAbove": 272000,
+                "input": 8,
+                "output": 30,
+                "cacheRead": 0.8,
+                "cacheWrite": 10
+              }
+            ]
+          }
+        }
+      }
+    }
+  },
+  "additions": {
+    "anthropic": [
+      {
+        "id": "claude-fable-5-2",
+        "name": "Claude Fable 5.2",
+        "api": "anthropic-messages",
+        "provider": "anthropic",
+        "baseUrl": "https://api.anthropic.com",
+        "reasoning": true,
+        "input": [
+          "text",
+          "image"
+        ],
+        "cost": {
+          "input": 8,
+          "output": 40,
+          "cacheRead": 0.2,
+          "cacheWrite": 10
+        },
+        "contextWindow": 1000000,
+        "maxTokens": 128000,
+        "thinkingLevelMap": {
+          "off": null,
+          "xhigh": "xhigh",
+          "max": "max"
+        },
+        "compat": {
+          "forceAdaptiveThinking": true,
+          "supportsMidConvoEffort": true,
+          "supportsMidConvoSystemMessages": true,
+          "supportsMidConvoToolChanges": true,
+          "supportsStrictTools": true,
+          "allowedFallbackModels": [
+            {
+              "provider": "anthropic",
+              "model": "claude-opus-5",
+              "cost": {
+                "input": 5,
+                "output": 25,
+                "cacheRead": 0.5,
+                "cacheWrite": 6.25
+              }
+            }
+          ]
+        },
+        "promptCache": {
+          "short": 300,
+          "long": 3600
+        },
+        "inputLimits": {
+          "maxRequestBytes": 33554432,
+          "images": {
+            "maxPerRequest": 600,
+            "resize": {
+              "maxWidth": 2000,
+              "maxHeight": 2000,
+              "maxBytes": 4718592,
+              "jpegQuality": 80
+            }
+          }
+        },
+        "type": "chat"
+      }
+    ]
+  }
+}

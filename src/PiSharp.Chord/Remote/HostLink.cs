@@ -24,7 +24,8 @@ internal sealed class HostLink : IChannelHandler
         Limits = Limits.ForLink(options.Trusted, options.Limits); Context = ChordContext.WithoutAbortSignal(context);
         Consumer = new ConsumerSide(this);
         channel = new Channel(link, this, new ChannelOptions(options.Codec == LinkCodec.Text ? TextCodec.Instance : BinaryCodec.Instance,
-            host.Incarnation, 256, Trusted, error => host.Report(new HostError("protocol_error", error)), host.Options.TimeProvider, Context));
+            host.Incarnation, 256, Trusted, error => host.Report(new HostError("protocol_error", error)), host.Options.TimeProvider, Context, host.Telemetry.Metrics));
+        ChordTelemetry.Metrics(host.Telemetry.Metrics).UpDownCounter("chord.links.open").Add(1);
     }
     internal void Start() => channel.Start();
     internal bool Open => !channel.Closed;
@@ -32,7 +33,7 @@ internal sealed class HostLink : IChannelHandler
     internal string Peer => channel.Peer;
     internal void Send(Message message) => channel.Send(message);
     internal void Close() => channel.Close();
-    internal void Tick(long now) => channel.Tick(now, (long)Host.Options.HeartbeatPing.TotalMilliseconds, (long)Host.Options.HeartbeatClose.TotalMilliseconds);
+    internal void Tick(long now, long paused = 0) => channel.Tick(now, paused, (long)Host.Options.HeartbeatPing.TotalMilliseconds, (long)Host.Options.HeartbeatClose.TotalMilliseconds);
     internal Part Part(string json) => Parts.Origin(json, Host.Options.Compression, Context);
     internal Part OpenPart(Part part, Limits limits) => Parts.Open(part, limits, Host.Options.Compression, Context);
     internal async Task InflateOwned(Part? part, Limits limits)
@@ -66,6 +67,7 @@ internal sealed class HostLink : IChannelHandler
     }));
     public void Closed() => Host.Dispatcher.Invoke(() =>
     {
+        ChordTelemetry.Metrics(Host.Telemetry.Metrics).UpDownCounter("chord.links.open").Add(-1);
         foreach (var provider in providers.Values.ToArray()) provider.Close(); providers.Clear();
         Consumer.Close(); Host.Unlink(this);
     });

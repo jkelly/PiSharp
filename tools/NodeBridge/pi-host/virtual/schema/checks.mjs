@@ -1,14 +1,16 @@
-// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/schema/src/checks.ts.
+// Pi b4afdddf44e059c67ccf5097e5317d913521b470 (MIT): packages/schema/src/checks.ts.
 // Ported to plain ESM for the PiSharp Node extension bridge (TypeScript types stripped mechanically; behaviour unchanged).
 export const ALWAYS = ()=>true;
 export const NEVER = ()=>false;
 const IS_STRING = (v)=>typeof v === "string";
-const IS_NUMBER = (v)=>typeof v === "number";
+const IS_NUMBER = (v)=>Number.isFinite(v);
 const IS_INTEGER = (v)=>Number.isInteger(v);
 const IS_BOOLEAN = (v)=>typeof v === "boolean";
 const IS_NULL = (v)=>v === null;
 export const IS_ARRAY = (v)=>Array.isArray(v);
 const IS_BYTES = (v)=>v instanceof Uint8Array;
+const IS_BIGINT = (v)=>typeof v === "bigint";
+const IS_UNDEFINED = (v)=>v === undefined;
 export const IS_OBJECT = (v)=>isObject(v);
 export function isObject(v) {
     return typeof v === "object" && v !== null && !Array.isArray(v) && !(v instanceof Uint8Array);
@@ -45,56 +47,125 @@ export const TYPE_CHECKS = new Map([
     [
         "bytes",
         IS_BYTES
+    ],
+    [
+        "bigint",
+        IS_BIGINT
+    ],
+    [
+        "undefined",
+        IS_UNDEFINED
     ]
 ]);
-export const LEAF_CODES = new Map([
+const leaves = new WeakMap([
     [
         IS_STRING,
-        1
+        [
+            1,
+            undefined
+        ]
     ],
     [
         IS_NUMBER,
-        2
+        [
+            2,
+            undefined
+        ]
     ],
     [
         IS_INTEGER,
-        3
+        [
+            3,
+            undefined
+        ]
     ],
     [
         IS_BOOLEAN,
-        4
+        [
+            4,
+            undefined
+        ]
     ],
     [
         IS_NULL,
-        5
+        [
+            5,
+            undefined
+        ]
     ],
     [
         ALWAYS,
-        6
+        [
+            6,
+            undefined
+        ]
     ]
 ]);
-function leafOk(code, x) {
+export function leafOf(check) {
+    return leaves.get(check);
+}
+function leaf(code, arg, check) {
+    leaves.set(check, [
+        code,
+        arg
+    ]);
+    return check;
+}
+class Bounds {
+    min;
+    max;
+    xmin;
+    xmax;
+    constructor(min, max, xmin, xmax){
+        this.min = min;
+        this.max = max;
+        this.xmin = xmin;
+        this.xmax = xmax;
+    }
+}
+function leafOk(code, x, arg) {
     switch(code){
         case 1:
             return typeof x === "string";
         case 2:
-            return typeof x === "number";
+            return Number.isFinite(x);
         case 3:
             return Number.isInteger(x);
         case 4:
             return typeof x === "boolean";
         case 5:
             return x === null;
+        case 7:
+            return x === arg;
+        case 8:
+            {
+                const list = arg;
+                for(let i = 0; i < list.length; i++)if (list[i] === x) return true;
+                return false;
+            }
+        case 9:
+            return (typeBits(x) & arg) !== 0;
+        case 10:
+            return Number.isInteger(x) && inBounds(x, arg);
+        case 11:
+            return Number.isFinite(x) && inBounds(x, arg);
+        case 12:
+            return typeof x === "string" && lengthOk(x, arg.min, arg.max);
+        case 13:
+            return typeof x === "string" && arg.test(x);
         default:
             return true;
     }
 }
+function inBounds(x, b) {
+    return x >= b.min && x <= b.max && x > b.xmin && x < b.xmax;
+}
 export const GUARD_NONE = 0;
 export const GUARD_STRICT = 1;
 export const GUARD_LOOSE = 2;
-export const CODE = 7;
-export const REQUIRED = 8;
-export const INHERITED = 16;
+export const CODE = 15;
+export const REQUIRED = 16;
+export const INHERITED = 32;
 export function and(parts) {
     switch(parts.length){
         case 0:
@@ -130,12 +201,81 @@ export function scopedCheck(scope, uri, check) {
     };
 }
 export function typeCheck(types) {
-    const checks = types.map((t)=>(typeof t === "string" ? TYPE_CHECKS.get(t) : undefined) ?? NEVER);
-    if (checks.length === 1) return checks[0];
-    return (v)=>{
-        for(let i = 0; i < checks.length; i++)if (checks[i](v)) return true;
-        return false;
-    };
+    if (types.length === 1) return (typeof types[0] === "string" ? TYPE_CHECKS.get(types[0]) : undefined) ?? NEVER;
+    return maskCheck(typeMask(types));
+}
+const TYPE_BITS = new Map([
+    [
+        "string",
+        1
+    ],
+    [
+        "number",
+        2
+    ],
+    [
+        "integer",
+        4
+    ],
+    [
+        "boolean",
+        8
+    ],
+    [
+        "null",
+        16
+    ],
+    [
+        "array",
+        32
+    ],
+    [
+        "object",
+        64
+    ],
+    [
+        "bytes",
+        128
+    ],
+    [
+        "bigint",
+        256
+    ],
+    [
+        "undefined",
+        512
+    ]
+]);
+export function typeMask(types) {
+    let mask = 0;
+    for (const t of types)if (typeof t === "string") mask |= TYPE_BITS.get(t) ?? 0;
+    return mask;
+}
+function typeBits(v) {
+    switch(typeof v){
+        case "string":
+            return 1;
+        case "number":
+            return Number.isInteger(v) ? 6 : Number.isFinite(v) ? 2 : 0;
+        case "boolean":
+            return 8;
+        case "object":
+            return v === null ? 16 : Array.isArray(v) ? 32 : v instanceof Uint8Array ? 128 : 64;
+        case "bigint":
+            return 256;
+        case "undefined":
+            return 512;
+        default:
+            return 0;
+    }
+}
+function maskCheck(mask) {
+    return leaf(9, mask, (v)=>(typeBits(v) & mask) !== 0);
+}
+export function maskedAnyCheck(mask, checks) {
+    if (checks.length === 0) return maskCheck(mask);
+    const rest = checks.length === 1 ? checks[0] : anyCheck(checks);
+    return (v)=>(typeBits(v) & mask) !== 0 || rest(v);
 }
 export function bytesCheck(min, max) {
     return (v)=>v instanceof Uint8Array && v.length >= min && v.length <= max;
@@ -159,10 +299,10 @@ function lengthOk(s, min, max) {
 }
 export function stringCheck(strict, min, max, re, format) {
     if (re !== undefined && min === 0 && max === Number.POSITIVE_INFINITY && format === undefined) {
-        return strict ? (v)=>typeof v === "string" && re.test(v) : (v)=>typeof v !== "string" || re.test(v);
+        return strict ? leaf(13, re, (v)=>typeof v === "string" && re.test(v)) : (v)=>typeof v !== "string" || re.test(v);
     }
     if (re === undefined && format === undefined) {
-        return strict ? (v)=>typeof v === "string" && lengthOk(v, min, max) : (v)=>typeof v !== "string" || lengthOk(v, min, max);
+        return strict ? leaf(12, new Bounds(min, max, 0, 0), (v)=>typeof v === "string" && lengthOk(v, min, max)) : (v)=>typeof v !== "string" || lengthOk(v, min, max);
     }
     return (v)=>{
         if (typeof v !== "string") return !strict;
@@ -170,13 +310,22 @@ export function stringCheck(strict, min, max, re, format) {
     };
 }
 export function numberCheck(mode, min, max, xmin, xmax, multipleOf) {
-    return (v)=>{
-        if (typeof v !== "number") return mode === 0;
+    const check = (v)=>{
+        if (typeof v !== "number" && typeof v !== "bigint") return mode === 0;
+        if (mode === 3 ? typeof v !== "bigint" : mode !== 0 && !Number.isFinite(v)) return false;
         if (mode === 2 && !Number.isInteger(v)) return false;
         return v >= min && v <= max && v > xmin && v < xmax && (multipleOf === undefined || isMultiple(v, multipleOf));
     };
+    const plain = typeof min === "number" && typeof max === "number" && typeof xmin === "number" && typeof xmax === "number";
+    if (mode === 0 || mode === 3 || multipleOf !== undefined || !plain) return check;
+    return leaf(mode === 2 ? 10 : 11, new Bounds(min, max, xmin, xmax), check);
 }
 export function isMultiple(v, d) {
+    if (typeof v === "bigint" || typeof d === "bigint") {
+        if (typeof v === "number" && !Number.isInteger(v) || typeof d === "number" && !Number.isInteger(d)) return false;
+        const divisor = BigInt(d);
+        return divisor !== 0n && BigInt(v) % divisor === 0n;
+    }
     const q = v / d;
     if (Number.isInteger(q)) return true;
     if (!Number.isFinite(q)) return v % d === 0;
@@ -205,18 +354,23 @@ export function declaredObject(entries, requiredCount, closed, guard) {
         if (guard !== GUARD_NONE && !isObject(v)) return guard === GUARD_LOOSE;
         const o = v;
         let required = 0;
+        let next = 0;
         for(const k in o){
-            let i = 0;
-            while(i < n && entries[i] !== k)i += 3;
-            if (i === n) {
-                if (closed) return false;
-                continue;
+            let i = next;
+            if (entries[i] !== k) {
+                i = 0;
+                while(i < n && entries[i] !== k)i += 3;
+                if (i === n) {
+                    if (closed) return false;
+                    continue;
+                }
             }
+            next = i + 3;
             const x = o[k];
-            if (x === undefined) continue;
             const f = entries[i + 2];
+            if (x === undefined && !(f & REQUIRED)) continue;
             const c = f & CODE;
-            if (c !== 0 ? !leafOk(c, x) : !entries[i + 1](x)) return false;
+            if (c !== 0 ? !leafOk(c, x, entries[i + 1]) : !entries[i + 1](x)) return false;
             if (f & REQUIRED) required++;
         }
         return required === requiredCount;
@@ -231,12 +385,12 @@ export function openObject(entries, keys, extraRequired, patterns, additional, g
             const k = entries[i];
             const x = o[k];
             const f = entries[i + 2];
-            if (x === undefined || f & INHERITED && !Object.hasOwn(o, k)) {
+            if (x === undefined && !(f & REQUIRED && Object.hasOwn(o, k)) || f & INHERITED && !Object.hasOwn(o, k)) {
                 if (f & REQUIRED) return false;
                 continue;
             }
             const c = f & CODE;
-            if (c !== 0 ? !leafOk(c, x) : !entries[i + 1](x)) return false;
+            if (c !== 0 ? !leafOk(c, x, entries[i + 1]) : !entries[i + 1](x)) return false;
         }
         for(let i = 0; i < extraRequired.length; i++)if (!Object.hasOwn(o, extraRequired[i])) return false;
         if (known === undefined) return true;
@@ -281,9 +435,13 @@ export function dependentSchemasCheck(entries) {
         return true;
     };
 }
+const NO_LEAF = [
+    0,
+    undefined
+];
 export function listCheck(guard, min, max, prefix, rest) {
     const n = prefix.length;
-    const code = rest === undefined ? 0 : LEAF_CODES.get(rest) ?? 0;
+    const [code, arg] = (rest === undefined ? undefined : leafOf(rest)) ?? NO_LEAF;
     return (v)=>{
         if (!Array.isArray(v)) return guard === GUARD_LOOSE;
         const length = v.length;
@@ -292,7 +450,7 @@ export function listCheck(guard, min, max, prefix, rest) {
         for(let i = 0; i < m; i++)if (!prefix[i](v[i])) return false;
         if (rest === undefined) return true;
         if (code !== 0) {
-            for(let i = n; i < length; i++)if (!leafOk(code, v[i])) return false;
+            for(let i = n; i < length; i++)if (!leafOk(code, v[i], arg)) return false;
             return true;
         }
         for(let i = n; i < length; i++)if (!rest(v[i])) return false;
@@ -321,17 +479,17 @@ export function uniqueCheck(v) {
 export function enumCheck(values) {
     const primitives = values.filter((x)=>typeof x !== "object" || x === null);
     if (primitives.length === values.length && primitives.length <= 8) {
-        return (v)=>{
+        return leaf(8, primitives, (v)=>{
             for(let i = 0; i < primitives.length; i++)if (primitives[i] === v) return true;
             return false;
-        };
+        });
     }
     const set = new Set(primitives);
     const objects = values.filter((x)=>typeof x === "object" && x !== null);
     return (v)=>set.has(v) || typeof v === "object" && objects.some((o)=>deepEqual(v, o));
 }
 export function constCheck(value) {
-    if (typeof value !== "object" || value === null) return (v)=>v === value;
+    if (typeof value !== "object" || value === null) return leaf(7, value, (v)=>v === value);
     return (v)=>deepEqual(v, value);
 }
 export function anyCheck(checks) {

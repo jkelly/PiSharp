@@ -1,3 +1,14 @@
+# Current source candidate: Pi 1.5.2
+
+The source candidate targets Pi v1.5.2 (`b4afdddf44e059c67ccf5097e5317d913521b470`), including v1.5.1. The published release remains **PiSharp 1.5.0.1**, on Pi v1.5.0. Applicable candidate work is **tested-with-limitations** in local source validation; this section does not replace or extend any historical acceptance below.
+
+- [Complete source applicability](compatibility/sync-1.5.2-applicability.json): all 2,531 changed upstream files have an owner or explicit no-op reason.
+- [Unreleased candidate notes](docs/release-notes/1.5.2.md) and [decision 0014](docs/decisions/0014-pi-1.5.2-sync.md).
+- [Durable candidate overlay](compatibility/durable-sync-1.5.2-overlay.json), with the exact [previous map](compatibility/durable-port-map.v1.5.0.json) preserved.
+- [Work plan and area reports](AI_DOCS/sync-1.5.2.md). Root owns integrated validation and final status changes.
+
+## Preserved historical implementation records
+
 **Anthropic awaited payload callback - authored source only:** An init-only OnPayload hook and explicit structured FromPrepared route now inspect or replace an owned bounded payload before HTTP allocation. Key/authenticated factories and Simple forward it; legacy arbitrary factories reject it. Seven focused groups are authored, unexecuted. Exact callback tasks/faults, fixed auth/endpoint ownership, native cancellation and sanitized diagnostics are retained. See docs/contracts/anthropic-payload-hook.md; no mutable-JavaScript equivalence claim.
 
 **Anthropic source cost error-path correction - authored source only:** A rejected usage DTO may mutate scratch cache counts; source projection now reads the split from committed TokenUsage. Six registered groups include initial/later malformed usage preserving native sanitized outcomes. No compilation or execution; blocked predecessor retained.

@@ -1,8 +1,19 @@
-// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/telemetry/src/memory.ts.
+// Pi b4afdddf44e059c67ccf5097e5317d913521b470 (MIT): packages/telemetry/src/memory.ts.
 // Ported to plain ESM for the PiSharp Node extension bridge (TypeScript types stripped mechanically; behaviour unchanged).
 import { NOOP_TELEMETRY_CONTEXT } from "./noop.mjs";
 function carrierId(carrier) {
     return `${carrier["pi-memory-scope"]}:${carrier["pi-memory-span"]}`;
+}
+const TOLERANCE_MS = 10;
+let anchor = performance.timeOrigin;
+export function telemetryNow() {
+    const clock = performance.now();
+    const wall = Date.now();
+    if (Math.abs(anchor + clock - wall) > TOLERANCE_MS) anchor = wall - clock;
+    return microseconds(anchor + clock);
+}
+function microseconds(ms) {
+    return Math.round(ms * 1000) / 1000;
 }
 const contextCarriers = new WeakMap();
 function copyAttributes(attributes) {
@@ -46,7 +57,7 @@ function createSpan(state, parent, options) {
     }
     const id = state.nextSpanId++;
     return {
-        startedMs: Date.now(),
+        startedMs: telemetryNow(),
         clock: performance.now(),
         id,
         parentId: parent?.localId ?? null,
@@ -98,7 +109,7 @@ async function startInMemorySpan(state, parent, options, callback) {
             if (recordedSpan.settled) return;
             recordedSpan.events.push({
                 name,
-                timeMs: performance.now() - recordedSpan.clock,
+                timeMs: microseconds(performance.now() - recordedSpan.clock),
                 attributes: copyAttributes(attributes)
             });
         },
@@ -131,7 +142,7 @@ async function startInMemorySpan(state, parent, options, callback) {
         throw error;
     } finally{
         recordedSpan.settled = true;
-        recordedSpan.endedMs = recordedSpan.startedMs + performance.now() - recordedSpan.clock;
+        recordedSpan.endedMs = microseconds(recordedSpan.startedMs + performance.now() - recordedSpan.clock);
         recordedSpan.endSequence = state.nextEndSequence++;
     }
 }

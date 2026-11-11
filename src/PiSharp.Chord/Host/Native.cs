@@ -1,5 +1,6 @@
 // Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/chord/src/next/host/native.ts
 using PiSharp.Chord.Data;
+using PiSharp.Telemetry;
 
 namespace PiSharp.Chord.Host;
 
@@ -26,8 +27,16 @@ internal sealed class NativeHandle<T>(Attempt attempt, int position, Func<ChordC
         if (state != "unopened") return;
         state = "opening";
         T result;
+        OpenSpan? trace = null;
+        if (!ChordTelemetry.IsUntraced(context.Telemetry))
+        {
+            var attributes = attempt.Owner.Host.Attributes(attempt.Served.Contract.Name); attributes["native"] = (double)position;
+            trace = new OpenSpan(context.Telemetry, "chord.open", attributes);
+            context = ChordContext.WithTelemetry(trace.Span, context);
+        }
         try { result = await attempt.Owner.Host.InvokeCallbackAsync(open, () => open(context), attempt.Served.DeclaringFacet); }
-        catch { ReleaseLifetime(); throw; }
+        catch (Exception error) { if (trace is not null) ChordTelemetry.Ended(trace.Span, "open_failed", error, context.AbortSignal); ReleaseLifetime(); throw; }
+        finally { trace?.End(); }
         if (state == "abandoned")
         {
             state = "closed";
@@ -50,6 +59,13 @@ internal sealed class NativeHandle<T>(Attempt attempt, int position, Func<ChordC
         var host = attempt.Owner.Host;
         var cancelled = new CancellationTokenSource();
         var context = ChordContext.WithAbortSignal(cancelled.Token, ChordContext.WithoutAbortSignal(attempt.Owner.Context));
+        OpenSpan? trace = null;
+        if (!ChordTelemetry.IsUntraced(host.Telemetry))
+        {
+            var attributes = host.Attributes(attempt.Served.Contract.Name); attributes["native"] = (double)position; attributes["reason"] = closing.ToString().ToLowerInvariant();
+            trace = new OpenSpan(host.Telemetry, "chord.close", attributes);
+            context = ChordContext.WithTelemetry(trace.Span, context);
+        }
         var original = CloseOriginal();
         try { await original.WaitAsync(options?.CloseTimeout ?? host.Options.CloseTimeout, host.Options.TimeProvider); }
         catch (TimeoutException)
@@ -61,7 +77,8 @@ internal sealed class NativeHandle<T>(Attempt attempt, int position, Func<ChordC
         async Task CloseOriginal()
         {
             try { await host.InvokeCallbackAsync(close, () => close(current, closing, context), attempt.Served.DeclaringFacet); }
-            finally { cancelled.Dispose(); ReleaseLifetime(); }
+            catch (Exception error) { if (trace is not null) ChordTelemetry.SpanFailed(trace.Span, "close_failed", error); throw; }
+            finally { trace?.End(); cancelled.Dispose(); ReleaseLifetime(); }
         }
     }
 }

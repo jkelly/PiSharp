@@ -6,9 +6,10 @@
 // - Opening a store takes a session-owned application lock that close releases, so one storage owns a store at a time (a SQLite file has
 //   no lock of its own; the CLI's session lock covers it).
 // - Commits lock the store's allocator row (UPDLOCK) first, and global ID ownership is read in one query per batch.
+//   SQL remains per batch/per record; this backend does not implement SQLite's bulk statement pipeline.
 // - A batch commit (upstream v1.5.0's Storage.commit, as SqliteStorage ports it) is one transaction per call: each batch's checks, copy
-//   resolution included, run before it writes anything, and a check fails as a refusal only when no database call failed
-//   (SqlServerExecutor.CallFailed); XACT_ABORT rolls back every batch of the call on a database failure.
+//   resolution included, run before it writes anything, and a check fails as a refusal only when no database call or stored-data decode
+//   failed (SqlServerExecutor.CallFailed). Database failures and malformed stored data roll back every batch of the call.
 // - Inserts that SQLite writes with INSERT OR IGNORE or ON CONFLICT DO UPDATE are IF NOT EXISTS ... INSERT and UPDATE ... IF @@ROWCOUNT = 0
 //   INSERT, which the allocator lock keeps race-free.
 using System.Collections.Immutable;
@@ -39,7 +40,7 @@ public sealed class SqlServerStorage : IStorage
     // SQL Server accepts at most 2,100 parameters per request.
     private const int IdsPerQuery = 1_000;
 
-    private readonly SqlServerDatabase db;
+    private readonly ISqlServerDatabase db;
     private readonly string schema;
     private readonly int storeId;
     private readonly string storeLock;
@@ -50,7 +51,7 @@ public sealed class SqlServerStorage : IStorage
     private int admittedReads;
     private TaskCompletionSource? readsDrained;
 
-    private SqlServerStorage(SqlServerDatabase db, string schema, int storeId, string storeLock, long nextId)
+    internal SqlServerStorage(ISqlServerDatabase db, string schema, int storeId, string storeLock, long nextId)
     {
         this.db = db;
         this.schema = schema;
@@ -548,34 +549,36 @@ public sealed class SqlServerStorage : IStorage
         return row is null ? null : ConversationRecord.FromJson(Record(row));
     }
 
-    private async Task<StoredDocument?> MaterializeDocument(SqlServerExecutor executor, DocumentId id, DocumentPoint at)
+    private async Task<StoredDocument?> MaterializeDocument(ISqlServerExecutor executor, DocumentId id, DocumentPoint at)
     {
         var row = await executor.GetAsync(Sql("SELECT record FROM {schema}.durable_documents WHERE store_id = @p0 AND id = @p1"), storeId, id.Value)
             .ConfigureAwait(false);
         if (row is null) return null;
-        var record = DocumentRecord.FromJson(Record(row));
+        var record = Stored(executor, () => DocumentRecord.FromJson(Record(row)));
         if (!at.IsCurrent && StorageRules.IsCurrentOnly(record))
             throw new StorageRequestException($"Document {id} does not retain historical content");
         if (!StorageRules.IsAliveAt(record, at)) return null;
         var upper = at.Seq?.Value ?? Ids.MaxSafeInteger;
-        var documentBase = await executor.GetAsync(Sql("""
+        var baseRow = await executor.GetAsync(Sql("""
             SELECT TOP (1) seq, kind, version, content FROM {schema}.durable_document_revisions
             WHERE store_id = @p0 AND document_id = @p1 AND kind = N'base' AND seq <= @p2 ORDER BY seq DESC
-            """), storeId, id.Value, upper).ConfigureAwait(false) ?? throw new InvalidOperationException($"Document {id} is missing a required base");
-        var baseVersion = checked((int)documentBase.GetInt64("version"));
-        var baseValue = JsonValue.Parse(documentBase.GetString("content")) as JsonObjectValue ??
-            throw new InvalidOperationException($"Document {id} base is not a JSON object");
+            """), storeId, id.Value, upper).ConfigureAwait(false);
+        var documentBase = Stored(executor, () => baseRow ?? throw new InvalidOperationException($"Document {id} is missing a required base"));
+        var baseVersion = Stored(executor, () => StoredVersion(documentBase));
+        var baseValue = Stored(executor, () => JsonValue.Parse(documentBase.GetString("content")) as JsonObjectValue ??
+            throw new InvalidOperationException($"Document {id} base is not a JSON object"));
+        var baseSeq = Stored(executor, () => documentBase.GetInt64("seq"));
         var tail = await executor.AllAsync(Sql("""
             SELECT seq, kind, version, content FROM {schema}.durable_document_revisions
             WHERE store_id = @p0 AND document_id = @p1 AND seq > @p2 AND seq <= @p3 ORDER BY seq
-            """), storeId, id.Value, documentBase.GetInt64("seq"), upper).ConfigureAwait(false);
-        var value = StorageRules.Replay(id, baseVersion, baseValue, tail,
-            revision => (revision.GetString("kind") == "delta", (int)Math.Clamp(revision.GetInt64("version"), int.MinValue, int.MaxValue)),
-            revision => DecodeOps(revision.GetString("content")));
+            """), storeId, id.Value, baseSeq, upper).ConfigureAwait(false);
+        var value = Stored(executor, () => StorageRules.Replay(id, baseVersion, baseValue, tail,
+            revision => (revision.GetString("kind") == "delta", StoredVersion(revision)),
+            revision => DecodeOps(revision.GetString("content"))));
         return new StoredDocument(record, baseVersion, value, tail.Count);
     }
 
-    private async Task CheckGlobalIds(SqlServerExecutor executor, IReadOnlyList<StorageWrite> writes)
+    private async Task CheckGlobalIds(ISqlServerExecutor executor, IReadOnlyList<StorageWrite> writes)
     {
         var owners = new Dictionary<long, StorageTable?>();
         foreach (var write in writes)
@@ -588,12 +591,12 @@ public sealed class SqlServerStorage : IStorage
             var ids = string.Join(", ", chunk.Select(id => filter.Bind(id)));
             var rows = await executor.AllAsync(Sql($"SELECT id, record_type FROM {{schema}}.durable_record_ids WHERE {filter} AND id IN ({ids})"),
                 filter.Parameters).ConfigureAwait(false);
-            foreach (var row in rows) owners[row.GetInt64("id")] = ParseTable(row.GetString("record_type"));
+            foreach (var row in rows) Stored(executor, () => owners[row.GetInt64("id")] = ParseTable(row.GetString("record_type")));
         }
         StorageRules.CheckGlobalIds(writes, id => owners[id]);
     }
 
-    private async Task CheckDocumentActions(SqlServerExecutor executor, OrderedDictionary<long, DocumentBatchAction> actions)
+    private async Task CheckDocumentActions(ISqlServerExecutor executor, OrderedDictionary<long, DocumentBatchAction> actions)
     {
         var stored = new Dictionary<long, DocumentCheckState?>();
         var current = new Dictionary<string, long?>(StringComparer.Ordinal);
@@ -601,14 +604,16 @@ public sealed class SqlServerStorage : IStorage
         {
             var row = await executor.GetAsync(Sql("SELECT record FROM {schema}.durable_documents WHERE store_id = @p0 AND id = @p1"), storeId, id)
                 .ConfigureAwait(false);
-            var existing = row is null ? null : DocumentRecord.FromJson(Record(row));
+            var existing = row is null ? null : Stored(executor, () => DocumentRecord.FromJson(Record(row)));
             int? lastVersion = null;
-            if (existing is not null && action.Content is DocumentDelta)
+            if (existing is { RetiredAt: null } && action.Content is DocumentDelta)
             {
                 var previous = await executor.GetAsync(Sql("""
                     SELECT TOP (1) version FROM {schema}.durable_document_revisions WHERE store_id = @p0 AND document_id = @p1 ORDER BY seq DESC
                     """), storeId, id).ConfigureAwait(false);
-                lastVersion = previous is null ? null : checked((int)previous.GetInt64("version"));
+                lastVersion = Stored(executor, () => previous is null
+                    ? throw new InvalidOperationException($"Document {id} delta has no base")
+                    : StoredVersion(previous));
             }
             stored[id] = existing is null ? null : new DocumentCheckState(existing, lastVersion);
             IDocumentDescriptor? descriptor = action.Create is not null ? action.Create : existing;
@@ -619,15 +624,15 @@ public sealed class SqlServerStorage : IStorage
         StorageRules.CheckDocumentActions(actions, id => stored[id], key => current[key]);
     }
 
-    private async Task<long?> CurrentDocumentId(SqlServerExecutor executor, IDocumentDescriptor address)
+    private async Task<long?> CurrentDocumentId(ISqlServerExecutor executor, IDocumentDescriptor address)
     {
         var parts = AddressParts.Of(address.Kind, address.Scope, address.Key);
         var row = await executor.GetAsync(Sql($"SELECT TOP (1) id FROM {{schema}}.durable_documents WHERE {AddressSql} AND retired_at IS NULL"),
             storeId, parts.Kind, parts.ScopeKind, parts.OwnerId, parts.Family, parts.KeyValue).ConfigureAwait(false);
-        return row?.GetInt64("id");
+        return row is null ? null : Stored(executor, () => row.GetInt64("id"));
     }
 
-    private async Task ApplyTableWrite(SqlServerExecutor executor, StorageWrite write, Seq seq)
+    private async Task ApplyTableWrite(ISqlServerExecutor executor, StorageWrite write, Seq seq)
     {
         switch (write)
         {
@@ -668,7 +673,7 @@ public sealed class SqlServerStorage : IStorage
     }
 
     /// <summary>Resolves each copy to a base of its source's state before this batch, which may not change the source.</summary>
-    private async Task ResolveCopies(SqlServerExecutor executor, OrderedDictionary<long, DocumentBatchAction> actions)
+    private async Task ResolveCopies(ISqlServerExecutor executor, OrderedDictionary<long, DocumentBatchAction> actions)
     {
         foreach (var (id, action) in actions)
         {
@@ -684,7 +689,7 @@ public sealed class SqlServerStorage : IStorage
         }
     }
 
-    private async Task ApplyDocumentActions(SqlServerExecutor executor, OrderedDictionary<long, DocumentBatchAction> actions, Seq seq)
+    private async Task ApplyDocumentActions(ISqlServerExecutor executor, OrderedDictionary<long, DocumentBatchAction> actions, Seq seq)
     {
         foreach (var (id, action) in actions)
         {
@@ -706,7 +711,7 @@ public sealed class SqlServerStorage : IStorage
             {
                 var row = (await executor.GetAsync(Sql("SELECT record FROM {schema}.durable_documents WHERE store_id = @p0 AND id = @p1"), storeId, id)
                     .ConfigureAwait(false))!;
-                record = DocumentRecord.FromJson(Record(row));
+                record = Stored(executor, () => DocumentRecord.FromJson(Record(row)));
             }
 
             if (content is not null)
@@ -736,7 +741,7 @@ public sealed class SqlServerStorage : IStorage
         }
     }
 
-    private Task DeleteRevisions(SqlServerExecutor executor, long id) =>
+    private Task DeleteRevisions(ISqlServerExecutor executor, long id) =>
         executor.RunAsync(Sql("DELETE FROM {schema}.durable_document_revisions WHERE store_id = @p0 AND document_id = @p1"), storeId, id);
 
     /// <summary>Claims record ID @p1 for table @p2 in store @p0 (SQLite's INSERT OR IGNORE INTO record_ids).</summary>
@@ -779,6 +784,24 @@ public sealed class SqlServerStorage : IStorage
     }
 
     private static JsonValue Record(SqlServerRow row) => JsonValue.Parse(row.GetString("record"));
+
+    // Only decoding and validating persisted state belongs here. Caller-supplied action checks and copy compatibility remain semantic
+    // refusals; a successful SQL call followed by corrupt data is still a storage failure and must escape the accepted-prefix catch.
+    private static T Stored<T>(ISqlServerExecutor executor, Func<T> decode)
+    {
+        try { return decode(); }
+        catch
+        {
+            executor.CallFailed = true;
+            throw;
+        }
+    }
+
+    private static int StoredVersion(SqlServerRow row)
+    {
+        var version = checked((int)row.GetInt64("version"));
+        return version > 0 ? version : throw new InvalidOperationException("Stored document version must be positive");
+    }
 
     private static IEnumerable<Op> DecodeOps(string content) =>
         JsonValue.Parse(content) is JsonArrayValue ops ? ops.Select(Op.FromJson).ToImmutableArray() : throw new FormatException("Document delta is not an operation array");

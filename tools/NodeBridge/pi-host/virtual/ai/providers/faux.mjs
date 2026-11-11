@@ -1,4 +1,4 @@
-// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/ai/src/providers/faux.ts.
+// Pi b4afdddf44e059c67ccf5097e5317d913521b470 (MIT): packages/ai/src/providers/faux.ts.
 // Ported to plain ESM for the PiSharp Node extension bridge (TypeScript types stripped mechanically; behaviour unchanged).
 import { createProvider } from "../models.mjs";
 import { createAssistantMessageEventStream } from "../utils/event-stream.mjs";

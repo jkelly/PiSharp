@@ -159,8 +159,8 @@ internal static partial class Program
         var runtime = new LiveSessionRuntime(Env(("AZURE_OPENAI_API_KEY", "az-key"), ("AZURE_OPENAI_BASE_URL", "https://az.invalid/openai/v1"), ("MISTRAL_API_KEY", "mi-key")),
             () => endpoint, ModelsPath: models);
         var anthropic = await new SettingsModelSelection("anthropic", LiveModelFor("anthropic"), null).ResolveAsync(null, runtime, null, false, CancellationToken.None);
-        var (authentication, handler, reresolve) = await anthropic.ResolveAnthropicAsync(runtime, CancellationToken.None);
-        await using (var connection = await anthropic.ConnectResolvedAnthropicAsync(authentication, handler, CancellationToken.None, reresolve))
+        var (authentication, handler, reresolve, retention) = await anthropic.ResolveAnthropicAsync(runtime, CancellationToken.None);
+        await using (var connection = await anthropic.ConnectResolvedAnthropicAsync(authentication, handler, CancellationToken.None, reresolve, retention))
             await Drive(connection.CreateTransport(), anthropic.Model);
         var sent = endpoint.Snapshot()[^1];
         Equal("cfg-anthropic-key", sent.Headers["x-api-key"], "models.json apiKey for anthropic"); Equal("p1", sent.Headers["X-Proxy"], "anthropic provider header");

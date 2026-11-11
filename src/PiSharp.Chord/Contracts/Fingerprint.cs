@@ -38,12 +38,19 @@ internal static partial class ContractsInternal
     /// its own, so contracts without keyed members keep their fingerprints and <see cref="NormalFormVersion"/> stays).</summary>
     private static JsonObject VariantNormal(VariantData variant) => SortedDict(
         variant.State.Select(entry => (entry.Key, (JsonNode?)new JsonObject { ["state"] = entry.Value.Normal.DeepClone() }))
-            .Concat(variant.Keyed.Select(entry => (entry.Key, (JsonNode?)new JsonObject { ["keyed"] = entry.Value.Normal.DeepClone() })))
+            .Concat(variant.Keyed.Select(entry => (entry.Key, (JsonNode?)KeyedNormal(entry.Value))))
             .Concat(variant.Methods.Select(entry => (entry.Key, (JsonNode?)new JsonObject
             {
                 ["args"] = entry.Value.Args.Normal.DeepClone(),
                 ["result"] = entry.Value.Result.Normal.DeepClone(),
             }))));
+
+    private static JsonObject KeyedNormal(Snapshot member)
+    {
+        var normal = new JsonObject { ["keyed"] = member.Normal.DeepClone() };
+        if (member.KeyHost is { } host) normal["key"] = host.Kind;
+        return normal;
+    }
 
     private static JsonObject SortedDict(IEnumerable<(string Key, JsonNode? Value)> entries)
     {

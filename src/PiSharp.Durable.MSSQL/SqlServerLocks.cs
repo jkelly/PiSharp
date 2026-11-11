@@ -19,7 +19,7 @@ internal static class SqlServerLocks
 
     /// <summary>Takes an exclusive application lock owned by <paramref name="owner"/> (<c>Session</c> or <c>Transaction</c>), waiting at most
     /// <paramref name="timeoutMs"/>; fails with <paramref name="busyMessage"/> when another connection holds it past the timeout.</summary>
-    public static async Task AcquireAsync(SqlServerExecutor executor, string resource, string owner, int timeoutMs, string busyMessage)
+    public static async Task AcquireAsync(ISqlServerExecutor executor, string resource, string owner, int timeoutMs, string busyMessage)
     {
         // The command outlasts the lock wait, which the server bounds.
         var row = await executor.GetWaitingAsync(timeoutMs / 1000 + 30, $"""
@@ -33,7 +33,7 @@ internal static class SqlServerLocks
     }
 
     /// <summary>Releases a session-owned lock this connection holds.</summary>
-    public static Task ReleaseAsync(SqlServerExecutor executor, string resource) =>
+    public static Task ReleaseAsync(ISqlServerExecutor executor, string resource) =>
         executor.RunAsync("EXEC sp_releaseapplock @Resource = @p0, @LockOwner = N'Session'", resource);
 
     // The raw UTF-16 code units, so that names differing only in a lone surrogate never share a lock.

@@ -95,9 +95,11 @@ public sealed class WebSocketLink : LinkEnd
         private readonly long _maxQueued;
         private readonly CancellationTokenSource _stop=new();
         private readonly object _sendGate=new();
+        private readonly SemaphoreSlim _wireSend=new(1,1);
         private readonly Queue<byte[]> _pending=new();
         private bool _writing;
         private long _queuedBytes;
+        private int _closing, _ended;
         public SystemWebSocketPort(WebSocket socket,int max,long maxQueued)
         {
             if(max<0) throw new ArgumentOutOfRangeException(nameof(max));
@@ -123,11 +125,41 @@ public sealed class WebSocketLink : LinkEnd
             }
             if(overflow) Close(); else if(first is not null) _=Write(first);
         }
-        public void Close()
+        public void Close() => BeginClose(WebSocketCloseStatus.NormalClosure, "link closed");
+        private void BeginClose(WebSocketCloseStatus status, string description)
         {
             lock(_sendGate) { _pending.Clear(); _queuedBytes=0; }
-            if(_stop.IsCancellationRequested) return;
-            _stop.Cancel(); _socket.Abort(); Closed?.Invoke();
+            if(Interlocked.Exchange(ref _closing,1)!=0) return;
+            // The logical link stops immediately, while the socket remains alive to
+            // exchange close frames. Its actual Closed event still follows the handshake.
+            try { Error?.Invoke(); }
+            finally { _=CloseOutput(status,description); }
+        }
+        private async Task CloseOutput(WebSocketCloseStatus status, string description)
+        {
+            try
+            {
+                using var deadline=new CancellationTokenSource(TimeSpan.FromSeconds(2));
+                await _wireSend.WaitAsync(deadline.Token).ConfigureAwait(false);
+                try
+                {
+                    if(_socket.State is WebSocketState.Open or WebSocketState.CloseReceived)
+                        await _socket.CloseOutputAsync(status,description,deadline.Token).ConfigureAwait(false);
+                }
+                finally { _wireSend.Release(); }
+                if(_socket.State==WebSocketState.Closed) { Finish(); return; }
+                await Task.Delay(TimeSpan.FromSeconds(2),_stop.Token).ConfigureAwait(false);
+            }
+            catch(OperationCanceledException) when(_stop.IsCancellationRequested) { return; }
+            catch { }
+            Finish();
+        }
+        private void Finish()
+        {
+            if(Interlocked.Exchange(ref _ended,1)!=0) return;
+            _stop.Cancel();
+            if(_socket.State is not (WebSocketState.Closed or WebSocketState.Aborted)) _socket.Abort();
+            Closed?.Invoke();
         }
         private async Task Run()
         {
@@ -142,16 +174,30 @@ public sealed class WebSocketLink : LinkEnd
                     do
                     {
                         frame=await _socket.ReceiveAsync(buffer.AsMemory(),_stop.Token).ConfigureAwait(false);
-                        if(frame.MessageType==WebSocketMessageType.Close) return;
-                        if(frame.MessageType!=WebSocketMessageType.Binary || frame.Count>_max-message.Length) { Close(); return; }
+                        if(frame.MessageType==WebSocketMessageType.Close)
+                        {
+                            await _wireSend.WaitAsync(_stop.Token).ConfigureAwait(false);
+                            try
+                            {
+                                if(_socket.State==WebSocketState.CloseReceived)
+                                    await _socket.CloseOutputAsync(WebSocketCloseStatus.NormalClosure,"link closed",_stop.Token).ConfigureAwait(false);
+                            }
+                            finally { _wireSend.Release(); }
+                            return;
+                        }
+                        if(Volatile.Read(ref _closing)!=0) continue;
+                        if(frame.MessageType!=WebSocketMessageType.Binary)
+                        { BeginClose(WebSocketCloseStatus.InvalidMessageType,"binary messages required"); continue; }
+                        if(frame.Count>_max-message.Length)
+                        { BeginClose(WebSocketCloseStatus.MessageTooBig,"message exceeds limit"); continue; }
                         message.Write(buffer,0,frame.Count);
                     } while(!frame.EndOfMessage);
-                    Message?.Invoke(message.ToArray());
+                    if(Volatile.Read(ref _closing)==0) Message?.Invoke(message.ToArray());
                 }
             }
             catch(Exception) when(_stop.IsCancellationRequested) { }
             catch { Error?.Invoke(); }
-            finally { Close(); }
+            finally { Finish(); }
         }
         private async Task Write(byte[] first)
         {
@@ -160,7 +206,13 @@ public sealed class WebSocketLink : LinkEnd
                 var bytes=first;
                 while(true)
                 {
-                    await _socket.SendAsync(bytes.AsMemory(),WebSocketMessageType.Binary,true,_stop.Token).ConfigureAwait(false);
+                    await _wireSend.WaitAsync(_stop.Token).ConfigureAwait(false);
+                    try
+                    {
+                        if(Volatile.Read(ref _closing)!=0) return;
+                        await _socket.SendAsync(bytes.AsMemory(),WebSocketMessageType.Binary,true,_stop.Token).ConfigureAwait(false);
+                    }
+                    finally { _wireSend.Release(); }
                     lock(_sendGate)
                     {
                         if(_pending.Count==0 || _stop.IsCancellationRequested) { _writing=false; return; }

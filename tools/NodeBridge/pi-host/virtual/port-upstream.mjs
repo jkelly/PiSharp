@@ -7,19 +7,25 @@
 //
 //   node port-upstream.mjs <path-to-upstream-pi>/packages
 //
-// The upstream checkout must be Pi commit f9a26365568127461c47a07a37dcb42c140a3ac5 (v1.5.0, MIT).
+// The upstream checkout must be Pi commit b4afdddf44e059c67ccf5097e5317d913521b470 (v1.5.2, MIT).
 import fs from "node:fs";
 import path from "node:path";
 import { stripTypeScriptTypes } from "node:module";
 import { fileURLToPath } from "node:url";
+import { execFileSync } from "node:child_process";
 
-const COMMIT = "f9a26365568127461c47a07a37dcb42c140a3ac5";
+const COMMIT = "b4afdddf44e059c67ccf5097e5317d913521b470";
 const UP = path.resolve(process.argv[2] ?? process.env.PI_UPSTREAM_PACKAGES ?? "");
 if (!process.argv[2] && !process.env.PI_UPSTREAM_PACKAGES) {
 	console.error("usage: node port-upstream.mjs <upstream pi packages dir>");
 	process.exit(2);
 }
 const OUT = path.resolve(process.env.OUT ?? path.dirname(fileURLToPath(import.meta.url)));
+const upstreamRoot = path.dirname(UP);
+const sourceHead = execFileSync("git", ["-c", `safe.directory=${upstreamRoot.replace(/\\/g, "/")}`, "-C", upstreamRoot, "rev-parse", "HEAD"], { encoding: "utf8" }).trim();
+if (sourceHead !== COMMIT) throw new Error(`Expected upstream ${COMMIT}, got ${sourceHead}; no modules were written.`);
+const sourceChanges = execFileSync("git", ["-c", `safe.directory=${upstreamRoot.replace(/\\/g, "/")}`, "-C", upstreamRoot, "status", "--porcelain", "--untracked-files=all"], { encoding: "utf8" }).trim();
+if (sourceChanges) throw new Error("Upstream checkout is not clean; no modules were written.");
 
 // upstream path (relative to packages/) -> output path (relative to virtual/)
 const outMap = new Map();
@@ -206,10 +212,10 @@ const patchConfig = {
 		],
 	],
 	"coding-agent/src/config.ts": [
-		["let pkg: PackageJson = {};", 'let pkg: PackageJson = { name: "@earendil-works/pi-coding-agent", version: "1.5.0" };'],
+		["let pkg: PackageJson = {};", 'let pkg: PackageJson = { name: "@earendil-works/pi-coding-agent", version: "1.5.2" };'],
 		[
 			'try {\n\tconst packageJsonPath = getPackageJsonPath();\n\tpkg = JSON.parse(stripBom(readFileSync(packageJsonPath, "utf-8"))) as PackageJson;\n\tstartupPackageJsonPath = packageJsonPath;\n} catch (e: unknown) {\n\tconst err = e as NodeJS.ErrnoException;\n\tif (err.code !== "ENOENT") throw e;\n}',
-			"// PiSharp: the Node bridge ships no Pi package.json; it identifies as the ported Pi 1.5.0.\nstartupPackageJsonPath = undefined;",
+			"// PiSharp: the Node bridge ships no Pi package.json; it identifies as the ported Pi 1.5.2.\nstartupPackageJsonPath = undefined;",
 		],
 	],
 	"coding-agent/src/modes/interactive/theme/theme.ts": [

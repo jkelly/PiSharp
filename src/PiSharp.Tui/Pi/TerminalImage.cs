@@ -63,7 +63,8 @@ public static partial class TerminalImage
         if (termProgram == "warpterminal" || Has("WARP_SESSION_ID") || Has("WARP_TERMINAL_SESSION_UUID")) return new(ImageProtocol.Kitty, true, true);
         if (Has("ITERM_SESSION_ID") || termProgram == "iterm.app") return new(ImageProtocol.ITerm2, true, true);
         if (Has("WT_SESSION")) return new(ImageProtocol.None, true, true);
-        if (termProgram is "alacritty" or "vscode" or "zed") return new(ImageProtocol.None, true, true);
+        var isAlacritty = termProgram == "alacritty" || term.StartsWith("alacritty", StringComparison.Ordinal) || Has("ALACRITTY_WINDOW_ID");
+        if (isAlacritty || termProgram is "vscode" or "zed") return new(ImageProtocol.None, true, true);
         if (terminalEmulator == "jetbrains-jediterm") return new(ImageProtocol.None, true, false);
         if (OperatingSystem.IsWindows()) return new(ImageProtocol.None, true, false);
         return new(ImageProtocol.None, trueColorHint, false);

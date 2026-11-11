@@ -4,6 +4,7 @@ using System.Text.Json.Nodes;
 using PiSharp.Chord.Data;
 using PiSharp.Chord.Documents;
 using PiSharp.Chord.Host;
+using PiSharp.Telemetry;
 
 namespace PiSharp.Chord.Jobs;
 
@@ -46,15 +47,19 @@ internal sealed class HostedJob : IHostedJob, IJobHandle
     {
         try { owner.Host.Dispatcher.Invoke(() => owner.Documents.Batch.AssertOutside("job.start")); }
         catch (Exception error) { return Task.FromException<IJobRun>(error); }
-        return owner.Host.Dispatcher.RunAsync(() =>
-            owner.Documents.TxAsync(tx => Task.FromResult(Stage(tx, args, context, options ?? new())), owner.Token, context));
+        var attributes = owner.Host.Attributes(obj: owner.Documents.Label); attributes["job"] = definition.Name; attributes["phase"] = "intent";
+        return owner.Host.TraceOperation("chord.job", attributes, context, traced => owner.Host.Dispatcher.RunAsync(() =>
+            owner.Documents.TxAsync(tx => Task.FromResult(Stage(tx, args, traced, options ?? new())), owner.Token, traced)));
     }
     internal IJobRun Stage(Transaction tx, JsonNode? args, ChordContext context, StartOptions options) => owner.Host.Dispatcher.Invoke(() =>
     {
         if (!ReferenceEquals(tx.Documents, owner.Documents)) throw new ArgumentException($"{owner.Documents.Label}: a transaction starts only its own object's jobs");
-        if (state is "sealed" or "handed") throw new ChordError("released", $"{definition.Name}: its attempt ended", "ended");
+        if (state == "sealed") throw new ChordError("released", $"{definition.Name}: its attempt ended", "ended");
         if (state == "declared") throw new ChordError("not_ready", $"{definition.Name}: its object is not live yet");
-        return records.Stage(tx, args, context, options);
+        var run = records.Stage(tx, args, context, options);
+        if (run is JobRun job && job.Trace is null && ChordTelemetry.CarrierOf(context.Telemetry) is { } carrier)
+            job.Trace = new JsonObject(carrier.Select(each => KeyValuePair.Create(each.Key, (JsonNode?)JsonValue.Create(each.Value))));
+        return run;
     });
     public Task<JobOutcome> OutcomeAsync(string id, ChordContext context) => owner.Host.Dispatcher.RunAsync(() => records.OutcomeAsync(id, context));
     public Task<AbortResult> AbortAsync(string id, ChordContext context) => owner.Host.Dispatcher.RunAsync(() => records.AbortAsync(id, context));
@@ -67,16 +72,15 @@ internal sealed class HostedJob : IHostedJob, IJobHandle
     public void Live() { if (state != "declared") return; state = "live"; records.Attach(this); }
     public void HandOver()
     {
-        if (state is not ("live" or "declared")) return;
-        state = "handed"; records.Detach(this, []);
+        Seal(new ChordError("released", "job attempt reloaded", "ended"), "reload");
     }
     public void Seal(ChordError error, string reason)
     {
         if (state == "sealed") return;
-        var handed = state == "handed"; state = "sealed"; sealedError = error; cutReason = reason;
+        state = "sealed"; sealedError = error; cutReason = reason;
         if (owner.Documents.Own.Sealed) records.End(error);
         records.Detach(this, finishing); finishing.Clear();
-        if (!handed || owner.Documents.Own.Sealed) foreach (var run in invocations.ToArray()) records.Cut(run, error, reason);
+        foreach (var run in invocations.ToArray()) records.Cut(run, error, reason);
         invocations.Clear();
     }
     internal void Invoke(JobRun run)
@@ -108,7 +112,9 @@ internal sealed class HostedJob : IHostedJob, IJobHandle
     }
     private void Start(JobRun run, Invocation invocation)
     {
-        var call = new CallContext(owner.Host, owner.Caller, ChordContext.WithAbortSignal(invocation.Abort.Token, context));
+        var trace = PhaseSpan(run, "run");
+        var parent = trace is null ? context : ChordContext.WithTelemetry(trace.Span, context);
+        var call = new CallContext(owner.Host, owner.Caller, ChordContext.WithAbortSignal(invocation.Abort.Token, parent));
         var ctx = new JobContext(call, run.Id, StateOf(run, invocation));
         var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         // Drain admission precedes plugin invocation, including its synchronous pre-await code.
@@ -117,9 +123,10 @@ internal sealed class HostedJob : IHostedJob, IJobHandle
         async Task Execute()
         {
             string kind; object? result = null; JobError? failure = null;
-            try { result = await owner.Host.InvokeCallbackAsync(implementation.Run, () => implementation.Run(records.ArgsOf(run, definition), ctx), owner.DeclaringFacet); kind = "done"; }
+            try { result = await owner.Host.InvokeCallbackAsync(implementation.Run, () => implementation.Run(records.ArgsOf(run, definition), ctx), owner.DeclaringFacet); kind = "done"; trace?.Span.SetAttributes(new SpanAttributes { ["outcome"] = "ok" }); }
             catch (Exception error)
             {
+                if (trace is not null) trace.Span.SetAttributes(new SpanAttributes { ["outcome"] = ChordTelemetry.Ended(trace.Span, "job_failed", error, invocation.Abort.Token) });
                 kind = "failed";
                 if (invocation.Abort.IsCancellationRequested) failure = new("aborted", Reason: "abort");
                 else
@@ -128,7 +135,7 @@ internal sealed class HostedJob : IHostedJob, IJobHandle
                     failure = new("threw", error is ChordError or PluginError ? error : new PluginError("internal", error.Message));
                 }
             }
-            finally { invocation.Settle(); }
+            finally { invocation.Settle(); trace?.End(); }
             try
             {
                 ctx.Dispose(); invocations.Remove(run);
@@ -167,6 +174,8 @@ internal sealed class HostedJob : IHostedJob, IJobHandle
         _ = Execute();
         async Task Execute()
         {
+            var trace = PhaseSpan(run, "finish");
+            var phaseContext = trace is null ? context : ChordContext.WithTelemetry(trace.Span, context);
             var delay = 1000;
             try
             {
@@ -180,7 +189,8 @@ internal sealed class HostedJob : IHostedJob, IJobHandle
                             if (implementation.Finish is { } finish) await owner.Host.InvokeCallbackAsync(finish, () => finish(records.OutcomeOf(run), tx), owner.DeclaringFacet);
                             records.Change(tx, new("delete", run));
                             return true;
-                        }), owner.Token, context);
+                        }), owner.Token, phaseContext);
+                        trace?.Span.SetAttributes(new SpanAttributes { ["outcome"] = "ok" });
                         return;
                     }
                     catch (Exception error)
@@ -189,7 +199,8 @@ internal sealed class HostedJob : IHostedJob, IJobHandle
                         records.Report("job_finish_failed", run, error);
                         var failures = run.FinishFailures + 1;
                         if (failures >= 5)
-                        { await records.RecordAsync(new("block", run, Phase: "blocked", FinishFailures: failures, Blocked: "finish_failed")); return; }
+                        { if (trace is not null) { ChordTelemetry.SpanFailed(trace.Span, "job_failed", error); trace.Span.SetAttributes(new SpanAttributes { ["outcome"] = "error" }); } await records.RecordAsync(new("block", run, Phase: "blocked", FinishFailures: failures, Blocked: "finish_failed")); return; }
+                        trace?.Span.AddEvent("chord.retry", new SpanAttributes { ["backoff"] = (double)delay });
                         await records.RecordAsync(new("update", run, FinishFailures: failures));
                         try { await Task.Delay(TimeSpan.FromMilliseconds(delay), owner.Host.Options.TimeProvider, owner.Signal); }
                         catch (OperationCanceledException) { return; }
@@ -198,7 +209,15 @@ internal sealed class HostedJob : IHostedJob, IJobHandle
                 }
             }
             catch (Exception error) { records.Report("job_record_failed", run, error); }
-            finally { finishing.Remove(run); completion.TrySetResult(); }
+            finally { trace?.End(); finishing.Remove(run); completion.TrySetResult(); }
         }
+    }
+    private OpenSpan? PhaseSpan(JobRun run, string phase)
+    {
+        if (ChordTelemetry.IsUntraced(owner.Host.Telemetry)) return null;
+        var carrier = run.Trace?.ToDictionary(each => each.Key, each => each.Value!.GetValue<string>(), StringComparer.Ordinal);
+        var attributes = owner.Host.Attributes(obj: owner.Documents.Label); attributes["job"] = definition.Name;
+        attributes["phase"] = phase; attributes["job.id"] = run.Id;
+        return new OpenSpan(ChordTelemetry.ParentOf(carrier, owner.Host.Telemetry), "chord.job", attributes);
     }
 }

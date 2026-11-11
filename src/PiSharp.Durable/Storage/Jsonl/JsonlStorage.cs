@@ -1,4 +1,5 @@
 // Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/src/storage/jsonl/storage.ts (and its index.ts exports).
+// Read-only opening follows Pi b4afdddf44e059c67ccf5097e5317d913521b470, including bounded retries when a writer reclaims during recovery.
 //
 // Invalid read requests (an unknown conversation, a malformed or foreign cursor, history a document does not keep) are the in-memory
 // store's StorageRequestExceptions; upstream's own StorageRequestError, "Storage.entry() requires an entry ID", has no counterpart, since
@@ -8,8 +9,9 @@
 // sidecars doc-<id>.jsonl (one document incarnation's bases and deltas) and task-<id>.jsonl (live task replacements). A batch commit applies
 // each batch in memory as it is checked, appends the batches' complete records to every affected sidecar, optionally flushes them, then
 // appends their markers to main.jsonl in one write; reads wait until the appends are done, and any failure once a batch applied poisons the
-// open storage. Opening removes torn final lines, ignores and truncates unconfirmed sidecar tails,
+// open storage. Writable opening removes torn final lines, ignores and truncates unconfirmed sidecar tails,
 // replays confirmed records, and reclaims sidecar records that a later latest base, retirement or terminal task made unnecessary.
+// A read-only open only loads the confirmed snapshot; it creates and changes no files and retries recovery that races a writer.
 // main.jsonl is never compacted. Lines are byte-for-byte what upstream writes: the same file names, key orders and JSON text, so Pi and
 // PiSharp open each other's directories. This file uses no local runtime API; JsonlStorage.Local.cs adds the local-file-system opener.
 using System.Collections.Immutable;
@@ -25,7 +27,14 @@ public sealed record JsonlStorageOptions
 {
     /// <summary>Flush every affected sidecar before appending the main marker. Defaults to false.</summary>
     public bool Fsync { get; init; }
+
+    /// <summary>Opens an existing directory without writing, for a viewer of a directory another process writes. Recovery skips torn
+    /// lines and unconfirmed tails in memory, and reclaims nothing. Reads hold the state committed at open; commits reject. Defaults to false.</summary>
+    public bool ReadOnly { get; init; }
 }
+
+/// <summary>A commit was attempted on storage opened read-only. Nothing was written (upstream <c>JsonlStorageReadOnlyError</c>).</summary>
+public sealed class JsonlStorageReadOnlyException() : Exception("JSONL storage is open read-only");
 
 /// <summary>A JSONL storage directory holds data that no commit could have written (upstream <c>JsonlCorruptionError</c>).</summary>
 public sealed class JsonlCorruptionException : Exception
@@ -46,6 +55,7 @@ public sealed partial class JsonlStorage : IStorage
     private const int FormatVersion = 1;
     private const string MainFile = "main.jsonl";
     private const string ReclaimSuffix = ".reclaim";
+    private const int ReadOnlyOpenAttempts = 5;
     private static readonly UTF8Encoding StrictUtf8 = new(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true);
     private static readonly UTF8Encoding Utf8 = new(encoderShouldEmitUTF8Identifier: false);
     private static readonly Regex SidecarFileName = new(@"^(?:doc|task)-(?:0|[1-9][0-9]*)\.jsonl$", RegexOptions.CultureInvariant);
@@ -55,10 +65,12 @@ public sealed partial class JsonlStorage : IStorage
     private readonly string directory;
     private readonly string mainPath;
     private readonly bool fsync;
+    private readonly bool readOnly;
     private readonly MemoryStorage memory = new();
     private readonly HashSet<long> currentOnlyDocuments = [];
     private readonly HashSet<long> liveTaskSidecars = [];
     private bool closed;
+    private long mainSize;
     private JsonlStoragePoisonedException? poisonError;
     private readonly Lock readGate = new();
     /// <summary>Completes once the batches being appended are; they are in memory already (<see cref="CommitAsync"/>).</summary>
@@ -70,9 +82,11 @@ public sealed partial class JsonlStorage : IStorage
         this.directory = directory;
         this.mainPath = mainPath;
         fsync = options.Fsync;
+        readOnly = options.ReadOnly;
     }
 
-    /// <summary>Opens or creates a JSONL storage directory using the supplied file system.</summary>
+    /// <summary>Opens or creates a JSONL storage directory using the supplied file system. A read-only open creates and writes nothing;
+    /// a recovery failure caused by a concurrent writer's commit is retried.</summary>
     public static async Task<JsonlStorage> OpenAsync(string directory, IFileSystem fs, DurableContext context, JsonlStorageOptions? options = null)
     {
         ArgumentNullException.ThrowIfNull(directory);
@@ -80,13 +94,27 @@ public sealed partial class JsonlStorage : IStorage
         ArgumentNullException.ThrowIfNull(context);
         var absolute = await fs.AbsolutePathAsync(directory, context);
         if (!absolute.IsOk) throw ErrorFromFile("path resolution", absolute.Error);
-        var created = await fs.CreateDirAsync(absolute.Value, new CreateDirOptions { Recursive = true }, context);
-        if (!created.IsOk) throw ErrorFromFile("directory creation", created.Error);
+        options ??= new JsonlStorageOptions();
+        if (!options.ReadOnly)
+        {
+            var created = await fs.CreateDirAsync(absolute.Value, new CreateDirOptions { Recursive = true }, context);
+            if (!created.IsOk) throw ErrorFromFile("directory creation", created.Error);
+        }
         var mainPathResult = await fs.JoinPathAsync([absolute.Value, MainFile], context);
         if (!mainPathResult.IsOk) throw ErrorFromFile("path join", mainPathResult.Error);
-        var storage = new JsonlStorage(fs, absolute.Value, mainPathResult.Value, options ?? new JsonlStorageOptions());
-        await storage.RecoverAsync(context);
-        return storage;
+        for (var attempt = 1; ; attempt++)
+        {
+            var storage = new JsonlStorage(fs, absolute.Value, mainPathResult.Value, options);
+            try
+            {
+                await storage.RecoverAsync(context);
+                return storage;
+            }
+            catch (JsonlCorruptionException)
+            {
+                if (!storage.readOnly || attempt == ReadOnlyOpenAttempts || !await storage.MainChangedAsync(context)) throw;
+            }
+        }
     }
 
     /// <summary>
@@ -99,6 +127,7 @@ public sealed partial class JsonlStorage : IStorage
     {
         StorageRules.CheckCommitArguments(batches, receive);
         AssertUsable();
+        if (readOnly) throw new JsonlStorageReadOnlyException();
         var seqs = new List<Seq>();
         var encoded = new List<EncodedCommit>();
         var reclamations = new OrderedDictionary<string, string>(StringComparer.Ordinal);
@@ -402,7 +431,8 @@ public sealed partial class JsonlStorage : IStorage
 
     private async Task RecoverAsync(DurableContext context)
     {
-        var main = await ReadLinesAsync(fs, mainPath, MainFile, context, ParseMainMarker);
+        var main = await ReadLinesAsync(mainPath, MainFile, context, ParseMainMarker);
+        mainSize = main.Size;
         var previousSeq = 0L;
         foreach (var marker in main.Lines)
         {
@@ -413,7 +443,7 @@ public sealed partial class JsonlStorage : IStorage
         var listed = await fs.ListDirAsync(directory, context);
         if (!listed.IsOk) throw ErrorFromFile("directory listing", listed.Error);
         foreach (var info in listed.Value)
-            if (info.Kind == FileKind.File && ReclaimFileName.IsMatch(info.Name)) await fs.RemoveAsync(info.Path, new RemoveOptions { Force = true }, context);
+            if (!readOnly && info.Kind == FileKind.File && ReclaimFileName.IsMatch(info.Name)) await fs.RemoveAsync(info.Path, new RemoveOptions { Force = true }, context);
         var sidecarFiles = listed.Value.Where(info => info.Kind == FileKind.File && SidecarFileName.IsMatch(info.Name))
             .Select(info => info.Name).Order(StringComparer.Ordinal).ToList();
         var parsedFiles = new OrderedDictionary<string, ParsedFile<SidecarRecord>>(StringComparer.Ordinal);
@@ -422,7 +452,7 @@ public sealed partial class JsonlStorage : IStorage
         {
             var pathResult = await fs.JoinPathAsync([directory, file], context);
             if (!pathResult.IsOk) throw ErrorFromFile("path join", pathResult.Error);
-            var parsed = await ReadLinesAsync(fs, pathResult.Value, file, context, (text, line) => ParseSidecarRecord(text, file, line));
+            var parsed = await ReadLinesAsync(pathResult.Value, file, context, (text, line) => ParseSidecarRecord(text, file, line));
             parsedFiles.Add(file, parsed);
             SidecarRecord? previous = null;
             foreach (var line in parsed.Lines)
@@ -545,7 +575,7 @@ public sealed partial class JsonlStorage : IStorage
                 }
                 else unconfirmedAt ??= line.Start;
             }
-            if (unconfirmedAt is { } size)
+            if (unconfirmedAt is { } size && !readOnly)
             {
                 var truncated = await fs.TruncateFileAsync(parsed.Path, size, context);
                 if (!truncated.IsOk) throw ErrorFromFile($"tail truncation of {file}", truncated.Error);
@@ -564,7 +594,7 @@ public sealed partial class JsonlStorage : IStorage
             if (retainedLines is not null && (retainedLines.Count < confirmedLines.Count || retainedLines.Count == 0))
                 reclamations[file] = string.Concat(retainedLines.Select(line => JsonLine(line.Value.Raw)));
         }
-        await ReclaimSidecarsAsync(reclamations, context);
+        if (!readOnly) await ReclaimSidecarsAsync(reclamations, context);
 
         foreach (var id in currentOnly) currentOnlyDocuments.Add(id);
         foreach (var (id, live) in finalTaskIsLive)
@@ -586,12 +616,12 @@ public sealed partial class JsonlStorage : IStorage
         return line.Value;
     }
 
-    private static async Task<ParsedFile<T>> ReadLinesAsync<T>(IFileSystem fs, string path, string name, DurableContext context, Func<string, int, T> parse)
+    private async Task<ParsedFile<T>> ReadLinesAsync<T>(string path, string name, DurableContext context, Func<string, int, T> parse)
     {
         var read = await fs.ReadBinaryFileAsync(path, context);
         if (!read.IsOk)
         {
-            if (read.Error.Code == FileErrorCode.NotFound) return new(path, []);
+            if (read.Error.Code == FileErrorCode.NotFound) return new(path, [], 0);
             throw ErrorFromFile($"read of {name}", read.Error);
         }
         var bytes = read.Value;
@@ -599,8 +629,11 @@ public sealed partial class JsonlStorage : IStorage
         if (completeSize > 0 && bytes[completeSize - 1] != (byte)'\n')
         {
             completeSize = Array.LastIndexOf(bytes, (byte)'\n') + 1;
-            var truncated = await fs.TruncateFileAsync(path, completeSize, context);
-            if (!truncated.IsOk) throw ErrorFromFile($"torn-line truncation of {name}", truncated.Error);
+            if (!readOnly)
+            {
+                var truncated = await fs.TruncateFileAsync(path, completeSize, context);
+                if (!truncated.IsOk) throw ErrorFromFile($"torn-line truncation of {name}", truncated.Error);
+            }
         }
         var lines = new List<ParsedLine<T>>();
         var start = 0;
@@ -624,7 +657,14 @@ public sealed partial class JsonlStorage : IStorage
             start = end + 1;
             lineNumber++;
         }
-        return new(path, lines);
+        return new(path, lines, bytes.Length);
+    }
+
+    // A writer only reclaims a sidecar after appending the marker that permits it. A changed main size explains a recovery race.
+    private async Task<bool> MainChangedAsync(DurableContext context)
+    {
+        var info = await fs.FileInfoAsync(mainPath, context);
+        return info.IsOk && info.Value.Size != mainSize;
     }
 
     private async Task<string> ResolveFileAsync(string file, DurableContext context)
@@ -685,7 +725,7 @@ public sealed partial class JsonlStorage : IStorage
 
     private sealed record ParsedLine<T>(T Value, long Start);
 
-    private sealed record ParsedFile<T>(string Path, List<ParsedLine<T>> Lines);
+    private sealed record ParsedFile<T>(string Path, List<ParsedLine<T>> Lines, long Size);
 
     private static string SidecarName(string kind, long id) => $"{kind}-{id}.jsonl";
 

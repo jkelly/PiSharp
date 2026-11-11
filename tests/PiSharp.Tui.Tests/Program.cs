@@ -16,6 +16,7 @@ if (dotnetHost is null) throw new ArgumentException("Explicit .NET host path is 
 var tests = TerminalInputTests.Cases().Concat(TerminalLeaseTests.Cases())
     .Concat(TerminalRendererTests.Cases())
     .Concat(TerminalTextComponentTests.Cases())
+    .Concat(Sync152TuiTests.Cases())
     .Concat(WindowsConPtyFixture.Cases(dotnetHost, typeof(TerminalInputTests).Assembly.Location))
     .Concat(WindowsConPtyRendererFixture.Cases(dotnetHost, typeof(TerminalInputTests).Assembly.Location)).ToArray();
 var availableTests = tests.Length;

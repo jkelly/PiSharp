@@ -128,8 +128,8 @@ internal static class EditToolTests
         foreach (var test in new[]
         {
             (Before: "\ufefffirst\r\nsecond\r\nthird\r\n", Old: "second\n", New: "SECOND\n", After: "\ufefffirst\r\nSECOND\r\nthird\r\n"),
-            (Before: "first\r\nsecond\nthird\r", Old: "second\n", New: "SECOND\n", After: "first\r\nSECOND\r\nthird\r"),
-            (Before: "first\nsecond\r\nthird\r", Old: "second\r\n", New: "SECOND\r\n", After: "first\nSECOND\nthird\r"),
+            (Before: "first\r\nsecond\nthird\r", Old: "second\n", New: "SECOND\n", After: "first\r\nSECOND\nthird\r"),
+            (Before: "first\nsecond\r\nthird\r", Old: "second\r\n", New: "SECOND\r\n", After: "first\nSECOND\r\nthird\r"),
             (Before: "\U0001f642 before\n\u6587 after\n", Old: "\U0001f642 before", New: "\U0001f680 changed", After: "\U0001f680 changed\n\u6587 after\n")
         })
         {
@@ -283,12 +283,12 @@ internal static class EditToolTests
             await File.WriteAllBytesAsync(temp.File("file"), bytes); Success(await Invoke(Tool(temp, operations), Input("file", new TextEdit("a", "A"))));
             Equal(Convert.ToHexString(expected), Convert.ToHexString(await File.ReadAllBytesAsync(temp.File("file"))));
         }
-        // Pi edits any file: only the display diff is bounded natively, so an oversized diff is omitted and the edit is written.
+        // Diff construction must settle before a write: a native display bound fails the edit without effects.
         foreach (var diff in new DiffFormatterOptions[] { new(MaximumOutputCharacters: 16), new(MaximumTraceCells: 1) })
         {
             await File.WriteAllTextAsync(temp.File("file"), "a\nb\n");
-            var omitted = await Invoke(Tool(temp, operations, options: new(DiffOptions: diff)), Input("file", new TextEdit("b", "B"))); Success(omitted);
-            Equal("""{"diff":"","patch":"","firstChangedLine":2}""", omitted.Details.ToString()); Equal("a\nB\n", await File.ReadAllTextAsync(temp.File("file")));
+            var rejected = await Invoke(Tool(temp, operations, options: new(DiffOptions: diff)), Input("file", new TextEdit("b", "B"))); Code(rejected, "ResourceLimit");
+            Equal("a\nb\n", await File.ReadAllTextAsync(temp.File("file")));
         }
         // Control characters and NUL are text (source buffer.toString("utf-8")), as is a GIF signature without image handling.
         foreach (var (bytes, expected) in new (byte[], string)[] { ([0x61, 0x00, 0x62], "A\0b"), (Encoding.ASCII.GetBytes("GIF89a"), "GIF89A"), ([0x61, 0x1b, 0x0c], "A\u001b\f") })

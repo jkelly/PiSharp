@@ -98,6 +98,7 @@ internal static class JsText
             case TelemetryAttributeType.Boolean: sb.Append(value.GetBoolean() ? "true" : "false"); break;
             case TelemetryAttributeType.StringArray: Join(sb, value.GetStrings(), static (b, item) => Quote(b, item)); break;
             case TelemetryAttributeType.NumberArray: Join(sb, value.GetNumbers(), static (b, item) => b.Append(JsonNumber(item))); break;
+            case TelemetryAttributeType.StringNumberArray: Join(sb, value.GetStringNumbers(), Write); break;
             default: Join(sb, value.GetBooleans(), static (b, item) => b.Append(item ? "true" : "false")); break;
         }
     }
@@ -137,18 +138,25 @@ internal sealed class AttributeValueJsonConverter : JsonConverter<AttributeValue
                 var strings = ImmutableArray.CreateBuilder<string>();
                 var numbers = ImmutableArray.CreateBuilder<double>();
                 var booleans = ImmutableArray.CreateBuilder<bool>();
+                var mixed = ImmutableArray.CreateBuilder<AttributeValue>();
                 while (reader.Read() && reader.TokenType != JsonTokenType.EndArray)
                 {
                     switch (reader.TokenType)
                     {
-                        case JsonTokenType.String: strings.Add(reader.GetString()!); break;
-                        case JsonTokenType.Number: numbers.Add(reader.GetDouble()); break;
+                        case JsonTokenType.String:
+                            var text = reader.GetString()!; strings.Add(text); mixed.Add(text); break;
+                        case JsonTokenType.Number:
+                            var number = reader.GetDouble(); numbers.Add(number); mixed.Add(number); break;
                         case JsonTokenType.True or JsonTokenType.False: booleans.Add(reader.GetBoolean()); break;
                         default: throw new JsonException("Attribute arrays hold strings, numbers or booleans.");
                     }
                 }
                 var kinds = (strings.Count > 0 ? 1 : 0) + (numbers.Count > 0 ? 1 : 0) + (booleans.Count > 0 ? 1 : 0);
-                if (kinds > 1) throw new JsonException("Attribute arrays hold one element type.");
+                if (kinds > 1)
+                {
+                    if (booleans.Count != 0) throw new JsonException("Boolean attribute arrays hold one element type.");
+                    return AttributeValue.FromStringNumberArray(mixed);
+                }
                 return numbers.Count > 0 ? numbers.ToImmutable() : booleans.Count > 0 ? booleans.ToImmutable() : strings.ToImmutable();
             default: throw new JsonException("Attribute values are strings, numbers, booleans or arrays of one of them.");
         }
@@ -165,6 +173,7 @@ internal sealed class AttributeValueJsonConverter : JsonConverter<AttributeValue
                 writer.WriteStartArray();
                 if (value.Type == TelemetryAttributeType.StringArray) foreach (var item in value.GetStrings()) writer.WriteStringValue(item);
                 else if (value.Type == TelemetryAttributeType.NumberArray) foreach (var item in value.GetNumbers()) JsText.WriteNumber(writer, item);
+                else if (value.Type == TelemetryAttributeType.StringNumberArray) foreach (var item in value.GetStringNumbers()) Write(writer, item, options);
                 else foreach (var item in value.GetBooleans()) writer.WriteBooleanValue(item);
                 writer.WriteEndArray();
                 break;
@@ -285,7 +294,8 @@ internal sealed class AttributeTypeConverter() : NamedEnumConverter<TelemetryAtt
     internal static readonly (TelemetryAttributeType, string)[] Names =
     [
         (TelemetryAttributeType.String, "string"), (TelemetryAttributeType.Number, "number"), (TelemetryAttributeType.Boolean, "boolean"),
-        (TelemetryAttributeType.StringArray, "string[]"), (TelemetryAttributeType.NumberArray, "number[]"), (TelemetryAttributeType.BooleanArray, "boolean[]")
+        (TelemetryAttributeType.StringArray, "string[]"), (TelemetryAttributeType.NumberArray, "number[]"), (TelemetryAttributeType.BooleanArray, "boolean[]"),
+        (TelemetryAttributeType.StringNumberArray, "(string|number)[]")
     ];
 }
 

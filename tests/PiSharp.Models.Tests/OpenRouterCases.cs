@@ -126,7 +126,7 @@ internal static partial class Program
     {
         var modelsPath = Path.Combine(root, "models.json");
         await File.WriteAllTextAsync(modelsPath, """{"providers":{"openrouter":{"baseUrl":"https://us.openrouter.ai/api/v1/"}}}""");
-        var builtin = BuiltinModelCatalog.Get("openrouter").Models;
+        var builtin = CurrentModelCatalog.Get("openrouter")!.Models;
         var chat = builtin.Where(model => model.Type == CatalogModelType.Chat).Select(model => model.Id).ToArray();
         var allowed = new[] { chat[0], chat[2], "openrouter/auto", "remote/new" };
         var data = string.Join(",", allowed.Select(id => "{\"id\":\"" + id + "\",\"top_provider\":{\"context_length\":4242},\"pricing\":{\"prompt\":\"0.000001\",\"completion\":\"-1\"}}"));
@@ -179,7 +179,7 @@ internal static partial class Program
 
     private static async Task OpenRouterRegistryCredentials()
     {
-        var builtin = BuiltinModelCatalog.Get("openrouter").Models.Where(model => model.Type == CatalogModelType.Chat).Select(model => model.Id).ToArray();
+        var builtin = CurrentModelCatalog.Get("openrouter")!.Models.Where(model => model.Type == CatalogModelType.Chat).Select(model => model.Id).ToArray();
         // Without a credential the network phase is skipped (models.ts refresh), so neither pi.dev nor OpenRouter is asked.
         var endpoint = OpenRouterEndpoint(() => """{"data":[{"id":"openrouter/auto"}]}""");
         var store = new InMemoryModelsStore();

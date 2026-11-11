@@ -6,6 +6,7 @@ import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "nod
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { NORMALIZER_VERSION } from "./canonical-json.mjs";
+import { resolveSourceLock } from "./source-lock.mjs";
 import { canonicalRawJson, compareRawJson, parseJsonSupported } from "./raw-json.mjs";
 
 const repo = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
@@ -1078,13 +1079,16 @@ try {
   requireCondition(target.previousBaseline.commit === baseline.source.commit && target.previousBaseline.tag === baseline.source.tag, "Target lock names the preserved evidence lock");
   const surfaces = read("compatibility/surfaces.json");
   const parity = read("compatibility/parity.json");
+  const inventoryLock = resolveSourceLock(read, target, surfaces.sourceSha);
+  const inventorySha = inventoryLock.source.commit;
+  const inventoryPaths = new Set(inventoryLock.artifacts.filter(artifact => artifact.kind === "source-file").map(artifact => artifact.path));
   const provenance = read("compatibility/provenance.json");
   const manifest = read("fixtures/pi-v0.99.1/manifest.json");
   const manifestPaths = discoverManifests();
   const manifests = manifestPaths.map(path => ({ path, document: read(path) }));
   const sha = baseline.source.commit;
   requireCondition(sha === "d86654abb8862e201933517d6f1fce9f88dd117f", "Pinned evidence SHA");
-  for (const document of [surfaces, parity]) requireCondition(document.sourceSha === targetSha, "Inventory source SHA matches target baseline");
+  for (const document of [surfaces, parity]) requireCondition(document.sourceSha === inventorySha, "Inventory source SHA matches its preserved baseline");
   for (const document of [provenance, manifest]) requireCondition(document.sourceSha === sha, "Provenance and fixture manifest match evidence baseline");
   const requirementIds = new Set(surfaces.requirements.map(row => row.id));
   requireCondition(requirementIds.size === surfaces.requirements.length, "Unique requirement IDs");
@@ -1112,8 +1116,8 @@ try {
   const fixtureIds = new Set(fixtures.map(row => row.fixture.fixtureId));
   requireCondition(fixtureIds.size === fixtures.length, "Unique fixture IDs across all manifests");
   for (const row of surfaces.requirements) {
-    requireCondition(row.source.sha === targetSha && row.source.url === `https://github.com/earendil-works/pi/blob/${targetSha}/${row.source.path}`, `Pinned source link ${row.id}`);
-    requireCondition(targetPaths.has(row.source.path), `Source hash exists for ${row.id}`);
+    requireCondition(row.source.sha === inventorySha && row.source.url === `https://github.com/earendil-works/pi/blob/${inventorySha}/${row.source.path}`, `Pinned source link ${row.id}`);
+    requireCondition(inventoryPaths.has(row.source.path), `Source hash exists for ${row.id}`);
     requireCondition(row.owner && row.testId && Number.isInteger(row.targetPhase) && row.targetPhase >= 1 && row.targetPhase <= 8, `Owner/test/phase metadata for ${row.id}`);
     const parityRow = parity.rows.find(candidate => candidate.requirementId === row.id);
     requireCondition(parityRow.status === row.status && parityRow.mandatory === row.mandatory, `Parity classification for ${row.id}`);

@@ -1,0 +1,331 @@
+{
+  "schemaVersion": 1,
+  "status": "local-package-validation-complete",
+  "version": "1.5.2",
+  "generatedUtc": "2026-11-11T07:18:19.9972476Z",
+  "sourceState": "working-tree candidate; base commit is not an immutable new-source claim",
+  "published": false,
+  "globalToolInstall": false,
+  "sourceValidation": {
+    "sha256": "43dc9aae61cfaeeb4eae5a857f49d5a9d908c4041ef6cffa89df737b5413013f",
+    "path": "E:/AI/PiSharp/update-1.5.2/AI_DOCS/sync-1.5.2-source-validation.json"
+  },
+  "sourceCoverage": {
+    "sha256": "7c6f8b4ee894ffe0baece99ae67dad6b28912d09aa5efe94ccc8cd8dd2c2ff45",
+    "path": "E:/AI/PiSharp/update-1.5.2/AI_DOCS/sync-1.5.2-source-coverage.json"
+  },
+  "metadataAcceptance": {
+    "path": "E:/AI/PiSharp/update-1.5.2/artifacts/sync-1.5.2-meta/final-acceptance-applied-plan.json",
+    "sha256": "392d5d13c66b508cc8ca9c65c9f6fd03e9bdd6fb0b386295f001b2516fb7580e",
+    "suiteCount": 47,
+    "status": "tested-with-limitations"
+  },
+  "postAcceptanceSourceControls": {
+    "sha256": "cc58787a55b1995313a42dae1ce51e1d8936f3f247faed01f8a5bfca7e076998",
+    "path": "E:/AI/PiSharp/update-1.5.2/artifacts/sync152-post-acceptance-source-controls.log"
+  },
+  "distributionValidatorControls": {
+    "path": "E:/AI/PiSharp/update-1.5.2/artifacts/sync-1.5.2-meta/distribution-validation-tests.json",
+    "runBy": "source_pins",
+    "command": "./tests/packaging/distribution-validation.tests.ps1 -Repo .",
+    "sha256": "cc073d626e4b16e8193b16cfe34ca5ec344260c6664d020b6d7a161f2959e581",
+    "passed": 95
+  },
+  "auxiliaryEvidence": [
+    {
+      "name": "Anthropic SDK beta native observation",
+      "status": "unavailable-admitted-input",
+      "requiredSuite": false,
+      "reason": "The executable requires an admitted eight-case beta input. No such input was located. The known immutable SDK reference input has three cases and a different schema; its failed auxiliary attempt is not a product regression or a parity pass.",
+      "knownInput": "tools/PiReferenceRunner/anthropic-sdk-inputs.json",
+      "knownInputSha256": "80ab9885440ccca2e01ed421b89a17899f3ecd25f92a558b809ca247921486e4",
+      "attemptReceipt": "artifacts/gap-validation/sync152-sdk-beta-native-observation-cbf6f10635d0496a87f74b6928b1adc1/command-receipt.json",
+      "rawObservation": "artifacts/sdk-beta-observation-27e0ca81a15d4dfb968d7e7b55747b24/native.json",
+      "originalExecuted": false,
+      "sourceOrSdkParityClaimed": false
+    }
+  ],
+  "productionRuntimeEvidence": {
+    "receipt": "E:\\AI\\PiSharp\\update-1.5.2\\artifacts\\gap-validation\\sync152-extension-installer-network-r2-d802ff01d91a4aaeb189bb3c3441239d\\receipt.json",
+    "version": "1.5.2",
+    "verified": true,
+    "packageCount": 123,
+    "provenance": "E:\\AI\\PiSharp\\update-1.5.2\\artifacts\\runtime-installer-147f2a298d2348eaa5724934c576eb32\\1.5.2-no-default-attribution-v1\\provenance.json",
+    "provenanceSha256": "a56d179227def3ef21333563e49570a79e319423480b772d57af734be5aa7649",
+    "globalInstall": false
+  },
+  "packageBuild": {
+    "sha256": "481e3b6c95e9adda9446778b4c89b714674c8ca4cd0b98bf3935c90148a743f8",
+    "source": {
+      "beforeSha256": "832e31f06361851fe71cb497487316d93db52c282e6c50faa5f11ac16cf0d188",
+      "beforeManifest": "E:\\AI\\PiSharp\\update-1.5.2\\artifacts\\gap-validation\\sync152-package-final-b5ed35b5bf604d50914484da117e122f\\source-before.json",
+      "afterSha256": "832e31f06361851fe71cb497487316d93db52c282e6c50faa5f11ac16cf0d188",
+      "changedDuringRun": false
+    },
+    "receipt": "E:\\AI\\PiSharp\\update-1.5.2\\artifacts\\gap-validation\\sync152-package-final-b5ed35b5bf604d50914484da117e122f\\command-receipt.json"
+  },
+  "priorPackageAttempts": [
+    {
+      "sha256": "db161f3e23e9a9694ed05b26c67febe5bd82cfa5e9d285f52fac905cda0a691b",
+      "source": {
+        "beforeSha256": "a9131013b6dde878dc915e5a79c7d225225e53f96e664b9d7884b0dfde3616a0",
+        "beforeManifest": "E:\\AI\\PiSharp\\update-1.5.2\\artifacts\\gap-validation\\sync152-package-final-1ba90fd91d244b6999fd980d53f2899e\\source-before.json",
+        "afterSha256": "a9131013b6dde878dc915e5a79c7d225225e53f96e664b9d7884b0dfde3616a0",
+        "changedDuringRun": false
+      },
+      "receipt": "E:\\AI\\PiSharp\\update-1.5.2\\artifacts\\gap-validation\\sync152-package-final-1ba90fd91d244b6999fd980d53f2899e\\command-receipt.json",
+      "stderr": "E:\\AI\\PiSharp\\update-1.5.2\\artifacts\\gap-validation\\sync152-package-final-1ba90fd91d244b6999fd980d53f2899e\\stderr.log",
+      "result": "failed"
+    }
+  ],
+  "priorPackageAttemptArchive": {
+    "sha256": "11d2ac755cd031811f53d4d80447e6c4ab0c1c721f7b87bbe2986ba3bcd54bf6",
+    "path": "E:/AI/PiSharp/update-1.5.2/artifacts/sync152-package-first-attempt-superseded.json"
+  },
+  "publicFallback": {
+    "sha256": "fd15072caabcba8f0dfffd29d50c34fcbc2b598e7590f5002a4ca12a3658532e",
+    "candidatePiSharpFallbackCount": 0,
+    "inventory": "E:/AI/PiSharp/update-1.5.2/artifacts/public-fallback-inventory.json"
+  },
+  "postMetadataIntegrity": {
+    "receipt": "E:\\AI\\PiSharp\\update-1.5.2\\artifacts\\gap-validation\\sync152-post-metadata-integrity-69c15ddc58a5432b8ed8a54f52b35ece\\command-receipt.json",
+    "sha256": "ca69c72fbb8c991d4cc8be8d474117f2f6a7bcd6100432ad90c0f1f84ecb09f4"
+  },
+  "postMetadataSolution": {
+    "sha256": "e44b059b27c1780c2425c47018ae6a562e6719ec768284a17f4a74e614deb5e4",
+    "source": {
+      "beforeSha256": "832e31f06361851fe71cb497487316d93db52c282e6c50faa5f11ac16cf0d188",
+      "beforeManifest": "E:\\AI\\PiSharp\\update-1.5.2\\artifacts\\gap-validation\\sync152-solution-post-metadata-a908e9f48bc14ec9a29df73a3eb78ed6\\source-before.json",
+      "afterSha256": "832e31f06361851fe71cb497487316d93db52c282e6c50faa5f11ac16cf0d188",
+      "changedDuringRun": false
+    },
+    "receipt": "E:\\AI\\PiSharp\\update-1.5.2\\artifacts\\gap-validation\\sync152-solution-post-metadata-a908e9f48bc14ec9a29df73a3eb78ed6\\command-receipt.json"
+  },
+  "externalConsumer": {
+    "sha256": "4303e75232d51ad924144b4fd01ae6bcf1dd87c8bfe71fe8eb015ae2bb2bc427",
+    "receipt": "E:/AI/PiSharp/update-1.5.2/artifacts/package-consumer-sync152/receipt.json",
+    "stages": [
+      {
+        "name": "restore",
+        "exitCode": 0,
+        "expectedFailure": false,
+        "log": "restore.log"
+      },
+      {
+        "name": "experimental-diagnostics",
+        "exitCode": 1,
+        "expectedFailure": true,
+        "log": "experimental-diagnostics.log"
+      },
+      {
+        "name": "build",
+        "exitCode": 0,
+        "expectedFailure": false,
+        "log": "build.log"
+      },
+      {
+        "name": "run",
+        "exitCode": 0,
+        "expectedFailure": false,
+        "log": "run.log"
+      }
+    ],
+    "packageConsumptionProven": true
+  },
+  "privateCli": {
+    "sha256": "d82355a7728357ed1f586ef08dd6bbe25a2358c586ba380b096b7e3deab1d461",
+    "receipt": "E:\\AI\\PiSharp\\update-1.5.2\\artifacts\\cli-package-smoke-6072d23ecd344926b4c0a4044b9bdb0f\\receipt.json",
+    "commandReceipt": "E:\\AI\\PiSharp\\update-1.5.2\\artifacts\\gap-validation\\sync152-cli-smoke-final-302cb6d4b7364aebb2f842c43b71a287\\command-receipt.json",
+    "details": {
+      "result": "passed",
+      "version": "1.5.2",
+      "entry": "E:\\AI\\PiSharp\\update-1.5.2\\artifacts\\cli-package-smoke-6072d23ecd344926b4c0a4044b9bdb0f\\tool\\pisharp.exe",
+      "sdk": "E:/AI/PiSharp/PiSharp/artifacts/sample-tools/dotnet/dotnet.exe",
+      "dotnetRoot": "E:\\AI\\PiSharp\\PiSharp\\artifacts\\sample-tools\\dotnet",
+      "dotnetRootX64": "E:\\AI\\PiSharp\\PiSharp\\artifacts\\sample-tools\\dotnet",
+      "feed": "E:\\AI\\PiSharp\\update-1.5.2\\artifacts\\packages-sync152",
+      "nugetCache": "E:\\AI\\PiSharp\\update-1.5.2\\artifacts\\cli-package-smoke-6072d23ecd344926b4c0a4044b9bdb0f\\nuget-cache",
+      "sourceConfig": "E:\\AI\\PiSharp\\update-1.5.2\\artifacts\\cli-package-smoke-6072d23ecd344926b4c0a4044b9bdb0f\\NuGet.Config",
+      "versionOutput": "1.5.2",
+      "helpOutput": "E:\\AI\\PiSharp\\update-1.5.2\\artifacts\\cli-package-smoke-6072d23ecd344926b4c0a4044b9bdb0f\\help.txt",
+      "globalInstall": false
+    }
+  },
+  "packageCount": 29,
+  "packages": [
+    {
+      "name": "PiSharp.Agent.1.5.2.nupkg",
+      "path": "E:\\AI\\PiSharp\\update-1.5.2\\artifacts\\packages-sync152\\PiSharp.Agent.1.5.2.nupkg",
+      "bytes": 172591,
+      "sha256": "50e2946266bcf23760452cff73d006b6688018c5c19a3465d3d6c218a378909f"
+    },
+    {
+      "name": "PiSharp.AI.1.5.2.nupkg",
+      "path": "E:\\AI\\PiSharp\\update-1.5.2\\artifacts\\packages-sync152\\PiSharp.AI.1.5.2.nupkg",
+      "bytes": 868717,
+      "sha256": "0f8fb080add5faf4e6651c925b903c39d0c28cb0d7f682e4ee9aafbf3c721406"
+    },
+    {
+      "name": "PiSharp.Chord.1.5.2.nupkg",
+      "path": "E:\\AI\\PiSharp\\update-1.5.2\\artifacts\\packages-sync152\\PiSharp.Chord.1.5.2.nupkg",
+      "bytes": 877812,
+      "sha256": "f7963bb807802b7ca00c42ee2a270beb82289947798a860bafce2ada2872e0c2"
+    },
+    {
+      "name": "PiSharp.Chord.Hosting.1.5.2.nupkg",
+      "path": "E:\\AI\\PiSharp\\update-1.5.2\\artifacts\\packages-sync152\\PiSharp.Chord.Hosting.1.5.2.nupkg",
+      "bytes": 357315,
+      "sha256": "01b7a9a195438307baeb0391d7824c7bb4198d6cace9ec9fcd6ae9a9178591fb"
+    },
+    {
+      "name": "PiSharp.Cli.1.5.2.nupkg",
+      "path": "E:\\AI\\PiSharp\\update-1.5.2\\artifacts\\packages-sync152\\PiSharp.Cli.1.5.2.nupkg",
+      "bytes": 196675256,
+      "sha256": "2ae7e0747e73a4fb9d71a680da242e0338cd7b8630c43212805551519d1b654f"
+    },
+    {
+      "name": "PiSharp.Codemode.1.5.2.nupkg",
+      "path": "E:\\AI\\PiSharp\\update-1.5.2\\artifacts\\packages-sync152\\PiSharp.Codemode.1.5.2.nupkg",
+      "bytes": 139278,
+      "sha256": "052d78480748126327752166e5bfb7939434324cda280e70c35b68c8a1aef8ec"
+    },
+    {
+      "name": "PiSharp.CodingAgent.1.5.2.nupkg",
+      "path": "E:\\AI\\PiSharp\\update-1.5.2\\artifacts\\packages-sync152\\PiSharp.CodingAgent.1.5.2.nupkg",
+      "bytes": 549951,
+      "sha256": "a5404486fa5039047e99429f8caa166c5b5d10634446a92011801e047414ee69"
+    },
+    {
+      "name": "PiSharp.Compatibility.Node.1.5.2.nupkg",
+      "path": "E:\\AI\\PiSharp\\update-1.5.2\\artifacts\\packages-sync152\\PiSharp.Compatibility.Node.1.5.2.nupkg",
+      "bytes": 107370,
+      "sha256": "9f08888bace55bf5a676f5cf6ce20161bf501321c0d64564e3fcf809f90691b2"
+    },
+    {
+      "name": "PiSharp.Contracts.1.5.2.nupkg",
+      "path": "E:\\AI\\PiSharp\\update-1.5.2\\artifacts\\packages-sync152\\PiSharp.Contracts.1.5.2.nupkg",
+      "bytes": 154301,
+      "sha256": "7116b949a04d14a6fbb59c64673b6def4fc76176a898379549912580a6ee44c6"
+    },
+    {
+      "name": "PiSharp.CustomAgents.1.5.2.nupkg",
+      "path": "E:\\AI\\PiSharp\\update-1.5.2\\artifacts\\packages-sync152\\PiSharp.CustomAgents.1.5.2.nupkg",
+      "bytes": 251422,
+      "sha256": "8ab79153d15a2c6017766fc365147f244ae7a1a941cd1d0f189a9db6b6598465"
+    },
+    {
+      "name": "PiSharp.CustomAgents.JavaScript.1.5.2.nupkg",
+      "path": "E:\\AI\\PiSharp\\update-1.5.2\\artifacts\\packages-sync152\\PiSharp.CustomAgents.JavaScript.1.5.2.nupkg",
+      "bytes": 48480,
+      "sha256": "7c9d7d3b71ae70ff233fc743a07894b88a53c5ba5a6b242099bea114e09f6397"
+    },
+    {
+      "name": "PiSharp.CustomAgents.Scripting.1.5.2.nupkg",
+      "path": "E:\\AI\\PiSharp\\update-1.5.2\\artifacts\\packages-sync152\\PiSharp.CustomAgents.Scripting.1.5.2.nupkg",
+      "bytes": 53854,
+      "sha256": "a3170e0e0a1f771c1430efd1e9d28f5c7b92aa8474388af1afa43298da9b4110"
+    },
+    {
+      "name": "PiSharp.Durable.1.5.2.nupkg",
+      "path": "E:\\AI\\PiSharp\\update-1.5.2\\artifacts\\packages-sync152\\PiSharp.Durable.1.5.2.nupkg",
+      "bytes": 853266,
+      "sha256": "dc0bac40fd39b43db03ec3afdc3d8f1078d2335c3495db1536734a7a0be1ae0d"
+    },
+    {
+      "name": "PiSharp.Durable.Sqlite.1.5.2.nupkg",
+      "path": "E:\\AI\\PiSharp\\update-1.5.2\\artifacts\\packages-sync152\\PiSharp.Durable.Sqlite.1.5.2.nupkg",
+      "bytes": 81840,
+      "sha256": "56c4d6abbda9d8ef763e3edae7a39bed1791fec02789f94e0331bfa788bdfcfa"
+    },
+    {
+      "name": "PiSharp.Durable.Store.1.5.2.nupkg",
+      "path": "E:\\AI\\PiSharp\\update-1.5.2\\artifacts\\packages-sync152\\PiSharp.Durable.Store.1.5.2.nupkg",
+      "bytes": 70087,
+      "sha256": "6ffbb805f8151b17fffaba30401f6aac2d6219750c36a49e089b15b857ce5471"
+    },
+    {
+      "name": "PiSharp.Durable.Tools.1.5.2.nupkg",
+      "path": "E:\\AI\\PiSharp\\update-1.5.2\\artifacts\\packages-sync152\\PiSharp.Durable.Tools.1.5.2.nupkg",
+      "bytes": 212367,
+      "sha256": "bc94899a6b65fa8d511b05c2de29f1e0e70362f1025f621612340dd3168b4180"
+    },
+    {
+      "name": "PiSharp.Env.1.5.2.nupkg",
+      "path": "E:\\AI\\PiSharp\\update-1.5.2\\artifacts\\packages-sync152\\PiSharp.Env.1.5.2.nupkg",
+      "bytes": 113264,
+      "sha256": "8c691d7728a3c20f7c01a96d6dee49ba8e2105ba76f44d8cded005e60d445529"
+    },
+    {
+      "name": "PiSharp.Env.Protocol.1.5.2.nupkg",
+      "path": "E:\\AI\\PiSharp\\update-1.5.2\\artifacts\\packages-sync152\\PiSharp.Env.Protocol.1.5.2.nupkg",
+      "bytes": 30254,
+      "sha256": "7e33abfc7542025161af76343ef627ddc07dd966ae18750a34ebd1c0d0260395"
+    },
+    {
+      "name": "PiSharp.ExtensionHost.1.5.2.nupkg",
+      "path": "E:\\AI\\PiSharp\\update-1.5.2\\artifacts\\packages-sync152\\PiSharp.ExtensionHost.1.5.2.nupkg",
+      "bytes": 88219,
+      "sha256": "75d8b831f274b0443afcf8415d1eaf4ff71cd1f6fef64d1c25dacfd78fc162bc"
+    },
+    {
+      "name": "PiSharp.Extensions.Abstractions.1.5.2.nupkg",
+      "path": "E:\\AI\\PiSharp\\update-1.5.2\\artifacts\\packages-sync152\\PiSharp.Extensions.Abstractions.1.5.2.nupkg",
+      "bytes": 196566,
+      "sha256": "f2677a1fc25bb3cc7d7443a57c67fdbbdf8380357d1faeebd034409d0b0be3e3"
+    },
+    {
+      "name": "PiSharp.Extensions.Agent.1.5.2.nupkg",
+      "path": "E:\\AI\\PiSharp\\update-1.5.2\\artifacts\\packages-sync152\\PiSharp.Extensions.Agent.1.5.2.nupkg",
+      "bytes": 50421,
+      "sha256": "022c6a5fd89c70034bfe85b7f26c41b85e5ff1d5556250610e9157a86a0b4ee1"
+    },
+    {
+      "name": "PiSharp.Extensions.Runtime.1.5.2.nupkg",
+      "path": "E:\\AI\\PiSharp\\update-1.5.2\\artifacts\\packages-sync152\\PiSharp.Extensions.Runtime.1.5.2.nupkg",
+      "bytes": 388610,
+      "sha256": "56b989ff2c57efd0a609f77d9097dcb64b19b98579e168514adcead9b99b6074"
+    },
+    {
+      "name": "PiSharp.PromptTemplates.Yaml.1.5.2.nupkg",
+      "path": "E:\\AI\\PiSharp\\update-1.5.2\\artifacts\\packages-sync152\\PiSharp.PromptTemplates.Yaml.1.5.2.nupkg",
+      "bytes": 27697,
+      "sha256": "7f234d01eee9713138dd6d6e8d3c1ca3ae8d460a2ae8bc5f286f581c21b2f294"
+    },
+    {
+      "name": "PiSharp.Rpc.1.5.2.nupkg",
+      "path": "E:\\AI\\PiSharp\\update-1.5.2\\artifacts\\packages-sync152\\PiSharp.Rpc.1.5.2.nupkg",
+      "bytes": 136338,
+      "sha256": "c5c5df708ff5b4311d6d76ba0efead18cbf85d2e4683b63aa7b124020fd124a9"
+    },
+    {
+      "name": "PiSharp.Sessions.1.5.2.nupkg",
+      "path": "E:\\AI\\PiSharp\\update-1.5.2\\artifacts\\packages-sync152\\PiSharp.Sessions.1.5.2.nupkg",
+      "bytes": 150361,
+      "sha256": "0a85a41c09beb0a936bef4d39dedabddc69b81ad789f4f2adef906425d226a68"
+    },
+    {
+      "name": "PiSharp.Telemetry.1.5.2.nupkg",
+      "path": "E:\\AI\\PiSharp\\update-1.5.2\\artifacts\\packages-sync152\\PiSharp.Telemetry.1.5.2.nupkg",
+      "bytes": 110064,
+      "sha256": "05fd0c0acf001146158e99e9640a9a992db4d13103b070c766fbdbda246cba7b"
+    },
+    {
+      "name": "PiSharp.Tools.1.5.2.nupkg",
+      "path": "E:\\AI\\PiSharp\\update-1.5.2\\artifacts\\packages-sync152\\PiSharp.Tools.1.5.2.nupkg",
+      "bytes": 233993,
+      "sha256": "601204ce2392c7715d2372b0aa7df01d5f4ff1ddf12e2ef4c29032f46fe64def"
+    },
+    {
+      "name": "PiSharp.Tools.Skia.1.5.2.nupkg",
+      "path": "E:\\AI\\PiSharp\\update-1.5.2\\artifacts\\packages-sync152\\PiSharp.Tools.Skia.1.5.2.nupkg",
+      "bytes": 59049,
+      "sha256": "6c0de009ed794ef63d8b6712b347390913f90aedfac58eac60d495ece5df3b76"
+    },
+    {
+      "name": "PiSharp.Tui.1.5.2.nupkg",
+      "path": "E:\\AI\\PiSharp\\update-1.5.2\\artifacts\\packages-sync152\\PiSharp.Tui.1.5.2.nupkg",
+      "bytes": 3354204,
+      "sha256": "905e79c89a2d4104fc57b288b17ecbcc2a9e4c383855649f0c979d967b555f9d"
+    }
+  ]
+}

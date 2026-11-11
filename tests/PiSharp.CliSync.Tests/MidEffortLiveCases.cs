@@ -63,7 +63,7 @@ internal static partial class Program
             // Pi 1.5.0 fixes the top-level effort at "low" (it was "high" in 1.2.0); the markers carry the level.
             Equal("""{"effort":"low"}""", body.GetProperty("output_config").GetRawText(), "output_config " + index);
             Check(!body.TryGetProperty("temperature", out _), "temperature sent");
-            Equal("mid-conversation-output-config-2026-07-01,thinking-binding-controls-2026-08-01,message-threads-2026-08-12", requests[index].Headers["anthropic-beta"], "betas " + index);
+            Equal("mid-conversation-output-config-2026-07-01,thinking-binding-controls-2026-08-01,inline-tools-2026-09-15,message-threads-2026-08-12", requests[index].Headers["anthropic-beta"], "betas " + index);
         }
         var levels = rpc.Events.Where(record => record.Value.GetProperty("type").GetString() == "message_end" &&
                 record.Value.GetProperty("message").GetProperty("role").GetString() == "assistant")

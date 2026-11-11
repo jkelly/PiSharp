@@ -12,12 +12,12 @@ public sealed partial class RemoteExecutionEnv
     {
         var reply = await Connection.RequestAsync("opendir", new() { ["path"] = resolved }).ConfigureAwait(false);
         var handle = Handle(reply, resolved);
-        try { CheckCancellation(context, resolved); return new RemoteDirReader(handle, await Connection.InfoAsync().ConfigureAwait(false)); }
+        try { CheckCancellation(context, resolved); return new RemoteDirReader(handle, await Connection.InfoAsync(context.CancellationToken).ConfigureAwait(false)); }
         catch { await handle.CloseAsync().ConfigureAwait(false); throw; }
     });
     public Task<Result<ImmutableArray<FileMetadata>, FileError>> ListDirAsync(string path, DurableContext context) => FileOp(path, context, async resolved =>
     {
-        var info = await Connection.InfoAsync().ConfigureAwait(false);
+        var info = await Connection.InfoAsync(context.CancellationToken).ConfigureAwait(false);
         var handle = Handle(await Connection.RequestAsync("opendir", new() { ["path"] = resolved }).ConfigureAwait(false), resolved);
         var entries = new List<(byte[] Sort, JsonObject Entry)>();
         try

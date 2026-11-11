@@ -2,7 +2,12 @@
   <PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net10.0</TargetFramework><AssemblyName>PiSharp.CodingAgent.Tests</AssemblyName></PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../../src/PiSharp.Cli/PiSharp.Cli.csproj" />
+    <ProjectReference Include="../fixtures/extensions/native/PublishedFixture.InitializerContext/PublishedFixture.InitializerContext.csproj" />
     <Compile Include="../PiSharp.CodingAgent.Tests/ContextDurableSessionMessageTests.cs" Link="ContextDurableSessionMessageTests.cs" />
     <Compile Include="../PiSharp.CodingAgent.Tests/NativeInitializerLoaderTests.cs" Link="NativeInitializerLoaderTests.cs" />
+    <None Include="../fixtures/extensions/native/PublishedFixture.InitializerContext/bin/$(Configuration)/$(TargetFramework)/PublishedFixture.InitializerContext.deps.json"
+          Link="PublishedFixture.InitializerContext.deps.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="../fixtures/extensions/native/PublishedFixture.InitializerContext/bin/$(Configuration)/$(TargetFramework)/PublishedFixture.InitializerContext.runtimeconfig.json"
+          Link="PublishedFixture.InitializerContext.runtimeconfig.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

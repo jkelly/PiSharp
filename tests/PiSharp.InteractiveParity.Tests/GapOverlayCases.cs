@@ -32,7 +32,7 @@ internal static class GapOverlayCases
                 await mounted;
                 const second = ctx.ui.custom((tui, theme, keys, done) => {
                   closeUpper = done;
-                  return { render: () => ['upper'], handleInput: data => {
+                  return { render: () => [`upper:${upper?.isFocused() === true}`], handleInput: data => {
                     if (data === 'h') { lower.setHidden(true); log(['hidden', lower.isHidden()]); }
                     if (data === 's') lower.setHidden(false);
                     if (data === 'f') lower.focus();
@@ -60,17 +60,19 @@ internal static class GapOverlayCases
         pi.Type("s");
         await pi.WaitFor("lower:true");
         pi.Type("u");
-        await pi.WaitFor("lower:false");
+        // unfocus and focus are separate host notifications. A lower:false frame can precede upper.focus;
+        // wait for the intended input recipient before driving resize and the next key.
+        await pi.WaitUntil(text => text.Contains("lower:false", StringComparison.Ordinal) && text.Contains("upper:true", StringComparison.Ordinal), "upper focused after transfer");
         pi.Terminal.Resize(70, 30);
         await pi.WaitUntil(text => !text.Contains("lower:", StringComparison.Ordinal) && text.Contains("upper", StringComparison.Ordinal), "dynamic predicate after shrinking");
         pi.Terminal.Resize(120, 30);
-        await pi.WaitFor("lower:false");
+        await pi.WaitUntil(text => text.Contains("lower:false", StringComparison.Ordinal) && text.Contains("upper:true", StringComparison.Ordinal), "upper focused after resize");
         pi.Type("b");
         await pi.WaitUntil(_ => File.Exists(log) && File.ReadAllText(log).Contains("bounds", StringComparison.Ordinal), "bounds recorded after resize");
         pi.Type("f");
         await pi.WaitFor("lower:true");
         pi.Type("u");
-        await pi.WaitFor("lower:false");
+        await pi.WaitUntil(text => text.Contains("lower:false", StringComparison.Ordinal) && text.Contains("upper:true", StringComparison.Ordinal), "upper focused before closing lower");
         pi.Type("c");
         await pi.WaitUntil(text => !text.Contains("lower:", StringComparison.Ordinal) && text.Contains("upper", StringComparison.Ordinal), "done closes its own overlay");
         pi.Type("x");

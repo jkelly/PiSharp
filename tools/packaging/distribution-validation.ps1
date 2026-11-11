@@ -65,6 +65,80 @@ function Read-PiSharpArchiveText {
     finally { $archive.Dispose() }
 }
 
+function Get-PiSharpDistributionSourcePin {
+    # Source admission only. This reads repository metadata; it does not inspect working-tree
+    # runtime files or infer a new publication from an accepted source candidate.
+    param([Parameter(Mandatory)][string]$Repo, [Parameter(Mandatory)][string]$Version)
+    $root = [IO.Path]::GetFullPath($Repo)
+    function MetadataPath([string]$Path) {
+        if ([string]::IsNullOrWhiteSpace($Path) -or [IO.Path]::IsPathRooted($Path)) { throw 'Source metadata path must be repository relative.' }
+        $full = [IO.Path]::GetFullPath((Join-Path $root $Path))
+        $relative = [IO.Path]::GetRelativePath($root, $full)
+        if ($relative -eq '..' -or $relative.StartsWith('../') -or $relative.StartsWith('..\') -or [IO.Path]::IsPathRooted($relative)) {
+            throw 'Source metadata path escapes repository.'
+        }
+        return $full
+    }
+    function ReadMetadata([string]$Path) { return (Get-Content -LiteralPath (MetadataPath $Path) -Raw | ConvertFrom-Json -AsHashtable) }
+    function CheckLock($Lock) {
+        $source = $Lock['source']
+        if ($null -eq $source -or $source['tag'] -cnotmatch '^v[0-9]+\.[0-9]+\.[0-9]+$' -or
+            $source['commit'] -cnotmatch '^[0-9a-f]{40}$' -or $source['tree'] -cnotmatch '^[0-9a-f]{40}$' -or
+            ($source.Contains('tagResolvedCommit') -and $source['tagResolvedCommit'] -cne $source['commit'])) { throw 'Pinned Pi baseline changed: malformed source lock.' }
+    }
+    $target = ReadMetadata 'compatibility/target.lock.json'
+    CheckLock $target # Also required when selecting an older published baseline.
+    $release = ReadMetadata 'compatibility/public-release.json'
+    if ($release['upstream']['tag'] -cnotmatch '^v[0-9]+\.[0-9]+\.[0-9]+$' -or
+        $release['upstream']['commit'] -cnotmatch '^[0-9a-f]{40}$') { throw 'Pinned Pi baseline changed: malformed published source.' }
+    $queue = [Collections.Generic.Queue[object]]::new(); $queue.Enqueue($target)
+    $seen = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+    $published = $null
+    while ($queue.Count -gt 0) {
+        $lock = $queue.Dequeue(); CheckLock $lock
+        if (-not $seen.Add($lock['source']['commit'])) { continue }
+        if ($lock['source']['tag'] -ceq $release['upstream']['tag'] -and $lock['source']['commit'] -ceq $release['upstream']['commit']) { $published = $lock; break }
+        foreach ($name in @('previousTarget', 'previousBaseline')) {
+            $link = $lock[$name]
+            if ($null -eq $link) { continue }
+            $previous = ReadMetadata $link['lock']; CheckLock $previous
+            if ($previous['source']['tag'] -cne $link['tag'] -or $previous['source']['commit'] -cne $link['commit'] -or
+                ($link.Contains('tree') -and $previous['source']['tree'] -cne $link['tree'])) { throw 'Pinned Pi baseline changed: preserved lock link differs.' }
+            $queue.Enqueue($previous)
+        }
+    }
+    if ($null -eq $published) { throw 'Pinned Pi baseline changed: published source has no matching preserved lock.' }
+    if ($Version -ceq $release['version']) { return [pscustomobject]@{ baseline = $published; evidence = 'published-release'; acceptance = $null } }
+    if ($Version -cnotmatch '^([0-9]+\.[0-9]+\.[0-9]+)(?:\.[0-9]+)?(?:-[0-9A-Za-z]+(?:[.-][0-9A-Za-z]+)*)?$' -or
+        ('v' + $Matches[1]) -cne $target['source']['tag']) { throw 'Candidate provenance mismatch: version does not match the current source target or published release.' }
+    $versionBase = $Matches[1]
+    $table = ReadMetadata "compatibility/sync-$versionBase-applicability.json"
+    $acceptancePath = $table['acceptance']['record']
+    $acceptance = ReadMetadata $acceptancePath
+    foreach ($source in @($table['to'], $acceptance['source'])) {
+        foreach ($key in @('tag', 'commit', 'tree')) {
+            if ($source[$key] -cne $target['source'][$key]) { throw 'Candidate source acceptance does not match the current source target.' }
+        }
+    }
+    if ($acceptance['eligible'] -ne $true -or $acceptance['status'] -cnotin @('tested', 'tested-with-limitations') -or
+        [string]::IsNullOrWhiteSpace($acceptance['appliedAt']) -or @($acceptance['problems']).Count -ne 0 -or
+        @($table['rows'] | Where-Object { $_['status'] -cnotin @('tested', 'tested-with-limitations', 'no-op') }).Count -ne 0) {
+        throw 'Candidate source acceptance is not applied and qualified.'
+    }
+    foreach ($name in @('ledger', 'coverage')) {
+        $pin = $acceptance[$name]
+        if ($pin['sha256'] -cnotmatch '^[0-9a-f]{64}$' -or
+            (Get-FileHash -LiteralPath (MetadataPath $pin['path']) -Algorithm SHA256).Hash.ToLowerInvariant() -cne $pin['sha256'] -or
+            $table['acceptance'][$name]['sha256'] -cne $pin['sha256'] -or $table['acceptance'][$name]['path'] -cne $pin['path']) {
+            throw 'Candidate source acceptance frozen evidence hash mismatch.'
+        }
+    }
+    $ledger = ReadMetadata $acceptance['ledger']['path']; $coverage = ReadMetadata $acceptance['coverage']['path']
+    if ($ledger['sourceValidationOnly'] -ne $true -or @($ledger['pendingSuites']).Count -ne 0 -or @($ledger['additionalPending']).Count -ne 0 -or
+        $coverage['complete'] -ne $true) { throw 'Candidate source acceptance has incomplete source evidence.' }
+    return [pscustomobject]@{ baseline = $target; evidence = 'accepted-source-candidate'; acceptance = $acceptancePath }
+}
+
 function Assert-PiSharpDistribution {
     param(
         [Parameter(Mandatory)][string]$Path,
@@ -78,11 +152,8 @@ function Assert-PiSharpDistribution {
     # A fourth numeric segment marks a C#-only patch on an unchanged Pi baseline.
     if ($Version -cnotmatch '^[0-9]+\.[0-9]+\.[0-9]+(?:\.[0-9]+)?(?:-[0-9A-Za-z]+(?:[.-][0-9A-Za-z]+)*)?$') { throw 'Explicit SemVer candidate required.' }
     if ($Kind -eq 'standalone' -and -not $Rid) { throw 'Standalone RID required.' }
-    $baseline = Get-Content -LiteralPath (Join-Path $Repo 'compatibility/target.lock.json') -Raw | ConvertFrom-Json
-    # The target baseline must be a well-formed tagged commit that the release record agrees with.
-    $release = Get-Content -LiteralPath (Join-Path $Repo 'compatibility/public-release.json') -Raw | ConvertFrom-Json
-    if ($baseline.source.tag -cnotmatch '^v[0-9]+\.[0-9]+\.[0-9]+$' -or $baseline.source.commit -cnotmatch '^[0-9a-f]{40}$' -or
-        $release.upstream.tag -cne $baseline.source.tag -or $release.upstream.commit -cne $baseline.source.commit) { throw 'Pinned Pi baseline changed.' }
+    $sourcePin = Get-PiSharpDistributionSourcePin -Repo $Repo -Version $Version
+    $baseline = $sourcePin.baseline
     # The CLI loads Pi extensions through its Node bridge (decisions 0004 items 8-10), so the bridge's own
     # PiSharp.Compatibility.Node members ship with it; Node/npm executables and node_modules stay forbidden.
     $files = Get-PiSharpArchiveInventory -Path $Path -AllowNodeBridge
@@ -205,6 +276,7 @@ function Assert-PiSharpDistribution {
     return [pscustomobject]@{
         schemaVersion = 1; evidenceKind = 'offline-artifact-structure'; platformQualified = $false
         sourceCommit = $SourceCommit; baselineTag = $baseline.source.tag; baselineCommit = $baseline.source.commit
+        baselineEvidence = $sourcePin.evidence; sourceAcceptance = $sourcePin.acceptance
         sdk = $sdk
         version = $Version; kind = $Kind; rid = $Rid; enablePromptTemplateYaml = $EnablePromptTemplateYaml
         archiveSha256 = (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash.ToLowerInvariant()

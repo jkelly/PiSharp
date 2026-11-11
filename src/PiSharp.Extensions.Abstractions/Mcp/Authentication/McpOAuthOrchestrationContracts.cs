@@ -16,7 +16,8 @@ public sealed record McpOAuthClientMetadataDocument(string Url, string RedirectU
 /// not cached.</summary>
 public sealed record McpOAuthOrchestrationOptions(Uri ServerUrl, JsonData ClientMetadata,
     string? ClientMetadataScope = null, Func<JsonData?, McpOAuthClientMetadataDocument?>? ClientMetadataDocument = null, string? Scope = null,
-    string? AuthorizationCode = null, bool SkipRefresh = false, string? Iss = null, Uri? AuthorizationServerMetadataUrl = null)
+    string? AuthorizationCode = null, bool SkipRefresh = false, string? Iss = null, Uri? AuthorizationServerMetadataUrl = null,
+    bool RefreshOnly = false, string? AuthorizationRedirectUrl = null, string? RedirectUrl = null)
 { public override string ToString() => nameof(McpOAuthOrchestrationOptions); }
 /// <summary><paramref name="RedirectUrl"/> is the redirect URI of a Client ID Metadata Document, which may differ from
 /// the installed one by a server-specific path; null uses the installed redirect URI.</summary>

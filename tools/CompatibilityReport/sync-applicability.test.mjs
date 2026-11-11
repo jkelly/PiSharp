@@ -37,8 +37,8 @@ export function changelogBullets(pkg, text) {
   return ids;
 }
 
-test('the table spans the previous and current target locks', () => {
-  const lock = json('compatibility/target.lock.json'), previous = json('compatibility/target.v1.2.0.lock.json');
+test('the historical v1.5.0 table spans its preserved target locks', () => {
+  const lock = json('compatibility/target.v1.5.0.lock.json'), previous = json('compatibility/target.v1.2.0.lock.json');
   assert.deepEqual(table.from, { tag: previous.source.tag, commit: previous.source.commit, tree: previous.source.tree });
   assert.deepEqual(table.to, { tag: lock.source.tag, commit: lock.source.commit, tree: lock.source.tree });
   assert(existsSync(resolve(repo, table.decision)), table.decision);

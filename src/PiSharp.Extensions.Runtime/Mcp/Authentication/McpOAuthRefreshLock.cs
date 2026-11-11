@@ -2,6 +2,7 @@
 // withRefreshLock: proper-lockfile on `<agent dir>/mcp-auth-refresh-<hash>`, stale after 20 s, waited for up to 25 s in 100 ms steps).
 using System.Security.Cryptography;
 using System.Text;
+using PiSharp.Extensions.Mcp.Authentication;
 
 namespace PiSharp.Extensions.Runtime.Mcp.Authentication;
 
@@ -51,8 +52,10 @@ public static class McpOAuthRefreshLock
             // Windows reports an existing directory of that name (the original's lock) as access denied.
             catch (Exception error) when (error is IOException or UnauthorizedAccessException)
             {
+                // Only an existing lock is contention. Permissions and other filesystem failures must fail sign-in.
+                if (!File.Exists(path) && !Directory.Exists(path)) throw;
                 if (RemoveStale(path)) continue;
-                if (DateTime.UtcNow >= deadline) throw new IOException($"The MCP OAuth refresh lock is held by another process: {path}", error);
+                if (DateTime.UtcNow >= deadline) throw new McpRefreshLockBusyException(error);
                 await Task.Delay(RetryDelay, token).ConfigureAwait(false);
             }
         }

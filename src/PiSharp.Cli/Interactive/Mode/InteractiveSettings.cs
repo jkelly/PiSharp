@@ -234,7 +234,7 @@ internal sealed class InteractiveSettings
         Set("httpIdleTimeoutMs", timeoutMs);
     }
     /// <summary>Read from global settings only because warming costs money.</summary>
-    public string CacheWarmingMode => Str(global["cacheWarming"]) is "off" or "streaming" or "idle" ? Str(global["cacheWarming"])! : "streaming";
+    public string CacheWarmingMode => Str(global["cacheWarming"]) is "off" or "streaming" or "idle" ? Str(global["cacheWarming"])! : "idle";
     public void SetCacheWarmingMode(string mode) => Set("cacheWarming", mode);
     public bool HideThinkingBlock => Bool(Get("hideThinkingBlock")) ?? false;
     public void SetHideThinkingBlock(bool hide) => Set("hideThinkingBlock", hide);

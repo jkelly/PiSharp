@@ -258,6 +258,8 @@ internal static partial class StoreInternal
             if (format != ArchiveFormat) throw DataInternal.Invalid("args", $"{what}: format {format} is not {ArchiveFormat}");
             var schema = Integer(part["schema"]);
             if (schema > StoreSchema) throw DataInternal.Invalid("args", $"{what}: schema {schema} is newer than {StoreSchema}");
+            if (ChordJson.AsString(part["host"]) is { } host)
+                throw DataInternal.Invalid("args", $"{what}: a host's data archive ({host}); import it with importHostData");
             manifest = new ArchiveManifest(format, schema, Integer(part["lastSeq"]), Integer(part["nextId"]));
             step = new Step(executor, manifest.LastSeq, new IdAllocator(manifest.NextId), new Dictionary<string, TableRecord>(StringComparer.Ordinal));
         }
@@ -312,7 +314,7 @@ internal static partial class StoreInternal
                 throw DataInternal.Invalid("args", $"{what}: a lifetime outside the manifest's lastSeq");
             // A singleton's record has no key; its column keeps "".
             var key = record.Key ?? "";
-            foreach (var text in new[] { record.Namespace, record.Owner, record.Kind, key })
+            foreach (var text in new[] { record.Namespace, record.Owner, record.Kind, key }.Concat(record.Host is null ? [] : new[] { record.Host }))
             {
                 if (StoredText(text, what) != text) throw DataInternal.Invalid("args", $"{what}: an address is not well-formed text");
             }

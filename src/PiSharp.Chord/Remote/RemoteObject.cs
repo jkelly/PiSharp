@@ -5,6 +5,7 @@ using PiSharp.Chord.Data;
 using PiSharp.Chord.Documents;
 using PiSharp.Chord.Host;
 using PiSharp.Chord.Link;
+using PiSharp.Telemetry;
 using StateEntry = PiSharp.Chord.Link.StateEntry;
 
 namespace PiSharp.Chord.Remote;
@@ -20,6 +21,10 @@ internal sealed class RemoteObject : ITarget, IUpstream
     private (ConsumerSide Side, long Id)? hold;
     private IHolder? binding;
     private bool attached;
+    private OpenSpan? holding;
+    private IReadOnlyDictionary<string, string>? firstHold;
+    private int holds;
+    public ITelemetrySpan? Span => holding?.Span;
     internal Caller Caller { get; }
     internal HoldMessage Request { get; }
     internal IReadOnlyList<string>? ActivationChain => binding?.Dependent?.ActivationChain();
@@ -31,22 +36,43 @@ internal sealed class RemoteObject : ITarget, IUpstream
     public string? ActivationId => null;
     public bool BlocksFirstPass => false;
     public object? Instance => bound;
-    internal RemoteObject(ChordHost host, Contract contract, CheckedParams parameters, Address address, Caller caller, RemotePath path)
+    internal RemoteObject(ChordHost host, Contract contract, CheckedParams parameters, Address address, Caller caller, RemotePath path, ChordContext context)
     {
         this.host = host; this.contract = contract; this.parameters = parameters.Value; this.path = path; Caller = caller;
         Label = parameters.Key == "" ? contract.Name : $"{contract.Name}({parameters.Key})";
         Request = new(0, contract.Name, contract.Version, contract.Fingerprint, new Part.Text(ChordJson.Stringify(parameters.Value)), new(address.Kind, address.Params));
+        var parent = context.Telemetry;
+        if (!ChordTelemetry.IsUntraced(parent))
+        {
+            holding = new OpenSpan(parent, "chord.hold", HoldAttributes());
+            firstHold = ChordTelemetry.CarrierOf(holding.Span);
+        }
     }
     public void Hold(IHolder holder) { binding = holder; if (!attached) { attached = true; path.Attach(this); } }
     public void Unhold(IHolder holder) { if (State.Kind == "ended") return; hold?.Side.Release(hold.Value.Id, HostErrors.Released()); End(HostErrors.Released()); }
-    public void Attach(HostLink link) { if (State.Kind != "ended") hold = (link.Consumer, link.Consumer.Attach(this)); }
+    public void Attach(HostLink link) { if (State.Kind != "ended") hold = (link.Consumer, link.Consumer.Attach(this, HoldTrace())); }
     public void Dropped(ChordError error) { hold = null; Loading(); }
-    public void Unreachable(ChordError error) { LastFailure = error; Move(RefState.Failed(new(FailureKind.Waiting, error))); }
+    public void Unreachable(ChordError error) { Held("failed", error); LastFailure = error; Move(RefState.Failed(new(FailureKind.Waiting, error))); }
     public Task<object?> CallAsync(string method, object? args, ChordContext context, Caller caller, long version)
     {
         if (State.Kind != "live" || bound is null || hold is null) return Task.FromException<object?>(HostErrors.NotReady(Label));
         if (!bound.Data.Methods.TryGetValue(method, out var data)) return Task.FromException<object?>(HostErrors.InvalidMember(method));
-        return hold.Value.Side.CallAsync(hold.Value.Id, bound.Names.Methods.ToList().IndexOf(method), data, args, context);
+        var current = hold.Value;
+        var index = bound.Names.Methods.ToList().IndexOf(method);
+        var parent = context.Telemetry;
+        if (ChordTelemetry.IsUntraced(parent)) return current.Side.CallAsync(current.Id, index, data, args, context);
+        var attributes = HoldAttributes(); attributes["member"] = ChordTelemetry.Capped(method);
+        foreach (var pair in host.PrincipalAttributes(Caller.Principal, context)) attributes[pair.Key] = pair.Value;
+        return parent.StartSpanAsync(new SpanOptions("chord.call") { Attributes = attributes }, async span =>
+        {
+            try
+            {
+                var result = await current.Side.CallAsync(current.Id, index, data, args, ChordContext.WithTelemetry(span, context));
+                span.SetAttributes(new() { ["outcome"] = "ok" }); return result;
+            }
+            catch (Exception error)
+            { span.SetAttributes(new() { ["outcome"] = ChordTelemetry.Ended(span, "call_failed", error, context.AbortSignal) }); throw; }
+        });
     }
     public Followed Followed(string member, long version)
     {
@@ -125,10 +151,11 @@ internal sealed class RemoteObject : ITarget, IUpstream
             foreach (var replica in retired) if (!updates.Any(x => ReferenceEquals(x.replica, replica))) replica.Retire();
         };
     }
-    internal void WentLive() { LastFailure = null; Move(RefState.Live); }
+    internal void WentLive() { Held("bound"); LastFailure = null; Move(RefState.Live); }
     internal void Failed(FailedMessage message)
     {
         var error = DataInternal.AsChordError(message.Cause.Error.ToException(), Label); LastFailure = error;
+        Held("failed", error);
         var kind = Enum.Parse<FailureKind>(message.Cause.Kind, true);
         Move(RefState.Failed(new(kind, error), message.RetryIn is { } retry ? host.Options.TimeProvider.GetUtcNow().ToUnixTimeMilliseconds() + retry : null));
     }
@@ -136,6 +163,7 @@ internal sealed class RemoteObject : ITarget, IUpstream
     internal void TooLarge(ChordError error)
     {
         if (hold is { } current) current.Side.Release(current.Id, error);
+        Held("failed", error);
         hold = null; path.Detach(this); path = host.UnplacedPath; path.Attach(this); LastFailure = error; Move(RefState.Failed(new(FailureKind.Broken, error)));
     }
     internal void Revoke(ChordError error) { if (hold is { } current) current.Side.Release(current.Id, error); Lost(error); }
@@ -145,9 +173,29 @@ internal sealed class RemoteObject : ITarget, IUpstream
     }
     private void End(ChordError error)
     {
+        Held("ended");
         State = RefState.Ended(error); hold = null; binding = null; path.Detach(this);
         if (bound is not null) foreach (var replica in bound.Replicas.Values) replica.End(error);
         bound = null;
+    }
+    private SpanAttributes HoldAttributes() => new()
+    {
+        ["chord.host"] = ChordTelemetry.HostAttribute(host.Address), ["type"] = ChordTelemetry.Capped(contract.Name),
+        ["object"] = ChordTelemetry.Capped(Label), ["address.kind"] = ChordTelemetry.Capped(Request.Address.Kind),
+    };
+    private IReadOnlyDictionary<string, string>? HoldTrace()
+    {
+        if (holds++ == 0) return firstHold;
+        if (firstHold is null || ChordTelemetry.IsUntraced(host.Telemetry)) return null;
+        Held("ended"); holding = new OpenSpan(host.Telemetry, "chord.hold", HoldAttributes());
+        holding.Span.AddLink(new(ChordTelemetry.ParentOf(firstHold, host.Telemetry)));
+        return ChordTelemetry.CarrierOf(holding.Span);
+    }
+    private void Held(string outcome, Exception? error = null)
+    {
+        if (holding is not { } span) return; holding = null;
+        if (error is not null) ChordTelemetry.SpanFailed(span.Span, "hold_failed", error);
+        span.Span.SetAttributes(new() { ["outcome"] = outcome }); span.End();
     }
     private void Move(RefState state)
     {

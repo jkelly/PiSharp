@@ -25,6 +25,7 @@ internal sealed record RetryWalk(HashSet<ITarget> Visited, int Hops = 16);
 internal sealed record Followed(string Kind, object? Source = null, object? Instance = null, ChordError? Error = null, object? Last = null);
 internal interface IHolder
 {
+    bool Listed => true;
     Caller Caller { get; }
     Contract Contract { get; }
     bool Following { get; }
@@ -37,6 +38,7 @@ internal interface ITarget
 {
     string Label { get; }
     RefState State { get; }
+    RefState StateFor(long version, string fingerprint) => State;
     bool Hydrated { get; }
     string? Variant { get; }
     ChordError? LastFailure { get; }

@@ -41,12 +41,15 @@ internal sealed class IncomingHold : IIncomingHold, IHolder, IReloadAwareHolder
     private ServedType? served;
     private VariantNames? names;
     private VariantData? variant;
+    private (VariantNames Names, VariantData Variant, long Until)? previousBinding;
+    private ChordError? refusal;
     private object? instance;
     private bool released, counted = true, binding, toldFailed;
     internal IncomingHold(ProviderSide provider, HoldMessage request, Caller caller, Limits limits)
     {
         this.provider = provider; this.request = request; Caller = caller; Limits = limits;
         provider.Link.Host.CountReference(1);
+        ChordTelemetry.Metrics(provider.Link.Host.Telemetry.Metrics).UpDownCounter("chord.holds.active").Add(1);
         provider.Link.Host.PublishedChanged += Published;
     }
     public long Id => request.Hold;
@@ -58,14 +61,18 @@ internal sealed class IncomingHold : IIncomingHold, IHolder, IReloadAwareHolder
     private bool FollowsBoundInstance => instance is not null && target is ChordObject local &&
         local.State.Kind != "ended" && ReferenceEquals(local.FollowingAttempt, instance);
     internal bool Bound => !released && !binding && names is not null && FollowsBoundInstance;
-    internal bool Callable => !released && names is not null && target?.State.Kind == "live";
+    private (VariantNames Names, VariantData Variant)? CallBinding =>
+        previousBinding is { } previous && !provider.Acknowledged(previous.Until) ? (previous.Names, previous.Variant) :
+        names is not null && variant is not null ? (names, variant) : null;
+    internal bool Callable => !released && target is not null && CallBinding is not null && !toldFailed;
+    internal ChordError Refusal => refusal ?? HostErrors.NotReady("hold " + Id);
     internal bool Unbound => !released && target is null;
     private void Published()
     {
         if (released) return;
         if (target is ChordObject local)
         {
-            if (!DataInternal.Binds(local.Served.Provider, request.Version, request.Fingerprint))
+            if (!DataInternal.Binds(local.Served.Provider, request.Version, request.Fingerprint) && !local.OldServes(request.Version, request.Fingerprint))
                 Removed(new ChordError("contract_mismatch", $"{request.Type} v{request.Version}: not served"));
             else served = local.Served;
         }
@@ -98,7 +105,8 @@ internal sealed class IncomingHold : IIncomingHold, IHolder, IReloadAwareHolder
             if (!actualAddress.Equals(host.Address))
             { Refuse(FailureKind.Waiting, new ChordError("unavailable", $"{request.Type}: its provider places it elsewhere")); return; }
             served = found;
-            var made = host.LocalObject(found, new CheckedParams(parameters.Params, parameters.Key), Caller);
+            var trigger = ChordHost.WithTelemetryParent(ChordTelemetry.ParentOf(request.Trace, host.Telemetry), link.Context);
+            var made = host.LocalObject(found, new CheckedParams(parameters.Params, parameters.Key), Caller, trigger);
             if (request.Chain is { } chain && made.ActivationId is { } activation && chain.Contains(activation))
                 throw DataInternal.Invalid("cycle", $"{request.Type}: activation cycle");
             made.InheritActivationChain(request.Chain);
@@ -113,7 +121,8 @@ internal sealed class IncomingHold : IIncomingHold, IHolder, IReloadAwareHolder
     }
     private void Refuse(FailureKind kind, ChordError error)
     {
-        toldFailed = true; provider.Send(new FailedMessage(Id, new WireFailure(kind.ToString().ToLowerInvariant(), WireError.FromException(error))));
+        toldFailed = true; refusal = error;
+        provider.Send(new FailedMessage(Id, new WireFailure(kind.ToString().ToLowerInvariant(), WireError.FromException(error))));
     }
     public void Retarget()
     {
@@ -123,7 +132,7 @@ internal sealed class IncomingHold : IIncomingHold, IHolder, IReloadAwareHolder
     public void Moved()
     {
         if (released || target is null) return;
-        var state = target.State;
+        var state = target.StateFor(request.Version, request.Fingerprint);
         if (state.Kind == "ended") { End(state.Error ?? HostErrors.Released()); return; }
         if (state.Kind == "live")
         {
@@ -138,26 +147,36 @@ internal sealed class IncomingHold : IIncomingHold, IHolder, IReloadAwareHolder
         if (names is not null && FollowsBoundInstance) return;
         if (names is not null || binding)
         {
-            Unfollow(); names = null; variant = null; instance = null; binding = false;
-            provider.Unbound(this, state.Cause?.Error ?? new ChordError("unavailable", "hold rebinds"));
+            Unfollow(); instance = null; binding = false;
+            if (state.Cause is { } failure)
+            {
+                names = null; variant = null; previousBinding = null;
+                provider.Unbound(this, failure.Error);
+            }
+            else provider.Unbind(this);
             if (state.Kind == "loading") provider.Send(new LoadingMessage(Id));
         }
         if (state.Cause is { } cause)
         {
             var now = provider.Link.Host.Options.TimeProvider.GetUtcNow().ToUnixTimeMilliseconds();
             provider.Send(new FailedMessage(Id, new(cause.Kind.ToString().ToLowerInvariant(), WireError.FromException(cause.Error)),
-                state.RetryAt is { } retry ? (long)Math.Max(0, retry - now) : null)); toldFailed = true;
+                state.RetryAt is { } retry ? (long)Math.Max(0, retry - now) : null));
+            names = null; variant = null; previousBinding = null; refusal = cause.Error; toldFailed = true;
         }
-        else if (toldFailed) { toldFailed = false; provider.Send(new LoadingMessage(Id)); }
+        else if (toldFailed) { toldFailed = false; refusal = null; provider.Send(new LoadingMessage(Id)); }
     }
     internal BoundEntry BoundEntry()
     {
-        if (target is null || served is null || target.State.Kind != "live") throw new InvalidOperationException("bind a live hold");
+        if (target is null || served is null || target.StateFor(request.Version, request.Fingerprint).Kind != "live") throw new InvalidOperationException("bind a live hold");
+        var previous = CallBinding;
         Unfollow(); binding = false; instance = target.Instance;
-        var variants = ContractsInternal.VariantsAt(served.Contract, request.Version);
+        var boundContract = instance is Attempt attempt ? attempt.Served.Contract : served.Contract;
+        var variants = ContractsInternal.VariantsAt(boundContract, request.Version);
         var name = target.Variant ?? ContractsInternal.Local;
         if (!variants.TryGetValue(name, out variant)) throw new ArgumentException("variant is not in consumer version");
         names = ContractsInternal.VariantNamesOf(variant);
+        previousBinding = previous is { } old ? (old.Names, old.Variant, provider.NextOwn) : null;
+        toldFailed = false; refusal = null;
         var members = new List<BoundMember>(); var failed = new List<FailedMember>();
         for (var i = 0; i < names.State.Count; i++)
         {
@@ -193,8 +212,9 @@ internal sealed class IncomingHold : IIncomingHold, IHolder, IReloadAwareHolder
     }
     internal (string Name, bool Bytes) Method(long index)
     {
-        if (names is null || variant is null || index < 0 || index >= names.Methods.Count) throw new ArgumentException($"hold {Id}: no method {index}");
-        var name = names.Methods[(int)index]; return (name, variant.Methods[name].Result.Bytes);
+        var current = CallBinding;
+        if (current is null || index < 0 || index >= current.Value.Names.Methods.Count) throw new ArgumentException($"hold {Id}: no method {index}");
+        var name = current.Value.Names.Methods[(int)index]; return (name, current.Value.Variant.Methods[name].Result.Bytes);
     }
     internal Task<object?> CallAsync(string method, object? args, ChordContext context) => target!.CallAsync(method, args, context, Caller, request.Version);
     public void Retry(long hops)
@@ -207,7 +227,7 @@ internal sealed class IncomingHold : IIncomingHold, IHolder, IReloadAwareHolder
     {
         if (released) return;
         var previous = target; target = null; previous?.Unhold(this);
-        Unfollow(); names = null; variant = null; instance = null; served = null; binding = false;
+        Unfollow(); names = null; variant = null; previousBinding = null; instance = null; served = null; binding = false;
         provider.Unbound(this, error); provider.Send(new LoadingMessage(Id)); Refuse(FailureKind.Waiting, error);
     }
     public void End(ChordError error)
@@ -220,8 +240,12 @@ internal sealed class IncomingHold : IIncomingHold, IHolder, IReloadAwareHolder
         if (released) return; released = true;
         provider.Link.Host.PublishedChanged -= Published; Unfollow(); provider.Unbind(this);
         var held = target; target = null; held?.Unhold(this);
-        served = null; names = null; variant = null; instance = null;
-        if (counted) { counted = false; provider.Link.Host.CountReference(-1); }
+        served = null; names = null; variant = null; previousBinding = null; instance = null;
+        if (counted)
+        {
+            counted = false; provider.Link.Host.CountReference(-1);
+            ChordTelemetry.Metrics(provider.Link.Host.Telemetry.Metrics).UpDownCounter("chord.holds.active").Add(-1);
+        }
     }
     private void Unfollow()
     {

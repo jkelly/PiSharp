@@ -5,7 +5,7 @@ namespace PiSharp.Chord.Hosting.Http;
 public sealed class HttpRouter
 {
     internal sealed record Route(string Plugin, string Pattern, HttpRoute Value, Pattern Path);
-    internal sealed record Socket(string Plugin, string Pattern, HttpSocket Value, Pattern Path, int MaxPayload);
+    internal sealed record Socket(string Plugin, string Pattern, HttpSocket Value, Pattern Path, int MaxPayload, bool Public = false);
     internal IReadOnlyList<Route> Routes { get; }
     internal IReadOnlyList<Socket> Sockets { get; }
     internal IReadOnlyList<(string Plugin, HttpWrapper Value)> Wraps { get; }
@@ -13,13 +13,15 @@ public sealed class HttpRouter
     internal HashSet<string> Hosts { get; }
     internal HashSet<string> Framers { get; }
     internal IReadOnlyDictionary<string, IReadOnlyList<string>> Csp { get; }
+    internal IReadOnlyList<string> ScriptPaths { get; }
     internal IReadOnlyList<object?> CallbackOwners { get; }
-    private HttpRouter(List<Route> routes, List<Socket> sockets, List<(string, HttpWrapper)> wraps, List<(string, HttpRelay)> relays, HashSet<string> hosts, HashSet<string> framers, Dictionary<string, IReadOnlyList<string>> csp, IReadOnlyList<object?> owners)
-    { Routes = routes; Sockets = sockets; Wraps = wraps; Relays = relays; Hosts = hosts; Framers = framers; Csp = csp; CallbackOwners = owners; }
+    private HttpRouter(List<Route> routes, List<Socket> sockets, List<(string, HttpWrapper)> wraps, List<(string, HttpRelay)> relays, HashSet<string> hosts, HashSet<string> framers, Dictionary<string, IReadOnlyList<string>> csp, IReadOnlyList<object?> owners, IReadOnlyList<string> scripts)
+    { Routes = routes; Sockets = sockets; Wraps = wraps; Relays = relays; Hosts = hosts; Framers = framers; Csp = csp; CallbackOwners = owners; ScriptPaths = scripts; }
     internal static HttpRouter Compose(IReadOnlyList<RegistryEntry<HttpContribution>> table, ComposeContext context)
     {
         var routes = new List<Route>(); var sockets = new List<Socket>(); var wraps = new List<(string, HttpWrapper)>(); var relays = new List<(string, HttpRelay)>();
         var hosts = new HashSet<string>(StringComparer.Ordinal); var framers = new HashSet<string>(StringComparer.Ordinal); var csp = new Dictionary<string, IReadOnlyList<string>>();
+        var scripts = new HashSet<string>(StringComparer.Ordinal);
         foreach (var entry in table.OrderBy(x => x.Plugin, StringComparer.Ordinal))
         {
             var contribution = entry.Value;
@@ -34,6 +36,20 @@ public sealed class HttpRouter
                 if (sockets.FirstOrDefault(x => x.Pattern == key) is { } previous) { context.Report(new($"duplicate socket {key}", [previous.Plugin, entry.Plugin])); continue; }
                 try { sockets.Add(new(entry.Plugin, key, socket, new(key), contribution.MaxPayload)); } catch (ArgumentException) { context.Report(new($"invalid socket {key}", [entry.Plugin])); }
             }
+            foreach (var (key, socket) in contribution.SocketOptions)
+            {
+                if (sockets.FirstOrDefault(x => x.Pattern == key) is { } previous) { context.Report(new($"duplicate socket {key}", [previous.Plugin, entry.Plugin])); continue; }
+                try
+                {
+                    var limit = socket.MaxPayload ?? contribution.MaxPayload;
+                    if (limit <= 0) throw new ArgumentException("invalid payload limit");
+                    sockets.Add(new(entry.Plugin, key, socket.Handler, new(key), limit, socket.Public));
+                }
+                catch (ArgumentException) { context.Report(new($"invalid socket {key}", [entry.Plugin])); }
+            }
+            foreach (var path in contribution.ScriptPaths)
+                if (path.StartsWith('/') && !path.StartsWith("//", StringComparison.Ordinal) && !path.Any(c => char.IsWhiteSpace(c) || char.IsControl(c) || c is ';' or '\'' or '"' or '\\' or '?' or '#')) scripts.Add(path);
+                else context.Report(new($"invalid script path {path}", [entry.Plugin]));
             wraps.AddRange(contribution.Wraps.Select(x => (entry.Plugin, x))); relays.AddRange(contribution.Relays.Select(x => (entry.Plugin, x)));
             foreach (var host in contribution.Hosts) if (!host.Any(x => x is '/' or '@' or '\r' or '\n' or '\0')) hosts.Add(host);
             foreach (var framer in contribution.Framers) if (IsOrigin(framer)) framers.Add(framer);
@@ -42,7 +58,7 @@ public sealed class HttpRouter
         }
         var phases = new[] { "observe", "headers", "transform" };
         wraps = wraps.Where(x => phases.Contains(x.Item2.Phase)).OrderBy(x => Array.IndexOf(phases, x.Item2.Phase)).ToList();
-        return new(routes, sockets, wraps, relays, hosts, framers, csp, table.Select(entry => entry.CallbackOwner).ToArray());
+        return new(routes, sockets, wraps, relays, hosts, framers, csp, table.Select(entry => entry.CallbackOwner).ToArray(), scripts.ToArray());
     }
     internal (Route? Route, IReadOnlyDictionary<string, string> Parameters) Match(string method, string path)
     {

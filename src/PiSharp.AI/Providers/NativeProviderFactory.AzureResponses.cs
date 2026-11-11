@@ -37,7 +37,8 @@ public static partial class NativeProviderFactory
         var direct = new AzureResponsesOptions(modelMetadata, projection)
         {
             AzureBaseUrl = azure?.AzureBaseUrl, AzureResourceName = azure?.AzureResourceName, AzureDeploymentName = azure?.AzureDeploymentName,
-            ConfigurationValues = values.ToImmutable(), MaxTokens = maxTokens, Headers = headers
+            ConfigurationValues = values.ToImmutable(), MaxTokens = maxTokens, Headers = headers,
+            StreamOptions = new(Rates: ResponsesRatesForModel(modelMetadata))
         };
         return Bind(model, handler, client => new AzureResponsesThinkingTransport(model, client, direct, explicitApiKey, fixedReasoningOff));
     }

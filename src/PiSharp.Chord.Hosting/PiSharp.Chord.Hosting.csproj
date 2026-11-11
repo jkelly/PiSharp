@@ -1,11 +1,13 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <IsPackable>true</IsPackable>
-    <NoWarn>$(NoWarn);PISHARP_CHORD001;PISHARP_SCHEMA001;PISHARP_TELEMETRY001</NoWarn>
+    <NoWarn>$(NoWarn);PISHARP_CHORD001;PISHARP_SCHEMA001;PISHARP_TELEMETRY001;PISHARP_DURABLE001;PISHARP_TUI001</NoWarn>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../PiSharp.Chord/PiSharp.Chord.csproj" />
     <ProjectReference Include="../PiSharp.Tools/PiSharp.Tools.csproj" />
+    <ProjectReference Include="../PiSharp.Tui/PiSharp.Tui.csproj" />
+    <ProjectReference Include="../PiSharp.Durable.Store/PiSharp.Durable.Store.csproj" />
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
   </ItemGroup>
 </Project>

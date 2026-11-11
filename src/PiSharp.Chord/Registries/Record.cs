@@ -13,6 +13,7 @@
 //   as a JavaScript Map's iteration visits it.
 // - Table order compares plugin names and types as JavaScript's < does (UTF-16 code units, string.CompareOrdinal).
 using PiSharp.Chord.Data;
+using PiSharp.Chord.Host;
 using PiSharp.Chord.State;
 
 namespace PiSharp.Chord.Registries;
@@ -31,6 +32,7 @@ internal enum RegistryErrorKind
 
     /// <summary><c>contribution_refused</c>: a contribution of a version the provider does not accept is left out.</summary>
     ContributionRefused,
+    RegistryUndeclared,
 }
 
 /// <summary>What a registry reports to its host's <c>onError</c>, by kind; each once per episode (upstream <c>RegistryError</c>).</summary>
@@ -54,6 +56,9 @@ internal sealed record ContributionFailedError(string Registry, string Plugin, s
 /// (<c>contribution_refused</c>).</summary>
 internal sealed record ContributionRefusedError(string Registry, string Plugin, string? Type, long Version)
     : RegistryError(RegistryErrorKind.ContributionRefused, Registry);
+
+internal sealed record RegistryUndeclaredError(string Registry, IReadOnlyList<string> Plugins)
+    : RegistryError(RegistryErrorKind.RegistryUndeclared, Registry);
 
 internal static partial class RegistriesInternal
 {
@@ -89,11 +94,15 @@ internal sealed class RegistryRecord
     // The values readers follow, by version; made by the first reader of a version.
     private readonly Dictionary<long, IRegistryValueSource> values = [];
     private readonly List<IRegistryValueSource> valuesInOrder = [];
+    internal UnboundClock? Clock { get; }
+    private string? undeclared;
+    internal long? NewestContribution => contributions.Length == 0 ? null : contributions.Max(each => each.Version);
+    internal IReadOnlyList<long> ContributionVersions => contributions.Select(each => each.Version).Distinct().ToArray();
 
     /// <param name="name">The registry's name.</param>
     /// <param name="batch">The host's batch.</param>
     /// <param name="report">The host's <c>onError</c>.</param>
-    public RegistryRecord(string name, Batch batch, Action<RegistryError> report)
+    public RegistryRecord(string name, Batch batch, Action<RegistryError> report, UnboundClock? clock = null)
     {
         ArgumentNullException.ThrowIfNull(name);
         ArgumentNullException.ThrowIfNull(batch);
@@ -101,6 +110,17 @@ internal sealed class RegistryRecord
         Name = name;
         this.batch = batch;
         this.report = report;
+        Clock = clock;
+    }
+
+    internal void ReportUndeclared()
+    {
+        if (provider is not null) { undeclared = null; return; }
+        if (contributions.Length == 0) return;
+        var plugins = contributions.Select(each => each.Contributor.Plugin).Distinct(StringComparer.Ordinal).ToArray();
+        var key = string.Join('\0', plugins);
+        if (key == undeclared) return;
+        undeclared = key; report(new RegistryUndeclaredError(Name, plugins));
     }
 
     public string Name { get; }

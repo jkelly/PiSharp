@@ -50,21 +50,29 @@
       "durable.chord.examples": {
         "type": "Project",
         "dependencies": {
-          "PiSharp.Durable.Store": "[1.5.0, )"
+          "PiSharp.Durable.Store": "[1.5.2, )"
+        }
+      },
+      "pisharp.agent": {
+        "type": "Project",
+        "dependencies": {
+          "PiSharp.AI": "[1.5.2, )",
+          "PiSharp.Contracts": "[1.5.2, )"
         }
       },
       "pisharp.ai": {
         "type": "Project",
         "dependencies": {
-          "PiSharp.Contracts": "[1.5.0, )",
-          "PiSharp.Telemetry": "[1.5.0, )"
+          "PiSharp.Contracts": "[1.5.2, )",
+          "PiSharp.Telemetry": "[1.5.2, )"
         }
       },
       "pisharp.chord": {
         "type": "Project",
         "dependencies": {
-          "PiSharp.Contracts": "[1.5.0, )",
-          "PiSharp.Telemetry": "[1.5.0, )"
+          "PiSharp.Contracts": "[1.5.2, )",
+          "PiSharp.Telemetry": "[1.5.2, )",
+          "PiSharp.Tools": "[1.5.2, )"
         }
       },
       "pisharp.contracts": {
@@ -73,15 +81,15 @@
       "pisharp.durable": {
         "type": "Project",
         "dependencies": {
-          "PiSharp.AI": "[1.5.0, )",
-          "PiSharp.Contracts": "[1.5.0, )"
+          "PiSharp.AI": "[1.5.2, )",
+          "PiSharp.Contracts": "[1.5.2, )"
         }
       },
       "pisharp.durable.sqlite": {
         "type": "Project",
         "dependencies": {
           "Microsoft.Data.Sqlite": "[10.0.12, 10.0.12]",
-          "PiSharp.Durable": "[1.5.0, )",
+          "PiSharp.Durable": "[1.5.2, )",
           "SQLitePCLRaw.bundle_e_sqlite3": "[2.1.12, 2.1.12]",
           "SQLitePCLRaw.core": "[2.1.12, 2.1.12]",
           "SQLitePCLRaw.lib.e_sqlite3": "[2.1.12, 2.1.12]",
@@ -91,13 +99,20 @@
       "pisharp.durable.store": {
         "type": "Project",
         "dependencies": {
-          "PiSharp.Chord": "[1.5.0, )",
-          "PiSharp.Durable": "[1.5.0, )",
-          "PiSharp.Durable.Sqlite": "[1.5.0, )"
+          "PiSharp.Chord": "[1.5.2, )",
+          "PiSharp.Durable": "[1.5.2, )",
+          "PiSharp.Durable.Sqlite": "[1.5.2, )"
         }
       },
       "pisharp.telemetry": {
         "type": "Project"
+      },
+      "pisharp.tools": {
+        "type": "Project",
+        "dependencies": {
+          "PiSharp.Agent": "[1.5.2, )",
+          "PiSharp.Contracts": "[1.5.2, )"
+        }
       }
     }
   }

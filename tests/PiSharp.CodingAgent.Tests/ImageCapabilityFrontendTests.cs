@@ -17,7 +17,9 @@ using PiSharp.Sessions.Storage;
 internal static partial class ImageCapabilityFrontendTests
 {
     private const string Api = "openai-completions", ModelId = "pisharp-offline-completions-session";
-    private const string ImageJson = "{\"type\":\"image\",\"data\":\"AA==\",\"mimeType\":\"image/png\"}";
+    // A valid 1x1 PNG keeps these tests about new-input normalization and durable history/projection, not corrupt-image omission.
+    private const string PixelPng = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
+    private const string ImageJson = "{\"type\":\"image\",\"data\":\"" + PixelPng + "\",\"mimeType\":\"image/png\"}";
     private const string PromptText = "retain this canonical image";
     private static readonly UTF8Encoding Utf8 = new(false, true);
     private static string host = "", cli = "";
@@ -151,7 +153,7 @@ internal static partial class ImageCapabilityFrontendTests
             using var files = new Files(); var canonical = ImagePrompt(); var before = canonical.WireBody.ToString();
             // Actual summary serialization intentionally turns history into text; it supplies no image blocks.
             var prompt = SessionSummaryRequestBuilder.SerializeConversation([canonical]);
-            Check(prompt.Contains(PromptText, StringComparison.Ordinal) && !prompt.Contains("AA==", StringComparison.Ordinal), "Summary text unexpectedly forwarded image data.");
+            Check(prompt.Contains(PromptText, StringComparison.Ordinal) && !prompt.Contains(PixelPng, StringComparison.Ordinal), "Summary text unexpectedly forwarded image data.");
             var expected = Request(new JsonArray(new JsonObject { ["role"] = "system", ["content"] = "summarize retained history" },
                 TextUser(prompt)), maximumTokens: 51, includeTools: false);
             await using var profile = await Profile(files, vision, SessionCommandTests.CompletionsText("generated summary", expectedRequest: expected));
@@ -216,7 +218,7 @@ internal static partial class ImageCapabilityFrontendTests
     private static JsonObject ProjectedImage(bool vision)
     {
         var result = TextUser(PromptText); var content = result["content"]!.AsArray();
-        content.Add(vision ? new JsonObject { ["type"] = "image_url", ["image_url"] = new JsonObject { ["url"] = "data:image/png;base64,AA==" } } :
+        content.Add(vision ? new JsonObject { ["type"] = "image_url", ["image_url"] = new JsonObject { ["url"] = "data:image/png;base64," + PixelPng } } :
             new JsonObject { ["type"] = "text", ["text"] = "(image omitted: model does not support images)" });
         return result;
     }

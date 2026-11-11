@@ -84,7 +84,7 @@ internal sealed record PiPackageInstallFailure(string Source, string Scope, stri
 /// <summary>Source MissingSourceAction.</summary>
 internal enum PiMissingSourceAction { Install, Skip, Error }
 
-/// <summary>Source ProgressEvent: type start|progress|complete|error, action install|remove|update|clone|pull.</summary>
+/// <summary>Source ProgressEvent: type start|progress|complete|error|result, action install|remove|update|clone|pull.</summary>
 internal sealed record PiPackageProgressEvent(string Type, string Action, string Source, string? Message = null);
 
 /// <summary>Source PackageUpdate.</summary>

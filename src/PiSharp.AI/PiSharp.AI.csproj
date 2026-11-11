@@ -7,6 +7,10 @@
   </PropertyGroup>
   <ItemGroup>
     <EmbeddedResource Include="Catalogs/reviewed-2026-11-08.json" />
+    <EmbeddedResource Include="Catalogs/Releases/1.5.2/*.json" Exclude="Catalogs/Releases/1.5.2/.manifest.json"
+                      LogicalName="PiSharp.AI.Catalogs.Releases.1.5.2.%(Filename)%(Extension)" />
+    <EmbeddedResource Include="Catalogs/Releases/1.5.2/.manifest.json" LogicalName="PiSharp.AI.Catalogs.Releases.1.5.2..manifest.json" />
+    <EmbeddedResource Include="Catalogs/reviewed-2026-11-10.json" />
     <ProjectReference Include="../PiSharp.Contracts/PiSharp.Contracts.csproj" />
     <!-- pi-ai depends on pi-telemetry: the request option's span type and the pi.ai.request / pi.ai.poll schema. -->
     <ProjectReference Include="../PiSharp.Telemetry/PiSharp.Telemetry.csproj" />

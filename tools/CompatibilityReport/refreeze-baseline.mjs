@@ -3,7 +3,7 @@
 // Carries the previous lock's source-file paths forward, drops files the target removed, adds
 // --add paths, and hashes every row under the unchanged hashPolicy. Never touches fixtures.
 // Usage: node refreeze-baseline.mjs --upstream <checkout> --tag <vX.Y.Z> --previous <lock>
-//          --previous-path <repo path of preserved lock> [--add a,b,c] --out <new lock>
+//          --previous-path <repo path of preserved lock> [--add a,b,c] [--add-file <JSON path array>] --out <new lock>
 //          [--decision <repo path of the decision record>]
 //          [--evidence <evidence lock> --evidence-path <repo path of the evidence lock>]
 // --previous supplies the carried-forward paths, hashPolicy, runtime and gaps. previousBaseline names the
@@ -14,6 +14,7 @@ import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { resolve } from "node:path";
+import { readSourceFiles } from "./git-source.mjs";
 
 const args = Object.fromEntries(process.argv.slice(2).reduce((pairs, value, index, all) =>
   value.startsWith("--") ? [...pairs, [value.slice(2), all[index + 1]]] : pairs, []));
@@ -40,15 +41,19 @@ const origin = path => `https://github.com/earendil-works/pi/blob/${commit}/${pa
 const exists = path => { try { execFileSync("git", ["-C", upstream, "cat-file", "-e", `${commit}:${path}`], { stdio: "ignore" }); return true; } catch { return false; } };
 
 const previousRows = new Map(previous.artifacts.filter(row => row.kind === "source-file").map(row => [row.path, row]));
-const added = (args.add ?? "").split(",").map(path => path.trim()).filter(Boolean);
-const paths = [...previousRows.keys(), ...added.filter(path => !previousRows.has(path))];
+const added = [...(args.add ?? "").split(",").map(path => path.trim()).filter(Boolean),
+  ...(args["add-file"] ? JSON.parse(readFileSync(resolve(args["add-file"]), "utf8")) : [])];
+if (added.some(path => typeof path !== "string")) throw new Error("--add-file must be a JSON array of source paths");
+const paths = [...new Set([...previousRows.keys(), ...added])];
+const sourceFiles = readSourceFiles(upstream, commit, paths);
 const summary = { unchanged: [], changed: [], added: [], removed: [] };
 const rows = [];
 for (const path of paths) {
-  if (!exists(path)) { summary.removed.push(path); continue; }
-  const blob = git("show", `${commit}:${path}`);
+  if (!sourceFiles.has(path)) { summary.removed.push(path); continue; }
+  const sourceFile = sourceFiles.get(path);
+  const blob = sourceFile.bytes;
   const checkout = readFileSync(resolve(upstream, path));
-  const row = { kind: "source-file", path, origin: origin(path), acquiredAt, gitBlob: text("rev-parse", `${commit}:${path}`),
+  const row = { kind: "source-file", path, origin: origin(path), acquiredAt, gitBlob: sourceFile.gitBlob,
     sha256: sha256(blob), bytes: blob.length, checkoutSha256: sha256(checkout), checkoutBytes: checkout.length };
   const before = previousRows.get(path);
   summary[!before ? "added" : before.sha256 === row.sha256 ? "unchanged" : "changed"].push(path);

@@ -398,15 +398,15 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
                 {
                     if (fresh.Model.Provider == "anthropic" && fresh.Model.Api == "anthropic-messages")
                     {
-                        var (authentication, handler, reresolve) = await fresh.ResolveAnthropicAsync(runtime, token).ConfigureAwait(false);
-                        return await fresh.ConnectResolvedAnthropicAsync(authentication, handler, token, reresolve).ConfigureAwait(false);
+                        var (authentication, handler, reresolve, retention) = await fresh.ResolveAnthropicAsync(runtime, token).ConfigureAwait(false);
+                        return await fresh.ConnectResolvedAnthropicAsync(authentication, handler, token, reresolve, retention).ConfigureAwait(false);
                     }
                     return fresh.Connect(runtime);
                 }
                 // model-runtime.ts prepareRequest: no auth resolution for the provider.
                 catch (LiveSessionException error) when (error.Code == "MissingLiveApiKey")
                 { throw new LiveSessionConnection.ProviderNotConfiguredException("Provider is not configured: " + fresh.Model.Provider); }
-            });
+            }, runtime.ReadEnvironment("PI_CACHE_RETENTION"));
 
     internal static ModelDescriptor SelectModel(string? offlineApi) => offlineApi switch
     {
@@ -659,8 +659,9 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
                 {
                     if (resolvedAnthropicAuthentication is null && liveSelection is { Model.Provider: "anthropic" })
                     {
-                        var (anthropic, anthropicHandler, reresolve) = await liveSelection.ResolveAnthropicAsync(liveRuntime, token).ConfigureAwait(false);
-                        connectionOriginal = liveSelection.ConnectResolvedAnthropicAsync(anthropic, anthropicHandler, token, reresolve).AsTask();
+                        var (anthropic, anthropicHandler, reresolve, retention) = await liveSelection.ResolveAnthropicAsync(liveRuntime, token).ConfigureAwait(false);
+                        connectionOriginal = liveSelection.ConnectResolvedAnthropicAsync(anthropic, anthropicHandler, token, reresolve,
+                            retention).AsTask();
                         connection = await connectionOriginal.ConfigureAwait(false);
                     }
                     else if (resolvedAnthropicAuthentication is null) connection = liveSelection?.Connect(liveRuntime);

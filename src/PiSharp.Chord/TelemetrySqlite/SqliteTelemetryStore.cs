@@ -10,6 +10,23 @@ namespace PiSharp.Chord.TelemetrySqlite;
 /// types, and require all attribute conditions to match the same span.</summary>
 public static class SqliteTelemetryStore
 {
+    /// <summary>Checks an already-open read-only database without creating or migrating anything. The returned reader owns
+    /// the database and closes it on disposal, including when the schema check fails.</summary>
+    public static async Task<SqliteTelemetryReader> OpenReaderAsync(ISqliteDatabase ownedReadOnlyDatabase)
+    {
+        ArgumentNullException.ThrowIfNull(ownedReadOnlyDatabase);
+        try
+        {
+            await SqliteTelemetrySchema.CheckAsync(ownedReadOnlyDatabase).ConfigureAwait(false);
+            return new SqliteTelemetryReader(ownedReadOnlyDatabase);
+        }
+        catch
+        {
+            try { await ownedReadOnlyDatabase.CloseAsync().ConfigureAwait(false); } catch { /* Preserve the schema error. */ }
+            throw;
+        }
+    }
+
     private static string Text(IReadOnlyDictionary<string, object?> row, string key) => (string)row[key]!;
     private static double Number(IReadOnlyDictionary<string, object?> row, string key) => Convert.ToDouble(row[key], CultureInfo.InvariantCulture);
     private static SpanAttributes Attributes(string json) => JsonSerializer.Deserialize<SpanAttributes>(json)!;
@@ -18,7 +35,7 @@ public static class SqliteTelemetryStore
         using var events = JsonDocument.Parse(Text(row, "events"));
         using var links = JsonDocument.Parse(Text(row, "links"));
         return new(Text(row, "id"), Text(row, "trace_id"), (string?)row["parent_id"], Text(row, "name"),
-            Number(row, "started_ms"), Number(row, "ended_ms"), Attributes(Text(row, "attributes")),
+            Number(row, "started_us") / 1000, Number(row, "ended_us") / 1000, Attributes(Text(row, "attributes")),
             events.RootElement.EnumerateArray().Select(e => new StoredSpanEvent(e.GetProperty("name").GetString()!,
                 e.GetProperty("time_ms").GetDouble(), Attributes(e.GetProperty("attributes").GetRawText()))).ToArray(),
             links.RootElement.EnumerateArray().Select(l => new StoredSpanLink(l.GetProperty("trace_id").GetString()!,
@@ -54,7 +71,7 @@ public static class SqliteTelemetryStore
     public static async Task<StoredTrace?> GetTraceAsync(ISqliteDatabase db, string traceId, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        var rows = await db.AllAsync("SELECT * FROM telemetry_spans WHERE trace_id = ? ORDER BY started_ms, id", traceId).ConfigureAwait(false);
+        var rows = await db.AllAsync("SELECT * FROM telemetry_spans WHERE trace_id = ? ORDER BY started_us, length(id), id", traceId).ConfigureAwait(false);
         return rows.Count == 0 ? null : new(traceId, rows.Select(Span).ToArray());
     }
 
@@ -68,10 +85,10 @@ public static class SqliteTelemetryStore
         var parameters = new List<object?>();
         if (query.Name is { } name)
         {
-            terms.Add("(SELECT name FROM telemetry_spans WHERE trace_id = heads.trace_id ORDER BY started_ms, id LIMIT 1) = ?"); parameters.Add(name);
+            terms.Add("(SELECT name FROM telemetry_spans WHERE trace_id = heads.trace_id ORDER BY started_us, length(id), id LIMIT 1) = ?"); parameters.Add(name);
         }
-        if (query.StartMin is { } min) { terms.Add("started_ms >= ?"); parameters.Add(min); }
-        if (query.StartMax is { } max) { terms.Add("started_ms <= ?"); parameters.Add(max); }
+        if (query.StartMin is { } min) { terms.Add("started_us >= ?"); parameters.Add(min * 1000); }
+        if (query.StartMax is { } max) { terms.Add("started_us <= ?"); parameters.Add(max * 1000); }
         if (query.Errors) terms.Add("EXISTS (SELECT 1 FROM telemetry_spans WHERE trace_id = heads.trace_id AND json_extract(status, '$.status') = 'error')");
         if (query.Attributes is { } attributes)
             terms.Add($"EXISTS (SELECT 1 FROM telemetry_spans candidate WHERE candidate.trace_id = heads.trace_id AND {AttributesSql(attributes, "candidate.attributes", parameters)})");
@@ -81,23 +98,23 @@ public static class SqliteTelemetryStore
             var root = json.RootElement;
             if (root.ValueKind != JsonValueKind.Array || root.GetArrayLength() != 2 || root[0].ValueKind != JsonValueKind.Number || root[1].ValueKind != JsonValueKind.String)
                 throw new ArgumentException("The trace cursor is not one this store issued.", nameof(query));
-            terms.Add("(started_ms < ? OR (started_ms = ? AND trace_id > ?))");
+            terms.Add("(started_us < ? OR (started_us = ? AND trace_id > ?))");
             parameters.AddRange([root[0].GetDouble(), root[0].GetDouble(), root[1].GetString()]);
         }
         parameters.Add((long)limit + 1);
         return await db.TransactionAsync(async tx =>
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var heads = (await tx.AllAsync($"WITH heads AS (SELECT trace_id, min(started_ms) started_ms FROM telemetry_spans GROUP BY trace_id) SELECT * FROM heads WHERE {(terms.Count == 0 ? "1" : string.Join(" AND ", terms))} ORDER BY started_ms DESC, trace_id LIMIT ?", parameters.ToArray()).ConfigureAwait(false)).ToList();
+            var heads = (await tx.AllAsync($"WITH heads AS (SELECT trace_id, min(started_us) started_us FROM telemetry_spans GROUP BY trace_id) SELECT * FROM heads WHERE {(terms.Count == 0 ? "1" : string.Join(" AND ", terms))} ORDER BY started_us DESC, trace_id LIMIT ?", parameters.ToArray()).ConfigureAwait(false)).ToList();
             var more = heads.Count > limit;
             if (more) heads.RemoveAt(heads.Count - 1);
             if (heads.Count == 0) return new TracePage([]);
             cancellationToken.ThrowIfCancellationRequested();
-            var rows = await tx.AllAsync("SELECT * FROM telemetry_spans WHERE trace_id IN (SELECT value FROM json_each(?)) ORDER BY started_ms, id",
+            var rows = await tx.AllAsync("SELECT * FROM telemetry_spans WHERE trace_id IN (SELECT value FROM json_each(?)) ORDER BY started_us, length(id), id",
                 JsonSerializer.Serialize(heads.Select(h => Text(h, "trace_id")))).ConfigureAwait(false);
             var grouped = rows.Select(Span).GroupBy(s => s.TraceId).ToDictionary(g => g.Key, g => g.ToArray(), StringComparer.Ordinal);
             return new TracePage(heads.Select(h => new StoredTrace(Text(h, "trace_id"), grouped[Text(h, "trace_id")])).ToArray(),
-                more ? JsonSerializer.Serialize(new object[] { Number(heads[^1], "started_ms"), Text(heads[^1], "trace_id") }) : null);
+                more ? JsonSerializer.Serialize(new object[] { Number(heads[^1], "started_us"), Text(heads[^1], "trace_id") }) : null);
         }).ConfigureAwait(false);
     }
 

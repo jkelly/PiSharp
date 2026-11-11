@@ -14,7 +14,18 @@ public sealed record ShellConfiguration(string Shell, ImmutableArray<string> Arg
 {
     /// <summary>The full argv after the shell for one command (source spawn arguments).</summary>
     public ImmutableArray<string> CommandArguments(string command) =>
-        CommandTransport == ShellCommandTransport.Stdin ? Arguments : Arguments.Add(command);
+        CommandTransport == ShellCommandTransport.Stdin ? Arguments : Arguments.Add(PrepareCommand(command));
+
+    private const string WindowsPowerShellExitSuffix = "\n;\nif ($?) { exit 0 }\nif (($LASTEXITCODE -eq 0) -and (\"$($Error[0].FullyQualifiedErrorId)\" -like \"NativeCommandError*\")) { exit 0 }\nexit 1";
+
+    /// <summary>PowerShell 5.1 redirects native stderr into error records even on a successful native exit.</summary>
+    public string PrepareCommand(string command)
+    {
+        var basename = Shell.Replace('\\', '/').Split('/')[^1];
+        return basename.Equals("powershell.exe", StringComparison.OrdinalIgnoreCase) &&
+            !command.TrimEnd().EndsWith('`') && !command.EndsWith(WindowsPowerShellExitSuffix, StringComparison.Ordinal)
+            ? command + WindowsPowerShellExitSuffix : command;
+    }
 }
 
 /// <summary>Source getShellConfig failures ("Custom shell path not found", "No bash shell found").</summary>

@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 1,
+  "sourceCommit": "b4afdddf44e059c67ccf5097e5317d913521b470",
+  "ledger": "AI_DOCS/sync-1.5.2-source-validation.json",
+  "coverage": "AI_DOCS/sync-1.5.2-source-coverage.json",
+  "scope": "Current-source local suite acceptance; no whole-product, hosted, live-provider, cross-platform or publication claim.",
+  "limitations": [
+    "Execution evidence is local and platform-scoped; hosted, other-platform and live-provider acceptance are not inferred.",
+    "The pre-existing complete legacy fixture checker is not closed: six standalone fixture families require dedicated registration/verification handlers and its final gate requires the exact historical Node 24.19.0 executable. Current dedicated source/applicability checks are separate."
+  ],
+  "workPackages": {
+    "META": ["Models", "ExtensionParity"],
+    "AI": ["Models", "ModelRuntime", "ProviderSync", "ProviderApis", "OpenAICompatibilityGap", "AnthropicResolved", "AnthropicThreads", "AnthropicSimple", "AnthropicProfile", "AnthropicAuthSync", "AzureResponses", "AzureSimple", "NativeModelCatalog", "ClassifierConfig", "Classifiers", "Agent"],
+    "CLI": ["CliParity", "CodingAgent", "SessionParity", "InteractiveParity", "ExtensionParity", "Tools", "Agent", "Rpc", "DurableMessages"],
+    "CODEMODE": ["Codemode"],
+    "SCHEMA": ["Schema"],
+    "DURABLE": ["Durable", "Chord.Durable.Integration", "Durable.Hosting", "Durable.Server", "DurableMessages"],
+    "STORAGE": ["Durable", "Chord", "Chord.Durable.Integration"],
+    "ENV": ["Env.Adapter", "Env.Connection", "Env.Daemon", "Env.Process", "Env.Ssh", "Env.Terminal", "Env.Watch"],
+    "MCP": ["McpSync", "McpParity", "McpTuiOriginalQualification", "Extensions.ContractTests"],
+    "TUI": ["Tui", "Tui.Editor", "InteractiveParity"],
+    "TELEMETRY": ["Telemetry", "Chord"],
+    "CHORD": ["Chord", "Chord.Hosting", "Chord.Legacy.Cluster"],
+    "C-K": ["Chord"],
+    "C-W": ["Chord"],
+    "C-HD": ["Chord", "Chord.Durable.Integration"],
+    "C-STORE": ["Chord", "Durable", "Chord.Durable.Integration"],
+    "C-SYNC": ["Chord"],
+    "C-HTTP": ["Chord.Hosting"],
+    "C-PL": ["Chord.Hosting"],
+    "C-WK": ["Chord.Hosting"],
+    "C-A1": ["Chord.Hosting"],
+    "C-A2": ["Chord.Hosting"],
+    "C-A3": ["Chord.Hosting", "Chord"],
+    "C-SUR": ["Chord"],
+    "C-PUB": ["Chord.Hosting", "Chord"],
+    "C-TEL": ["Telemetry", "Chord", "Chord.Hosting"],
+    "C-LEGACY": ["Chord.Legacy.Cluster", "Chord"],
+    "C-JS": [],
+    "C-TERM": ["Chord.Hosting"]
+  },
+  "catalog": {
+    "provenance": "src/PiSharp.AI/Catalogs/Releases/1.5.2.provenance.json",
+    "directory": "src/PiSharp.AI/Catalogs/Releases/1.5.2",
+    "report": "AI_DOCS/agent-reports/sync-1.5.2-catalog.md"
+  }
+}

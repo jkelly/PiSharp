@@ -81,6 +81,7 @@ const historical = [
   [/^compatibility\/target\.lock\.json$/, "previousTarget names the previous target lock"],
   [/^compatibility\/target\.v1\.1\.0\.lock\.json$/, "the preserved v1.1.0 target lock"],
   [/^compatibility\/target\.v1\.2\.0\.lock\.json$/, "the preserved v1.2.0 target lock"],
+  [/^compatibility\/target\.v1\.5\.0\.lock\.json$/, "the preserved v1.5.0 target lock"],
   [/^compatibility\/.*\.v1\.1\.0(\.overlay)?\.json$/, "inventory generated for the v1.1.0 target (validated against target.v1.1.0.lock.json)"],
   [/^compatibility\/.*\.v1\.2\.0(\.overlay)?\.json$/, "inventory generated for the v1.2.0 target (validated against target.v1.2.0.lock.json); any v1.1.0 commit in it is refresh provenance and the anchors of entries removed upstream at v1.2.0"],
   [/^compatibility\/.*\.v1\.5\.0(\.overlay)?\.json$/, "inventory generated for the v1.5.0 target from the v1.2.0 inventories; any v1.2.0 commit in it is refresh provenance and the removedUpstream marks carried from v1.2.0"],
@@ -316,6 +317,7 @@ for (const entry of report.pending) {
 }
 const generated = {
   schemaVersion: 1,
+  mode: args.write ? "applied" : "report-only",
   generatedBy: `node ${self} --upstream <Pi repo> --from ${args.from} --to ${args.to}${args.paths ? ` --paths '${args.paths}'` : ""}${args.write ? " --write" : ""}`,
   decision: args.decision,
   from: { tag: args.from, commit: OLD },

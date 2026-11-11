@@ -16,10 +16,15 @@ namespace PiSharp.Chord.Store;
 
 /// <summary>An archive's first part, as import reads it: the format, the store's schema version, its <c>lastSeq</c> and the allocator's
 /// next id (rule 24, D3; upstream <c>ArchiveManifest</c>, whose JSON is <c>{ kind: "manifest", format, schema, lastSeq, nextId }</c>).</summary>
-internal sealed record ArchiveManifest(long Format, long Schema, long LastSeq, long NextId)
+internal sealed record ArchiveManifest(long Format, long Schema, long LastSeq, long NextId, string? Host = null)
 {
     /// <summary><c>{ kind: "manifest", format, schema, lastSeq, nextId }</c>.</summary>
-    internal JsonObject ToJson() => new() { ["kind"] = "manifest", ["format"] = Format, ["schema"] = Schema, ["lastSeq"] = LastSeq, ["nextId"] = NextId };
+    internal JsonObject ToJson()
+    {
+        var json = new JsonObject { ["kind"] = "manifest", ["format"] = Format, ["schema"] = Schema, ["lastSeq"] = LastSeq, ["nextId"] = NextId };
+        if (Host is not null) json["host"] = Host;
+        return json;
+    }
 }
 
 internal static partial class StoreInternal
@@ -37,7 +42,8 @@ internal static partial class StoreInternal
         ("optional", Opt(Lit(true))),
         ("default", Opt(Union(Str(), Num(), Bool()))),
         ("version", Opt(Safe(1))),
-        ("fingerprint", Opt(Str())));
+        ("fingerprint", Opt(Str())),
+        ("host", Opt(Str())));
 
     /// <summary>A <c>table</c> write (upstream <c>TABLE</c>).</summary>
     private static JsonObject ArchiveTable() => Obj(
@@ -72,6 +78,7 @@ internal static partial class StoreInternal
         ("createdAt", Safe(1)),
         ("retiredAt", Opt(Safe(1))),
         ("meta", Opt(Str())),
+        ("host", Opt(Str())),
         ("revision", Safe(1)),
         ("version", Safe(1)),
         ("fingerprint", Str()));
@@ -90,7 +97,7 @@ internal static partial class StoreInternal
         // A delta's ops; their shapes are checked where they are applied.
         var ops = Arr(Unknown());
         return Union(
-            Obj(("kind", Lit("manifest")), ("format", Safe(1)), ("schema", Safe(1)), ("lastSeq", Safe(0)), ("nextId", Safe(1))),
+            Obj(("kind", Lit("manifest")), ("format", Safe(1)), ("schema", Safe(1)), ("lastSeq", Safe(0)), ("nextId", Safe(1)), ("host", Opt(Str()))),
             ArchiveTable(),
             ArchivePut(),
             ArchiveIndex(),

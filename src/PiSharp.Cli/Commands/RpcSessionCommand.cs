@@ -321,7 +321,7 @@ public static class RpcSessionCommand
                     await created.ConfigureAsync(new(ThinkingLevel: level), token).ConfigureAwait(false);
             };
             session = parsed.SessionMode == "open"
-                ? await lifecycle.OpenAsync(new(parsed.Session, parsed.Latest, parsed.Leaf), profile.SelectedModel, cancellationToken).ConfigureAwait(false)
+                ? await lifecycle.OpenAsync(new(parsed.Session, parsed.Latest, parsed.Leaf) { WorkingDirectoryOverride = pi?.SessionCwdOverride }, profile.SelectedModel, cancellationToken).ConfigureAwait(false)
                 : await lifecycle.CreateAsync(parsed.Session, new PiSharp.Sessions.Serialization.SessionEntryCodec().Parse(JsonSerializer.Serialize(new
                     { type = "session", version = 3, id = pi?.HeaderId ?? NextId(), timestamp = pi?.HeaderTimestamp ?? DateTimeOffset.FromUnixTimeMilliseconds(Clock()).ToString("yyyy-MM-dd'T'HH:mm:ss.fff'Z'", CultureInfo.InvariantCulture), cwd = profile.Workspace })),
                     profile.SelectedModel, cancellationToken).ConfigureAwait(false);
@@ -336,7 +336,6 @@ public static class RpcSessionCommand
                 !Directory.Exists(session.WorkingDirectory);
             if (!continuesElsewhere && !string.Equals(SessionCommands.Absolute(session.WorkingDirectory), profile.Workspace, pathComparison))
                 throw new SessionCommandException(SessionCommandFailure.WorkspaceMismatch);
-            if (continuesElsewhere) lifecycle.WorkingDirectoryOverride = profile.Workspace;
             var thinking = SettingsModelSelection.Thinking(settings, session.Snapshot.Agent.Model, parsed.Thinking ?? liveSelection?.PatternThinkingLevel,
                 parsed.SessionMode == "open", session.GetSupportedThinkingLevels());
             // sdk.ts: an existing session takes the CLI level in memory (no thinking_level_change; the Pi entry), a new one recorded it.
@@ -350,6 +349,24 @@ public static class RpcSessionCommand
             if (parsed.SessionMode == "open") await profile.ApplySkillsAsync(session, cancellationToken).ConfigureAwait(false);
             if (settings is not null) { session.SteeringMode = settings.SteeringMode; session.FollowUpMode = settings.FollowUpMode; }
             await profile.AttachOwnerAsync(session, options, Clock, NextId, parsed.Stores.IsEmpty ? null : parsed.Stores, lifecycle).ConfigureAwait(false);
+            if (pi is not null)
+                profile.Sessions!.PrepareSwitch = async (request, cancellation) =>
+                {
+                    var header = PiSharp.Cli.Pi.PiSessions.ReadHeader(request.Path);
+                    var stored = header is null ? null : PiSharp.Cli.Pi.PiSessions.Text(header, "cwd");
+                    if (string.IsNullOrEmpty(stored) || Directory.Exists(stored)) return new(request);
+                    if (pi.Interactive?.Host.ChooseMissingSessionCwd is not { } choose)
+                        throw new InvalidDataException(PiSharp.Cli.Pi.PiSessions.MissingCwdError(stored, request.Path, profile.Workspace));
+                    var choice = await choose(stored, profile.Workspace, cancellation).ConfigureAwait(false);
+                    if (choice is null) return null;
+                    if (choice == PiSharp.Cli.Pi.MissingSessionCwdChoice.Continue)
+                        return new(request with { WorkingDirectoryOverride = profile.Workspace });
+                    var fork = PiSharp.Cli.Pi.PiSessions.ForkFrom(request.Path, profile.Workspace,
+                        Path.GetDirectoryName(profile.Sessions.Current.Session.Path), pi.Interactive!.AgentDir,
+                        parentSession: pi.Interactive.Host.ImportSource(request.Path));
+                    return new(request with { Path = fork, WorkingDirectoryOverride = null }, () =>
+                    { File.Delete(fork); return ValueTask.CompletedTask; });
+                };
             if (reloadAdmission is not null) profile.ConfigureReload(reloadAdmission);
             await profile.ApplyInitialToolSelectionAsync(session, cancellationToken, resumed: parsed.SessionMode == "open" || pi is not null).ConfigureAwait(false);
             observedInput = new InputObservation(stdin, gate);

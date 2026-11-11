@@ -119,8 +119,13 @@ internal static class McpDynamicRootsHttpBindingTests
         try { AdmittedMcpHttpChannelFactory.Create(entry, Binding(), client, new(1, "0.99.1"), dynamicRoots: provider + provider); throw new IOException("Multicast roots admitted."); }
         catch (ArgumentException) { }
         var factory = AdmittedMcpHttpChannelFactory.Create(entry, Binding(), client, new(1, "0.99.1"), dynamicRoots: provider);
+        // The manager republishes entries after presentation-only changes. A fresh equivalent
+        // entry is the same admitted connection; changing its scope is a different admission.
+        var equivalent = await Acquire(factory, Entry());
+        var closeError = await Join("equivalent-entry-close", equivalent.CloseAsync());
+        if (closeError is not null) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(closeError).Throw();
         Task<IMcpAdmittedRequestChannel>? unexpected = null;
-        try { unexpected = factory(Entry(), default).AsTask(); await unexpected; throw new IOException("Foreign entry admitted."); }
+        try { unexpected = factory(Entry() with { Scope = McpConfigurationScope.Project }, default).AsTask(); await unexpected; throw new IOException("Foreign entry admitted."); }
         catch (InvalidOperationException) when (unexpected is null) { }
         Require(calls == 0 && server.Calls == 0);
     }

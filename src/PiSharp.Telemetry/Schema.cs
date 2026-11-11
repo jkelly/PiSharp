@@ -145,12 +145,14 @@ public static class TelemetrySchema
         {
             if (metric && definition.Cardinality == TelemetryCardinality.High)
                 throw new ArgumentException($"Telemetry {what} attribute '{name}' is high-cardinality; metrics take low-cardinality attributes.");
-            var array = definition.Type is TelemetryAttributeType.StringArray or TelemetryAttributeType.NumberArray or TelemetryAttributeType.BooleanArray;
+            var array = definition.Type is TelemetryAttributeType.StringArray or TelemetryAttributeType.NumberArray or TelemetryAttributeType.BooleanArray or TelemetryAttributeType.StringNumberArray;
             if (array ? definition.Values is not null : definition.ElementValues is not null)
                 throw new ArgumentException($"Telemetry {what} attribute '{name}' declares {(array ? "values" : "elementValues")} for a {definition.Type} attribute.");
             var element = TelemetryAttributeChecks.ElementType(definition.Type);
             foreach (var value in (array ? definition.ElementValues : definition.Values) ?? [])
-                if (value is null || value.Type != element)
+                if (value is null || (definition.Type == TelemetryAttributeType.StringNumberArray
+                    ? value.Type is not (TelemetryAttributeType.String or TelemetryAttributeType.Number)
+                    : value.Type != element))
                     throw new ArgumentException($"Telemetry {what} attribute '{name}' declares a closed-set value of another type.");
         }
     }
@@ -269,7 +271,8 @@ internal static class TelemetryAttributeChecks
                 if (!definitions.TryGetValue(name, out var definition))
                     throw new ArgumentException($"Telemetry {what} attribute '{name}' is not declared.", nameof(attributes));
                 if (value is null) continue;
-                if (value.Type != definition.Type)
+                if (value.Type != definition.Type && !(definition.Type == TelemetryAttributeType.StringNumberArray &&
+                    value.Type is TelemetryAttributeType.StringArray or TelemetryAttributeType.NumberArray))
                     throw new ArgumentException($"Telemetry {what} attribute '{name}' must be a {definition.Type} value.", nameof(attributes));
                 if (value.IsArray ? definition.ElementValues is { } elements && value.Elements().Any(item => !elements.Contains(item))
                     : definition.Values is { } values && !values.Contains(value))

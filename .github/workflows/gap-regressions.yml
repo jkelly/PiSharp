@@ -79,14 +79,17 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           node --test tools/ci/historical-ai-archive.test.mjs
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-      - name: Install the locked extension runtime fixture
+      - name: Install and verify the locked Pi 1.5.2 extension runtime fixture
         if: matrix.group == 'core'
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Path artifacts/node-runtime-150 -Force | Out-Null
-          Copy-Item tools/NodeBridge/runtime-fixture-150/package.json,tools/NodeBridge/runtime-fixture-150/package-lock.json artifacts/node-runtime-150/
-          npm ci --prefix artifacts/node-runtime-150 --ignore-scripts --no-audit --no-fund
+          New-Item -ItemType Directory -Path artifacts/node-runtime-152 -Force | Out-Null
+          Copy-Item tools/NodeBridge/runtime-fixture-152/package.json,tools/NodeBridge/runtime-fixture-152/package-lock.json artifacts/node-runtime-152/
+          npm ci --prefix artifacts/node-runtime-152 --ignore-scripts --no-audit --no-fund
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node tools/NodeBridge/installed-runtime-abi.mjs artifacts/node-runtime-152/node_modules
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          "PISHARP_TEST_PI152_NODE_MODULES=$((Resolve-Path artifacts/node-runtime-152/node_modules).Path)" >> $env:GITHUB_ENV
       - name: Install search tools (Windows)
         if: runner.os == 'Windows'
         run: choco install ripgrep fd --yes --no-progress

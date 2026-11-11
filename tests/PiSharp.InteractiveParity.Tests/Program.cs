@@ -31,8 +31,10 @@ internal static class Program
         var filter = Environment.GetEnvironmentVariable("INTERACTIVEPARITY_FILTER");
         if (!string.IsNullOrEmpty(filter)) cases = [.. cases.Where(test => filter.Split('|').Any(part => test.Id.Contains(part, StringComparison.Ordinal)))];
         var results = new List<object>(); var failures = 0; var skipped = 0;
+        Console.Error.WriteLine($"selected {cases.Count} interactive parity cases");
         foreach (var test in cases)
         {
+            Console.Error.WriteLine($"start {test.Id}");
             try
             {
                 Expect.ResetPerCase();
@@ -40,7 +42,7 @@ internal static class Program
                 results.Add(new { test.Id, status = "PASS_AUTHORED_NATIVE_ONLY" });
             }
             catch (SkipCaseException skip) { skipped++; results.Add(new { test.Id, status = "SKIPPED", reason = skip.Message }); }
-            catch (Exception error) { failures++; results.Add(new { test.Id, status = "FAIL", failure = error.ToString() }); }
+            catch (Exception error) { failures++; Console.Error.WriteLine($"FAIL {test.Id}: {error}"); results.Add(new { test.Id, status = "FAIL", failure = error.ToString() }); }
         }
         var output = new { sourceSha = Upstream, status = "AUTHORED NATIVE; NO UPSTREAM CAPTURE", cases = cases.Count, failures, skipped,
             genuineSourceCasesCaptured = 0, results };

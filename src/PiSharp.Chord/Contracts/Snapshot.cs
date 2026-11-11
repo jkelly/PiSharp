@@ -11,7 +11,7 @@ namespace PiSharp.Chord.Contracts;
 
 /// <summary>A Chord-owned copy of an app schema, its normal form, and whether it has a <c>bytes()</c> leaf (values crossing a link then
 /// carry raw byte segments); immutable by convention.</summary>
-internal sealed record Snapshot(JsonNode Schema, JsonNode Normal, bool Bytes);
+internal sealed record Snapshot(JsonNode Schema, JsonNode Normal, bool Bytes, HostKind? KeyHost = null);
 
 internal static partial class ContractsInternal
 {

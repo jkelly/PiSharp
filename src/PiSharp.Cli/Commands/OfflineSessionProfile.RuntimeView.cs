@@ -158,6 +158,13 @@ internal sealed partial class OfflineSessionProfile
                 throw new InvalidOperationException("Attachment already has another profile view.");
             BindEffectiveSettingsAttachment(attachment, view);
             BindOriginalPromptAttachment(attachment, view);
+            attachment.Session.InputNormalizer = (model, message, token) =>
+            {
+                token.ThrowIfCancellationRequested();
+                var wire = model == SelectedModel ? SelectedModelWire : _liveModels?.Wire(model);
+                return ValueTask.FromResult(PromptImageNormalizer.Normalize(message, ImageSettings.AutoResizeImages,
+                    wire, PiSharp.Tools.Skia.SkiaImageCodec.Instance));
+            };
             runtimeViews[attachment] = view;
             runtimeViewAttached = true;
         }
@@ -197,6 +204,7 @@ internal sealed partial class OfflineSessionProfile
                 runtimeViews.Remove(attachment);
                 forgotten = true;
             }
+        if (forgotten && _cacheWarmers.TryGetValue(attachment.Session, out var warmer)) warmer.Cancel();
         if (forgotten)
             PiSharp.AI.Protocols.AnthropicMessages.AnthropicMessageThreadStore.Shared.Cleanup(
                 attachment.Session.Snapshot.Log.Header.Id);
@@ -242,6 +250,7 @@ internal sealed partial class OfflineSessionProfile
     }
     private async Task CloseProfileViewsAsync()
     {
+        await Task.WhenAll(_cacheWarmers.Select(pair => pair.Value.CancelAndJoinAsync())).ConfigureAwait(false);
         // Includes the startup activation when no runtime ever adopted its hold.
         using var callback = EnterViewCleanupCallback();
         ProfileRuntimeViewOwnership[] ownerships; ProfileViewLifetime.Hold? startup;

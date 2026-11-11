@@ -1,4 +1,4 @@
-// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/coding-agent/src/modes/interactive/theme/theme.ts.
+// Pi b4afdddf44e059c67ccf5097e5317d913521b470 (MIT): packages/coding-agent/src/modes/interactive/theme/theme.ts.
 // Ported to plain ESM for the PiSharp Node extension bridge (TypeScript types stripped mechanically; behaviour unchanged except for the marked PiSharp adaptations).
 import * as fs from "node:fs";
 import * as path from "node:path";
@@ -701,6 +701,10 @@ export function getLanguageFromPath(filePath) {
         java: "java",
         kt: "kotlin",
         swift: "swift",
+        dart: "dart",
+        groovy: "groovy",
+        gradle: "groovy",
+        nix: "nix",
         c: "c",
         h: "c",
         cpp: "cpp",

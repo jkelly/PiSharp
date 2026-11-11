@@ -92,12 +92,28 @@ public sealed class ContractEditor
         return PutKeyed(variant, member, schema);
     }
 
+    /// <summary>Changes a keyed member's schema and address kind.</summary>
+    public ContractEditor Keyed(string member, HostKind host, JsonNode? schema)
+    {
+        var variant = KeyedVariant();
+        if (!Variant(variant).Keyed.ContainsKey(member)) throw new ArgumentException($"{MemberPath(variant, member, MemberKind.Keyed)}: no such keyed member");
+        return PutKeyed(variant, member, schema, host);
+    }
+
     /// <summary>Adds keyed member <paramref name="member"/>.</summary>
     public ContractEditor AddKeyed(string member, JsonNode? schema)
     {
         var variant = KeyedVariant();
         RefuseDeclared(variant, member, MemberKind.Keyed);
         return PutKeyed(variant, member, schema);
+    }
+
+    /// <summary>Adds a keyed member whose keys are addresses of <paramref name="host"/>.</summary>
+    public ContractEditor AddKeyed(string member, HostKind host, JsonNode? schema)
+    {
+        var variant = KeyedVariant();
+        RefuseDeclared(variant, member, MemberKind.Keyed);
+        return PutKeyed(variant, member, schema, host);
     }
 
     /// <summary>Removes keyed member <paramref name="member"/>.</summary>
@@ -168,9 +184,10 @@ public sealed class ContractEditor
         return Checked();
     }
 
-    private ContractEditor PutKeyed(string variant, string member, JsonNode? schema)
+    private ContractEditor PutKeyed(string variant, string member, JsonNode? schema, HostKind? host = null)
     {
-        Variant(variant).Keyed[member] = ContractsInternal.SnapshotSchema(schema, MemberPath(variant, member, MemberKind.Keyed));
+        if (host is not null) ContractsInternal.KindParams(host);
+        Variant(variant).Keyed[member] = ContractsInternal.SnapshotSchema(schema, MemberPath(variant, member, MemberKind.Keyed)) with { KeyHost = host };
         _changes.Add(new Change(variant, member, ChangeSide.Keyed));
         return Checked();
     }

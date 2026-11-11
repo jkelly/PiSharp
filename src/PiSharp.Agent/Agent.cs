@@ -45,6 +45,8 @@ public sealed record AgentOptions(AgentLoopOptions? Loop = null, AgentPendingInp
     AgentCancellationBehavior CancellationBehavior = AgentCancellationBehavior.SettleAborted,
     ToolProgressDeliveryOptions? ProgressDelivery = null)
 {
+    /// <summary>Normalizes delivered input before message events, history and provider requests. Queue identity is retained until delivery.</summary>
+    public Func<ModelDescriptor, TranscriptEntry, CancellationToken, ValueTask<TranscriptEntry>>? NormalizeInput { get; init; }
     public ToolResultValueOptions ResultValues { get; init; } = ToolResultValueOptions.ExecutionBoundary;
     /// <summary>Opt-in monotonic clock for assistant response and tool execution durations (durationMs). Null records
     /// none, preserving the earlier messages and events exactly; session hosts supply the system clock.</summary>
@@ -75,6 +77,7 @@ public sealed class Agent : IAsyncDisposable
     private StreamEvent? _latest;
     private AgentFailureKind? _failure;
     private bool _cancellationCallbackFailed;
+    private ImmutableArray<Exception> _cancellationCallbackFailures = [];
     private bool _cancellationRequested;
     private long _generation;
     private Run? _active;
@@ -112,6 +115,7 @@ public sealed class Agent : IAsyncDisposable
         public long Timestamp;
         public int CancelUsers;
         public bool Done, Settling, CallbackFailed;
+        public ImmutableArray<Exception> CallbackFailures = [];
         public AgentLoopResult? Result;
         public Exception? Error;
     }
@@ -145,6 +149,11 @@ public sealed class Agent : IAsyncDisposable
                 _queue.SteeringCount, _queue.FollowUpCount, _active is not null, _disposed, _failure, _cancellationCallbackFailed,
                 _active?.Cancellation.IsCancellationRequested ?? _cancellationRequested);
         }
+    }
+    /// <summary>Original callback failures for the native owner; the public snapshot retains its boolean contract.</summary>
+    internal ImmutableArray<Exception> CancellationCallbackFailures
+    {
+        get { lock (_gate) return _active?.CallbackFailures ?? _cancellationCallbackFailures; }
     }
     public AgentPendingInputMode SteeringMode
     {
@@ -289,6 +298,7 @@ public sealed class Agent : IAsyncDisposable
             _latest = null;
             _outcomes = [];
             _cancellationCallbackFailed = false;
+            _cancellationCallbackFailures = [];
             _cancellationRequested = false;
         }
         // Registration and all user code run outside the state lock.
@@ -422,6 +432,20 @@ public sealed class Agent : IAsyncDisposable
                 hooks.FinishTurn is { } finish ? (completed, cancellation) => InCallbackAsync(run, () => finish(completed, cancellation)) : null,
                 hooks.FinishTurnDecision is { } decision ? (completed, cancellation) => InCallbackAsync(run, () => decision(completed, cancellation)) : null)
             {
+                NormalizeInput = async (message, cancellation) =>
+                {
+                    if (_options.NormalizeInput is not { } normalize) return message;
+                    var normalized = await InCallbackAsync(run, () => normalize(config.Model, message, cancellation)).ConfigureAwait(false);
+                    ValidateMessages([normalized], inputsOnly: true);
+                    if (normalized.Role != message.Role) throw new ArgumentException("Input normalization cannot change the role.");
+                    if (!ReferenceEquals(message, normalized))
+                        lock (_gate)
+                        {
+                            var slot = run.Pending.FindIndex(candidate => ReferenceEquals(candidate, message));
+                            if (slot >= 0) run.Pending[slot] = normalized;
+                        }
+                    return normalized;
+                },
                 TransformRequestMessages = Project, PrepareRequestBoundary = (boundary, cancellation) => PrepareBoundary(boundary, cancellation),
                 GetContextOnlyMessages = cancellation => PollContextOnly(run, cancellation),
                 TakeTranscriptReplacement = () => { lock (_gate) { var replaced = run.TranscriptReplacement; run.TranscriptReplacement = null; return replaced; } }
@@ -618,7 +642,16 @@ public sealed class Agent : IAsyncDisposable
         var priorGeneration = _callbackGeneration.Value;
         _callbackGeneration.Value = run.Generation;
         try { run.Cancellation.Cancel(); }
-        catch (Exception) { lock (_gate) { run.CallbackFailed = true; _cancellationCallbackFailed = true; } }
+        catch (Exception error)
+        {
+            lock (_gate)
+            {
+                run.CallbackFailed = true; _cancellationCallbackFailed = true;
+                // Keep the caught tree intact; the owning session flattens its leaves in
+                // callback order and deduplicates original instances across cancellation paths.
+                if (!run.CallbackFailures.Any(existing => ReferenceEquals(existing, error))) run.CallbackFailures = run.CallbackFailures.Add(error);
+            }
+        }
         finally
         {
             bool settle;
@@ -649,6 +682,7 @@ public sealed class Agent : IAsyncDisposable
                     (token.IsCancellationRequested || run.Result.Turns.Any(turn => turn.Result.Chat.Message.StopReason == StopReason.Aborted)
                         ? AgentFailureKind.Canceled : AgentFailureKind.ChatFailure) : null;
             _cancellationCallbackFailed = run.CallbackFailed;
+            _cancellationCallbackFailures = run.CallbackFailures;
             _cancellationRequested = token.IsCancellationRequested;
             _latest = null;
             _active = null;

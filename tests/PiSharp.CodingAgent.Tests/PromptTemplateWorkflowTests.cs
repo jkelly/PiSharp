@@ -8,6 +8,8 @@ using static PromptTemplateDiscoveryTests;
 
 internal static class PromptTemplateWorkflowTests
 {
+    // A real 1x1 PNG: prompt image normalization validates input before persistence.
+    private const string PixelPng = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
     public const string Prefix = "prompt template workflow ";
     public static (string Name, Func<Task> Run)[] Cases() =>
     [
@@ -42,7 +44,7 @@ internal static class PromptTemplateWorkflowTests
         await host.Send(new { id = "clear", type = "clear_queue" }); await host.Response("clear");
         if (withImage)
             await host.Send(new { id = "prompt", type = "prompt", message = "/review 'the change'", streamingBehavior = "steer",
-                images = new[] { new { type = "image", mimeType = "image/png", data = "AA==" } } });
+                images = new[] { new { type = "image", mimeType = "image/png", data = PixelPng } } });
         else await host.Send(new { id = "prompt", type = "prompt", message = "/review 'the change'", streamingBehavior = "steer" });
         await host.Response("prompt"); await host.Wait(record => Type(record) == "agent_settled");
         await host.Send(new { id = "messages", type = "get_messages" });
@@ -52,7 +54,7 @@ internal static class PromptTemplateWorkflowTests
         if (withImage)
         {
             var image = user.GetProperty("content")[1]; Equal("image", image.GetProperty("type").GetString());
-            Equal("image/png", image.GetProperty("mimeType").GetString()); Equal("AA==", image.GetProperty("data").GetString());
+            Equal("image/png", image.GetProperty("mimeType").GetString()); Equal(PixelPng, image.GetProperty("data").GetString());
         }
         Equal(0, await host.Finish()); Equal("", host.Error.ToString());
     }

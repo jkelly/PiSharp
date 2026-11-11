@@ -7,8 +7,8 @@ namespace PiSharp.Durable.Storage.Jsonl;
 
 public sealed partial class JsonlStorage
 {
-    /// <summary>Opens or creates a JSONL storage directory using the local file system (upstream <c>openNodeJsonlStorage</c>); a relative
-    /// <paramref name="directory"/> resolves against the process's current directory.</summary>
+    /// <summary>Opens or creates a JSONL storage directory using the local file system (upstream <c>openNodeJsonlStorage</c>); read-only
+    /// opens create and write nothing. A relative <paramref name="directory"/> resolves against the process's current directory.</summary>
     public static Task<JsonlStorage> OpenAsync(string directory, DurableContext context, JsonlStorageOptions? options = null) =>
         OpenAsync(directory, new LocalFileSystem(Environment.CurrentDirectory), context, options);
 }

@@ -1,0 +1,532 @@
+{
+  "schemaVersion": 1,
+  "generatedUtc": "2026-11-11T06:33:43.6239647Z",
+  "scope": "Explicit new case identities compared with observed full-suite receipts; raw and authored captures remain separately labeled.",
+  "groups": [
+    {
+      "group": "Models catalog",
+      "project": "tests/PiSharp.Models.Tests/PiSharp.Models.Tests.csproj",
+      "expectedCount": 11,
+      "expectedIds": [
+        "sync152.catalog.azure-all-tiered-counterparts",
+        "sync152.catalog.azure-tier-boundary-runtime-cost",
+        "sync152.catalog.codex-label",
+        "sync152.catalog.exact-current-package-resources",
+        "sync152.catalog.explicit-user-model-can-restore-removed-id",
+        "sync152.catalog.fable-all-released-provider-variants",
+        "sync152.catalog.fable-fallback-billing",
+        "sync152.catalog.fable-finalized-metadata-and-selection",
+        "sync152.catalog.fable-request-adaptive-effort",
+        "sync152.catalog.release-additions-removals-and-metadata",
+        "sync152.catalog.user-cost-and-capability-overrides-win"
+      ],
+      "receipt": "E:\\AI\\PiSharp\\update-1.5.2\\artifacts\\gap-validation\\sync152-models-stable-r4-d3e6d1480d2e41b59224d14062926e80\\receipt.json",
+      "selectedExpected": 11,
+      "missingIds": [],
+      "failedOrSkipped": [],
+      "complete": true
+    },
+    {
+      "group": "ModelRuntime public catalog auth",
+      "project": "tests/PiSharp.ModelRuntime.Tests/PiSharp.ModelRuntime.Tests.csproj",
+      "expectedCount": 8,
+      "expectedIds": [
+        "catalog-refresh-auth.api-key-is-not-sent-to-public-catalog",
+        "catalog-refresh-auth.auth-check-errors-are-per-provider",
+        "catalog-refresh-auth.custom-key-resolution-and-base-url-preserved",
+        "catalog-refresh-auth.expired-oauth-never-resolves-for-public-catalog",
+        "catalog-refresh-auth.personalized-catalog-still-resolves-oauth",
+        "catalog-refresh-auth.rechecks-configuration",
+        "catalog-refresh-auth.unconfigured-restores-without-network",
+        "catalog-refresh-auth.unsupported-catalog-versus-real-failure"
+      ],
+      "receipt": "E:\\AI\\PiSharp\\update-1.5.2\\artifacts\\gap-validation\\sync152-modelruntime-stable-r4-39155149e88e4a919e53965d7eb43daf\\receipt.json",
+      "selectedExpected": 8,
+      "missingIds": [],
+      "failedOrSkipped": [],
+      "complete": true
+    },
+    {
+      "group": "MCP OAuth/shared helpers",
+      "project": "tests/PiSharp.McpSync.Tests/PiSharp.McpSync.Tests.csproj",
+      "expectedCount": 9,
+      "expectedIds": [
+        "mcp152.cancel-queued-lock-without-refresh",
+        "mcp152.cancel-sent-refresh-persists-rotated-token",
+        "mcp152.direct-host-provider-credentials-stay-in-agent-directory",
+        "mcp152.generic-client-metadata-path",
+        "mcp152.lock-busy-only-falls-back",
+        "mcp152.optional-output-save-and-unicode",
+        "mcp152.refresh-only-preserves-authorization",
+        "mcp152.shared-fields-preserve-application-data",
+        "mcp152.split-signin-persisted-and-superseded"
+      ],
+      "receipt": "E:\\AI\\PiSharp\\update-1.5.2\\artifacts\\gap-validation\\sync152-mcpsync-stable-r6-3a59c9b9217046d18078f560299ea700\\receipt.json",
+      "selectedExpected": 9,
+      "missingIds": [],
+      "failedOrSkipped": [],
+      "complete": true
+    },
+    {
+      "group": "MCP transports",
+      "project": "tests/PiSharp.Extensions.ContractTests/PiSharp.Extensions.ContractTests.csproj",
+      "expectedCount": 11,
+      "expectedIds": [
+        "mcp-transport.152-pipe-fragmented-reused-input-and-stderr-tail",
+        "mcp-transport.152-pipe-malformed-and-oversize-frame-recovery",
+        "mcp-transport.152-pipe-rejected-exit-incomplete-order-and-send-fence",
+        "mcp-transport.152-pipe-grace-force-kill-and-stable-close",
+        "mcp-transport.152-pipe-close-during-open-owns-late-pipe",
+        "mcp-transport.152-pipe-close-joins-receiver",
+        "mcp-transport.152-pipe-start-send-and-close-admission",
+        "mcp-transport.152-http-error-prefix-bound-and-safe-utf8",
+        "mcp-transport.152-http-error-read-failure-retains-status",
+        "mcp-transport.152-http-json-exact-byte-limit-and-multibyte-splits",
+        "mcp-transport.152-http-oversize-event-disposes-body"
+      ],
+      "receipt": "E:\\AI\\PiSharp\\update-1.5.2\\artifacts\\gap-validation\\sync152-extensions-contracttests-stable-r7-ce40206f5ccd4480b761c26f66d05397\\receipt.json",
+      "selectedExpected": 11,
+      "missingIds": [],
+      "failedOrSkipped": [],
+      "complete": true
+    },
+    {
+      "group": "Durable JSONL read-only",
+      "project": "tests/PiSharp.Durable.Tests/PiSharp.Durable.Tests.csproj",
+      "expectedCount": 8,
+      "expectedIds": [
+        "storage.jsonl.read-only.caps-recovery-at-five-attempts",
+        "storage.jsonl.read-only.creates-no-missing-directory",
+        "storage.jsonl.read-only.does-not-retry-filesystem-failure",
+        "storage.jsonl.read-only.keeps-torn-only-main",
+        "storage.jsonl.read-only.local-open-holds-snapshot",
+        "storage.jsonl.read-only.rejects-stable-corruption-without-retry",
+        "storage.jsonl.read-only.retries-writer-reclamation-race",
+        "storage.jsonl.read-only.skips-repair-and-reclamation-without-writes"
+      ],
+      "receipt": "E:\\AI\\PiSharp\\update-1.5.2\\artifacts\\gap-validation\\sync152-durable-stable-r1-9ca2a9f83c294217bfbf736d24cba6e4\\receipt.json",
+      "selectedExpected": 8,
+      "missingIds": [],
+      "failedOrSkipped": [],
+      "complete": true
+    },
+    {
+      "group": "Durable SQLite detailed bulk",
+      "project": "tests/PiSharp.Durable.Tests/PiSharp.Durable.Tests.csproj",
+      "expectedCount": 8,
+      "expectedIds": [
+        "storage.sqlite.bulk.eight-statements-for-one-or-150-delta-entry-batches",
+        "storage.sqlite.bulk.large-rows-use-16-2-1-bound-groups",
+        "storage.sqlite.bulk.seeded-physical-and-memory-differential",
+        "storage.sqlite.bulk.small-rows-split-at-512-kib",
+        "storage.sqlite.bulk.replacement-retains-current-create-first",
+        "storage.sqlite.bulk.replacement-retains-current-retire-first",
+        "storage.sqlite.bulk.malformed-copy-source-rolls-back-physical-state",
+        "storage.sqlite.bulk.malformed-check-record-rolls-back-physical-state"
+      ],
+      "receipt": "E:\\AI\\PiSharp\\update-1.5.2\\artifacts\\gap-validation\\sync152-durable-stable-r1-9ca2a9f83c294217bfbf736d24cba6e4\\receipt.json",
+      "selectedExpected": 8,
+      "missingIds": [],
+      "failedOrSkipped": [],
+      "complete": true
+    },
+    {
+      "group": "Durable MSSQL offline corruption",
+      "project": "tests/PiSharp.Durable.Tests/PiSharp.Durable.Tests.csproj",
+      "expectedCount": 20,
+      "expectedIds": [
+        "storage.mssql.offline.corruption-rolls-back-record-json",
+        "storage.mssql.offline.corruption-rolls-back-record-shape",
+        "storage.mssql.offline.corruption-rolls-back-copy-record-json",
+        "storage.mssql.offline.corruption-rolls-back-copy-record-shape",
+        "storage.mssql.offline.corruption-rolls-back-latest-version",
+        "storage.mssql.offline.corruption-rolls-back-missing-revision",
+        "storage.mssql.offline.corruption-rolls-back-base-json",
+        "storage.mssql.offline.corruption-rolls-back-base-shape",
+        "storage.mssql.offline.corruption-rolls-back-base-missing",
+        "storage.mssql.offline.corruption-rolls-back-base-version",
+        "storage.mssql.offline.corruption-rolls-back-delta-json",
+        "storage.mssql.offline.corruption-rolls-back-delta-shape",
+        "storage.mssql.offline.corruption-rolls-back-delta-op",
+        "storage.mssql.offline.corruption-rolls-back-delta-root",
+        "storage.mssql.offline.corruption-rolls-back-delta-version",
+        "storage.mssql.offline.semantic-refusal-keeps-prefix-missing-source",
+        "storage.mssql.offline.semantic-refusal-keeps-prefix-mismatched-source",
+        "storage.mssql.offline.semantic-refusal-keeps-prefix-unretained-history",
+        "storage.mssql.offline.semantic-refusal-keeps-prefix-retired-document",
+        "storage.mssql.offline.semantic-refusal-keeps-prefix-caller-version"
+      ],
+      "receipt": "E:\\AI\\PiSharp\\update-1.5.2\\artifacts\\gap-validation\\sync152-durable-stable-r1-9ca2a9f83c294217bfbf736d24cba6e4\\receipt.json",
+      "selectedExpected": 20,
+      "missingIds": [],
+      "failedOrSkipped": [],
+      "complete": true
+    },
+    {
+      "group": "Durable scheduler notification",
+      "project": "tests/PiSharp.Durable.Tests/PiSharp.Durable.Tests.csproj",
+      "expectedCount": 2,
+      "expectedIds": [
+        "sync152.scheduler.keeps-waiter-notification-during-planning",
+        "sync152.scheduler.keeps-completing-owner-notification-during-planning"
+      ],
+      "receipt": "E:\\AI\\PiSharp\\update-1.5.2\\artifacts\\gap-validation\\sync152-durable-stable-r1-9ca2a9f83c294217bfbf736d24cba6e4\\receipt.json",
+      "selectedExpected": 2,
+      "missingIds": [],
+      "failedOrSkipped": [],
+      "complete": true
+    },
+    {
+      "group": "Durable native telemetry integration",
+      "project": "tests/PiSharp.Durable.Tests/PiSharp.Durable.Tests.csproj",
+      "expectedCount": 3,
+      "expectedIds": [
+        "telemetry-sqlite.native-host-binding",
+        "telemetry-sqlite.native-read-only-file-and-connection-ownership",
+        "telemetry-sqlite.native-read-only-missing-old-newer"
+      ],
+      "receipt": "E:\\AI\\PiSharp\\update-1.5.2\\artifacts\\gap-validation\\sync152-durable-stable-r1-9ca2a9f83c294217bfbf736d24cba6e4\\receipt.json",
+      "selectedExpected": 3,
+      "missingIds": [],
+      "failedOrSkipped": [],
+      "complete": true
+    },
+    {
+      "group": "Interactive small UI",
+      "project": "tests/PiSharp.InteractiveParity.Tests/PiSharp.InteractiveParity.Tests.csproj",
+      "expectedCount": 13,
+      "expectedIds": [
+        "sync152.ui.diff-keeps-shared-indent",
+        "sync152.ui.editor-swap-expanded-paste",
+        "sync152.ui.extension-window",
+        "sync152.ui.hugging-face-pending-selection",
+        "sync152.ui.paste-shortcuts",
+        "sync152.ui.provider-animation-disposes",
+        "sync152.ui.provider-order-brand",
+        "sync152.ui.syntax-new-file-types",
+        "sync152.ui.tree-focus-and-width",
+        "sync152.ui.model-refresh-all-False",
+        "sync152.ui.model-refresh-all-True",
+        "sync152.ui.model-refresh-query-False",
+        "sync152.ui.model-refresh-query-True"
+      ],
+      "receipt": "E:\\AI\\PiSharp\\update-1.5.2\\artifacts\\gap-validation\\sync152-interactiveparity-stable-r5-ed366380ef4f4e6a8c47b4ebcde1d197\\receipt.json",
+      "selectedExpected": 13,
+      "missingIds": [],
+      "failedOrSkipped": [],
+      "complete": true
+    },
+    {
+      "group": "Interactive UI flow",
+      "project": "tests/PiSharp.InteractiveParity.Tests/PiSharp.InteractiveParity.Tests.csproj",
+      "expectedCount": 5,
+      "expectedIds": [
+        "sync152.ui.cache-warm-adjacent-notices",
+        "sync152.ui.changelog-transform-factory",
+        "sync152.ui.invalid-changelog-marker-repair",
+        "sync152.ui.overlay-blocked-hidden-reset",
+        "sync152.ui.pending-bash-expansion-queue-settle"
+      ],
+      "receipt": "E:\\AI\\PiSharp\\update-1.5.2\\artifacts\\gap-validation\\sync152-interactiveparity-stable-r5-ed366380ef4f4e6a8c47b4ebcde1d197\\receipt.json",
+      "selectedExpected": 5,
+      "missingIds": [],
+      "failedOrSkipped": [],
+      "complete": true
+    },
+    {
+      "group": "Interactive session lifecycle",
+      "project": "tests/PiSharp.InteractiveParity.Tests/PiSharp.InteractiveParity.Tests.csproj",
+      "expectedCount": 5,
+      "expectedIds": [
+        "sync152.session.model-cycle-outside-scope",
+        "sync152.session.startup-fork-missing-folder",
+        "sync152.session.import-missing-folder-continue",
+        "sync152.session.import-missing-folder-fork",
+        "sync152.session.import-missing-folder-cancel"
+      ],
+      "receipt": "E:\\AI\\PiSharp\\update-1.5.2\\artifacts\\gap-validation\\sync152-interactiveparity-stable-r5-ed366380ef4f4e6a8c47b4ebcde1d197\\receipt.json",
+      "selectedExpected": 5,
+      "missingIds": [],
+      "failedOrSkipped": [],
+      "complete": true
+    },
+    {
+      "group": "Interactive Markdown payloads",
+      "project": "tests/PiSharp.InteractiveParity.Tests/PiSharp.InteractiveParity.Tests.csproj",
+      "expectedCount": 2,
+      "expectedIds": [
+        "sync152.markdown-custom-and-summary-payload-metadata",
+        "sync152.markdown-six-surface-contexts"
+      ],
+      "receipt": "E:\\AI\\PiSharp\\update-1.5.2\\artifacts\\gap-validation\\sync152-interactiveparity-stable-r5-ed366380ef4f4e6a8c47b4ebcde1d197\\receipt.json",
+      "selectedExpected": 2,
+      "missingIds": [],
+      "failedOrSkipped": [],
+      "complete": true
+    },
+    {
+      "group": "Lovely Mermaid complete capture and transformer",
+      "project": "tests/PiSharp.InteractiveParity.Tests/PiSharp.InteractiveParity.Tests.csproj",
+      "expectedCount": 2,
+      "expectedIds": [
+        "mermaid.lovely-0.3.3-matches-actual-library",
+        "mermaid.lovely-transformer-surfaces-styles-links"
+      ],
+      "receipt": "E:\\AI\\PiSharp\\update-1.5.2\\artifacts\\gap-validation\\sync152-interactiveparity-stable-r5-ed366380ef4f4e6a8c47b4ebcde1d197\\receipt.json",
+      "selectedExpected": 2,
+      "missingIds": [],
+      "failedOrSkipped": [],
+      "complete": true
+    },
+    {
+      "group": "Queued images and cache warming",
+      "project": "tests/PiSharp.CodingAgent.Tests/PiSharp.CodingAgent.Tests.csproj",
+      "expectedCount": 6,
+      "expectedIds": [
+        "codingagent.QueuedImageNormalizationTests.Content",
+        "codingagent.QueuedImageNormalizationTests.Delivery",
+        "codingagent.QueuedImageNormalizationTests.Removal",
+        "codingagent.QueuedImageNormalizationTests.Replay",
+        "codingagent.QueuedImageNormalizationTests.Retention",
+        "codingagent.QueuedImageNormalizationTests.Retirement"
+      ],
+      "receipt": "E:\\AI\\PiSharp\\update-1.5.2\\artifacts\\gap-validation\\sync152-codingagent-stable-r5-46007366a08946419ba357aafd456bf2\\receipt.json",
+      "selectedExpected": 6,
+      "missingIds": [],
+      "failedOrSkipped": [],
+      "complete": true
+    },
+    {
+      "group": "Tools changes",
+      "project": "tests/PiSharp.Tools.Tests/PiSharp.Tools.Tests.csproj",
+      "expectedCount": 9,
+      "expectedIds": [
+        "sync152.edit-large-file-window-and-before-write-failure",
+        "sync152.edit-mixed-eol-local-style-and-seams",
+        "sync152.find-cancellation-before-spawn",
+        "sync152.find-windows-glob-dot-smartcase-noext",
+        "sync152.ls-zero-negative-and-exact-limit",
+        "sync152.powershell51-exit-suffix-and-pwsh-exclusion",
+        "sync152.read-bounded-huge-line-and-snapshot",
+        "sync152.read-seekless-single-pass-ranges-and-decoding",
+        "sync152.read-stream-error-and-cancellation-dispose"
+      ],
+      "receipt": "E:\\AI\\PiSharp\\update-1.5.2\\artifacts\\gap-validation\\sync152-tools-stable-r2-467d73b8f5cf45b6a7d28274a9ed766c\\receipt.json",
+      "selectedExpected": 9,
+      "missingIds": [],
+      "failedOrSkipped": [],
+      "complete": true
+    },
+    {
+      "group": "Schema changes",
+      "project": "tests/PiSharp.Schema.Tests/PiSharp.Schema.Tests.csproj",
+      "expectedCount": 8,
+      "expectedIds": [
+        "sync152.bigint-conversion",
+        "sync152.bigint-exact-bounds",
+        "sync152.bigint-literals-and-unions",
+        "sync152.bigint-validation",
+        "sync152.finite-numbers",
+        "sync152.public-json-boundary",
+        "sync152.required-undefined",
+        "sync152.undefined-conversion"
+      ],
+      "receipt": "E:\\AI\\PiSharp\\update-1.5.2\\artifacts\\gap-validation\\sync152-schema-stable-r2-b66406aab054429bba26facd6d8061b5\\receipt.json",
+      "selectedExpected": 8,
+      "missingIds": [],
+      "failedOrSkipped": [],
+      "complete": true
+    },
+    {
+      "group": "TUI changes",
+      "project": "tests/PiSharp.Tui.Tests/PiSharp.Tui.Tests.csproj",
+      "expectedCount": 5,
+      "expectedIds": [
+        "sync152.alacritty-environment",
+        "sync152.cursor-markers-and-horizontal-slices",
+        "sync152.kitty-images-after-covered-row-writes",
+        "sync152.markdown-hidden-comments",
+        "sync152.paste-short-marker-renumbering"
+      ],
+      "receipt": "E:\\AI\\PiSharp\\update-1.5.2\\artifacts\\gap-validation\\sync152-tui-final-f77b69d8a7264838ab5c04ffcd30b409\\receipt.json",
+      "selectedExpected": 5,
+      "missingIds": [],
+      "failedOrSkipped": [],
+      "complete": true
+    },
+    {
+      "group": "Codemode references and finite values",
+      "project": "tests/PiSharp.Codemode.Tests/PiSharp.Codemode.Tests.csproj",
+      "expectedCount": 7,
+      "expectedIds": [
+        "sync152.refs.all-declaration-entrypoints",
+        "sync152.refs.codemode-empty-segment-compatibility",
+        "sync152.refs.strict-public-helper",
+        "sync152.nonfinite.process.start",
+        "sync152.nonfinite.process.execute",
+        "sync152.nonfinite.thread.start",
+        "sync152.nonfinite.thread.execute"
+      ],
+      "receipt": "E:\\AI\\PiSharp\\update-1.5.2\\artifacts\\gap-validation\\sync152-codemode-stable-r6-97baaab2781c46248562505e261cee96\\receipt.json",
+      "selectedExpected": 7,
+      "missingIds": [],
+      "failedOrSkipped": [],
+      "complete": true
+    },
+    {
+      "group": "CLI auth packages",
+      "project": "tests/PiSharp.CliParity.Tests/PiSharp.CliParity.Tests.csproj",
+      "expectedCount": 6,
+      "expectedIds": [
+        "sync152.auth.catalog-refresh-diagnostics",
+        "sync152.auth.radius-global-plan-and-shell-login",
+        "sync152.auth.unknown-logout-and-credential-kind",
+        "sync152.llama.network-detail-and-cancellation",
+        "sync152.mcp.command-scoped-provider-token-and-json",
+        "sync152.packages.oauth-refresh-warning-classification"
+      ],
+      "receipt": "E:\\AI\\PiSharp\\update-1.5.2\\artifacts\\gap-validation\\sync152-cliparity-stable-r6-a5d77ecf3dab450bb0827b529d127c04\\receipt.json",
+      "selectedExpected": 6,
+      "missingIds": [],
+      "failedOrSkipped": [],
+      "complete": true
+    },
+    {
+      "group": "Extension package results",
+      "project": "tests/PiSharp.ExtensionParity.Tests/PiSharp.ExtensionParity.Tests.csproj",
+      "expectedCount": 2,
+      "expectedIds": [
+        "sync152.package.aggregate-outcomes",
+        "sync152.package.results-are-changes-in-configured-order"
+      ],
+      "receipt": "E:\\AI\\PiSharp\\update-1.5.2\\artifacts\\gap-validation\\sync152-extensionparity-stable-full-r2-97ff33808d434af49b0f186b05c24a71\\receipt.json",
+      "selectedExpected": 2,
+      "missingIds": [],
+      "failedOrSkipped": [],
+      "complete": true
+    },
+    {
+      "group": "Node Markdown registration",
+      "project": "tests/PiSharp.ExtensionParity.Tests/PiSharp.ExtensionParity.Tests.csproj",
+      "expectedCount": 1,
+      "expectedIds": [
+        "bridge.sync152-markdown-registration-surfaces-and-isolation"
+      ],
+      "receipt": "E:\\AI\\PiSharp\\update-1.5.2\\artifacts\\gap-validation\\sync152-extensionparity-stable-full-r2-97ff33808d434af49b0f186b05c24a71\\receipt.json",
+      "selectedExpected": 1,
+      "missingIds": [],
+      "failedOrSkipped": [],
+      "complete": true
+    },
+    {
+      "group": "Provider strict session and cache routes",
+      "project": "tests/PiSharp.ProviderSync.Tests/PiSharp.ProviderSync.Tests.csproj",
+      "expectedCount": 6,
+      "expectedIds": [
+        "strict-session.anthropic-bedrock-share-state",
+        "strict-session.bounded-insertion-order-cleanup-and-concurrency",
+        "strict-session.failed-fallback-still-persists",
+        "strict-session.key-authenticated-and-prepared-requests-persist",
+        "strict-session.refusals-hooks-and-cancellation-do-not-persist",
+        "cache.provider-route-retention-and-summary-override"
+      ],
+      "receipt": "E:\\AI\\PiSharp\\update-1.5.2\\artifacts\\gap-validation\\sync152-providersync-stable-r2-206310925b74480ca7abc3f8d599a6ae\\receipt.json",
+      "selectedExpected": 6,
+      "missingIds": [],
+      "failedOrSkipped": [],
+      "complete": true
+    },
+    {
+      "group": "Anthropic released catalog binding",
+      "project": "tests/PiSharp.ProviderSync.Tests/PiSharp.ProviderSync.Tests.csproj",
+      "expectedCount": 4,
+      "expectedIds": [
+        "anthropic.catalog-explicit-overrides-and-raw-defaults",
+        "anthropic.catalog-optional-flags-and-affinity",
+        "anthropic.catalog-other-provider-isolation",
+        "anthropic.catalog-released-fable-wire-capabilities"
+      ],
+      "receipt": "E:\\AI\\PiSharp\\update-1.5.2\\artifacts\\gap-validation\\sync152-providersync-stable-r2-206310925b74480ca7abc3f8d599a6ae\\receipt.json",
+      "selectedExpected": 4,
+      "missingIds": [],
+      "failedOrSkipped": [],
+      "complete": true
+    },
+    {
+      "group": "Host data transaction telemetry",
+      "project": "tests/PiSharp.Chord.Tests/PiSharp.Chord.Tests.csproj",
+      "expectedCount": 1,
+      "expectedIds": [
+        "host.host-data.telemetry-counts-committed-documents-ops-rows-and-skips-noop"
+      ],
+      "receipt": "E:\\AI\\PiSharp\\update-1.5.2\\artifacts\\gap-validation\\sync152-chord-stable-r2-c3000e0f111e44a99fc41424e211d2a1\\receipt.json",
+      "selectedExpected": 1,
+      "missingIds": [],
+      "failedOrSkipped": [],
+      "complete": true
+    },
+    {
+      "group": "Env raw input ordering",
+      "project": "tests/PiSharp.Env.Process.Tests/PiSharp.Env.Process.Tests.csproj",
+      "expectedCount": 1,
+      "expectedIds": [
+        "raw-input-acknowledges-before-reading-and-preserves-frame-order"
+      ],
+      "receipt": "E:\\AI\\PiSharp\\update-1.5.2\\artifacts\\gap-validation\\sync152-env-process-stable-r1-f1070f8ffc7a4437847e2e4ba880a539\\receipt.json",
+      "selectedExpected": 1,
+      "missingIds": [],
+      "failedOrSkipped": [],
+      "complete": true
+    },
+    {
+      "group": "Chord Hosting new surfaces",
+      "project": "tests/PiSharp.Chord.Hosting.Tests/PiSharp.Chord.Hosting.Tests.csproj",
+      "expectedCount": 32,
+      "expectedIds": [
+        "plugins.152.discovery-and-build-tables",
+        "publication.152.retention",
+        "publication.152.build-once",
+        "publication.152.failure-http-isolation",
+        "publication.152.http-artifact",
+        "publication.152.scripts-round-trip",
+        "workers.152.captures-deployment",
+        "workers.152.failed-build-and-close",
+        "workers.152.close-during-build",
+        "workers.152.later-worker-and-cancelled-close",
+        "workers.152.link-recovery",
+        "workers.152.idle-lock-serializes-start",
+        "http.152.admission-and-headers",
+        "http.152.trace-trust",
+        "http.152.sockets-and-hooks",
+        "app.152.files",
+        "app.152.archives",
+        "app.152.layout",
+        "app.152.owner-links-and-caps",
+        "app.152.routes-and-invites",
+        "app.152.startup-and-recovery",
+        "app.152.session-expiry-and-ephemeral-links",
+        "app.152.base-build-isolation",
+        "app.152.telemetry-shutdown",
+        "app.152.cleanup-retains-store-and-lock",
+        "terminal.152.frames-and-filter",
+        "terminal.152.launcher-and-channel",
+        "terminal.152.confirmation-bounds-and-shutdown",
+        "terminal.152.actions-and-network",
+        "terminal.152.scope-and-optimistic",
+        "terminal.152.actual-attachment",
+        "terminal.152.native-runtime"
+      ],
+      "receipt": "E:\\AI\\PiSharp\\update-1.5.2\\artifacts\\gap-validation\\sync152-chord-hosting-stable-r5-627ee0d7605a4e5184d389ae46c15bf1\\receipt.json",
+      "selectedExpected": 32,
+      "missingIds": [],
+      "failedOrSkipped": [],
+      "complete": true
+    }
+  ],
+  "complete": true,
+  "mermaidInternalComparisons": {
+    "styles": 163,
+    "corpus": 541,
+    "requiredGroup": "mermaid.lovely-0.3.3-matches-actual-library"
+  }
+}

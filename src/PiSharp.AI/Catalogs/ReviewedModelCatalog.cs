@@ -9,14 +9,24 @@ namespace PiSharp.AI.Catalogs;
 /// The returned digest identifies the projected JSON, never the historical package shard.</summary>
 public static class ReviewedModelCatalog
 {
-    private static readonly JsonObject Bundle = Load();
-    public const string UpstreamCommit = "7d073328e44337d3292a7db9b0f0308f679c5e97";
+    private static readonly JsonObject[] Bundles = [Load("reviewed-2026-11-08.json"), Load("reviewed-2026-11-10.json")];
+    public const string UpstreamCommit = CurrentModelCatalog.SourceCommit;
+    public const string HistoricalReviewedCommit = "7d073328e44337d3292a7db9b0f0308f679c5e97";
     public static ImmutableArray<string> AdditionalProviders { get; } = ["qwen-token-plan-individual-cn"];
 
     public static FrozenModelCatalog? Apply(string provider, FrozenModelCatalog? baseline)
     {
-        var corrections = Bundle["corrections"]?[provider] as JsonObject;
-        var additions = Bundle["additions"]?[provider] as JsonArray;
+        // A complete newer release supersedes earlier reviewed corrections and additions,
+        // including models removed from that release. Explicit host/user layers still run later.
+        if (CurrentModelCatalog.Get(provider) is { } current) return current;
+        foreach (var bundle in Bundles) baseline = Apply(bundle, provider, baseline);
+        return baseline;
+    }
+
+    private static FrozenModelCatalog? Apply(JsonObject bundle, string provider, FrozenModelCatalog? baseline)
+    {
+        var corrections = bundle["corrections"]?[provider] as JsonObject;
+        var additions = bundle["additions"]?[provider] as JsonArray;
         if (corrections is null && additions is null) return baseline;
         var shard = baseline is null ? new JsonObject() : JsonNode.Parse(baseline.Raw.ToString())!.AsObject();
         if (corrections is not null)
@@ -26,6 +36,9 @@ public static class ReviewedModelCatalog
                     ?? throw new InvalidOperationException("Reviewed correction has no historical model: " + provider + "/" + id);
                 var metadata = entry!["metadata"]!.AsObject();
                 if (metadata["contextWindow"] is { } context) model["contextWindow"] = context.DeepClone();
+                // Prices are a complete reviewed replacement, including request-wide tiers.
+                // Merging only the base rates can silently retain stale or omit new tiers.
+                if (metadata["cost"] is JsonObject cost) model["cost"] = cost.DeepClone();
                 foreach (var field in new[] { "compat", "thinkingLevelMap" })
                     if (metadata[field] is JsonObject changes)
                     {
@@ -47,9 +60,9 @@ public static class ReviewedModelCatalog
         return FrozenModelCatalog.ReadProviderJson(provider, Encoding.UTF8.GetBytes(shard.ToJsonString()));
     }
 
-    private static JsonObject Load()
+    private static JsonObject Load(string name)
     {
-        using var stream = typeof(ReviewedModelCatalog).Assembly.GetManifestResourceStream("PiSharp.AI.Catalogs.reviewed-2026-11-08.json")
+        using var stream = typeof(ReviewedModelCatalog).Assembly.GetManifestResourceStream("PiSharp.AI.Catalogs." + name)
             ?? throw new InvalidOperationException("Reviewed catalog resource is missing.");
         using var reader = new StreamReader(stream, Encoding.UTF8);
         return JsonNode.Parse(reader.ReadToEnd())!.AsObject();

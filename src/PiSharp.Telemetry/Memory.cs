@@ -234,7 +234,7 @@ public sealed class InMemoryTelemetryContext(TimeProvider? timeProvider = null)
         return (root[0].GetDouble(), root[1].GetString()!);
     }
 
-    private double NowMs() => _time.GetUtcNow().ToUnixTimeMilliseconds();
+    private double NowMs() => TelemetryClock.Now(_time);
 
     private Task<T> Start<T>(Parent? parent, SpanOptions options, Func<ITelemetrySpan, Task<T>> callback)
     {
@@ -268,7 +268,7 @@ public sealed class InMemoryTelemetryContext(TimeProvider? timeProvider = null)
             lock (_gate)
             {
                 recorded.Settled = true;
-                recorded.EndedMs = recorded.StartedMs + _time.GetElapsedTime(recorded.Clock).TotalMilliseconds;
+                recorded.EndedMs = TelemetryClock.RoundMillisecondsToMicrosecond(recorded.StartedMs + _time.GetElapsedTime(recorded.Clock).TotalMilliseconds);
                 recorded.EndSequence = _nextEndSequence++;
             }
         }
@@ -312,7 +312,7 @@ public sealed class InMemoryTelemetryContext(TimeProvider? timeProvider = null)
         Carrier? carrier = null;
         if (context is not null) ContextCarriers.TryGetValue(context, out carrier);
         var measurement = new Measurement(kind, name, description, unit, boundaries, value, SpanAttributes.Copy(attributes), carrier);
-        lock (_gate) _measurements.Add((Math.Floor(NowMs() / 10_000) * 10_000, measurement));
+        lock (_gate) _measurements.Add((Math.Floor(_time.GetUtcNow().ToUnixTimeMilliseconds() / 10_000d) * 10_000, measurement));
     }
 
     /// <summary>An immutable carrier identity; <see cref="ToDictionary"/> returns a detached copy.</summary>
@@ -370,7 +370,7 @@ public sealed class InMemoryTelemetryContext(TimeProvider? timeProvider = null)
             ArgumentNullException.ThrowIfNull(name);
             var copy = SpanAttributes.Copy(attributes);
             lock (owner._gate)
-                if (!recorded.Settled) recorded.Events.Add((name, owner._time.GetElapsedTime(recorded.Clock).TotalMilliseconds, copy));
+                if (!recorded.Settled) recorded.Events.Add((name, TelemetryClock.RoundMillisecondsToMicrosecond(owner._time.GetElapsedTime(recorded.Clock).TotalMilliseconds), copy));
         }
 
         public void SetAttributes(SpanAttributes attributes)

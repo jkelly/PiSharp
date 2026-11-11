@@ -11,6 +11,8 @@ using System.Text.RegularExpressions;
 
 namespace PiSharp.Cli.Pi;
 
+internal enum MissingSessionCwdChoice { Continue, Fork }
+
 internal sealed record PiSessionInfo(string Path, string Id, string Cwd, string? Name, string? ParentSessionPath, DateTimeOffset Created,
     DateTimeOffset Modified, int MessageCount, string FirstMessage, string AllMessagesText);
 
@@ -280,7 +282,8 @@ internal static partial class PiSessions
 
     /// <summary>Source SessionManager.forkFrom: a new session in the target cwd's directory whose header names the source as parent,
     /// followed by every non-header entry of the source. Returns the new file.</summary>
-    internal static string ForkFrom(string sourcePath, string targetCwd, string? sessionDir, string agentDir, string? id = null, DateTimeOffset? now = null)
+    internal static string ForkFrom(string sourcePath, string targetCwd, string? sessionDir, string agentDir, string? id = null, DateTimeOffset? now = null,
+        string? parentSession = null)
     {
         var source = Path.GetFullPath(sourcePath); var target = Path.GetFullPath(targetCwd);
         var lines = File.Exists(source) ? File.ReadAllLines(source, new UTF8Encoding(false, false)) : [];
@@ -299,7 +302,7 @@ internal static partial class PiSessions
         var header = new JsonObject
         {
             ["type"] = "session", ["version"] = CurrentSessionVersion, ["id"] = sessionId, ["timestamp"] = timestamp,
-            ["cwd"] = target, ["parentSession"] = source
+            ["cwd"] = target, ["parentSession"] = parentSession ?? source
         };
         var text = new StringBuilder(PiJson.Stringify(header)).Append('\n');
         foreach (var entry in entries.Where(entry => Text(entry, "type") != "session")) text.Append(PiJson.Stringify(entry)).Append('\n');
@@ -312,7 +315,11 @@ internal static partial class PiSessions
     internal static string MissingCwdError(string sessionCwd, string? sessionFile, string fallbackCwd) =>
         $"Stored session working directory does not exist: {sessionCwd}{(sessionFile is null ? "" : $"\nSession file: {sessionFile}")}\nCurrent working directory: {fallbackCwd}";
 
-    /// <summary>Source formatMissingSessionCwdPrompt (IMPL-I shows it with Continue and Cancel).</summary>
+    /// <summary>Source formatMissingSessionCwdPrompt.</summary>
     internal static string MissingCwdPrompt(string sessionCwd, string fallbackCwd) =>
-        $"cwd from session file does not exist\n{sessionCwd}\n\ncontinue in current cwd\n{fallbackCwd}";
+        $"Session cwd does not exist: {sessionCwd}";
+
+    internal static IReadOnlyList<(string Label, MissingSessionCwdChoice? Value)> MissingCwdOptions(string fallbackCwd) =>
+        [($"Continue in {fallbackCwd} (asks again next time)", MissingSessionCwdChoice.Continue),
+         ($"Fork into {fallbackCwd} (new session ID, original kept)", MissingSessionCwdChoice.Fork), ("Cancel", null)];
 }

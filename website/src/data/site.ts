@@ -62,8 +62,10 @@ export const versions = {
 	baselineUrl: `${target.repository}/releases/tag/${published.tag}`,
 	/** The Pi release the port is currently being synced to. */
 	target: target.tag.replace(/^v/, ''),
+	targetCommit: target.commit,
+	targetUrl: `${target.repository}/tree/${target.commit}`,
 	/** Update by hand when Pi ships a new release. */
-	latestPi: '1.5.0',
+	latestPi: '1.5.2',
 };
 
 export const inSync = versions.baseline === versions.latestPi;

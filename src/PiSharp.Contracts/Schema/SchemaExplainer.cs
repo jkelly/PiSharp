@@ -6,6 +6,7 @@
 #pragma warning disable PISHARP_SCHEMA001 // the engine uses its own experimental types
 
 using System.Runtime.CompilerServices;
+using System.Numerics;
 
 namespace PiSharp.Contracts.Schema;
 
@@ -69,7 +70,7 @@ internal sealed class SchemaExplainer(SchemaCompiler c, object? schema)
         if (n.HasOwn("const") && !SchemaChecks.ConstCheck(n.GetOwn("const"))(v)) Push("const", $"expected {Js.Stringify(n.GetOwn("const"), 0) ?? "undefined"}");
         if (v is string s && type is not "bytes") WalkString(n, s, Push);
         if (v is byte[] bytes && type is "bytes") WalkBytes(n, bytes, Push);
-        if (v is double d) WalkNumber(n, d, Push);
+        if (v is double or BigInteger) WalkNumber(n, v, Push);
         if (v is JsObject o) WalkObject(n, b, o, path, output, Push);
         if (v is JsArray a) WalkArray(n, b, a, path, output, Push);
         if (n.GetOwn("allOf") is JsArray allOf) foreach (var sub in allOf) Walk(sub, b, v, path, output);
@@ -136,14 +137,16 @@ internal sealed class SchemaExplainer(SchemaCompiler c, object? schema)
         if (SchemaCompiler.Number(node, "maxLength") is { } maxLength && v.Length > maxLength) push("maxLength", $"expected at most {Num(maxLength)} bytes", null);
     }
 
-    private static void WalkNumber(JsObject node, double v, Action<string, string, string?> push)
+    private static void WalkNumber(JsObject node, object v, Action<string, string, string?> push)
     {
-        if (SchemaCompiler.Number(node, "minimum") is { } minimum && v < minimum) push("minimum", $"expected >= {Num(minimum)}", null);
-        if (SchemaCompiler.Number(node, "maximum") is { } maximum && v > maximum) push("maximum", $"expected <= {Num(maximum)}", null);
-        if (SchemaCompiler.Number(node, "exclusiveMinimum") is { } xmin && v <= xmin) push("exclusiveMinimum", $"expected > {Num(xmin)}", null);
-        if (SchemaCompiler.Number(node, "exclusiveMaximum") is { } xmax && v >= xmax) push("exclusiveMaximum", $"expected < {Num(xmax)}", null);
-        if (SchemaCompiler.Number(node, "multipleOf") is { } multipleOf && !SchemaChecks.IsMultiple(v, multipleOf)) push("multipleOf", $"expected a multiple of {Num(multipleOf)}", null);
+        if (SchemaCompiler.Bound(node, "minimum") is { } minimum && SchemaChecks.CompareNumbers(v, minimum) is < 0) push("minimum", $"expected >= {BoundText(minimum)}", null);
+        if (SchemaCompiler.Bound(node, "maximum") is { } maximum && SchemaChecks.CompareNumbers(v, maximum) is > 0) push("maximum", $"expected <= {BoundText(maximum)}", null);
+        if (SchemaCompiler.Bound(node, "exclusiveMinimum") is { } xmin && SchemaChecks.CompareNumbers(v, xmin) is <= 0) push("exclusiveMinimum", $"expected > {BoundText(xmin)}", null);
+        if (SchemaCompiler.Bound(node, "exclusiveMaximum") is { } xmax && SchemaChecks.CompareNumbers(v, xmax) is >= 0) push("exclusiveMaximum", $"expected < {BoundText(xmax)}", null);
+        if (SchemaCompiler.Bound(node, "multipleOf") is { } multipleOf && !SchemaChecks.IsMultiple(v, multipleOf)) push("multipleOf", $"expected a multiple of {BoundText(multipleOf)}", null);
     }
+
+    private static string BoundText(object value) => value is double d ? Num(d) : ((BigInteger)value).ToString(System.Globalization.CultureInfo.InvariantCulture);
 
     private void WalkObject(JsObject node, string b, JsObject v, string path, List<JsonSchemaValidationError> output, Action<string, string, string?> push)
     {
@@ -152,7 +155,9 @@ internal sealed class SchemaExplainer(SchemaCompiler c, object? schema)
         {
             foreach (var k in required)
             {
-                if (k is string key && v.GetOwn(key) is JsUndefined) push("required", "missing", Pointer(path, key));
+                if (k is not string key) continue;
+                var accepted = v.GetOwn(key) is JsUndefined && properties.HasOwn(key) && Ok(properties.GetOwn(key), b, Js.Undefined);
+                if (!v.HasOwn(key) || (v.GetOwn(key) is JsUndefined && !accepted)) push("required", "missing", Pointer(path, key));
             }
         }
 
@@ -374,7 +379,9 @@ internal sealed class SchemaExplainer(SchemaCompiler c, object? schema)
         null => "null",
         JsArray => "array",
         byte[] => "bytes",
+        BigInteger => "bigint",
         double d when Js.IsInteger(d) => "integer",
+        double d when !double.IsFinite(d) => Num(d),
         double => "number",
         string => "string",
         bool => "boolean",

@@ -96,7 +96,7 @@ public sealed class EnvDaemonSession : IAsyncDisposable
                 var entry = new Pending(request, cancelRequest);
                 pending[frame.Id] = entry; // Cancellation can observe the request before it enters any worker queue.
                 var op = frame.Json["op"] is JsonValue value && value.TryGetValue<string>(out var operationName) ? operationName : null;
-                if (op is "hello" or "ptyWrite" or "ptyResize" or "ptyForeground")
+                if (op is "hello" or "ptyWrite" or "ptyResize" or "ptyForeground" or "processWrite" or "processCloseStdin")
                 {
                     // Handshake is ordered before any subsequent operation.
                     entry.Task = ExecuteAsync(entry, op);

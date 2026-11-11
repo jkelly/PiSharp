@@ -18,12 +18,19 @@ internal sealed class CompactionSummaryMessageComponent : Box
     private bool expanded;
     private readonly JsonObject message;
     private readonly MarkdownTheme markdownTheme;
+    private readonly IReadOnlyList<MarkdownTransformer> markdownTransformers;
+    private readonly string? messageId;
+    private readonly string? timestamp;
 
-    public CompactionSummaryMessageComponent(JsonObject message, MarkdownTheme? markdownTheme = null, int outputPad = 1)
+    public CompactionSummaryMessageComponent(JsonObject message, MarkdownTheme? markdownTheme = null, int outputPad = 1,
+        IReadOnlyList<MarkdownTransformer>? markdownTransformers = null, string? messageId = null, string? timestamp = null)
         : base(outputPad, 1, t => theme.Bg("customMessageBg", t))
     {
         this.message = message;
         this.markdownTheme = markdownTheme ?? Themes.GetMarkdownTheme();
+        this.markdownTransformers = markdownTransformers ?? [];
+        this.messageId = messageId;
+        this.timestamp = timestamp;
         UpdateDisplay();
     }
 
@@ -54,8 +61,10 @@ internal sealed class CompactionSummaryMessageComponent : Box
         if (expanded)
         {
             var header = $"**Compacted from {tokenStr} tokens**\n\n";
-            content.AddChild(new Markdown(header + (message["summary"]?.ToString() ?? "undefined"), 0, 0, markdownTheme,
-                new DefaultTextStyle(Color: text => theme.Fg("customMessageText", text))));
+            var transform = MarkdownTransform.CreateMarkdownTransform(MarkdownMessageType.Summary, () => false, markdownTransformers, messageId, timestamp);
+            content.AddChild(new Markdown((message["summary"]?.ToString() ?? "undefined"), 0, 0, markdownTheme,
+                new DefaultTextStyle(Color: text => theme.Fg("customMessageText", text)),
+                new MarkdownOptions(Transform: (markdown, width) => header + transform(markdown, width))));
         }
         else
         {

@@ -45,6 +45,49 @@ internal static class Program
             Check(raw.Length == 18 && raw.Contains((byte)255) && raw.Contains((byte)240), "spill preserves raw BOM and malformed bytes");
             DeleteSpill(path);
         });
+        await Case("raw-input-acknowledges-before-reading-and-preserves-frame-order", async () =>
+        {
+            await using var connection = Connect();
+            using var output = new MemoryStream();
+            var gate = Path.Combine(Path.GetTempPath(), "pisharp-input-" + Guid.NewGuid().ToString("N"));
+            var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            uint id = 0; long session = 0;
+            var json = Request("gated-echo");
+            json["argv"] = new JsonArray(Command("--child", "gated-echo", gate).Select(value => (JsonNode?)JsonValue.Create(value)).ToArray());
+            var exited = connection.RequestAsync("process", json, new()
+            {
+                OnStart = (value, generation) => { id = value; session = generation; },
+                OnEvent = (evt, bytes) =>
+                {
+                    if (evt["kind"]?.GetValue<string>() == "started") started.TrySetResult();
+                    else if (evt["stream"]?.GetValue<string>() == "stdout") output.Write(bytes.Span);
+                },
+            });
+            try
+            {
+                await started.Task.WaitAsync(TimeSpan.FromSeconds(10));
+                var replies = new List<Task<RemoteReply>>();
+                using var expected = new MemoryStream();
+                for (var index = 0; index < 48; index++)
+                {
+                    var bytes = Enumerable.Repeat((byte)index, 64 * 1024).ToArray();
+                    expected.Write(bytes);
+                    replies.Add(connection.RequestAsync("processWrite", new() { ["target"] = id }, new() { Session = session, Payload = bytes }));
+                }
+                replies.Add(connection.RequestAsync("processCloseStdin", new() { ["target"] = id }, new() { Session = session }));
+                // The child cannot consume any byte yet. All replies, including EOF, acknowledge queue admission.
+                await Task.WhenAll(replies).WaitAsync(TimeSpan.FromSeconds(5));
+                await File.WriteAllTextAsync(gate, "read");
+                Check((await exited.WaitAsync(TimeSpan.FromSeconds(15))).Json["exitCode"]!.GetValue<int>() == 7, "queued EOF reaches child");
+                Check(output.ToArray().SequenceEqual(expected.ToArray()), "raw requests retain frame order through blocked pipe and EOF");
+                Check((await Throws<RemoteError>(() => connection.RequestAsync("processWrite", new() { ["target"] = id }))).Code == "EBADF", "input after exit rejected");
+            }
+            finally
+            {
+                if (!exited.IsCompleted) connection.Kill(id, session);
+                File.Delete(gate);
+            }
+        });
         await Case("window-counts-tail-and-spill-complete", async () =>
         {
             await using var connection = Connect();
@@ -158,6 +201,9 @@ internal static class Program
             case "echo":
                 await Console.OpenStandardInput().CopyToAsync(stdout); await stdout.FlushAsync();
                 await stderr.WriteAsync(new byte[] { 255, 0, 13, 10 }); return 7;
+            case "gated-echo":
+                while (!File.Exists(args[1])) await Task.Delay(10);
+                await Console.OpenStandardInput().CopyToAsync(stdout); await stdout.FlushAsync(); return 7;
             case "utf8":
                 await stdout.WriteAsync(new byte[] { 239, 187, 191, 97, 226 }); await stdout.FlushAsync(); await Task.Delay(50);
                 await stderr.WriteAsync(Encoding.UTF8.GetBytes("separate\n")); await stderr.FlushAsync();

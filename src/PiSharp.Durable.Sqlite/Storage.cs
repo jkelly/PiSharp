@@ -3,8 +3,8 @@
 // Group-commit internals now follow the frozen 2026 upstream commit.ts/statements.ts (see Commit.cs).
 // The queries, orderings and JSON columns are upstream's. Records are stored as their JSON text (Chord JsonValue.ToJson, which matches
 // JSON.stringify), and indexed strings (task kinds, request IDs, document kinds and keys) are stored JSON-encoded, as upstream does to
-// keep lone UTF-16 surrogates lossless. Batch validation is shared with MemoryStorage (StorageRules): each check reads the rows it needs
-// once for the group, then applies the same rule sequentially in memory, in upstream's order. Upstream also exports this class from storage/sqlite/index.ts.
+// keep lone UTF-16 surrogates lossless. Batch validation uses StorageRules for IDs and a SQLite-local document check so only created
+// addresses need prefetching; each group applies upstream's rules sequentially in memory. Upstream also exports this class from storage/sqlite/index.ts.
 // Every table name comes from one SqliteSchema, rendered with the optional prefix of SqliteStorageOptions (upstream's
 // SqliteStorageOptions.prefix), and openNodeSqliteStorage's prefix check before the file opens (packages/durable/src/storage/sqlite/node.ts)
 // is OpenAsync(path, options). Group checks decode stored state before semantic-refusal handling. Copy reads flush accepted writes

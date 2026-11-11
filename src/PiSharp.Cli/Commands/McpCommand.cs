@@ -44,7 +44,12 @@ internal sealed record McpCommandOptions(string Cwd, string AgentDirectory)
     public Func<string, bool> IsProjectTrusted { get; init; } = _ => false;
 
     internal McpSessionHost CreateSessionHost() => new(AgentDirectory, HomeDirectory, ProcessEnvironment)
-    { CreateHttpHandler = HttpHandler is { } handler ? () => handler : null, Credentials = Credentials, CreateChannel = CreateChannel };
+    {
+        CreateHttpHandler = HttpHandler is { } handler ? () => handler : null, Credentials = Credentials, CreateChannel = CreateChannel,
+        ProviderToken = (provider, token) => McpProviderTokens.ResolveAsync(new LiveSessionRuntime(Environment, () => HttpHandler,
+            Path.Combine(AgentDirectory, "auth.json"), () => HttpHandler is { } handler ? new HttpClient(handler, disposeHandler: false) : new HttpClient(),
+            ModelsPath: Path.Combine(AgentDirectory, "models.json")), provider, token)
+    };
 }
 
 /// <summary>`mcp`: add, remove and check MCP servers and sign in to them outside a session. Agents run it through bash to
@@ -404,6 +409,7 @@ internal static class McpCommand
             if (entry.Override is { } overridden) report["override"] = overridden;
             var exposure = entry.Config.Exposure.ToString().ToLowerInvariant();
             report["enabled"] = entry.Config.Enabled; report["exposure"] = exposure; report["transport"] = DescribeTransport(entry);
+            if (entry.Config.AuthProvider is { } authProvider) report["authProvider"] = authProvider;
             report["state"] = "disabled"; report["tools"] = new JsonArray();
             if (!entry.Config.Enabled) return report;
             McpServerRuntime? runtime = null;
@@ -506,7 +512,8 @@ internal static class McpCommand
             {
                 log($"Sign in to MCP server \"{name}\" in your browser:\n{authorizationUrl.AbsoluteUri}");
                 openUrl(authorizationUrl.AbsoluteUri);
-            }, readRedirectUrl), AdmittedHttpClientRequestFactory.Create(client)) { Challenge = connected.Challenge }, timeout.Token).ConfigureAwait(false);
+            }, readRedirectUrl), AdmittedHttpClientRequestFactory.Create(client))
+            { Challenge = connected.Challenge, RefreshLock = McpOAuthRefreshLock.For(options.AgentDirectory, name, url) }, timeout.Token).ConfigureAwait(false);
         }
         catch (Exception signInError)
         {

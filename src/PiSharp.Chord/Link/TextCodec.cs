@@ -23,7 +23,7 @@ internal sealed class TextCodec : ICodec
             HelloMessage x => "[\"h\","+N(x.Protocol)+","+Q(x.Incarnation)+","+N(x.Calls)+"]",
             HoldMessage x => Hold(x),
             ReleaseMessage x => "[\"R\","+N(x.Hold)+"]",
-            CallMessage x => Payload("[\"c\","+N(x.Call)+","+N(x.Hold)+","+N(x.Method)+"]",x.Args,x.Segments),
+            CallMessage x => Call(x),
             AbortMessage x => "[\"x\","+N(x.Call)+"]",
             BoundMessage x => "[\"b\","+List(x.Holds,e=>"["+N(e.Hold)+","+N(e.Variant)+","+List(e.Members,p=>"["+N(p.Member)+","+Parts.Tagged(p.Value)+"]")+FailedField(e.Failed)+"]")+"]",
             StateMessage x => "[\"s\","+List(x.Holds,e=>"["+N(e.Hold)+","+List(e.Members,p=>"["+N(p.Member)+","+Parts.Tagged(p.Ops)+"]")+(e.Retired.Count==0 ? FailedField(e.Failed) : ","+Failures(e.Failed)+","+List(e.Retired,N))+"]")+"]",
@@ -41,9 +41,17 @@ internal sealed class TextCodec : ICodec
     }
     private static string Hold(HoldMessage x)
     {
-        var optional = new List<string> { J(x.Principal), x.Incarnation is null ? "null" : Q(x.Incarnation), x.Chain is null ? "null" : List(x.Chain,Q), x.Limit is null ? "null" : N(x.Limit.Value) };
+        var optional = new List<string> { J(x.Principal), x.Incarnation is null ? "null" : Q(x.Incarnation), x.Chain is null ? "null" : List(x.Chain,Q), x.Limit is null ? "null" : N(x.Limit.Value), x.Trace is null ? "null" : J(MessageCheck.CarrierJson(x.Trace)) };
         while(optional.Count>0 && optional[^1]=="null") optional.RemoveAt(optional.Count-1);
         return "[\"H\","+N(x.Hold)+","+Q(x.Type)+","+N(x.Version)+","+Q(x.Fingerprint)+","+Parts.Tagged(x.Params)+",["+Q(x.Address.Kind)+","+J(x.Address.Params)+"]"+(optional.Count==0 ? "" : ","+string.Join(",",optional))+"]";
+    }
+    private static string Call(CallMessage x)
+    {
+        var head = "[\"c\","+N(x.Call)+","+N(x.Hold)+","+N(x.Method);
+        if (x.Trace is null && x.Old != true) return Payload(head+"]",x.Args,x.Segments);
+        return head+","+(x.Args is null ? "null" : Parts.Tagged(x.Args))+","+
+            (x.Segments is null ? "null" : List(x.Segments,s=>N(s.Length)))+","+
+            (x.Trace is null ? "null" : J(MessageCheck.CarrierJson(x.Trace)))+(x.Old == true ? ",true" : "")+"]";
     }
     public byte[] Encode(Message message)
     {
@@ -73,13 +81,23 @@ internal sealed class TextCodec : ICodec
         {
             case "h": Arity(f,4); return new HelloMessage(Num(1),Str(2),Num(3));
             case "H":
-                Arity(f,7,8,9,10,11); var a=Array(f[6]); Arity(a,2);
+                Arity(f,7,8,9,10,11,12); var a=Array(f[6]); Arity(a,2);
                 var principal=f.Count>7 ? f[7]?.DeepClone() : null; var incarnation=f.Count>8 && f[8] is not null ? Str(8) : null;
                 var chain=f.Count>9 && f[9] is not null ? Array(f[9]).Select(String).ToArray() : null;
                 long? limit=f.Count>10 && f[10] is not null ? Num(10) : null;
-                return new HoldMessage(Num(1),Str(2),Num(3),Str(4),Parts.FromTagged(f[5]),new WireAddress(String(a[0]),a[1]?.DeepClone()),principal,incarnation,chain,limit);
+                var trace=f.Count>11 && f[11] is not null ? MessageCheck.ReadCarrier(f[11]) : null;
+                return new HoldMessage(Num(1),Str(2),Num(3),Str(4),Parts.FromTagged(f[5]),new WireAddress(String(a[0]),a[1]?.DeepClone()),principal,incarnation,chain,limit,trace);
             case "R": Arity(f,2); return new ReleaseMessage(Num(1));
-            case "c": Arity(f,4,5,6); var args=ReadPayload(f,4,rest); return new CallMessage(Num(1),Num(2),Num(3),args.Part,args.Segments);
+            case "c":
+                Arity(f,4,5,6,7,8);
+                if (f.Count < 7) { var args=ReadPayload(f,4,rest); return new CallMessage(Num(1),Num(2),Num(3),args.Part,args.Segments); }
+                var fields = new JsonArray();
+                if (f[4] is not null) { fields.Add(f[4]!.DeepClone()); if (f[5] is not null) fields.Add(f[5]!.DeepClone()); }
+                var tracedArgs=ReadPayload(fields,0,rest);
+                var callTrace=f[6] is null ? null : MessageCheck.ReadCarrier(f[6]);
+                bool? old=null;
+                if (f.Count==8) old=f[7] is JsonValue flag && flag.TryGetValue<bool>(out var value) && value ? true : throw MessageCheck.Invalid("old");
+                return new CallMessage(Num(1),Num(2),Num(3),tracedArgs.Part,tracedArgs.Segments,callTrace,old);
             case "x": Arity(f,2); return new AbortMessage(Num(1));
             case "b":
                 Arity(f,2); return new BoundMessage(Array(f[1]).Select(raw=>

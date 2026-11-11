@@ -38,7 +38,7 @@ internal sealed class SettingsConfig
     public string SessionShareDestination { get; init; } = "auto";
     public int HttpIdleTimeoutMs { get; init; } = 300_000;
     /// <summary>"off" | "streaming" | "idle".</summary>
-    public string CacheWarmingMode { get; init; } = "streaming";
+    public string CacheWarmingMode { get; init; } = "idle";
     public string ThinkingLevel { get; init; } = "medium";
     public IReadOnlyList<string> AvailableThinkingLevels { get; init; } = [];
     /// <summary>"provider/modelId" to thinking level.</summary>

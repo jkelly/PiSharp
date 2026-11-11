@@ -152,7 +152,7 @@ public sealed partial class BedrockConverseStreamTransport : IChatTransport, ITh
     public async Task<HttpRequestMessage> CreateRequestAsync(ChatRequest request, CancellationToken cancellationToken = default)
     {
         var resolved = await ResolveAsync(cancellationToken).ConfigureAwait(false);
-        var body = Encoding.UTF8.GetBytes(BodyText(BuildBody(request, resolved, false, out _)));
+        var body = Encoding.UTF8.GetBytes(BodyText(BuildBody(request, resolved, StrictToolLimits.HasExceeded(request.SessionId), out _)));
         return CreateHttpRequest(resolved, body, ClientIdentities.Merge(_options.Identity, request.Identity));
     }
 
@@ -247,7 +247,7 @@ public sealed partial class BedrockConverseStreamTransport : IChatTransport, ITh
             try
             {
                 var resolved = await ResolveAsync(token).ConfigureAwait(false);
-                for (var disablePreferredStrictTools = false; ; )
+                for (var disablePreferredStrictTools = StrictToolLimits.HasExceeded(request.SessionId); ; )
                 {
                     var payload = BuildBody(request, resolved, disablePreferredStrictTools, out var hasPreferredStrictTools);
                     if (_options.OnPayload is { } hook && await hook(JsonData.Parse(BodyText(payload)), request.Model, token).ConfigureAwait(false) is { } replaced)
@@ -261,6 +261,7 @@ public sealed partial class BedrockConverseStreamTransport : IChatTransport, ITh
                         rejected is { Modeled: true, Name: "ValidationException" } && ProviderTranscript.IsStrictToolLimitErrorMessage(rejected.Message))
                     {
                         disablePreferredStrictTools = true;
+                        StrictToolLimits.MarkExceeded(request.SessionId);
                         state.AddDiagnostic(new JsonObject
                         {
                             ["type"] = "bedrock_strict_tools_fallback", ["timestamp"] = _environment.Time.GetUtcNow().ToUnixTimeMilliseconds(),

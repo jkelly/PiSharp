@@ -1,6 +1,7 @@
 using PiSharp.Cli.Interactive.Mode.Components;
 using PiSharp.Cli.Interactive.Mode.Mermaid;
 using PiSharp.Cli.Interactive.Mode.Mermaid.Differential;
+using LovelyRenderer = PiSharp.Cli.Interactive.Mode.LovelyMermaid.LovelyMermaid;
 using static Expect;
 
 /// <summary>modes/interactive/components/mermaid.ts over the grok-mermaid 0.2.3 port. The port is compared with goldens the original
@@ -25,7 +26,7 @@ internal static class MermaidCases
     {
         const string source = "graph LR\n  A[Start] --> B[End]";
         var markdown = "Before\n\n```mermaid\n" + source + "\n```\n\nAfter\n";
-        var art = GrokMermaid.Render(source) ?? throw new InvalidOperationException("The sample diagram did not render.");
+        var art = LovelyRenderer.Render(source) ?? throw new InvalidOperationException("The sample diagram did not render.");
         // marked 18 lexes paragraph "Before", space "\n\n", the code block (raw without its trailing newline), space "\n\n", paragraph.
         var expected = "Before\n\n" + string.Join("  \n", art.Plain.Select(MermaidTransformer.CodeSpan)) + "\n" + "\n\nAfter\n";
         var mode = "streaming";
@@ -43,7 +44,7 @@ internal static class MermaidCases
         // A diagram with warnings keeps its source and gains the first warning (and the count of the others) as a code span.
         mode = "streaming";
         const string broken = "graph TD\n  A --> B\n  this is not mermaid";
-        var warned = GrokMermaid.Render(broken);
+        var warned = LovelyRenderer.Render(broken);
         if (warned is { Warnings.Count: > 0 })
         {
             var raw = "```mermaid\n" + broken + "\n```";

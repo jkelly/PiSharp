@@ -1,4 +1,4 @@
-// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/codemode/src/declarations.ts.
+// Pi b4afdddf44e059c67ccf5097e5317d913521b470 (MIT): packages/codemode/src/declarations.ts.
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using PiSharp.Contracts;
@@ -132,19 +132,17 @@ public static partial class CodemodeDeclarations
         public int Expansions { get; set; }
     }
 
-    private static JsonElement? ResolveRef(string reference, JsonElement root)
+    /// <summary>Resolves a local schema reference against <paramref name="root"/>. Invalid URI escapes, missing members,
+    /// non-schema targets and remote references return null. URI decoding precedes JSON Pointer unescaping; empty pointer
+    /// segments are ignored for compatibility with codemode declarations.</summary>
+    public static JsonElement? ResolveSchemaRef(string reference, JsonElement root)
     {
         if (reference != "#" && !reference.StartsWith("#/", StringComparison.Ordinal)) return null;
-        var current = root;
-        foreach (var segment in (reference.Length > 2 ? reference[2..] : "").Split('/').Where(segment => segment.Length > 0))
-        {
-            string key;
-            try { key = Uri.UnescapeDataString(segment).Replace("~1", "/", StringComparison.Ordinal).Replace("~0", "~", StringComparison.Ordinal); }
-            catch (UriFormatException) { return null; }
-            if (current.ValueKind != JsonValueKind.Object || !Get(current, key, out var next)) return null;
-            current = next;
-        }
-        return current.ValueKind is JsonValueKind.True or JsonValueKind.False or JsonValueKind.Object ? current : null;
+        // The shared metadata resolver retains empty keys. Codemode has always ignored raw empty segments;
+        // adapt only those segments so URI decoding and strict UTF-8 validation remain shared.
+        var path = reference == "#" ? "" : string.Join("/", reference[2..].Split('/', StringSplitOptions.RemoveEmptyEntries));
+        var normalized = path.Length == 0 ? "#" : "#/" + path;
+        return LocalSchemaReferences.TryResolve(normalized, root, out var target) ? target : null;
     }
 
     private static string ToType(JsonElement schema, Context context, string? typeOverride = null)
@@ -156,7 +154,7 @@ public static partial class CodemodeDeclarations
         {
             var reference = refValue.GetString()!;
             if (context.Resolving.Contains(reference) || context.Expansions >= MaxRefExpansions) return "unknown";
-            if (ResolveRef(reference, context.Root) is not { } target) return "unknown";
+            if (ResolveSchemaRef(reference, context.Root) is not { } target) return "unknown";
             context.Expansions++; context.Resolving.Add(reference);
             try { return ToType(target, context); }
             finally { context.Resolving.Remove(reference); }

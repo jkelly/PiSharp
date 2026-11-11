@@ -13,6 +13,12 @@ using PiSharp.Telemetry;
 
 namespace PiSharp.Chord;
 
+/// <summary>A typed identity for an invocation-scoped value.</summary>
+public sealed class ContextKey<T>(string name)
+{
+    public string Name { get; } = name;
+}
+
 /// <summary>Immutable invocation-scoped values passed explicitly through Chord v2's operations (upstream <c>Context</c>). Every
 /// derivation returns a new context and leaves its parent unchanged.</summary>
 public sealed class ChordContext
@@ -20,6 +26,8 @@ public sealed class ChordContext
     private readonly ChordContext? parent;
     private readonly string? name;
     private readonly string? key;
+    private readonly object? valueKey;
+    private readonly object? value;
 
     private ChordContext(string name)
     {
@@ -41,6 +49,27 @@ public sealed class ChordContext
         key = "chord.abortSignal";
         Telemetry = parent.Telemetry;
         AbortSignal = abortSignal;
+    }
+
+    private ChordContext(ChordContext parent, object identity, object? value, string name)
+    {
+        this.parent = parent; valueKey = identity; this.value = value; key = name;
+        Telemetry = parent.Telemetry; AbortSignal = parent.AbortSignal;
+    }
+
+    /// <summary>Adds a value without changing cancellation or telemetry.</summary>
+    public static ChordContext WithValue<T>(ContextKey<T> key, T value, ChordContext context)
+    {
+        ArgumentNullException.ThrowIfNull(key); ArgumentNullException.ThrowIfNull(context);
+        return new(context, key, value, key.Name);
+    }
+
+    /// <summary>Reads the nearest value associated with a key.</summary>
+    public T? Value<T>(ContextKey<T> key)
+    {
+        for (ChordContext? at = this; at is not null; at = at.parent)
+            if (ReferenceEquals(at.valueKey, key)) return (T?)at.value;
+        return default;
     }
 
     /// <summary>The empty root context for work with no caller (<c>BACKGROUND_CONTEXT</c>).</summary>

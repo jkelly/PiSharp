@@ -8,6 +8,8 @@ import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { resolveSourceLock } from "./source-lock.mjs";
+import { readSourceFiles } from "./git-source.mjs";
 
 const repo = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const index = process.argv.indexOf("--upstream");
@@ -35,8 +37,11 @@ check(text("rev-parse", `${sha}^{tree}`) === target.source.tree && text("rev-par
 const rows = target.artifacts.filter(row => row.kind === "source-file");
 const paths = new Set(rows.map(row => row.path));
 check(paths.size === rows.length, "Unique target source files");
+const sourceFiles = readSourceFiles(upstream, sha, [...paths]);
 for (const row of rows) {
-  const blob = git("show", `${sha}:${row.path}`);
+  const sourceFile = sourceFiles.get(row.path);
+  check(sourceFile?.gitBlob === row.gitBlob, `Canonical Git blob ${row.path}`);
+  const blob = sourceFile.bytes;
   const checkout = readFileSync(resolve(upstream, row.path));
   check(sha256(blob) === row.sha256 && blob.length === row.bytes && sha256(checkout) === row.checkoutSha256 && checkout.length === row.checkoutBytes,
     `Canonical blob and checkout bytes ${row.path}`);
@@ -45,11 +50,17 @@ const archive = git("archive", "--format=tar", sha);
 const lockedArchive = target.artifacts.find(row => row.kind === "source-archive");
 check(sha256(archive) === lockedArchive.sha256 && archive.length === lockedArchive.bytes, "Reproduced canonical source tar SHA256");
 
-for (const name of ["surfaces", "parity"]) check(read(`compatibility/${name}.json`).sourceSha === sha, `${name}.json names the target baseline`);
+const inventory = read("compatibility/surfaces.json");
+const inventoryLock = resolveSourceLock(read, target, inventory.sourceSha);
+const inventorySha = inventoryLock.source.commit;
+const inventoryPaths = new Set(inventoryLock.artifacts.filter(row => row.kind === "source-file").map(row => row.path));
+for (const name of ["surfaces", "parity"]) check(read(`compatibility/${name}.json`).sourceSha === inventorySha, `${name}.json names its preserved source baseline`);
 for (const row of read("compatibility/surfaces.json").requirements)
-  check(row.source.sha === sha && row.source.url === `https://github.com/earendil-works/pi/blob/${sha}/${row.source.path}` && paths.has(row.source.path), `Pinned source link ${row.id}`);
+  check(row.source.sha === inventorySha && row.source.url === `https://github.com/earendil-works/pi/blob/${inventorySha}/${row.source.path}` && inventoryPaths.has(row.source.path), `Pinned source link ${row.id}`);
 const release = read("compatibility/public-release.json");
-check(release.upstream.tag === target.source.tag && release.upstream.commit === sha, "Release record names the target baseline");
+const releaseLock = resolveSourceLock(read, target, release.upstream.commit);
+check(release.upstream.tag === releaseLock.source.tag, "Release record names its preserved source baseline");
 
 console.log(JSON.stringify({ sourceSha: sha, tag: target.source.tag, evidenceSourceSha: evidence.source.commit,
+  inventorySourceSha: inventorySha, publishedReleaseSourceSha: releaseLock.source.commit,
   verifiedSourceFiles: rows.length, sourceArchiveVerified: true, checksPassed: checks.length }, null, 2));

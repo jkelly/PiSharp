@@ -96,9 +96,13 @@ internal sealed class StartupUi(string agentDir, string cwd, Func<string, string
         return chosen is null ? null : options.FirstOrDefault(option => option.Label == chosen);
     }
 
-    /// <summary>promptForMissingSessionCwd: Continue (the fallback cwd) or Cancel.</summary>
-    public Task<string?> PromptForMissingSessionCwdAsync(string prompt, string fallbackCwd, CancellationToken token = default) =>
-        ShowStartupSelectorAsync<string>(prompt, [("Continue", fallbackCwd), ("Cancel", null!)], token);
+    /// <summary>promptForMissingSessionCwd: continue once, fork into this folder, or cancel.</summary>
+    public async Task<MissingSessionCwdChoice?> PromptForMissingSessionCwdAsync(string prompt, string fallbackCwd, CancellationToken token = default)
+    {
+        var choice = await ShowStartupSelectorAsync<string>(prompt,
+            PiSessions.MissingCwdOptions(fallbackCwd).Select(option => (option.Label, option.Value?.ToString()!)).ToList(), token);
+        return Enum.TryParse<MissingSessionCwdChoice>(choice, out var value) ? value : null;
+    }
 
     /// <summary>selectSession: the TUI session selector for --resume; null when cancelled.</summary>
     public Task<string?> SelectSessionAsync(ImmutableArray<PiSessionInfo> current, Func<ImmutableArray<PiSessionInfo>> all, CancellationToken token) =>

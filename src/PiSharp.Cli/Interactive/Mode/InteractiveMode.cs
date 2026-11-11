@@ -230,7 +230,7 @@ internal sealed partial class InteractiveMode
             {
                 chatContainer.AddChild(new ThemedText(() => theme.Bold(theme.Fg("accent", "What's New")), 1, 0));
                 chatContainer.AddChild(new Spacer(1));
-                chatContainer.AddChild(new Markdown(TextUtils.JsTrim(changelogMarkdown), 1, 0, GetMarkdownThemeWithSettings()));
+                chatContainer.AddChild(GetChangelogMarkdown(TextUtils.JsTrim(changelogMarkdown)));
                 chatContainer.AddChild(new Spacer(1));
             }
         }
@@ -246,7 +246,7 @@ internal sealed partial class InteractiveMode
             {
                 chatContainer.AddChild(new ThemedText(() => theme.Bold(theme.Fg("accent", "Extension Updates")), 1, 0));
                 chatContainer.AddChild(new Spacer(1));
-                chatContainer.AddChild(new Markdown(string.Join("\n\n", extensionChangelogUpdates.Select(update => update.Markdown)), 1, 0, GetMarkdownThemeWithSettings()));
+                chatContainer.AddChild(GetChangelogMarkdown(string.Join("\n\n", extensionChangelogUpdates.Select(update => update.Markdown))));
                 chatContainer.AddChild(new Spacer(1));
             }
         }
@@ -547,6 +547,11 @@ internal sealed partial class InteractiveMode
         {
             settings.SetLastChangelogVersion(version);
             context.ReportInstallTelemetry(version, settings);
+            return null;
+        }
+        if (!Changelog.TryParseVersion(lastVersion, out _))
+        {
+            settings.SetLastChangelogVersion(version);
             return null;
         }
         var newEntries = context.GetNewChangelogEntries(entries, lastVersion);

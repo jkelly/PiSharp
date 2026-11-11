@@ -15,6 +15,11 @@ internal sealed record InteractiveStartup(string AgentDir, string Home, string C
 /// <summary>Filled by the RPC host when its session is ready; read by the interactive mode.</summary>
 internal sealed class InteractiveHostLink
 {
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, string> imports = new(
+        OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal);
+    internal void TrackImport(string copiedPath, string sourcePath) => imports[Path.GetFullPath(copiedPath)] = Path.GetFullPath(sourcePath);
+    internal string? ImportSource(string copiedPath) => imports.GetValueOrDefault(Path.GetFullPath(copiedPath));
+    internal void ReleaseImport(string copiedPath) => imports.TryRemove(Path.GetFullPath(copiedPath), out _);
     private Func<PiSharp.CodingAgent.PersistentAgentSession?>? currentSession;
     private readonly TaskCompletionSource ready = new(TaskCreationOptions.RunContinuationsAsynchronously);
     public Task Ready => ready.Task;
@@ -24,6 +29,7 @@ internal sealed class InteractiveHostLink
     /// <summary>interactive-mode.ts bindCurrentSessionExtensions commandContextActions newSession/fork: what the mode does around an
     /// extension's ctx.newSession()/ctx.fork() (set by the mode, called by the session host).</summary>
     public InteractiveExtensionSessionActions? ExtensionSessionActions { get; set; }
+    public Func<string, string, CancellationToken, Task<MissingSessionCwdChoice?>>? ChooseMissingSessionCwd { get; set; }
     public void Publish(Func<PiSharp.CodingAgent.PersistentAgentSession?> session, object? profile)
     {
         currentSession = session; Profile = profile; ready.TrySetResult();

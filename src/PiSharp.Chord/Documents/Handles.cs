@@ -14,6 +14,8 @@
 //   The keyed handle's reads pass the slot an Access, its token and version (upstream passes the handle itself).
 using System.Text.Json.Nodes;
 using PiSharp.Chord.State;
+using PiSharp.Chord.Contracts;
+using PiSharp.Chord.Data;
 
 namespace PiSharp.Chord.Documents;
 
@@ -65,6 +67,61 @@ public interface IKeyedHandle
 
     /// <summary>One transaction that retires the document at <paramref name="key"/> (a no-op when absent).</summary>
     Task RetireAsync(string key, ChordContext context);
+}
+
+/// <summary>Documents whose keys are addresses of one declared host kind.</summary>
+public interface IHostKeyedHandle
+{
+    HostKind KeyHost { get; }
+    Task<JsonObject?> GetAsync(Address key, ChordContext context);
+    IAsyncEnumerable<Address> Keys(ChordContext context);
+    Task<IWatchHandle<JsonNode?>?> WatchAsync(Address key, ChordContext context);
+    IWatchable<JsonNode?> At(Address key);
+    Task<TResult> ChangeAsync<TResult>(Address key, Func<JsonObject, TResult> change, ChordContext context);
+    Task ChangeAsync(Address key, Action<JsonObject> change, ChordContext context);
+    Task RetireAsync(Address key, ChordContext context);
+}
+
+/// <summary>The address boundary around the existing string-keyed storage and watch machinery.</summary>
+internal sealed class HostKeyed(IKeyedHandle inner, HostKind kind) : IHostKeyedHandle
+{
+    internal IKeyedHandle Inner { get; } = inner;
+    public HostKind KeyHost { get; } = kind;
+
+    internal string Key(Address key) => ContractsInternal.KeyOfAddress(KeyHost, key)
+        ?? throw DataInternal.Invalid("args", $"expected an address of {KeyHost.Kind}");
+
+    public Task<JsonObject?> GetAsync(Address key, ChordContext context)
+    {
+        try { return Inner.GetAsync(Key(key), context); }
+        catch (Exception error) { return Task.FromException<JsonObject?>(error); }
+    }
+    public async IAsyncEnumerable<Address> Keys(ChordContext context)
+    {
+        await foreach (var key in Inner.Keys(context).ConfigureAwait(false))
+            yield return ContractsInternal.AddressOfKey(KeyHost, key);
+    }
+    public Task<IWatchHandle<JsonNode?>?> WatchAsync(Address key, ChordContext context)
+    {
+        try { return Inner.WatchAsync(Key(key), context); }
+        catch (Exception error) { return Task.FromException<IWatchHandle<JsonNode?>?>(error); }
+    }
+    public IWatchable<JsonNode?> At(Address key) => Inner.At(Key(key));
+    public Task<TResult> ChangeAsync<TResult>(Address key, Func<JsonObject, TResult> change, ChordContext context)
+    {
+        try { return Inner.ChangeAsync(Key(key), change, context); }
+        catch (Exception error) { return Task.FromException<TResult>(error); }
+    }
+    public Task ChangeAsync(Address key, Action<JsonObject> change, ChordContext context)
+    {
+        try { return Inner.ChangeAsync(Key(key), change, context); }
+        catch (Exception error) { return Task.FromException(error); }
+    }
+    public Task RetireAsync(Address key, ChordContext context)
+    {
+        try { return Inner.RetireAsync(Key(key), context); }
+        catch (Exception error) { return Task.FromException(error); }
+    }
 }
 
 /// <summary>

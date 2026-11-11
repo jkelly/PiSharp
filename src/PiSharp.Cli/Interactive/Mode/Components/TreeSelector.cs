@@ -1111,15 +1111,18 @@ internal sealed class TreeSelectorComponent : Container, IComponent, IFocusable,
     }
 
     /// <summary>Component that displays the current search query.</summary>
-    private sealed class SearchLine(TreeList treeList) : IComponent
+    private sealed class SearchLine(TreeList treeList) : IComponent, IFocusable
     {
+        public bool Focused { get; set; }
         public void Invalidate() { }
 
         public List<string> Render(int width)
         {
+            if (width <= 0) return [""];
             var query = treeList.GetSearchQuery();
-            if (query.Length > 0) return [TextUtils.TruncateToWidth($"  {theme.Fg("muted", "Type to search:")} {theme.Fg("accent", query)}", width)];
-            return [TextUtils.TruncateToWidth($"  {theme.Fg("muted", "Type to search:")}", width)];
+            var line = $"  {theme.Fg("muted", "Type to search:")} " + (query.Length > 0 ? theme.Fg("accent", query) : "");
+            if (!Focused) return [TextUtils.TruncateToWidth(line, width)];
+            return [TextUtils.TruncateToWidth(line, Math.Max(0, width - 1)) + TuiBase.CursorMarker + TuiBase.RenderFakeCursor(" ")];
         }
     }
 
@@ -1263,6 +1266,7 @@ internal sealed class TreeSelectorComponent : Container, IComponent, IFocusable,
     }
 
     private readonly TreeList treeList;
+    private readonly SearchLine searchLine;
     private LabelInput? labelInput;
     private readonly Container labelInputContainer;
     private readonly Container treeContainer;
@@ -1277,6 +1281,7 @@ internal sealed class TreeSelectorComponent : Container, IComponent, IFocusable,
         set
         {
             focused = value;
+            searchLine.Focused = value && labelInput is null;
             // Propagate to labelInput when it's active
             if (labelInput is not null) labelInput.Focused = value;
         }
@@ -1306,7 +1311,8 @@ internal sealed class TreeSelectorComponent : Container, IComponent, IFocusable,
         AddChild(new DynamicBorder());
         AddChild(new Text(theme.Bold("  Session Tree"), 1, 0));
         AddChild(new TreeHelp());
-        AddChild(new SearchLine(treeList));
+        searchLine = new SearchLine(treeList);
+        AddChild(searchLine);
         AddChild(new DynamicBorder());
         AddChild(new Spacer(1));
         AddChild(treeContainer);
@@ -1329,6 +1335,7 @@ internal sealed class TreeSelectorComponent : Container, IComponent, IFocusable,
         labelInput.OnCancel = HideLabelInput;
 
         // Propagate current focused state to the new labelInput
+        searchLine.Focused = false;
         labelInput.Focused = focused;
 
         treeContainer.Clear();
@@ -1339,6 +1346,7 @@ internal sealed class TreeSelectorComponent : Container, IComponent, IFocusable,
     private void HideLabelInput()
     {
         labelInput = null;
+        searchLine.Focused = focused;
         labelInputContainer.Clear();
         treeContainer.Clear();
         treeContainer.AddChild(treeList);

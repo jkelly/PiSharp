@@ -185,14 +185,15 @@ internal static class InteractiveModeCases
             await pi.WaitFor("Hello from the fake model.");
             var state = await pi.Mode!.Rpc.RequestAsync(new System.Text.Json.Nodes.JsonObject { ["type"] = "get_state" });
             Equal("low", state?["thinkingLevel"]?.GetValue<string>(), "level after reload and a turn");
-            // C13 (upstream 7860ff52): the next prompt records the effective selection, preserving the original off entry.
+            // Pi 1.5.2 compares the recorded selection after clamping: off already runs as low on this model,
+            // so a prompt must preserve the requested off value without appending a redundant low checkpoint.
             var entries = InteractiveHarness.ReadShared(session).Split('\n', StringSplitOptions.RemoveEmptyEntries)
                 .Select(line => System.Text.Json.Nodes.JsonNode.Parse(line)!).ToArray();
             var changes = entries.Where(entry => entry["type"]?.GetValue<string>() == "thinking_level_change").ToArray();
-            Equal("off,low", string.Join(',', changes.Select(entry => entry["thinkingLevel"]!.GetValue<string>())), "exactly the original and one effective checkpoint");
+            Equal("off", string.Join(',', changes.Select(entry => entry["thinkingLevel"]!.GetValue<string>())), "exactly the original requested selection");
             var prompt = entries.Single(entry => entry["message"]?["role"]?.GetValue<string>() == "user" &&
                 entry["message"]?["content"]?[0]?["text"]?.GetValue<string>() == "after reload");
-            Check(Array.IndexOf(entries, changes[1]) < Array.IndexOf(entries, prompt), "effective checkpoint precedes prompt execution");
+            Check(Array.IndexOf(entries, changes[0]) < Array.IndexOf(entries, prompt), "the prompt retains the original requested selection in its ancestry");
             Check(InteractiveHarness.ReadShared(session).StartsWith(original, StringComparison.Ordinal), "earlier session bytes stay unchanged");
         });
         yield return ("e2e.slash.model-switch-clamps-thinking", Case("model-clamped", async pi =>
@@ -702,11 +703,11 @@ internal static class InteractiveModeCases
                 if (answer == "cancel")
                 {
                     Equal(0, await pi.Exit(), "cancel exits 0");
-                    Equal($"cwd from session file does not exist\n{missing}\n\ncontinue in current cwd\n{pi.Cwd}", asked, "prompt text");
+                    Equal($"Session cwd does not exist: {missing}", asked, "prompt text");
                     return;
                 }
                 await pi.WaitFor("escape interrupt");
-                Contains(asked ?? "", "continue in current cwd", "prompted");
+                Contains(asked ?? "", "Session cwd does not exist:", "prompted");
                 await pi.Submit("still here");
                 await pi.WaitFor("Hello from the fake model.");
                 await pi.WaitUntil(_ => InteractiveHarness.ReadShared(sessionFile).Contains("still here", StringComparison.Ordinal), "entries appended to the session file");

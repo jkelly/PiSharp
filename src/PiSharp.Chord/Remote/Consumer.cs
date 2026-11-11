@@ -7,11 +7,14 @@ namespace PiSharp.Chord.Remote;
 
 internal sealed class ConsumerSide(HostLink link)
 {
-    private sealed class Outgoing(long hold, long method, Part? args, IReadOnlyList<ReadOnlyMemory<byte>>? segments)
+    private sealed class Outgoing(long hold, long method, Part? args, IReadOnlyList<ReadOnlyMemory<byte>>? segments,
+        IReadOnlyDictionary<string, string>? trace, bool old)
     {
         internal readonly long Hold = hold, Method = method;
         internal readonly Part? Args = args;
         internal readonly IReadOnlyList<ReadOnlyMemory<byte>>? Segments = segments;
+        internal readonly IReadOnlyDictionary<string, string>? Trace = trace;
+        internal readonly bool Old = old;
         internal readonly TaskCompletionSource<object?> Completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
         internal long? Id;
         internal CancellationTokenRegistration Abort;
@@ -23,11 +26,11 @@ internal sealed class ConsumerSide(HostLink link)
     private readonly List<Outgoing> waiting = [];
     private long nextHold, nextCall, limit;
     private bool closed;
-    internal long Attach(RemoteObject holder)
+    internal long Attach(RemoteObject holder, IReadOnlyDictionary<string, string>? trace = null)
     {
         var id = nextHold++; entries.Add(id, holder);
         var request = holder.Request with { Hold = id };
-        request = request with { Chain = holder.ActivationChain };
+        request = request with { Chain = holder.ActivationChain, Trace = trace };
         if (link.Role == LinkRole.Route && holder.Caller.Principal is not null)
             request = request with { Principal = holder.Caller.Principal, Incarnation = holder.Caller.Incarnation };
         link.Send(request); return id;
@@ -42,7 +45,7 @@ internal sealed class ConsumerSide(HostLink link)
             var payload = Parts.Payload(args, data.Args.Bytes); segments = payload.Segments;
             part = link.Role == LinkRole.Parent ? new Part.Text(payload.Json) : link.Part(payload.Json);
         }
-        var call = new Outgoing(hold, method, part, segments);
+        var call = new Outgoing(hold, method, part, segments, ChordTelemetry.CarrierOf(context.Telemetry), link.Host.OldWork.Of(context));
         if (context.AbortSignal is { } token)
             call.Abort = token.Register(() => link.Host.Dispatcher.Post(() =>
             {
@@ -59,7 +62,7 @@ internal sealed class ConsumerSide(HostLink link)
             var call = waiting[0]; waiting.RemoveAt(0);
             if (call.Completion.Task.IsCompleted) continue;
             var id = nextCall++; call.Id = id; calls.Add(id, call);
-            link.Send(new CallMessage(id, call.Hold, call.Method, call.Args, call.Segments));
+            link.Send(new CallMessage(id, call.Hold, call.Method, call.Args, call.Segments, call.Trace, call.Old ? true : null));
         }
     }
     private void Cancel(Outgoing call)
@@ -80,6 +83,13 @@ internal sealed class ConsumerSide(HostLink link)
     private void FailWaiting(long hold, Exception error)
     {
         foreach (var call in waiting.Where(x => x.Hold == hold).ToArray()) { waiting.Remove(call); call.Reject(error); }
+    }
+    private void FailCalls(long hold, Exception error)
+    {
+        FailWaiting(hold, error);
+        foreach (var (id, call) in calls.Where(x => x.Value.Hold == hold).ToArray())
+        { calls.Remove(id); call.Reject(error); }
+        Drain();
     }
     internal async Task MessageAsync(Message message)
     {
@@ -120,9 +130,14 @@ internal sealed class ConsumerSide(HostLink link)
             Adopt(adopted); foreach (var (holder, error) in oversized) holder.TooLarge(error); link.Send(new AckMessage());
         }
         else if (message is LoadingMessage loading && entries.TryGetValue(loading.Hold, out var loadingHolder))
-        { FailWaiting(loading.Hold, Unavailable()); loadingHolder.Loading(); }
+        {
+            // Queued calls still carry indexes from the old variant. Only calls
+            // already sent have a provider that can finish them across rebinding.
+            FailWaiting(loading.Hold, new ChordError("unavailable", $"hold {loading.Hold}: rebinding"));
+            loadingHolder.Loading();
+        }
         else if (message is FailedMessage failed && entries.TryGetValue(failed.Hold, out var failedHolder))
-        { FailWaiting(failed.Hold, DataInternal.AsChordError(failed.Cause.Error.ToException(), "remote hold")); failedHolder.Failed(failed); }
+        { FailCalls(failed.Hold, DataInternal.AsChordError(failed.Cause.Error.ToException(), "remote hold")); failedHolder.Failed(failed); }
         else if (message is GoneMessage gone && entries.TryGetValue(gone.Hold, out var goneHolder)) goneHolder.Lost(DataInternal.AsChordError(gone.Error.ToException(), "remote hold"));
         else if (message is ResultMessage result) await Reply(result.Call, result, null);
         else if (message is ErrorMessage error) await Reply(error.Call, null, error);

@@ -1,0 +1,1282 @@
+{
+  "schemaVersion": 1,
+  "eligible": true,
+  "scope": "Current-source local suite acceptance; no whole-product, hosted, live-provider, cross-platform or publication claim.",
+  "source": {
+    "tag": "v1.5.2",
+    "commit": "b4afdddf44e059c67ccf5097e5317d913521b470",
+    "tree": "ed418d79cb44d3690f110e1077c4612db033f2c9"
+  },
+  "status": "tested-with-limitations",
+  "limitations": [
+    "Execution evidence is local and platform-scoped; hosted, other-platform and live-provider acceptance are not inferred.",
+    "The pre-existing complete legacy fixture checker is not closed: six standalone fixture families require dedicated registration/verification handlers and its final gate requires the exact historical Node 24.19.0 executable. Current dedicated source/applicability checks are separate."
+  ],
+  "problems": [],
+  "ledger": {
+    "path": "AI_DOCS/sync-1.5.2-source-validation.json",
+    "sha256": "43dc9aae61cfaeeb4eae5a857f49d5a9d908c4041ef6cffa89df737b5413013f"
+  },
+  "coverage": {
+    "path": "AI_DOCS/sync-1.5.2-source-coverage.json",
+    "sha256": "7c6f8b4ee894ffe0baece99ae67dad6b28912d09aa5efe94ccc8cd8dd2c2ff45"
+  },
+  "packageValidation": {
+    "status": "pending-not-asserted",
+    "record": "AI_DOCS/sync-1.5.2-packaging.json",
+    "note": "Packaging is a later, separately recorded stage. This source acceptance does not claim package or install validation."
+  },
+  "applicabilityInput": {
+    "path": "compatibility/sync-1.5.2-applicability.json",
+    "sha256": "ddfdd2420f83669fe413f651bb09535f0d15ad559163f20771f05c9e4208aa5d"
+  },
+  "policySha256": "5c3686be07774717ec5ee4ed51a90cfbe4d36ead1c38fe9477df06a3b26dca8d",
+  "catalog": {
+    "provenance": "src/PiSharp.AI/Catalogs/Releases/1.5.2.provenance.json",
+    "provenanceSha256": "9051ecae6b2f09db92563bd9e1304ebbf9e457652411fede2b48dd2c621b5422",
+    "report": "AI_DOCS/agent-reports/sync-1.5.2-catalog.md",
+    "reportSha256": "78cbe471cba90f7de6e0748b1885a07e375cc53a3258a76a7e396ac9800a6498",
+    "tarball": {
+      "url": "https://registry.npmjs.org/@earendil-works/pi-ai/-/pi-ai-1.5.2.tgz",
+      "integrity": "sha512-2tWPSnV3qzfiDIY3aWluBag3vC++Vs+VsXt/UquSU5onPMohPih72FUhIhaqmDdMYubOgB3Byl9uF4Vk40JLvQ==",
+      "sha256": "d5715efa834c23bfdf10a042b49df4ee169cc99000bf16d7998fab2d533b45f8"
+    },
+    "providerCount": 43,
+    "entries": {
+      "chat": 1643,
+      "image": 66,
+      "classifier": 64
+    }
+  },
+  "workPackages": {
+    "META": {
+      "status": "tested",
+      "suites": [
+        "Models",
+        "ExtensionParity"
+      ],
+      "limitations": []
+    },
+    "AI": {
+      "status": "tested",
+      "suites": [
+        "Models",
+        "ModelRuntime",
+        "ProviderSync",
+        "ProviderApis",
+        "OpenAICompatibilityGap",
+        "AnthropicResolved",
+        "AnthropicThreads",
+        "AnthropicSimple",
+        "AnthropicProfile",
+        "AnthropicAuthSync",
+        "AzureResponses",
+        "AzureSimple",
+        "NativeModelCatalog",
+        "ClassifierConfig",
+        "Classifiers",
+        "Agent"
+      ],
+      "limitations": []
+    },
+    "CLI": {
+      "status": "tested-with-limitations",
+      "suites": [
+        "CliParity",
+        "CodingAgent",
+        "SessionParity",
+        "InteractiveParity",
+        "ExtensionParity",
+        "Tools",
+        "Agent",
+        "Rpc",
+        "DurableMessages"
+      ],
+      "limitations": [
+        "CliParity: unix.posix-spawn-own-process-group-cwd-environment-and-stdio-pipes: SKIPPED_PLATFORM",
+        "CliParity: unix.posix-spawn-children-see-stdin-eof-and-inherit-no-parent-pipe-ends: SKIPPED_PLATFORM",
+        "CliParity: unix.runner-refuses-a-missing-executable-or-working-directory-before-launching: SKIPPED_PLATFORM",
+        "CliParity: unix.runner-timeout-and-cancel-kill-the-whole-process-group: SKIPPED_PLATFORM",
+        "CliParity: unix.pi-entry-bash-tool-runs-and-timeout-kills-the-tree: SKIPPED_PLATFORM",
+        "CliParity: session-format.extension: SKIPPED_PLATFORM",
+        "CliParity: session-format.extensionmessage: SKIPPED_PLATFORM",
+        "CliParity: session-format.extensionnavigate: SKIPPED_PLATFORM",
+        "CliParity: session-format.forklabels: SKIPPED_PLATFORM",
+        "CliParity: session-format.override-openrouter: SKIPPED_PLATFORM",
+        "CliParity: sync150.macos-stop-group-before-kill.no-next-command-after-stop: SKIPPED_PLATFORM",
+        "CliParity: sync150.trust-saved-decision-wins-over-auto-trust: SKIPPED_PLATFORM",
+        "InteractiveParity: util.clipboard-command.binary-output: Unix-only case.",
+        "InteractiveParity: util.clipboard-command.unicode-input: Unix-only case.",
+        "InteractiveParity: util.paths.canonicalize-symlinks: Unix-only case.",
+        "InteractiveParity: util.paths.posix-literal-percent: Unix-only case.",
+        "InteractiveParity: x11-clipboard.xvfb-reads-text-images-and-incr: X11 cases need Linux.",
+        "InteractiveParity: x11-clipboard.xvfb-stalled-owner-fails-after-the-deadline: X11 cases need Linux.",
+        "Tools: INFO symlink fixture unavailable: IOException"
+      ]
+    },
+    "CODEMODE": {
+      "status": "tested",
+      "suites": [
+        "Codemode"
+      ],
+      "limitations": []
+    },
+    "SCHEMA": {
+      "status": "tested",
+      "suites": [
+        "Schema"
+      ],
+      "limitations": []
+    },
+    "DURABLE": {
+      "status": "tested-with-limitations",
+      "suites": [
+        "Durable",
+        "Chord.Durable.Integration",
+        "Durable.Hosting",
+        "Durable.Server",
+        "DurableMessages"
+      ],
+      "limitations": [
+        "Durable: compat.reverse.upstream-reads-pisharp-sessions: PISHARP_DURABLE_UPSTREAM unset",
+        "Durable: plan.symlink-escape.file-link: this process cannot create symbolic links (Windows needs SeCreateSymbolicLinkPrivilege or Developer Mode): A required privilege is not held by the client. : 'C:\\Users\\jksof\\AppData\\Local\\Temp\\pisharp-durable\\interaction-scope-file-link-367403d1d2164b58a7080a511a4796e4\\plans\\1\\link.txt'.",
+        "Durable: plan.symlink-escape.dangling-final: this process cannot create symbolic links (Windows needs SeCreateSymbolicLinkPrivilege or Developer Mode): A required privilege is not held by the client. : 'C:\\Users\\jksof\\AppData\\Local\\Temp\\pisharp-durable\\interaction-scope-dangling-f226710c1ca34e268273df6a0f242c54\\plans\\1\\dangling.txt'.",
+        "Durable: plan.symlink-escape.intermediate-dir-link: this process cannot create symbolic links (Windows needs SeCreateSymbolicLinkPrivilege or Developer Mode): A required privilege is not held by the client. : 'C:\\Users\\jksof\\AppData\\Local\\Temp\\pisharp-durable\\interaction-scope-dir-link-016475ad24aa4708b062477996f02c9a\\plans\\1\\sub'."
+      ]
+    },
+    "STORAGE": {
+      "status": "tested-with-limitations",
+      "suites": [
+        "Durable",
+        "Chord",
+        "Chord.Durable.Integration"
+      ],
+      "limitations": [
+        "Durable: compat.reverse.upstream-reads-pisharp-sessions: PISHARP_DURABLE_UPSTREAM unset",
+        "Durable: plan.symlink-escape.file-link: this process cannot create symbolic links (Windows needs SeCreateSymbolicLinkPrivilege or Developer Mode): A required privilege is not held by the client. : 'C:\\Users\\jksof\\AppData\\Local\\Temp\\pisharp-durable\\interaction-scope-file-link-367403d1d2164b58a7080a511a4796e4\\plans\\1\\link.txt'.",
+        "Durable: plan.symlink-escape.dangling-final: this process cannot create symbolic links (Windows needs SeCreateSymbolicLinkPrivilege or Developer Mode): A required privilege is not held by the client. : 'C:\\Users\\jksof\\AppData\\Local\\Temp\\pisharp-durable\\interaction-scope-dangling-f226710c1ca34e268273df6a0f242c54\\plans\\1\\dangling.txt'.",
+        "Durable: plan.symlink-escape.intermediate-dir-link: this process cannot create symbolic links (Windows needs SeCreateSymbolicLinkPrivilege or Developer Mode): A required privilege is not held by the client. : 'C:\\Users\\jksof\\AppData\\Local\\Temp\\pisharp-durable\\interaction-scope-dir-link-016475ad24aa4708b062477996f02c9a\\plans\\1\\sub'."
+      ]
+    },
+    "ENV": {
+      "status": "tested-with-limitations",
+      "suites": [
+        "Env.Adapter",
+        "Env.Connection",
+        "Env.Daemon",
+        "Env.Process",
+        "Env.Ssh",
+        "Env.Terminal",
+        "Env.Watch"
+      ],
+      "limitations": [
+        "Env.Daemon: raw FIFO daemon exits after EOF and SIGTERM: SKIP Unix raw FIFO EOF/SIGTERM regression on Windows",
+        "Env.Daemon: SKIP Unix raw FIFO EOF/SIGTERM regression on Windows"
+      ]
+    },
+    "MCP": {
+      "status": "tested",
+      "suites": [
+        "McpSync",
+        "McpParity",
+        "McpTuiOriginalQualification",
+        "Extensions.ContractTests"
+      ],
+      "limitations": []
+    },
+    "TUI": {
+      "status": "tested-with-limitations",
+      "suites": [
+        "Tui",
+        "Tui.Editor",
+        "InteractiveParity"
+      ],
+      "limitations": [
+        "InteractiveParity: util.clipboard-command.binary-output: Unix-only case.",
+        "InteractiveParity: util.clipboard-command.unicode-input: Unix-only case.",
+        "InteractiveParity: util.paths.canonicalize-symlinks: Unix-only case.",
+        "InteractiveParity: util.paths.posix-literal-percent: Unix-only case.",
+        "InteractiveParity: x11-clipboard.xvfb-reads-text-images-and-incr: X11 cases need Linux.",
+        "InteractiveParity: x11-clipboard.xvfb-stalled-owner-fails-after-the-deadline: X11 cases need Linux."
+      ]
+    },
+    "TELEMETRY": {
+      "status": "tested",
+      "suites": [
+        "Telemetry",
+        "Chord"
+      ],
+      "limitations": []
+    },
+    "CHORD": {
+      "status": "tested",
+      "suites": [
+        "Chord",
+        "Chord.Hosting",
+        "Chord.Legacy.Cluster"
+      ],
+      "limitations": []
+    },
+    "C-K": {
+      "status": "tested",
+      "suites": [
+        "Chord"
+      ],
+      "limitations": []
+    },
+    "C-W": {
+      "status": "tested",
+      "suites": [
+        "Chord"
+      ],
+      "limitations": []
+    },
+    "C-HD": {
+      "status": "tested",
+      "suites": [
+        "Chord",
+        "Chord.Durable.Integration"
+      ],
+      "limitations": []
+    },
+    "C-STORE": {
+      "status": "tested-with-limitations",
+      "suites": [
+        "Chord",
+        "Durable",
+        "Chord.Durable.Integration"
+      ],
+      "limitations": [
+        "Durable: compat.reverse.upstream-reads-pisharp-sessions: PISHARP_DURABLE_UPSTREAM unset",
+        "Durable: plan.symlink-escape.file-link: this process cannot create symbolic links (Windows needs SeCreateSymbolicLinkPrivilege or Developer Mode): A required privilege is not held by the client. : 'C:\\Users\\jksof\\AppData\\Local\\Temp\\pisharp-durable\\interaction-scope-file-link-367403d1d2164b58a7080a511a4796e4\\plans\\1\\link.txt'.",
+        "Durable: plan.symlink-escape.dangling-final: this process cannot create symbolic links (Windows needs SeCreateSymbolicLinkPrivilege or Developer Mode): A required privilege is not held by the client. : 'C:\\Users\\jksof\\AppData\\Local\\Temp\\pisharp-durable\\interaction-scope-dangling-f226710c1ca34e268273df6a0f242c54\\plans\\1\\dangling.txt'.",
+        "Durable: plan.symlink-escape.intermediate-dir-link: this process cannot create symbolic links (Windows needs SeCreateSymbolicLinkPrivilege or Developer Mode): A required privilege is not held by the client. : 'C:\\Users\\jksof\\AppData\\Local\\Temp\\pisharp-durable\\interaction-scope-dir-link-016475ad24aa4708b062477996f02c9a\\plans\\1\\sub'."
+      ]
+    },
+    "C-SYNC": {
+      "status": "tested",
+      "suites": [
+        "Chord"
+      ],
+      "limitations": []
+    },
+    "C-HTTP": {
+      "status": "tested",
+      "suites": [
+        "Chord.Hosting"
+      ],
+      "limitations": []
+    },
+    "C-PL": {
+      "status": "tested",
+      "suites": [
+        "Chord.Hosting"
+      ],
+      "limitations": []
+    },
+    "C-WK": {
+      "status": "tested",
+      "suites": [
+        "Chord.Hosting"
+      ],
+      "limitations": []
+    },
+    "C-A1": {
+      "status": "tested",
+      "suites": [
+        "Chord.Hosting"
+      ],
+      "limitations": []
+    },
+    "C-A2": {
+      "status": "tested",
+      "suites": [
+        "Chord.Hosting"
+      ],
+      "limitations": []
+    },
+    "C-A3": {
+      "status": "tested",
+      "suites": [
+        "Chord.Hosting",
+        "Chord"
+      ],
+      "limitations": []
+    },
+    "C-SUR": {
+      "status": "tested",
+      "suites": [
+        "Chord"
+      ],
+      "limitations": []
+    },
+    "C-PUB": {
+      "status": "tested",
+      "suites": [
+        "Chord.Hosting",
+        "Chord"
+      ],
+      "limitations": []
+    },
+    "C-TEL": {
+      "status": "tested",
+      "suites": [
+        "Telemetry",
+        "Chord",
+        "Chord.Hosting"
+      ],
+      "limitations": []
+    },
+    "C-LEGACY": {
+      "status": "tested",
+      "suites": [
+        "Chord.Legacy.Cluster",
+        "Chord"
+      ],
+      "limitations": []
+    },
+    "C-JS": {
+      "status": "no-op",
+      "suites": []
+    },
+    "C-TERM": {
+      "status": "tested",
+      "suites": [
+        "Chord.Hosting"
+      ],
+      "limitations": []
+    }
+  },
+  "suites": {
+    "Models": {
+      "suite": "Models",
+      "eligible": true,
+      "status": "tested",
+      "limitations": [],
+      "receipt": "artifacts/gap-validation/sync152-models-stable-r4-d3e6d1480d2e41b59224d14062926e80/receipt.json",
+      "receiptSha256": "29eb60c4b0e51ba59f1812ce9df163f8b24f4d219cfbb66f806775874051d9db",
+      "sourceFingerprint": "7ed880b7324eb84e91646a827d556f88a22449c5a6d8c6e092787f1f103383cb",
+      "platform": {
+        "os": "Microsoft Windows 10.0.26300",
+        "architecture": "X64"
+      },
+      "selectedCount": 124,
+      "evidenceKind": "console-json",
+      "recordedResult": "passed",
+      "caseStatusCounts": {
+        "PASS_AUTHORED_NATIVE_ONLY": 124
+      }
+    },
+    "ExtensionParity": {
+      "suite": "ExtensionParity",
+      "eligible": true,
+      "status": "tested",
+      "limitations": [],
+      "receipt": "artifacts/gap-validation/sync152-extensionparity-stable-full-r2-97ff33808d434af49b0f186b05c24a71/receipt.json",
+      "receiptSha256": "8f68b7dbdceae10271f81f098ea5da45bd472892b6eb3baf7f2f44313ee9f562",
+      "sourceFingerprint": "b7bb3b47bb38f5b16c0f979c1de7003a62deaac5c5e51cf740dc0d0155335a2e",
+      "platform": {
+        "os": "Microsoft Windows 10.0.26300",
+        "architecture": "X64"
+      },
+      "selectedCount": 158,
+      "evidenceKind": "console-json",
+      "recordedResult": "passed",
+      "caseStatusCounts": {
+        "PASS_AUTHORED_NATIVE_ONLY": 158
+      }
+    },
+    "ModelRuntime": {
+      "suite": "ModelRuntime",
+      "eligible": true,
+      "status": "tested",
+      "limitations": [],
+      "receipt": "artifacts/gap-validation/sync152-modelruntime-stable-r4-39155149e88e4a919e53965d7eb43daf/receipt.json",
+      "receiptSha256": "eafcbdc0129da66c51b93b2d97c68cbb3a4e4cb5b0474278f2000ea3b42249eb",
+      "sourceFingerprint": "a57b793590d0b8f7ad7606f14a65d02a215ff7bc81e6e4b642b35dcf9d6fadee",
+      "platform": {
+        "os": "Microsoft Windows 10.0.26300",
+        "architecture": "X64"
+      },
+      "selectedCount": 22,
+      "evidenceKind": "console-json",
+      "recordedResult": "passed",
+      "caseStatusCounts": {
+        "PASS_AUTHORED_NATIVE_ONLY": 22
+      }
+    },
+    "ProviderSync": {
+      "suite": "ProviderSync",
+      "eligible": true,
+      "status": "tested",
+      "limitations": [],
+      "receipt": "artifacts/gap-validation/sync152-providersync-stable-r2-206310925b74480ca7abc3f8d599a6ae/receipt.json",
+      "receiptSha256": "c2591d8e6b5b6cc7b56323e2e6b1041f1dfcc7f31b9fce7869f98400b2f4fd8e",
+      "sourceFingerprint": "022c5bb57df45ea17b74999565bb4d7fb93811b579b19e775b6b211f44920a09",
+      "platform": {
+        "os": "Microsoft Windows 10.0.26300",
+        "architecture": "X64"
+      },
+      "selectedCount": 97,
+      "evidenceKind": "console-json",
+      "recordedResult": "passed",
+      "caseStatusCounts": {
+        "PASS_AUTHORED_NATIVE_ONLY": 97
+      }
+    },
+    "ProviderApis": {
+      "suite": "ProviderApis",
+      "eligible": true,
+      "status": "tested",
+      "limitations": [],
+      "receipt": "artifacts/gap-validation/sync152-providerapis-stable-r6-475e6c7af61d444b8c8cbf325a9b6fb3/receipt.json",
+      "receiptSha256": "592789d3566bb5dc7840e9af4c721bb9577d2f888cc2309621fc72ac60e84730",
+      "sourceFingerprint": "939573b01d0746de4842dcef3c50372ed48de3b5ed994a33ac0631a87323b0f3",
+      "platform": {
+        "os": "Microsoft Windows 10.0.26300",
+        "architecture": "X64"
+      },
+      "selectedCount": 60,
+      "evidenceKind": "console-json",
+      "recordedResult": "passed",
+      "caseStatusCounts": {
+        "PASS_AUTHORED_NATIVE_ONLY": 60
+      }
+    },
+    "OpenAICompatibilityGap": {
+      "suite": "OpenAICompatibilityGap",
+      "eligible": true,
+      "status": "tested",
+      "limitations": [],
+      "receipt": "artifacts/gap-validation/sync152-openaicompatibilitygap-stable-r6-b0c8dc70271c4e93a596cd9c11663eb6/receipt.json",
+      "receiptSha256": "50c6c8b6f0064f3615e691a34368847e467fa43f7e4b5f092ad8b1d0805a56e4",
+      "sourceFingerprint": "7608116e06f33ea916b38123bcfcc2e2b4d9bce91e5f88cdb813486c116e9bab",
+      "platform": {
+        "os": "Microsoft Windows 10.0.26300",
+        "architecture": "X64"
+      },
+      "selectedCount": 1,
+      "evidenceKind": "observed-case-lines",
+      "recordedResult": "passed",
+      "caseStatusCounts": {
+        "PASS": 1
+      }
+    },
+    "AnthropicResolved": {
+      "suite": "AnthropicResolved",
+      "eligible": true,
+      "status": "tested",
+      "limitations": [],
+      "receipt": "artifacts/gap-validation/sync152-anthropicresolved-stable-r6-465b819d2e7c4a6bb6ea3c77d0744ff3/receipt.json",
+      "receiptSha256": "690cc36fc080242754b35208d347452975dbf7160f401c0d21cb773c96346f60",
+      "sourceFingerprint": "d2bc447f1fb20b4a5a6e5342a5a5a30ae5ab90b6c4bdd21f74d0ce11cd21b9b8",
+      "platform": {
+        "os": "Microsoft Windows 10.0.26300",
+        "architecture": "X64"
+      },
+      "selectedCount": 18,
+      "evidenceKind": "console-json",
+      "recordedResult": "passed",
+      "caseStatusCounts": {
+        "PASS_AUTHORED_NATIVE_ONLY": 18
+      }
+    },
+    "AnthropicThreads": {
+      "suite": "AnthropicThreads",
+      "eligible": true,
+      "status": "tested",
+      "limitations": [],
+      "receipt": "artifacts/gap-validation/sync152-anthropicthreads-stable-r6-090ac61785684b09b5dfed2c361fad46/receipt.json",
+      "receiptSha256": "4e55dc23caf308fc2e6af655b9f1fb74276411746b6693b1bc980b5bfc4aeb78",
+      "sourceFingerprint": "b43cc22e855bdb6035b38d4fbf2440ba5e5c116b989b553112367912b13f2129",
+      "platform": {
+        "os": "Microsoft Windows 10.0.26300",
+        "architecture": "X64"
+      },
+      "selectedCount": 4,
+      "evidenceKind": "observed-case-lines",
+      "recordedResult": "passed",
+      "caseStatusCounts": {
+        "PASS": 4
+      }
+    },
+    "AnthropicSimple": {
+      "suite": "AnthropicSimple",
+      "eligible": true,
+      "status": "tested",
+      "limitations": [],
+      "receipt": "artifacts/gap-validation/sync152-anthropicsimple-stable-r1-833720cd18834cfea50bb96715705089/receipt.json",
+      "receiptSha256": "e0ee35725b97998bf6f1833c3110877a7939797dcf6c27074e828f687e962b31",
+      "sourceFingerprint": "ee544a1aa914dd2f812cb10f267640eb15a8efe1c2f079886bbda7ab11c6b6cd",
+      "platform": {
+        "os": "Microsoft Windows 10.0.26300",
+        "architecture": "X64"
+      },
+      "selectedCount": 13,
+      "evidenceKind": "console-ndjson",
+      "recordedResult": "passed",
+      "caseStatusCounts": {
+        "PASS_AUTHORED_NATIVE_ONLY": 13
+      }
+    },
+    "AnthropicProfile": {
+      "suite": "AnthropicProfile",
+      "eligible": true,
+      "status": "tested",
+      "limitations": [],
+      "receipt": "artifacts/gap-validation/sync152-anthropicprofile-stable-r5-b1303e5947ed4c3c82442457fcf7ecbb/receipt.json",
+      "receiptSha256": "7a7c0571e97d28a76773a4c7e8d27f3f4f555bb2c55868aeeab3114669bd68a0",
+      "sourceFingerprint": "ee8bc4f96c3e9c559d13359c389187e0430ea38b0ca75b370e440c06edb2b634",
+      "platform": {
+        "os": "Microsoft Windows 10.0.26300",
+        "architecture": "X64"
+      },
+      "selectedCount": 6,
+      "evidenceKind": "console-json",
+      "recordedResult": "passed",
+      "caseStatusCounts": {
+        "PASS_AUTHORED_NATIVE_ONLY": 6
+      }
+    },
+    "AnthropicAuthSync": {
+      "suite": "AnthropicAuthSync",
+      "eligible": true,
+      "status": "tested",
+      "limitations": [],
+      "receipt": "artifacts/gap-validation/sync152-anthropicauthsync-stable-r1-f61e227e6c694264b89a465768da1722/receipt.json",
+      "receiptSha256": "b28a3d966204fc1687529a15e63767d39e08b287b66a21a2721e2ca06a1aef76",
+      "sourceFingerprint": "e65b9c45b4265c379dc8cfb7857a83fde1fd8478bb7f4131ae5d9fd3ef51f975",
+      "platform": {
+        "os": "Microsoft Windows 10.0.26300",
+        "architecture": "X64"
+      },
+      "selectedCount": 30,
+      "evidenceKind": "console-json",
+      "recordedResult": "passed",
+      "caseStatusCounts": {
+        "PASS_AUTHORED_NATIVE_ONLY": 30
+      }
+    },
+    "AzureResponses": {
+      "suite": "AzureResponses",
+      "eligible": true,
+      "status": "tested",
+      "limitations": [],
+      "receipt": "artifacts/gap-validation/sync152-azureresponses-stable-r1-519ff364313b4128889d6451e9897b76/receipt.json",
+      "receiptSha256": "92513dd5a10874b3357cbb9c1a5505f7b16035c417fc487f559571b796f95cff",
+      "sourceFingerprint": "7471f540f78f30b77928d953a603e2fbd7964956f625c1f2b3a9367eb12c76a2",
+      "platform": {
+        "os": "Microsoft Windows 10.0.26300",
+        "architecture": "X64"
+      },
+      "selectedCount": 17,
+      "evidenceKind": "console-json",
+      "recordedResult": "passed",
+      "caseStatusCounts": {
+        "PASS_AUTHORED_NATIVE_ONLY": 17
+      }
+    },
+    "AzureSimple": {
+      "suite": "AzureSimple",
+      "eligible": true,
+      "status": "tested",
+      "limitations": [],
+      "receipt": "artifacts/gap-validation/sync152-azuresimple-stable-r5-ab04b7fb11c9442a9950576a1d96fe81/receipt.json",
+      "receiptSha256": "000eabe3d284eee2eb353233f86c693c190e05bc26acf2d58b6c2bb3794dc62b",
+      "sourceFingerprint": "fb296ba08d690217eb1ff9f7cdcbb46a907809ca41546e9f1964e755200bb32d",
+      "platform": {
+        "os": "Microsoft Windows 10.0.26300",
+        "architecture": "X64"
+      },
+      "selectedCount": 8,
+      "evidenceKind": "console-json",
+      "recordedResult": "passed",
+      "caseStatusCounts": {
+        "PASS_AUTHORED_NATIVE_ONLY": 8
+      }
+    },
+    "NativeModelCatalog": {
+      "suite": "NativeModelCatalog",
+      "eligible": true,
+      "status": "tested",
+      "limitations": [],
+      "receipt": "artifacts/gap-validation/sync152-nativemodelcatalog-stable-r6-b8ab5d26181a4255b13c3a270a21510b/receipt.json",
+      "receiptSha256": "42a7273942cb3e823c0c461eca9205ab421c7e5155de51166f7c0d7166673ae0",
+      "sourceFingerprint": "f91842edec9fec5fc8d1cdb2bf9c2e06f45bbf18dc3218c24ecad33f9182aac7",
+      "platform": {
+        "os": "Microsoft Windows 10.0.26300",
+        "architecture": "X64"
+      },
+      "selectedCount": 7,
+      "evidenceKind": "console-json",
+      "recordedResult": "passed",
+      "caseStatusCounts": {
+        "PASS_AUTHORED_NATIVE_ONLY": 7
+      }
+    },
+    "ClassifierConfig": {
+      "suite": "ClassifierConfig",
+      "eligible": true,
+      "status": "tested",
+      "limitations": [],
+      "receipt": "artifacts/gap-validation/sync152-classifierconfig-stable-r6-688c346d71604b7dad3f8370cede7107/receipt.json",
+      "receiptSha256": "7ea6e58395f9fa1b19e39621ce4307d0074bf93f7e47630dc4600806881f1500",
+      "sourceFingerprint": "813544149a5bf9548f3a5ca724a9e7574bd8cdc30768c1c2a30f6daae17a92e7",
+      "platform": {
+        "os": "Microsoft Windows 10.0.26300",
+        "architecture": "X64"
+      },
+      "selectedCount": 1,
+      "evidenceKind": "observed-case-lines",
+      "recordedResult": "passed",
+      "caseStatusCounts": {
+        "PASS": 1
+      }
+    },
+    "Classifiers": {
+      "suite": "Classifiers",
+      "eligible": true,
+      "status": "tested",
+      "limitations": [],
+      "receipt": "artifacts/gap-validation/sync152-classifiers-stable-r6-bfae673880ce4e349ce052e827f25cb6/receipt.json",
+      "receiptSha256": "e42e1fb02e63425b32d0649cef7bd2e5d08007a1d5212658bb9395f6500ed14d",
+      "sourceFingerprint": "98b6b8845535a657b20bce4ac992600ba73f70c5a499d487d7d360bb180c4a67",
+      "platform": {
+        "os": "Microsoft Windows 10.0.26300",
+        "architecture": "X64"
+      },
+      "selectedCount": 63,
+      "evidenceKind": "console-json",
+      "recordedResult": "passed",
+      "caseStatusCounts": {
+        "PASS_AUTHORED_NATIVE_ONLY": 63
+      }
+    },
+    "Agent": {
+      "suite": "Agent",
+      "eligible": true,
+      "status": "tested",
+      "limitations": [],
+      "receipt": "artifacts/gap-validation/sync152-agent-stable-r2-04af235f18514d4596ede20d01c046d2/receipt.json",
+      "receiptSha256": "c9e84602f44214e57d9086c6e37182a173249ef4c92444726c08579fd87324e1",
+      "sourceFingerprint": "51e01fa8bd724e6cfac5548b7257f6a07a587723c01fd7600e992cb440dc86e1",
+      "platform": {
+        "os": "Microsoft Windows 10.0.26300",
+        "architecture": "X64"
+      },
+      "selectedCount": 238,
+      "evidenceKind": "observed-case-lines",
+      "recordedResult": "passed",
+      "caseStatusCounts": {
+        "PASS": 238
+      }
+    },
+    "CliParity": {
+      "suite": "CliParity",
+      "eligible": true,
+      "status": "tested-with-limitations",
+      "limitations": [
+        "unix.posix-spawn-own-process-group-cwd-environment-and-stdio-pipes: SKIPPED_PLATFORM",
+        "unix.posix-spawn-children-see-stdin-eof-and-inherit-no-parent-pipe-ends: SKIPPED_PLATFORM",
+        "unix.runner-refuses-a-missing-executable-or-working-directory-before-launching: SKIPPED_PLATFORM",
+        "unix.runner-timeout-and-cancel-kill-the-whole-process-group: SKIPPED_PLATFORM",
+        "unix.pi-entry-bash-tool-runs-and-timeout-kills-the-tree: SKIPPED_PLATFORM",
+        "session-format.extension: SKIPPED_PLATFORM",
+        "session-format.extensionmessage: SKIPPED_PLATFORM",
+        "session-format.extensionnavigate: SKIPPED_PLATFORM",
+        "session-format.forklabels: SKIPPED_PLATFORM",
+        "session-format.override-openrouter: SKIPPED_PLATFORM",
+        "sync150.macos-stop-group-before-kill.no-next-command-after-stop: SKIPPED_PLATFORM",
+        "sync150.trust-saved-decision-wins-over-auto-trust: SKIPPED_PLATFORM"
+      ],
+      "receipt": "artifacts/gap-validation/sync152-cliparity-stable-r6-a5d77ecf3dab450bb0827b529d127c04/receipt.json",
+      "receiptSha256": "66ae5550dd7794238cd384346acda04fb14b7f494060678d96319cb849af60d6",
+      "sourceFingerprint": "72e49e6177b7c99ce3a3eec5f4e9f3446e4132b98832c012cd92e684b8568aff",
+      "platform": {
+        "os": "Microsoft Windows 10.0.26300",
+        "architecture": "X64"
+      },
+      "selectedCount": 226,
+      "evidenceKind": "console-json",
+      "recordedResult": "passed",
+      "caseStatusCounts": {
+        "PASS_AUTHORED_NATIVE_ONLY": 214,
+        "SKIPPED_PLATFORM": 12
+      }
+    },
+    "CodingAgent": {
+      "suite": "CodingAgent",
+      "eligible": true,
+      "status": "tested",
+      "limitations": [],
+      "receipt": "artifacts/gap-validation/sync152-codingagent-stable-r5-46007366a08946419ba357aafd456bf2/receipt.json",
+      "receiptSha256": "366ae836adcde5fb0decd241b29d8af6bff6cc055260d94e1a6ce9aa12734adf",
+      "sourceFingerprint": "50572701adc3dfcf16b5f5b75ae20f6d2ca7223aac9a99a84f1516badd788abf",
+      "platform": {
+        "os": "Microsoft Windows 10.0.26300",
+        "architecture": "X64"
+      },
+      "selectedCount": 914,
+      "evidenceKind": "console-json",
+      "recordedResult": "passed",
+      "caseStatusCounts": {
+        "passed": 914
+      }
+    },
+    "SessionParity": {
+      "suite": "SessionParity",
+      "eligible": true,
+      "status": "tested",
+      "limitations": [],
+      "receipt": "artifacts/gap-validation/sync152-sessionparity-stable-r6-187e29e5167a4a739394ca66fd7e006d/receipt.json",
+      "receiptSha256": "9a50663a509f11ffada73f511af5988c785781a5477f36cda967b4a3753cbacb",
+      "sourceFingerprint": "33e80919c852b2fa41f6090ae58d60e74e223b52204d590032276a38e0e2458e",
+      "platform": {
+        "os": "Microsoft Windows 10.0.26300",
+        "architecture": "X64"
+      },
+      "selectedCount": 127,
+      "evidenceKind": "console-json",
+      "recordedResult": "passed",
+      "caseStatusCounts": {
+        "PASS_AUTHORED_NATIVE_ONLY": 127
+      }
+    },
+    "InteractiveParity": {
+      "suite": "InteractiveParity",
+      "eligible": true,
+      "status": "tested-with-limitations",
+      "limitations": [
+        "util.clipboard-command.binary-output: Unix-only case.",
+        "util.clipboard-command.unicode-input: Unix-only case.",
+        "util.paths.canonicalize-symlinks: Unix-only case.",
+        "util.paths.posix-literal-percent: Unix-only case.",
+        "x11-clipboard.xvfb-reads-text-images-and-incr: X11 cases need Linux.",
+        "x11-clipboard.xvfb-stalled-owner-fails-after-the-deadline: X11 cases need Linux."
+      ],
+      "receipt": "artifacts/gap-validation/sync152-interactiveparity-stable-r5-ed366380ef4f4e6a8c47b4ebcde1d197/receipt.json",
+      "receiptSha256": "8a9006bf231edec0479b0faf00092ed46751f346ef3c39c84c5dc44c2b0cccb2",
+      "sourceFingerprint": "06c19507154b614bc8883e07b21c8784bb798cee8d596c72893d731d8bf2f15b",
+      "platform": {
+        "os": "Microsoft Windows 10.0.26300",
+        "architecture": "X64"
+      },
+      "selectedCount": 750,
+      "evidenceKind": "console-json",
+      "recordedResult": "passed",
+      "caseStatusCounts": {
+        "PASS_AUTHORED_NATIVE_ONLY": 744,
+        "SKIPPED": 6
+      }
+    },
+    "Tools": {
+      "suite": "Tools",
+      "eligible": true,
+      "status": "tested-with-limitations",
+      "limitations": [
+        "INFO symlink fixture unavailable: IOException"
+      ],
+      "receipt": "artifacts/gap-validation/sync152-tools-stable-r2-467d73b8f5cf45b6a7d28274a9ed766c/receipt.json",
+      "receiptSha256": "41f5fdad0e0e34db8a8e01eaeab9617ad4ea869d467e5038a62d482fb5c4bf4a",
+      "sourceFingerprint": "28bebafa09284336f9d19d0fdc915226f84df8869d140a4185fd447f26cdcbd3",
+      "platform": {
+        "os": "Microsoft Windows 10.0.26300",
+        "architecture": "X64"
+      },
+      "selectedCount": 173,
+      "evidenceKind": "observed-case-lines",
+      "recordedResult": "passed-with-console-skips",
+      "caseStatusCounts": {
+        "PASS": 173
+      }
+    },
+    "Rpc": {
+      "suite": "Rpc",
+      "eligible": true,
+      "status": "tested",
+      "limitations": [],
+      "receipt": "artifacts/gap-validation/sync152-rpc-stable-r1-e66cef54e02b4eea98eae3873ed5b362/receipt.json",
+      "receiptSha256": "9ae04dcca2a837bba06875149e689264946ffb70303b7be5335f8e1597e6c36b",
+      "sourceFingerprint": "15db8a87fd8cc2adc62d084d56afa5dd180ead02ef3828cf31d404fff1447aca",
+      "platform": {
+        "os": "Microsoft Windows 10.0.26300",
+        "architecture": "X64"
+      },
+      "selectedCount": 137,
+      "evidenceKind": "observed-case-lines",
+      "recordedResult": "passed",
+      "caseStatusCounts": {
+        "PASS": 137
+      }
+    },
+    "DurableMessages": {
+      "suite": "DurableMessages",
+      "eligible": true,
+      "status": "tested",
+      "limitations": [],
+      "receipt": "artifacts/gap-validation/sync152-durablemessages-stable-r6-a832848780724f189f76cb81d24eb13e/receipt.json",
+      "receiptSha256": "d1eee881f08e95c4528adc29c1d75f19f210fbe105411ecaa967ba8e523bcd3b",
+      "sourceFingerprint": "da5976d6c0915fda9db4800501e44ef9aace23684ce2cf71b88c90f9288e0c77",
+      "platform": {
+        "os": "Microsoft Windows 10.0.26300",
+        "architecture": "X64"
+      },
+      "selectedCount": 8,
+      "evidenceKind": "observed-case-lines",
+      "recordedResult": "passed",
+      "caseStatusCounts": {
+        "PASS": 8
+      }
+    },
+    "Codemode": {
+      "suite": "Codemode",
+      "eligible": true,
+      "status": "tested",
+      "limitations": [],
+      "receipt": "artifacts/gap-validation/sync152-codemode-stable-r6-97baaab2781c46248562505e261cee96/receipt.json",
+      "receiptSha256": "1059893492ddcadcd1e0c46ca5fde7addc30689de38feb56c4e3029f6e66bd05",
+      "sourceFingerprint": "6090f9a7b936184d947aa60b7536c3a3e922d258b95fc40450b5cb31bd65a188",
+      "platform": {
+        "os": "Microsoft Windows 10.0.26300",
+        "architecture": "X64"
+      },
+      "selectedCount": 149,
+      "evidenceKind": "console-json",
+      "recordedResult": "passed",
+      "caseStatusCounts": {
+        "PASS_AUTHORED_NATIVE_ONLY": 149
+      }
+    },
+    "Schema": {
+      "suite": "Schema",
+      "eligible": true,
+      "status": "tested",
+      "limitations": [],
+      "receipt": "artifacts/gap-validation/sync152-schema-stable-r2-b66406aab054429bba26facd6d8061b5/receipt.json",
+      "receiptSha256": "c0bdad3fa4419cbe90b8619696e6f001380286c27741a4b91655666c722a4059",
+      "sourceFingerprint": "d1907eb05109aa1884d325b098ddd6ec7acc39a92d64ed5bb02376ffa6380dc6",
+      "platform": {
+        "os": "Microsoft Windows 10.0.26300",
+        "architecture": "X64"
+      },
+      "selectedCount": 42,
+      "evidenceKind": "console-json",
+      "recordedResult": "passed",
+      "caseStatusCounts": {
+        "PASS_AUTHORED_NATIVE_ONLY": 42
+      }
+    },
+    "Durable": {
+      "suite": "Durable",
+      "eligible": true,
+      "status": "tested-with-limitations",
+      "limitations": [
+        "compat.reverse.upstream-reads-pisharp-sessions: PISHARP_DURABLE_UPSTREAM unset",
+        "plan.symlink-escape.file-link: this process cannot create symbolic links (Windows needs SeCreateSymbolicLinkPrivilege or Developer Mode): A required privilege is not held by the client. : 'C:\\Users\\jksof\\AppData\\Local\\Temp\\pisharp-durable\\interaction-scope-file-link-367403d1d2164b58a7080a511a4796e4\\plans\\1\\link.txt'.",
+        "plan.symlink-escape.dangling-final: this process cannot create symbolic links (Windows needs SeCreateSymbolicLinkPrivilege or Developer Mode): A required privilege is not held by the client. : 'C:\\Users\\jksof\\AppData\\Local\\Temp\\pisharp-durable\\interaction-scope-dangling-f226710c1ca34e268273df6a0f242c54\\plans\\1\\dangling.txt'.",
+        "plan.symlink-escape.intermediate-dir-link: this process cannot create symbolic links (Windows needs SeCreateSymbolicLinkPrivilege or Developer Mode): A required privilege is not held by the client. : 'C:\\Users\\jksof\\AppData\\Local\\Temp\\pisharp-durable\\interaction-scope-dir-link-016475ad24aa4708b062477996f02c9a\\plans\\1\\sub'."
+      ],
+      "receipt": "artifacts/gap-validation/sync152-durable-stable-r1-9ca2a9f83c294217bfbf736d24cba6e4/receipt.json",
+      "receiptSha256": "546499446a5fd981ac8e94d723ff09229f1fa3b7402e3066d22d8a2fdfac9ecb",
+      "sourceFingerprint": "b76efaa0c0be23f5169f8e239fb12cf193382eaba50480d0c61f6fcb832b680a",
+      "platform": {
+        "os": "Microsoft Windows 10.0.26300",
+        "architecture": "X64"
+      },
+      "selectedCount": 4699,
+      "evidenceKind": "console-json",
+      "recordedResult": "passed",
+      "caseStatusCounts": {
+        "PASS_AUTHORED_NATIVE_ONLY": 4570,
+        "PASS_UPSTREAM_CAPTURE": 125,
+        "SKIPPED_NO_UPSTREAM": 4
+      }
+    },
+    "Chord.Durable.Integration": {
+      "suite": "Chord.Durable.Integration",
+      "eligible": true,
+      "status": "tested",
+      "limitations": [],
+      "receipt": "artifacts/gap-validation/sync152-chord-durable-integration-stable-r6-fa9fa21b18a949ef8dae203aac9fcc4f/receipt.json",
+      "receiptSha256": "28490ce8e39c60aa6ba3bdbca546099d1d5ca497bfd2636af9c09ce669b574cb",
+      "sourceFingerprint": "82765a971e770706bfa64b55ae6c2fe5082cd0887c9652cc022e29becefc22f9",
+      "platform": {
+        "os": "Microsoft Windows 10.0.26300",
+        "architecture": "X64"
+      },
+      "selectedCount": 7,
+      "evidenceKind": "observed-case-lines",
+      "recordedResult": "passed",
+      "caseStatusCounts": {
+        "PASS": 7
+      }
+    },
+    "Durable.Hosting": {
+      "suite": "Durable.Hosting",
+      "eligible": true,
+      "status": "tested",
+      "limitations": [],
+      "receipt": "artifacts/gap-validation/sync152-durable-hosting-stable-r1-1c294f62798b45d996d89f8b33ae075d/receipt.json",
+      "receiptSha256": "6ee6618b30cb17fb7ced82858a47559cc2647755a97d282b204f7e7d7482772c",
+      "sourceFingerprint": "e2c9d43598eb3ff6672a3dd0404ffc39e410b0f423373db5a8b23ded334f9be8",
+      "platform": {
+        "os": "Microsoft Windows 10.0.26300",
+        "architecture": "X64"
+      },
+      "selectedCount": 129,
+      "evidenceKind": "console-json",
+      "recordedResult": "passed",
+      "caseStatusCounts": {
+        "PASS_AUTHORED_NATIVE_ONLY": 129
+      }
+    },
+    "Durable.Server": {
+      "suite": "Durable.Server",
+      "eligible": true,
+      "status": "tested",
+      "limitations": [],
+      "receipt": "artifacts/gap-validation/sync152-durable-server-stable-r1-81f6e44c28c549e6a63f523fd839627b/receipt.json",
+      "receiptSha256": "46885cceb8fb8baa5b87a57f01c9952ae676560e96c3065aa8cc925e606203e3",
+      "sourceFingerprint": "d203507245b6400694b4d9f8d1a364b31f2f9fe1682dd4ee1d3d744e7884fa2a",
+      "platform": {
+        "os": "Microsoft Windows 10.0.26300",
+        "architecture": "X64"
+      },
+      "selectedCount": 31,
+      "evidenceKind": "console-json",
+      "recordedResult": "passed",
+      "caseStatusCounts": {
+        "PASS_AUTHORED_NATIVE_ONLY": 31
+      }
+    },
+    "Chord": {
+      "suite": "Chord",
+      "eligible": true,
+      "status": "tested",
+      "limitations": [],
+      "receipt": "artifacts/gap-validation/sync152-chord-stable-r2-c3000e0f111e44a99fc41424e211d2a1/receipt.json",
+      "receiptSha256": "df7eb816f0a1c1506a244f4bc05814f9ca57b32217052572e87fc191e2a81dac",
+      "sourceFingerprint": "0a4f193a05dd506fe84738a5eb53f265d81eab0e95c9597e73c6165b22fa4657",
+      "platform": {
+        "os": "Microsoft Windows 10.0.26300",
+        "architecture": "X64"
+      },
+      "selectedCount": 1024,
+      "evidenceKind": "console-json",
+      "recordedResult": "passed",
+      "caseStatusCounts": {
+        "PASS_AUTHORED_NATIVE_ONLY": 1014,
+        "PASS_UPSTREAM_CAPTURE": 10
+      }
+    },
+    "Env.Adapter": {
+      "suite": "Env.Adapter",
+      "eligible": true,
+      "status": "tested",
+      "limitations": [],
+      "receipt": "artifacts/gap-validation/sync152-env-adapter-stable-r1-02d1615c52804d30a717509b4683b782/receipt.json",
+      "receiptSha256": "ff8919e95d79642713913a113a4f8044586dea49159552167c647e9fbb8eed1c",
+      "sourceFingerprint": "3ba55d65492c8b243173c538b4c024599985205b3018fb145f74b1f54c43becb",
+      "platform": {
+        "os": "Microsoft Windows 10.0.26300",
+        "architecture": "X64"
+      },
+      "selectedCount": 55,
+      "evidenceKind": "observed-case-lines",
+      "recordedResult": "passed",
+      "caseStatusCounts": {
+        "PASS": 55
+      }
+    },
+    "Env.Connection": {
+      "suite": "Env.Connection",
+      "eligible": true,
+      "status": "tested",
+      "limitations": [],
+      "receipt": "artifacts/gap-validation/sync152-env-connection-stable-r1-f18ea6f278154507875be9abdcd51fe6/receipt.json",
+      "receiptSha256": "b2e4cc3b7d0faa5243c7392e1a01ae0f99390a4fe20bca0d4265887af7527e1e",
+      "sourceFingerprint": "adfa18af67f0952b038adc6d83790eb3f8a9e01ce14522daa840eca98e9a860a",
+      "platform": {
+        "os": "Microsoft Windows 10.0.26300",
+        "architecture": "X64"
+      },
+      "selectedCount": 10,
+      "evidenceKind": "observed-case-lines",
+      "recordedResult": "passed",
+      "caseStatusCounts": {
+        "PASS": 10
+      }
+    },
+    "Env.Daemon": {
+      "suite": "Env.Daemon",
+      "eligible": true,
+      "status": "tested-with-limitations",
+      "limitations": [
+        "raw FIFO daemon exits after EOF and SIGTERM: SKIP Unix raw FIFO EOF/SIGTERM regression on Windows",
+        "SKIP Unix raw FIFO EOF/SIGTERM regression on Windows"
+      ],
+      "receipt": "artifacts/gap-validation/sync152-env-daemon-stable-r1-dd0f0a6b6123481587ae1badbee9fcc0/receipt.json",
+      "receiptSha256": "28d2f972d5eb66f904f7042a885fe32b01849ed220c7870b853ea6483034b760",
+      "sourceFingerprint": "747a04a65ee654774d68c4b903f947318b7e7f53f6d302470195623f13189dde",
+      "platform": {
+        "os": "Microsoft Windows 10.0.26300",
+        "architecture": "X64"
+      },
+      "selectedCount": 10,
+      "evidenceKind": "observed-case-lines",
+      "recordedResult": "passed-with-console-skips",
+      "caseStatusCounts": {
+        "PASS": 9,
+        "SKIP": 1
+      }
+    },
+    "Env.Process": {
+      "suite": "Env.Process",
+      "eligible": true,
+      "status": "tested",
+      "limitations": [],
+      "receipt": "artifacts/gap-validation/sync152-env-process-stable-r1-f1070f8ffc7a4437847e2e4ba880a539/receipt.json",
+      "receiptSha256": "5f79eeeee6996fd09942e0184ae4c1b3b31742232acec5fdc94cc961b70add08",
+      "sourceFingerprint": "167bc6d73935eb6dd4812fd78c062e9f13d7139efd536ee25585037c97cfdf5c",
+      "platform": {
+        "os": "Microsoft Windows 10.0.26300",
+        "architecture": "X64"
+      },
+      "selectedCount": 11,
+      "evidenceKind": "observed-case-lines",
+      "recordedResult": "passed",
+      "caseStatusCounts": {
+        "PASS": 11
+      }
+    },
+    "Env.Ssh": {
+      "suite": "Env.Ssh",
+      "eligible": true,
+      "status": "tested",
+      "limitations": [],
+      "receipt": "artifacts/gap-validation/sync152-env-ssh-stable-r1-e3a5644238d349cf96725a502e66d8c6/receipt.json",
+      "receiptSha256": "c9b4d226aca55ecd9fbf98a7c8f9a03ec24178a6b20899887c1ccf6dbe38ebde",
+      "sourceFingerprint": "8da4b32e2d60a8adba94ef94800b764b5a3775ab016a01aa6ffb2d9b84624a83",
+      "platform": {
+        "os": "Microsoft Windows 10.0.26300",
+        "architecture": "X64"
+      },
+      "selectedCount": 9,
+      "evidenceKind": "observed-case-lines",
+      "recordedResult": "passed",
+      "caseStatusCounts": {
+        "PASS": 9
+      }
+    },
+    "Env.Terminal": {
+      "suite": "Env.Terminal",
+      "eligible": true,
+      "status": "tested",
+      "limitations": [],
+      "receipt": "artifacts/gap-validation/sync152-env-terminal-stable-r1-6e7d0d26ecb840ddaa9ced60f6bd340d/receipt.json",
+      "receiptSha256": "b93936daa6c5dcae3471371b92a2a54cdd93ca32016005e54740e9e0c51b8f61",
+      "sourceFingerprint": "d62db50e864711ba1bcb698ace38fdd54e249dbfe2daa47a8ba780dd5c2a4f03",
+      "platform": {
+        "os": "Microsoft Windows 10.0.26300",
+        "architecture": "X64"
+      },
+      "selectedCount": 7,
+      "evidenceKind": "observed-case-lines",
+      "recordedResult": "passed",
+      "caseStatusCounts": {
+        "PASS": 7
+      }
+    },
+    "Env.Watch": {
+      "suite": "Env.Watch",
+      "eligible": true,
+      "status": "tested",
+      "limitations": [],
+      "receipt": "artifacts/gap-validation/sync152-env-watch-stable-r6-09d5413028514f5bbb6b102364c7d701/receipt.json",
+      "receiptSha256": "a53704fc5bc8d759558703049142402113cfd75fdbe89b171ef5d901ce5f0670",
+      "sourceFingerprint": "a7a1ecfd29e058f4d2d1d5986c979aaf3ed82972240b520ae890e4c013c0282d",
+      "platform": {
+        "os": "Microsoft Windows 10.0.26300",
+        "architecture": "X64"
+      },
+      "selectedCount": 5,
+      "evidenceKind": "observed-case-lines",
+      "recordedResult": "passed",
+      "caseStatusCounts": {
+        "PASS": 5
+      }
+    },
+    "McpSync": {
+      "suite": "McpSync",
+      "eligible": true,
+      "status": "tested",
+      "limitations": [],
+      "receipt": "artifacts/gap-validation/sync152-mcpsync-stable-r6-3a59c9b9217046d18078f560299ea700/receipt.json",
+      "receiptSha256": "86a4c6dbe9f95792c4ac620bba59b5d209de381571362dc570e0fe6d1f50ced7",
+      "sourceFingerprint": "121ce2eac2380b027161fcdf358eb600666935289135ac29f3551fbff8bb9e27",
+      "platform": {
+        "os": "Microsoft Windows 10.0.26300",
+        "architecture": "X64"
+      },
+      "selectedCount": 64,
+      "evidenceKind": "console-json",
+      "recordedResult": "passed",
+      "caseStatusCounts": {
+        "PASS_AUTHORED_NATIVE_ONLY": 64
+      }
+    },
+    "McpParity": {
+      "suite": "McpParity",
+      "eligible": true,
+      "status": "tested",
+      "limitations": [],
+      "receipt": "artifacts/gap-validation/sync152-mcpparity-stable-r6-5e7a81ff93684703ba836548c536202e/receipt.json",
+      "receiptSha256": "e02060e2993a7a2997bfb1840e60278f5e497521e8813a2712d286a3bb89f0ec",
+      "sourceFingerprint": "829fbc9a9db8e1733adf927c62f11e6d00594fed830ad966d839147d23438718",
+      "platform": {
+        "os": "Microsoft Windows 10.0.26300",
+        "architecture": "X64"
+      },
+      "selectedCount": 47,
+      "evidenceKind": "console-json",
+      "recordedResult": "passed",
+      "caseStatusCounts": {
+        "PASS_AUTHORED_NATIVE_ONLY": 47
+      }
+    },
+    "McpTuiOriginalQualification": {
+      "suite": "McpTuiOriginalQualification",
+      "eligible": true,
+      "status": "tested",
+      "limitations": [],
+      "receipt": "artifacts/gap-validation/sync152-mcptuioriginalqualification-stable-r5-4f45e0c7ea694adca26d3a4a03dfb459/receipt.json",
+      "receiptSha256": "76f4fbf9dc021abfdef381c24f302b48dd646cca32f64726ce45bbfac87d90a6",
+      "sourceFingerprint": "2e5988f368670bfc754920f8bbef21f7864e806f8b40d0b89cbfedd2d907ba38",
+      "platform": {
+        "os": "Microsoft Windows 10.0.26300",
+        "architecture": "X64"
+      },
+      "selectedCount": 21,
+      "evidenceKind": "console-json",
+      "recordedResult": "passed",
+      "caseStatusCounts": {
+        "PASS_AUTHORED_NATIVE_ONLY": 21
+      }
+    },
+    "Extensions.ContractTests": {
+      "suite": "Extensions.ContractTests",
+      "eligible": true,
+      "status": "tested",
+      "limitations": [],
+      "receipt": "artifacts/gap-validation/sync152-extensions-contracttests-stable-r7-ce40206f5ccd4480b761c26f66d05397/receipt.json",
+      "receiptSha256": "2506391d14f355ad1b70b25a53192942fe87e1268b2d3cfb57383d2d4e886cc8",
+      "sourceFingerprint": "f36f74c6e850eefa47a09369eb704f63a4d6018d756cd751955b5aa11f6dd69a",
+      "platform": {
+        "os": "Microsoft Windows 10.0.26300",
+        "architecture": "X64"
+      },
+      "selectedCount": 397,
+      "evidenceKind": "observed-case-lines",
+      "recordedResult": "passed",
+      "caseStatusCounts": {
+        "PASS": 397
+      }
+    },
+    "Tui": {
+      "suite": "Tui",
+      "eligible": true,
+      "status": "tested",
+      "limitations": [],
+      "receipt": "artifacts/gap-validation/sync152-tui-final-f77b69d8a7264838ab5c04ffcd30b409/receipt.json",
+      "receiptSha256": "86ac250a9644701fc5809082474714a473c3847c15f3ffbecc2feda66a352ade",
+      "sourceFingerprint": "0d6091c4bf6761e2611e1532782d9f2a35cfdc705f011d14082a65ec79af5bb4",
+      "platform": {
+        "os": "Microsoft Windows 10.0.26300",
+        "architecture": "X64"
+      },
+      "selectedCount": 49,
+      "evidenceKind": "observed-case-lines",
+      "recordedResult": "passed",
+      "caseStatusCounts": {
+        "PASS": 49
+      }
+    },
+    "Tui.Editor": {
+      "suite": "Tui.Editor",
+      "eligible": true,
+      "status": "tested",
+      "limitations": [],
+      "receipt": "artifacts/gap-validation/sync152-tui-editor-stable-r1-5cb6260874d54bf18a4f6df705e57143/receipt.json",
+      "receiptSha256": "5142a2ae5560cb5f99acf15bbdf60cf73b6999a7849cd2bc8c7cc707deaaf26e",
+      "sourceFingerprint": "d3c442e2ad6e8ba0797b2a65cde786970d89796e62d3306e6dafe32ecbec940f",
+      "platform": {
+        "os": "Microsoft Windows 10.0.26300",
+        "architecture": "X64"
+      },
+      "selectedCount": 85,
+      "evidenceKind": "observed-case-lines",
+      "recordedResult": "passed",
+      "caseStatusCounts": {
+        "PASS": 85
+      }
+    },
+    "Telemetry": {
+      "suite": "Telemetry",
+      "eligible": true,
+      "status": "tested",
+      "limitations": [],
+      "receipt": "artifacts/gap-validation/sync152-telemetry-stable-r2-a7a04516b3954ab08d994d199e539c5c/receipt.json",
+      "receiptSha256": "9a541daaee1b0dd58eec4bd38b047d00ff3e962365bf420ce2a7c8719d2f32c3",
+      "sourceFingerprint": "9d36514f10530bdffc014ecc0cd704ebc691b3976efa9be4adb1445d171786ac",
+      "platform": {
+        "os": "Microsoft Windows 10.0.26300",
+        "architecture": "X64"
+      },
+      "selectedCount": 68,
+      "evidenceKind": "console-json",
+      "recordedResult": "passed",
+      "caseStatusCounts": {
+        "PASS_AUTHORED_NATIVE_ONLY": 68
+      }
+    },
+    "Chord.Hosting": {
+      "suite": "Chord.Hosting",
+      "eligible": true,
+      "status": "tested",
+      "limitations": [],
+      "receipt": "artifacts/gap-validation/sync152-chord-hosting-stable-r5-627ee0d7605a4e5184d389ae46c15bf1/receipt.json",
+      "receiptSha256": "850716db22d724e490ad6865cb9a024c15b77b01329c94b7e4c17d0c46745c7d",
+      "sourceFingerprint": "02748816dd7dae8681b2cfd27537524c96487bba036b2d567fa929f8344bc667",
+      "platform": {
+        "os": "Microsoft Windows 10.0.26300",
+        "architecture": "X64"
+      },
+      "selectedCount": 46,
+      "evidenceKind": "console-json",
+      "recordedResult": "passed",
+      "caseStatusCounts": {
+        "PASS_AUTHORED_NATIVE": 46
+      }
+    },
+    "Chord.Legacy.Cluster": {
+      "suite": "Chord.Legacy.Cluster",
+      "eligible": true,
+      "status": "tested",
+      "limitations": [],
+      "receipt": "artifacts/gap-validation/sync152-chord-legacy-cluster-stable-r6-17b2edf3cd954b5e8e407eb1a338a01c/receipt.json",
+      "receiptSha256": "89cd0eabe5c4b1515c4b46115063e5789d7f5109353e31268f35e04228998d1b",
+      "sourceFingerprint": "68ed1834583a93fe9f5d2fd9fb598742ef9d0731c1165cb4ebf446149ff3bd11",
+      "platform": {
+        "os": "Microsoft Windows 10.0.26300",
+        "architecture": "X64"
+      },
+      "selectedCount": 25,
+      "evidenceKind": "observed-case-lines",
+      "recordedResult": "passed",
+      "caseStatusCounts": {
+        "PASS": 25
+      }
+    }
+  },
+  "appliedAt": "2026-11-11T06:35:14.780Z"
+}

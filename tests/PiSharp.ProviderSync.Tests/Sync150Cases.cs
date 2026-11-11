@@ -406,11 +406,11 @@ internal static partial class Program
     private static Task Sync150IdentityFormats()
     {
         var detailed = ClientIdentities.FormatUserAgent(null);
-        Check(System.Text.RegularExpressions.Regex.IsMatch(detailed, @"^pi/1\.5\.0 \([a-z0-9]+; dotnet/" +
+        Check(System.Text.RegularExpressions.Regex.IsMatch(detailed, @"^pi/1\.5\.2 \([a-z0-9]+; dotnet/" +
             System.Text.RegularExpressions.Regex.Escape(Environment.Version.ToString()) + @"; [a-z0-9]+\)$"), "detailed user agent: " + detailed);
-        Equal("1.5.0", ClientIdentities.GetClientVersion(null));
+        Equal("1.5.2", ClientIdentities.GetClientVersion(null));
         Equal(detailed, ClientIdentities.FormatUserAgent(new() { UserAgent = ClientUserAgent.Detailed }));
-        Equal("pi/9.9.9 " + detailed["pi/1.5.0 ".Length..], ClientIdentities.FormatUserAgent(new() { Version = "9.9.9" }));
+        Equal("pi/9.9.9 " + detailed["pi/1.5.2 ".Length..], ClientIdentities.FormatUserAgent(new() { Version = "9.9.9" }));
         Equal("pi", ClientIdentities.FormatUserAgent(new() { UserAgent = ClientUserAgent.Short, Version = "9.9.9" }));
         Equal("acme/1.0", ClientIdentities.FormatUserAgent(new() { UserAgent = ClientUserAgent.Custom("acme/1.0") }));
 

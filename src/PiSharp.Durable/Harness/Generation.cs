@@ -1020,8 +1020,10 @@ internal static class GenerationPhases
         // The retry and compaction policies govern the next attempt, so they are read now rather than pinned at preparation.
         var settings = runtime.Settings;
         var overflow = stopReason == "error" && PiAiOverflow.IsContextOverflow(message);
-        var policy = Compaction.PolicyFor(settings, reference, (await runtime.AgentAsync(context).ConfigureAwait(false)).Compaction);
-        if (overflow && compacted is null && policy.Enabled)
+        var policy = overflow && compacted is null
+            ? Compaction.PolicyFor(settings, reference, (await runtime.AgentAsync(context).ConfigureAwait(false)).Compaction)
+            : null;
+        if (policy?.Enabled == true)
         {
             var view = await runtime.ContextAsync(conversationId, context, cutoff).ConfigureAwait(false);
             if (Compaction.SelectCut(view, policy.KeepRecentTokens) is not null)

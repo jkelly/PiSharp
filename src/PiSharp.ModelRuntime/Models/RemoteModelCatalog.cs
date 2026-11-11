@@ -135,7 +135,8 @@ internal interface ICatalogOverlay
     /// <summary>The provider's models with this layer applied.</summary>
     List<RegistryModel> Apply(IReadOnlyList<RegistryModel> baseline);
     Task RefreshAsync(RemoteRefreshContext context);
-    /// <summary>Whether the network phase needs a resolved credential (models.ts refresh skips it without one).</summary>
+    /// <summary>Whether the network phase needs a resolved credential. False uses a configured-only auth check, without
+    /// resolving a key or refreshing OAuth (models.ts refreshModelsAuth: configured); neither mode permits anonymous refresh.</summary>
     bool RequiresCredential { get; }
 }
 

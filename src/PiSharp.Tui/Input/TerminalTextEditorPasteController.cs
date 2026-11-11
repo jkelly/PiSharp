@@ -767,7 +767,7 @@ public sealed class TerminalTextEditorPasteController
             {
                 if (!int.TryParse(marker.Groups[1].Value, NumberStyles.None, CultureInfo.InvariantCulture, out var id) || id <= targetId) return marker.Value;
                 // Preserve the pinned source's literal undefined suffix when renumbering a bare alias.
-                return "[paste #" + (id - 1).ToString(CultureInfo.InvariantCulture) + (marker.Groups[2].Success ? marker.Groups[2].Value : "undefined") + "]";
+                return "[paste #" + (id - 1).ToString(CultureInfo.InvariantCulture) + marker.Groups[2].Value + "]";
             });
             var lineNumber = snapshot.Text.AsSpan(0, start).Count('\n'); var newStart = 0;
             for (var index = 0; index < lineNumber; index++) newStart = text.IndexOf('\n', newStart) + 1;

@@ -58,7 +58,7 @@ internal static partial class Program
             var registry = ModelRegistry.Create(new());
             foreach (var (provider, id) in ModelResolver.DefaultModelPerProvider)
                 Check(registry.Find(provider, id) is not null, provider + " default is available");
-            Equal(1724, Enum.GetValues<CatalogModelType>().Sum(type => registry.GetAllOfType(type).Count), "exact twelve added rows");
+            Equal(1773, Enum.GetValues<CatalogModelType>().Sum(type => registry.GetAllOfType(type).Count), "complete released 1.5.2 entries");
             var exactAzure = LiveSessionSelection.Parse("azure", "gpt-6.1-sol", null);
             Equal(1050000d, exactAzure.Definition.Raw.Value.GetProperty("contextWindow").GetDouble(), "exact-identity path uses reviewed corrections");
             Equal("qwen3.8-max", LiveSessionSelection.Parse("qwen-token-plan-individual-cn", "qwen3.8-max", null).Model.Id, "exact-identity path admits new provider");

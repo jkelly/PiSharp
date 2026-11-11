@@ -1,4 +1,4 @@
-// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/schema/src/validator.ts.
+// Pi b4afdddf44e059c67ccf5097e5317d913521b470 (MIT): packages/schema/src/validator.ts.
 // Ported to plain ESM for the PiSharp Node extension bridge (TypeScript types stripped mechanically; behaviour unchanged).
 import { Coercer } from "./coerce.mjs";
 import { Compiler, RESTART } from "./compiler.mjs";
@@ -23,6 +23,15 @@ export class Validator {
         this.explainer ??= new Explainer(compiler(this.schema, this.options), this.schema);
         return this.explainer.errors(value);
     }
+    validate(value) {
+        return this.check(value) ? {
+            ok: true,
+            value
+        } : {
+            ok: false,
+            errors: this.errors(value)
+        };
+    }
 }
 export class CoercingValidator extends Validator {
     coercer = undefined;
@@ -31,14 +40,7 @@ export class CoercingValidator extends Validator {
         return this.coercer.coerce(value);
     }
     parse(value) {
-        const coerced = this.coerce(value);
-        return this.check(coerced) ? {
-            ok: true,
-            value: coerced
-        } : {
-            ok: false,
-            errors: this.errors(coerced)
-        };
+        return this.validate(this.coerce(value));
     }
 }
 function compileCheck(schema, options) {

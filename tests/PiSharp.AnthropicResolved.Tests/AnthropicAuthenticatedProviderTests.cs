@@ -91,7 +91,7 @@ internal static class AnthropicAuthenticatedProviderTests
                 Check(body.RootElement.GetProperty("system")[0].GetProperty("text").GetString()!.StartsWith(oauth ? "You are Claude Code" : "Authored system", StringComparison.Ordinal));
                 Check(frames.OfType<ToolCallStarted>().Single().ToolCall.Name == (oauth ? "bash" : "Bash"));
                 Check(frames.Last() is StreamTerminalEvent { Reason: StopReason.ToolUse } && owner.Calls == 0);
-                if (oauth) Check(handler.Headers["user-agent"] == "claude-cli/2.1.280" && handler.Headers["anthropic-beta"].Contains("oauth-2025-04-20", StringComparison.Ordinal));
+                if (oauth) Check(handler.Headers["user-agent"] == "claude-cli/2.1.322" && handler.Headers["anthropic-beta"].Contains("oauth-2025-04-20", StringComparison.Ordinal));
             }
             Check(owner.Calls == 1 && !handler.Disposed);
             await lease.DisposeAsync(); Check(owner.Calls == 1);

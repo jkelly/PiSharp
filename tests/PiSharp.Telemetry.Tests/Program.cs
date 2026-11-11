@@ -24,6 +24,7 @@ internal static partial class Program
         cases.AddRange(ConformanceCases);
         cases.AddRange(AiCases);
         cases.AddRange(AotJsonCases);
+        cases.AddRange(ClockRender152Cases);
         var results = new List<object>(); var failures = 0;
         foreach (var test in cases)
         {

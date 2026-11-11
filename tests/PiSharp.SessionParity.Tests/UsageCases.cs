@@ -245,7 +245,7 @@ internal static partial class Program
             Equal("270000,50000,null", string.Join(",", new[] { 300_000d, 60_000, 10_000 }.Select(ttl => CacheWarmer.GetCacheWarmingDelayMs(ttl)?.ToString(CultureInfo.InvariantCulture) ?? "null")), "delay");
             Equal("False,True,True,True", string.Join(",", CacheWarmer.IsReplayable(BudgetModel, new(Reasoning: "medium")), CacheWarmer.IsReplayable(BudgetModel, null),
                 CacheWarmer.IsReplayable(AdaptiveModel, new(Reasoning: "medium")), CacheWarmer.IsReplayable(OpenAIModel, new(Reasoning: "medium"))), "replayable");
-            Equal("streaming|streaming|off|idle", string.Join("|", CacheWarmingModes.Resolve(null), CacheWarmingModes.Resolve("always"), CacheWarmingModes.Resolve("off"),
+            Equal("idle|idle|off|idle", string.Join("|", CacheWarmingModes.Resolve(null), CacheWarmingModes.Resolve("always"), CacheWarmingModes.Resolve("off"),
                 CacheWarmingModes.Resolve("idle")), "modes");
         });
 
@@ -418,6 +418,32 @@ internal static partial class Program
             await throwing.Advance(270_000);
             Equal(("scheduled", 0), (throwing.Warmer.Status.State, throwing.Appended.Count), "errors are best effort");
             throwing.Warmer.Cancel();
+        });
+
+        yield return Case("cache-warmer/cancel-joins-active-replay", async () =>
+        {
+            var release = new TaskCompletionSource<AssistantMessage>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var harness = new WarmHarness(result: _ => release.Task);
+            harness.Warmer.Start(WarmRequest(), Current);
+            await harness.Time.AdvanceAsync(270_000, () => Task.CompletedTask);
+            var joined = harness.Warmer.CancelAndJoinAsync();
+            Check(!joined.IsCompleted && harness.Calls[0].Signal.IsCancellationRequested, "cancel must join the original replay");
+            release.SetResult(WarmResponse(AdaptiveModel));
+            await joined;
+            Equal(0, harness.Appended.Count, "cancelled warm cannot append usage");
+            await harness.Advance(600_000);
+            Equal(1, harness.Calls.Count, "cancelled warmer cannot schedule again");
+        });
+
+        yield return Case("cache-warmer/idle-default-keeps-warming", async () =>
+        {
+            var harness = new WarmHarness(mode: CacheWarmingModes.Resolve(null), branch: BranchWithPrompt(400_000));
+            harness.Warmer.Start(WarmRequest(), Current);
+            harness.Warmer.OnAgentSettled();
+            await harness.Advance(270_000);
+            Equal(1, harness.Calls.Count, "default idle mode refreshes profitable settled context");
+            Equal("idle", harness.Warmer.Status.Decision!.Phase, "idle phase");
+            await harness.Warmer.CancelAndJoinAsync();
         });
 
         yield return Case("cache-warmer/formats-status-and-usage", () =>

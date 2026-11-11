@@ -27,7 +27,8 @@ public sealed record McpDefaultOAuthHostResources(
     Func<CancellationToken, ValueTask<string?>>? AuthorizationState = null,
     Func<McpDefaultOAuthClientAuthentication, CancellationToken, ValueTask>? AddClientAuthentication = null,
     Uri? ClientMetadataDocumentBase = null, int MaximumBytes = 1_048_576,
-    Uri? AuthorizationServerMetadataUrl = null, TimeSpan? RequestTimeout = null)
+    Uri? AuthorizationServerMetadataUrl = null, TimeSpan? RequestTimeout = null,
+    Func<JsonData?, McpOAuthClientMetadataDocument?>? ClientMetadataDocument = null)
 {
     /// <summary>Bounds each request to the authorization server.</summary>
     public static readonly TimeSpan DefaultRequestTimeout = TimeSpan.FromSeconds(15);

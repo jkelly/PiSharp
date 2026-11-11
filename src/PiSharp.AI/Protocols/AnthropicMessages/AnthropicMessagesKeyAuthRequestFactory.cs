@@ -4,12 +4,13 @@ using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using PiSharp.Contracts;
+using PiSharp.AI.Protocols.ProviderShared;
 
 namespace PiSharp.AI.Protocols.AnthropicMessages;
 
 public sealed record AnthropicMessagesKeyAuthRequestOptions(double? MaxTokens = null,
     JsonData? ModelHeaders = null, JsonData? Headers = null, JsonData? RuntimeHeaders = null,
-    string? SessionId = null, bool SendSessionAffinityHeaders = false, string SessionAffinityHeader = "x-session-affinity",
+    string? SessionId = null, bool? SendSessionAffinityHeaders = null, string? SessionAffinityHeader = null,
     double MaximumTokenMagnitude = 1_000_000, int MaximumKeyCharacters = 4096, int MaximumBaseUriCharacters = 4096,
     int MaximumPayloadBytes = PiRequestBudget.RequestPayloadBytes, int MaximumPayloadDepth = PiSharp.Contracts.JsonData.MaximumDepth, int MaximumHeaders = 128,
     int MaximumHeaderCharacters = 8192, int MaximumTotalHeaderCharacters = 32_768)
@@ -92,7 +93,7 @@ public sealed class AnthropicMessagesKeyAuthRequestFactory
     public AnthropicMessagesKeyAuthRequestFactory(Uri baseUri, ModelDescriptor expectedModel,
         AnthropicMessagesRequestOptions projectionOptions, AnthropicMessagesKeyAuthRequestOptions? options = null)
     {
-        _options = options ?? new();
+        _options = (options ?? new()) with { SessionAffinityHeader = options?.SessionAffinityHeader ?? "x-session-affinity" };
         _threadProjection = projectionOptions;
         _withScope = (session, tier, identity) => new(baseUri, expectedModel, projectionOptions,
             TierOptions(_options with { SessionId = session ?? _options.SessionId, Identity = identity ?? _options.Identity }, tier, expectedModel));
@@ -131,8 +132,8 @@ public sealed class AnthropicMessagesKeyAuthRequestFactory
         {
             HeaderValue(_options.SessionId);
             if (_options.SessionId.Length > _options.MaximumHeaderCharacters) throw Fail(AnthropicMessagesKeyAuthRequestFailure.ResourceLimit);
-            if (_options.SendSessionAffinityHeaders && projectionOptions.CacheRetention != AnthropicCacheRetention.None && _options.SessionId.Length != 0)
-                configured[_options.SessionAffinityHeader] = _options.SessionId;
+            if (_options.SendSessionAffinityHeaders == true && projectionOptions.CacheRetention != AnthropicCacheRetention.None && _options.SessionId.Length != 0)
+                configured[_options.SessionAffinityHeader!] = _options.SessionId;
         }
         ReadHeaders(_options.ModelHeaders, configured, ref supplied);
         foreach (var (name, value) in PiSharp.AI.Providers.ProviderHeaderPolicies.OpenCodeSessionHeaders(expectedModel.Provider, baseUri, _options.SessionId)) configured[name] = value;
@@ -200,6 +201,8 @@ public sealed class AnthropicMessagesKeyAuthRequestFactory
         if (ScopedTo(request) is { } scoped) return scoped.Prepare(request, explicitApiKey, cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();
         if (request is null || request.Model != _model) throw Fail(AnthropicMessagesKeyAuthRequestFailure.InvalidRequest);
+        if (!_threadProjection.DisablePreferredStrictTools && StrictToolLimits.HasExceeded(_options.SessionId ?? request.SessionId))
+            return WithoutPreferredStrict().Prepare(request, explicitApiKey, cancellationToken);
         if (string.IsNullOrEmpty(explicitApiKey)) throw Fail(AnthropicMessagesKeyAuthRequestFailure.InvalidKey);
         if (explicitApiKey.Length > _options.MaximumKeyCharacters) throw Fail(AnthropicMessagesKeyAuthRequestFailure.ResourceLimit);
         if (explicitApiKey.Any(value => value is < '!' or > '~')) throw Fail(AnthropicMessagesKeyAuthRequestFailure.InvalidKey);
@@ -208,13 +211,19 @@ public sealed class AnthropicMessagesKeyAuthRequestFactory
         var projected = AnthropicMessagesPreparedRequest.Project(details.Payload, Raw, cancellationToken);
         _ = PreparedHeaders(projected, explicitApiKey);
         return new(projected, _options, (payload, token) => CreateCore(request, explicitApiKey, token, payload), cancellationToken)
-        { Fallback = details.HasPreferredStrictTools ? token => WithoutPreferredStrict().Prepare(request, explicitApiKey, token) : null };
+        { Fallback = details.HasPreferredStrictTools ? token =>
+            {
+                StrictToolLimits.MarkExceeded(_options.SessionId ?? request.SessionId);
+                return WithoutPreferredStrict().Prepare(request, explicitApiKey, token);
+            } : null };
     }
 
     private HttpRequestMessage CreateCore(ChatRequest request, string explicitApiKey, CancellationToken cancellationToken, JsonData? prepared)
     {
         cancellationToken.ThrowIfCancellationRequested();
         if (request is null || request.Model != _model) throw Fail(AnthropicMessagesKeyAuthRequestFailure.InvalidRequest);
+        if (prepared is null && !_threadProjection.DisablePreferredStrictTools && StrictToolLimits.HasExceeded(_options.SessionId ?? request.SessionId))
+            return WithoutPreferredStrict().CreateCore(request, explicitApiKey, cancellationToken, null);
         if (string.IsNullOrEmpty(explicitApiKey)) throw Fail(AnthropicMessagesKeyAuthRequestFailure.InvalidKey);
         if (explicitApiKey.Length > _options.MaximumKeyCharacters) throw Fail(AnthropicMessagesKeyAuthRequestFailure.ResourceLimit);
         if (explicitApiKey.Any(value => value is < '!' or > '~')) throw Fail(AnthropicMessagesKeyAuthRequestFailure.InvalidKey);
@@ -268,7 +277,11 @@ public sealed class AnthropicMessagesKeyAuthRequestFactory
                 if (pair.Key.Equals("content-type", StringComparison.OrdinalIgnoreCase)) result.Content!.Headers.ContentType = new MediaTypeHeaderValue(pair.Value);
                 else if (!result.Headers.TryAddWithoutValidation(pair.Key, pair.Value)) throw Fail(AnthropicMessagesKeyAuthRequestFailure.UnsupportedOptions);
             if (details?.HasPreferredStrictTools == true)
-                result.Options.Set(AnthropicStrictToolsFallback.RequestKey, token => WithoutPreferredStrict().CreateCore(request, explicitApiKey, token, null));
+                result.Options.Set(AnthropicStrictToolsFallback.RequestKey, token =>
+                {
+                    StrictToolLimits.MarkExceeded(_options.SessionId ?? request.SessionId);
+                    return WithoutPreferredStrict().CreateCore(request, explicitApiKey, token, null);
+                });
             if (threadEligible && !request.DisableContinuation)
             {
                 var full = AnthropicThreadJson.Parse(Encoding.UTF8.GetString(buffer.ToArray())).AsObject();

@@ -135,6 +135,7 @@ internal static class Js
     public static bool StrictEquals(object? a, object? b)
     {
         if (a is double da && b is double db) return da == db;
+        if (a is BigInteger ia && b is BigInteger ib) return ia == ib;
         if (a is string sa && b is string sb) return string.Equals(sa, sb, StringComparison.Ordinal);
         if (a is bool ba && b is bool bb) return ba == bb;
         if (a is null && b is null) return true;

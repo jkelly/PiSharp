@@ -56,7 +56,7 @@ public sealed class McpStreamableHttpTransport : IMcpWireTransport
             var response = await ExchangeAsync(request, owned).ConfigureAwait(false);
             await OwnResponse(response, async lease =>
             {
-                owned.ThrowIfCancellationRequested(); Status(response); Capture(response);
+                owned.ThrowIfCancellationRequested(); await StatusAsync(response, lease, owned).ConfigureAwait(false); Capture(response);
                 var value = message.Value; var isRequest = value.TryGetProperty("method", out _) && value.TryGetProperty("id", out _);
                 if (!isRequest)
                 {
@@ -71,7 +71,10 @@ public sealed class McpStreamableHttpTransport : IMcpWireTransport
                 var body = await lease.BodyAsync(owned).ConfigureAwait(false); owned.ThrowIfCancellationRequested();
                 if (media == "application/json")
                 {
-                    var payload = await ReadBody(body, owned).ConfigureAwait(false); var json = JsonData.Parse(McpWireJson.Utf8.GetString(payload));
+                    var payload = await ReadBody(body, owned).ConfigureAwait(false);
+                    var text = McpWireJson.Utf8.GetString(payload);
+                    if (text.StartsWith('\uFEFF')) text = text[1..];
+                    var json = JsonData.Parse(text);
                     if (json.Value.ValueKind == JsonValueKind.Array)
                         foreach (var item in json.Value.EnumerateArray()) await receiver.Receive(McpWireJson.Validate(JsonData.FromElement(item))).ConfigureAwait(false);
                     else await receiver.Receive(McpWireJson.Validate(json)).ConfigureAwait(false);
@@ -96,8 +99,34 @@ public sealed class McpStreamableHttpTransport : IMcpWireTransport
         if (lastId is not null) { request.Headers.Remove("Last-Event-ID"); request.Headers.TryAddWithoutValidation("Last-Event-ID", lastId); }
         return request;
     }
-    private void Status(HttpResponseMessage response)
-    { if (!response.IsSuccessStatusCode) { bool expired; lock (gate) expired = response.StatusCode == HttpStatusCode.NotFound && !string.IsNullOrEmpty(session); throw new McpHttpStatusException((int)response.StatusCode, expired); } }
+    private async Task StatusAsync(HttpResponseMessage response, ResponseLease lease, CancellationToken token)
+    {
+        if (response.IsSuccessStatusCode) return;
+        bool expired; lock (gate) expired = response.StatusCode == HttpStatusCode.NotFound && !string.IsNullOrEmpty(session);
+        var text = ""; var truncated = false;
+        try
+        {
+            var body = await lease.BodyAsync(token).ConfigureAwait(false);
+            // One lookahead byte distinguishes an exact-limit body from truncation. Never size from Content-Length.
+            const int maximum = 8192;
+            var bytes = new byte[maximum + 1]; var count = 0;
+            while (count < bytes.Length)
+            {
+                var read = await body.ReadAsync(bytes.AsMemory(count), token).ConfigureAwait(false);
+                token.ThrowIfCancellationRequested();
+                if (read == 0) break;
+                count += read;
+            }
+            truncated = count > maximum;
+            var decoder = McpWireJson.Utf8.GetDecoder(); var chars = new char[maximum + 1];
+            // An incomplete UTF-8 character at a truncated boundary is omitted, never replaced.
+            var length = decoder.GetChars(bytes.AsSpan(0, Math.Min(count, maximum)), chars, flush: !truncated);
+            text = new string(chars, 0, length).TrimStart('\uFEFF');
+        }
+        catch (Exception) when (!token.IsCancellationRequested) { /* Diagnostics must not replace the HTTP status. */ }
+        token.ThrowIfCancellationRequested();
+        throw new McpHttpStatusException((int)response.StatusCode, expired, text, truncated);
+    }
     private void Capture(HttpResponseMessage response)
     {
         if (!response.Headers.TryGetValues("mcp-session-id", out var values)) return;
@@ -124,7 +153,7 @@ public sealed class McpStreamableHttpTransport : IMcpWireTransport
                 using var request = Request(HttpMethod.Get, "text/event-stream", cursor.Id); var response = await ExchangeAsync(request, token).ConfigureAwait(false);
                 await OwnResponse(response, async lease =>
                 {
-                    token.ThrowIfCancellationRequested(); Status(response); Capture(response);
+                    token.ThrowIfCancellationRequested(); await StatusAsync(response, lease, token).ConfigureAwait(false); Capture(response);
                     if (response.Content.Headers.ContentType?.MediaType?.ToLowerInvariant() != "text/event-stream") throw new McpRuntimeProtocolException("Unsupported MCP resume content type");
                     var resumed = await lease.BodyAsync(token).ConfigureAwait(false);
                     await Sse(resumed, receiver, cursor, id, token).ConfigureAwait(false); return true;
@@ -155,7 +184,7 @@ public sealed class McpStreamableHttpTransport : IMcpWireTransport
                     var supported = await OwnResponse(response, async lease =>
                     {
                         token.ThrowIfCancellationRequested(); if (response.StatusCode == HttpStatusCode.MethodNotAllowed) return false;
-                        Status(response); Capture(response);
+                        await StatusAsync(response, lease, token).ConfigureAwait(false); Capture(response);
                         if (response.Content.Headers.ContentType?.MediaType?.ToLowerInvariant() != "text/event-stream") throw new McpRuntimeProtocolException("Unsupported MCP GET content type");
                         var body = await lease.BodyAsync(token).ConfigureAwait(false); await Sse(body, receiver, cursor, null, token, lease).ConfigureAwait(false); return true;
                     }, () => cleanupFailed = true).ConfigureAwait(false);
@@ -230,7 +259,7 @@ public sealed class McpStreamableHttpTransport : IMcpWireTransport
         if (delete)
         {
             using var timeout = new CancellationTokenSource(TimeSpan.FromMilliseconds(binding.Profile.DeleteTimeoutMilliseconds), clock);
-            try { using var request = Request(HttpMethod.Delete); var response = await ExchangeAsync(request, timeout.Token, closingDelete: true).ConfigureAwait(false); await OwnResponse(response, _ => { timeout.Token.ThrowIfCancellationRequested(); Status(response); return Task.FromResult(true); }).ConfigureAwait(false); }
+            try { using var request = Request(HttpMethod.Delete); var response = await ExchangeAsync(request, timeout.Token, closingDelete: true).ConfigureAwait(false); await OwnResponse(response, async lease => { timeout.Token.ThrowIfCancellationRequested(); await StatusAsync(response, lease, timeout.Token).ConfigureAwait(false); return true; }).ConfigureAwait(false); }
             catch (Exception error) { errors.Add(error); }
         }
         lock (gate) foreach (var error in cleanupFailures) Add(errors, error);

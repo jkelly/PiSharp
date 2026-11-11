@@ -8,6 +8,9 @@ namespace PiSharp.Extensions.Mcp.Configuration;
 public enum McpExposure { Codemode, Deferred, Direct, Hidden }
 public enum McpTransportKind { Stdio, Http }
 public enum McpConfigurationScope { Global, Project, Extension }
+/// <summary>A shared stdio/HTTP entry, or a validation error. Unknown application fields are retained.</summary>
+public sealed record McpServerFieldsValidation(McpTransportKind? Transport, JsonData? Config, string? Error)
+{ public bool IsValid => Transport is not null; }
 
 /// <summary>Validated inert values. Raw JSON preserves optional and unknown fields with exposure aliases resolved;
 /// it grants no connection authority.</summary>

@@ -327,12 +327,21 @@ internal static partial class StoreInternal
             if (!ColumnName.IsMatch(name) || !folded.Add(name.ToLowerInvariant())) throw DataInternal.Invalid("args", $"{where}: not a column name");
             CheckColumn(column, where);
         }
+        if (write.Columns.Values.Count(column => column.Host is not null) > 1)
+            throw DataInternal.Invalid("args", $"{what}: more than one host(...) column");
         if (write.Key.Count == 0) throw DataInternal.Invalid("args", $"{what}: the key has no column");
         CheckOrderColumns(write.Columns, write.Key, $"{what}: the key");
     }
 
     private static void CheckColumn(ColumnRecord column, string what)
     {
+        if (column.Host is { } host)
+        {
+            if (column.Type != ColumnType.Str || column.Optional || column.Default is not null)
+                throw DataInternal.Invalid("args", $"{what}: a host(...) column is a required str without a default");
+            try { ContractsInternal.CheckName(host, $"{what}: host kind"); }
+            catch (ArgumentException error) { throw DataInternal.Invalid("args", error.Message); }
+        }
         var json = column.Type == ColumnType.Json;
         if (json != (column.Version is not null) || json != (column.Fingerprint is not null))
             throw DataInternal.Invalid("args", $"{what}: a json(...) column has a version and a fingerprint, no other column has");
@@ -458,6 +467,7 @@ internal static partial class StoreInternal
         CreatedAt = Integer(record["createdAt"]),
         RetiredAt = record["retiredAt"] is { } retired ? Integer(retired) : null,
         Meta = ChordJson.AsString(record["meta"]),
+        Host = ChordJson.AsString(record["host"]),
         Revision = Integer(record["revision"]),
         Version = Integer(record["version"]),
         Fingerprint = (string)record["fingerprint"]!,

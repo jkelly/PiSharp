@@ -1,6 +1,6 @@
 name: Release
 
-# Push a version tag (v1.5.0, or v1.5.0.1 for a C#-only patch) to build, validate,
+# Push a version tag (v1.5.2, or a fourth-segment C#-only patch) to build, validate,
 # publish every package to NuGet with trusted publishing, and create the GitHub release.
 # Run manually to do a dry run: it builds and validates the packages but publishes nothing.
 on:
@@ -11,7 +11,7 @@ on:
       version:
         description: Version to build and validate (dry run, nothing is published)
         required: true
-        default: '1.5.0.1'
+        default: '1.5.2'
       skip_tests:
         description: Skip the 22 release-list suites (dry runs only; core/Durable validation still runs)
         type: boolean
@@ -59,7 +59,7 @@ jobs:
           global-json-file: global.json
 
       # PiSharp.ExtensionParity.Tests runs TypeScript extensions with Node.js 22.13 or later (module.stripTypeScriptTypes) and
-      # installs the Pi 1.2.0 packages with npm; the runner image's default Node.js is older.
+      # uses the exact Pi 1.5.2 packages; the runner image's default Node.js may be older.
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -80,6 +80,16 @@ jobs:
       - name: Verify historical model catalog evidence
         if: github.event_name == 'push' || !inputs.skip_tests
         run: node tools/ci/ensure-historical-ai-archive.mjs
+
+      - name: Install and verify the current Pi 1.5.2 extension fixture
+        if: github.event_name == 'push' || !inputs.skip_tests
+        shell: bash
+        run: |
+          mkdir -p artifacts/node-runtime-152
+          cp tools/NodeBridge/runtime-fixture-152/package.json tools/NodeBridge/runtime-fixture-152/package-lock.json artifacts/node-runtime-152/
+          npm ci --prefix artifacts/node-runtime-152 --ignore-scripts --no-audit --no-fund
+          node tools/NodeBridge/installed-runtime-abi.mjs artifacts/node-runtime-152/node_modules
+          echo "PISHARP_TEST_PI152_NODE_MODULES=$GITHUB_WORKSPACE/artifacts/node-runtime-152/node_modules" >> "$GITHUB_ENV"
 
       - name: Run offline tests
         if: github.event_name == 'push' || !inputs.skip_tests

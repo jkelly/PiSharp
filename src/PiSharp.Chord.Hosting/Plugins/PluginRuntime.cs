@@ -19,6 +19,7 @@ public sealed class PluginContext(string name, string directory, string kind = "
 public sealed class PluginRuntimeOptions
 {
     public string Kind { get; init; } = "server";
+    public PluginManagerOptions? Policy { get; init; }
     /// <summary>A bounded wait for plugin callbacks at retirement; timeout never forces an executing context to unload.</summary>
     public TimeSpan CallbackDrainTimeout { get; init; } = TimeSpan.FromSeconds(30);
     /// <summary>Explicit host contract libraries. Their exact loaded identities are shared across all generations.</summary>
@@ -38,9 +39,10 @@ public sealed class PluginRuntime : IAsyncDisposable
     private bool initialized, disposed;
     private readonly object disposalSync = new();
     private Task? disposal;
+    private readonly HashSet<Task> originalDrains = [];
     private readonly IDisposable callbackRegistration;
     public PluginRuntime(ChordHost host, PluginRuntimeOptions? options = null)
-    { this.host = host; this.options = options ?? new(); callbackRegistration = host.RegisterCallbackLifetime((callback, facet) => PluginCallbacks.Acquire(callback, facet)); }
+    { this.host = host; this.options = options ?? new(); if (this.options.Policy is { } policy && policy.Kind != this.options.Kind) throw new ArgumentException("runtime kind must match plugin policy"); callbackRegistration = host.RegisterCallbackLifetime((callback, facet) => PluginCallbacks.Acquire(callback, facet)); }
     public IReadOnlyList<WeakReference> RetiredContexts => retired.ToArray();
 
     public async Task<LoadReport> LoadAsync(PluginBuildSet builds, IReadOnlyList<PluginFacet> coreFacets, ChordContext context)
@@ -57,11 +59,22 @@ public sealed class PluginRuntime : IAsyncDisposable
                 var rejected = report.Failed.Select(x => x.Plugin).ToHashSet(StringComparer.Ordinal);
                 foreach (var (name, generation) in next) { if (!rejected.Contains(name)) loaded.Add(name, generation); else _ = Retire(generation); }
                 core = coreFacets.ToArray(); initialized = true;
-                return new(failed.Concat(report.Failed).ToArray());
+                var all = failed.Concat(report.Failed).ToArray();
+                var required = builds.Problems.Where(p => p.Required).Select(p => p.Error).Concat(all.Where(f => builds.Plugins.Any(p => p.Plugin.Required && p.Plugin.Manifest.Name == f.Plugin)).Select(f => f.Error.Message)).ToArray();
+                if (required.Length != 0) throw new PluginError("required plugins failed: " + string.Join("; ", required));
+                return new(all);
             }
-            catch { foreach (var generation in next.Values) _ = Retire(generation); throw; }
+            catch { foreach (var generation in next.Values.Where(g => !loaded.Values.Contains(g))) _ = Retire(generation); throw; }
         }
         finally { gate.Release(); }
+    }
+
+    internal async Task SetCoreForTestingAsync(IReadOnlyList<PluginFacet> facets, PluginBuildSet builds, ChordContext context)
+    {
+        core = facets;
+        var report = await ReloadAsync(builds, context).ConfigureAwait(false);
+        if (report.Failed.Count != 0) throw new PluginError("test setup failed: " + string.Join("; ", report.Failed.Select(f => f.Error.Message)));
+        await DrainRetiredAsync(context).ConfigureAwait(false);
     }
 
     public async Task<ReloadReport> ReloadAsync(PluginBuildSet builds, ChordContext context)
@@ -117,7 +130,9 @@ public sealed class PluginRuntime : IAsyncDisposable
     }
     private Generation Evaluate(BuiltPlugin build)
     {
-        var context = new PluginLoadContext(build.AssemblyPath!, options.SharedAssemblies);
+        PluginPolicy.ValidateManifest(build.Plugin, options.Policy);
+        PluginPolicy.ValidateAssemblies(Path.GetDirectoryName(build.AssemblyPath!)!, options.Policy);
+        var context = new PluginLoadContext(build.AssemblyPath!, options.SharedAssemblies.Concat(PluginPolicy.Shared(options.Policy)).Distinct().ToArray(), options.Policy);
         try
         {
             var assembly = context.LoadFromAssemblyPath(Path.GetFullPath(build.AssemblyPath!));
@@ -157,9 +172,20 @@ public sealed class PluginRuntime : IAsyncDisposable
     private Task Retire(Generation generation)
     {
         if (!generation.Recorded) { generation.Recorded = true; retired.Add(new(generation.Context)); }
-        return generation.Retire();
+        var drain = generation.Retire();
+        lock (disposalSync) originalDrains.Add(drain);
+        return drain;
     }
     public ValueTask DisposeAsync() { lock (disposalSync) return new(disposal ??= DisposeCoreAsync()); }
+    /// <summary>Starts disposal and joins every actual generation callback, beyond the public disposal timeout.
+    /// Close the host first; stores and other callback resources must remain open until this settles.</summary>
+    public async Task JoinOriginalsAsync()
+    {
+        try { await DisposeAsync().ConfigureAwait(false); }
+        catch (TimeoutException) { /* Public timeout does not end ownership of actual callbacks. */ }
+        Task[] drains; lock (disposalSync) drains = originalDrains.ToArray();
+        await Task.WhenAll(drains).ConfigureAwait(false);
+    }
     private async Task DisposeCoreAsync()
     {
         await Task.Yield();
@@ -180,8 +206,10 @@ internal sealed class PluginLoadContext : AssemblyLoadContext
     private readonly string directory;
     private readonly string[] frameworkDirectories = [Path.GetDirectoryName(typeof(object).Assembly.Location)!, Path.GetDirectoryName(typeof(Microsoft.AspNetCore.Http.HttpContext).Assembly.Location)!];
     private readonly Dictionary<string, Assembly> shared;
-    internal PluginLoadContext(string assembly, IReadOnlyList<Assembly> hostAssemblies) : base($"chord:{Path.GetFileNameWithoutExtension(assembly)}:{Guid.NewGuid():N}", true)
+    private readonly PluginManagerOptions? policy;
+    internal PluginLoadContext(string assembly, IReadOnlyList<Assembly> hostAssemblies, PluginManagerOptions? policy = null) : base($"chord:{Path.GetFileNameWithoutExtension(assembly)}:{Guid.NewGuid():N}", true)
     {
+        this.policy = policy;
         resolver = new(assembly);
         directory = Path.GetDirectoryName(Path.GetFullPath(assembly))!;
         shared = new[] { typeof(Facet).Assembly, typeof(IChordPlugin).Assembly, typeof(PiSharp.Contracts.Schema.JsonSchemaBuilder).Assembly, typeof(PiSharp.Telemetry.ITelemetryContext).Assembly }
@@ -189,6 +217,8 @@ internal sealed class PluginLoadContext : AssemblyLoadContext
     }
     protected override Assembly? Load(AssemblyName name)
     {
+        if (policy?.AppApi is not null && name.Name!.StartsWith("PiSharp.Chord", StringComparison.OrdinalIgnoreCase) && !PluginPolicy.Shared(policy).Any(a => a.GetName().Name == name.Name))
+            throw new FileLoadException($"Direct Chord dependency {name.Name} is not admitted");
         if (shared.TryGetValue(name.Name!, out var assembly))
         {
             if (!string.Equals(name.FullName, assembly.GetName().FullName, StringComparison.Ordinal)) throw new FileLoadException($"shared assembly identity mismatch: {name}");
@@ -196,9 +226,18 @@ internal sealed class PluginLoadContext : AssemblyLoadContext
         }
         var path = resolver.ResolveAssemblyToPath(name);
         if (path is null && name.Name is { } simple) { var local = Path.Combine(directory, simple + ".dll"); if (File.Exists(local)) path = local; }
-        if (path is not null) return LoadFromAssemblyPath(path);
+        if (path is not null)
+        {
+            if (!PluginScanner.Inside(directory, Path.GetFullPath(path))) throw new FileLoadException($"Private dependency {name.Name} resolves outside its immutable plugin artifact");
+            return LoadFromAssemblyPath(path);
+        }
         if (name.Name is { } frameworkName && frameworkDirectories.Any(root => File.Exists(Path.Combine(root, frameworkName + ".dll")))) return null;
         throw new FileNotFoundException($"Private dependency {name.Name} was not included in the plugin build or explicitly shared by its host");
     }
-    protected override nint LoadUnmanagedDll(string name) => resolver.ResolveUnmanagedDllToPath(name) is { } path ? LoadUnmanagedDllFromPath(path) : 0;
+    protected override nint LoadUnmanagedDll(string name)
+    {
+        if (resolver.ResolveUnmanagedDllToPath(name) is not { } path) return 0;
+        if (!PluginScanner.Inside(directory, Path.GetFullPath(path))) throw new FileLoadException($"Native dependency {name} resolves outside its immutable plugin artifact");
+        return LoadUnmanagedDllFromPath(path);
+    }
 }

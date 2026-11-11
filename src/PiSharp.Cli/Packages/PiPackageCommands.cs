@@ -352,10 +352,12 @@ Options:
         await ReportSettingsErrors(console, settings, "package command").ConfigureAwait(false);
 
         var manager = new PiPackageManager(cwd, agentDir, host.Home, settings, host.GetEnvironment, Processes(host));
+        var warningCount = 0;
         manager.SetProgressCallback(progress =>
         {
             if (progress.Type == "start") host.Stdout.Write(console.Dim($"{progress.Message}\n"));
-            else if (progress.Type == "progress" && !string.IsNullOrEmpty(progress.Message)) host.Stdout.Write(console.Yellow($"{progress.Message}\n"));
+            else if (progress.Type == "progress" && !string.IsNullOrEmpty(progress.Message))
+            { Interlocked.Increment(ref warningCount); host.Stdout.Write(console.Yellow($"{progress.Message}\n")); }
             else return;
             host.Stdout.Flush();
         });
@@ -408,7 +410,9 @@ Options:
                     {
                         var updateSource = target.Type == "extensions" ? target.Source : null;
                         var summary = await manager.UpdateAsync(updateSource, token).ConfigureAwait(false);
-                        foreach (var line in summary.Lines()) await console.Log(line).ConfigureAwait(false);
+                        foreach (var package in summary.Packages.Where(package => package.Warning is not null))
+                            await console.Log(console.Yellow($"Warning: {package.Source}: {package.Warning}")).ConfigureAwait(false);
+                        foreach (var line in summary.CliLines(updateSource, warningCount)) await console.Log(line).ConfigureAwait(false);
                     }
                     if (target.Type is "all" or "self")
                     {
@@ -498,8 +502,15 @@ Options:
             IReadOnlyDictionary<string, Exception> errors;
             try { errors = await registry.RefreshAsync(allowNetwork: true, force: true, providers: null, timeout.Token).ConfigureAwait(false); }
             catch (OperationCanceledException) when (!token.IsCancellationRequested) { throw new PiPackageException("Model catalog refresh timed out."); }
-            if (errors.Count > 0)
-                throw new PiPackageException($"Could not refresh model catalogs: {string.Join("; ", errors.Select(pair => $"{pair.Key}: {pair.Value.Message}"))}");
+            var failures = new List<string>();
+            foreach (var (provider, error) in errors)
+            {
+                if (IsStaleCatalogLogin(error))
+                    await console.Error(console.Yellow($"Warning: skipped model catalog for {provider}: {error.Message}\nLog in again with `{App} auth login {provider}` to refresh it.")).ConfigureAwait(false);
+                else failures.Add($"{provider}: {error.Message}");
+            }
+            if (failures.Count > 0)
+                throw new PiPackageException($"Could not refresh model catalogs: {string.Join("; ", failures)}");
         }
         catch (Exception error) when (error is not OperationCanceledException || !token.IsCancellationRequested)
         {
@@ -509,4 +520,7 @@ Options:
         await console.Log(console.Green("Model catalogs refreshed")).ConfigureAwait(false);
         return 0;
     }
+
+    internal static bool IsStaleCatalogLogin(Exception error) => error is PiSharp.AI.Authentication.OAuth.OAuthLifecycleException
+    { Failure: PiSharp.AI.Authentication.OAuth.OAuthLifecycleFailure.Refresh or PiSharp.AI.Authentication.OAuth.OAuthLifecycleFailure.MinimumValidity };
 }

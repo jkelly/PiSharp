@@ -77,7 +77,8 @@ internal static partial class DataInternal
             if (label.Length + root.Length > room) label = Clip(label, room - root.Length);
         }
         var message = $"{WaitingPrefix}{label}{WaitingSeparator}{root}";
-        return new FailureCause(FailureKind.Waiting, new ChordError("unavailable", message, cause: error));
+        var version = error.Code == "contract_mismatch" || error.Code == "unavailable" && error.Reason == "version";
+        return new FailureCause(FailureKind.Waiting, new ChordError("unavailable", message, version ? "version" : null, cause: error));
     }
 
     /// <summary><paramref name="text"/> within <paramref name="length"/> characters, clipped with "…" when longer.</summary>

@@ -79,6 +79,31 @@ public sealed partial class Markdown : IComponent
     private void ClearRenderCache() { cachedText = null; cachedWidth = null; cachedLines = null; }
 
     [GeneratedRegex(@"\x1b\[0m")] private static partial Regex ResetCode();
+    [GeneratedRegex(@"<!--[\s\S]*?(?:-->|$)")] private static partial Regex HtmlComment();
+
+    private static string StripHtmlComments(string html) => HtmlComment().Replace(html, "");
+
+    private static void RemoveHtmlCommentBlocks(List<MarkdownToken> tokens)
+    {
+        for (var i = tokens.Count - 1; i >= 0; i--)
+        {
+            var token = tokens[i];
+            if (token.Type == "list")
+            {
+                foreach (var item in token.Items) if (item.Tokens is { } nested) RemoveHtmlCommentBlocks(nested);
+            }
+            else if (token.Type == "blockquote")
+            {
+                if (token.Tokens is { } nested) RemoveHtmlCommentBlocks(nested);
+            }
+            else if (token.Type == "html" && TextUtils.JsTrim(StripHtmlComments(token.Raw)).Length == 0)
+            {
+                tokens.RemoveAt(i);
+                if (i < tokens.Count && tokens[i].Type == "space" && (i == 0 || tokens[i - 1].Type == "space")) tokens.RemoveAt(i);
+                else if (i == tokens.Count && i > 0 && tokens[i - 1].Type == "space") tokens.RemoveAt(--i);
+            }
+        }
+    }
 
     public List<string> Render(int width)
     {
@@ -93,6 +118,7 @@ public sealed partial class Markdown : IComponent
         {
             var lexed = MarkdownLexer.Lex(normalized, out var linkCount);
             MarkdownLexer.TrimPartialClosingFences(lexed);
+            RemoveHtmlCommentBlocks(lexed);
             tokenCache = new TokenCache(normalized, lexed, linkCount);
             cachedTokens = new(tokenCache);
         }
@@ -254,7 +280,7 @@ public sealed partial class Markdown : IComponent
                 lines.Add(theme.Hr(TextUtils.Repeat("─", Math.Min(width, 80))));
                 if (nextType is not null && nextType != "space") lines.Add("");
                 break;
-            case "html": lines.Add(ApplyDefaultStyle(TextUtils.JsTrim(token.Raw))); break;
+            case "html": lines.Add(ApplyDefaultStyle(TextUtils.JsTrim(StripHtmlComments(token.Raw)))); break;
             case "space": lines.Add(""); break;
             default: if (token.Text.Length > 0 || token.Type is "image") lines.Add(token.Text); break;
         }
@@ -267,8 +293,13 @@ public sealed partial class Markdown : IComponent
         var (apply, prefix) = (resolved.ApplyText, resolved.StylePrefix);
         string WithNewlines(string value) => string.Join('\n', value.Split('\n').Select(apply));
         var result = new System.Text.StringBuilder();
-        foreach (var token in tokens)
+        var dropLeadingSpace = false;
+        for (var i = 0; i < tokens.Count; i++)
         {
+            var token = tokens[i];
+            var text = token.Text;
+            if (dropLeadingSpace && token.Type == "text" && token.Tokens is not { Count: > 0 }) text = text.TrimStart(' ', '\t');
+            dropLeadingSpace = false;
             switch (token.Type)
             {
                 case "latex":
@@ -276,7 +307,7 @@ public sealed partial class Markdown : IComponent
                 case "escape": result.Append(WithNewlines(options.PreserveBackslashEscapes ? token.Raw : token.Text)); break;
                 case "text":
                     if (token.Tokens is { Count: > 0 }) result.Append(RenderInline(token.Tokens, resolved));
-                    else result.Append(WithNewlines(token.Text));
+                    else result.Append(WithNewlines(text));
                     break;
                 case "paragraph": result.Append(RenderInline(token.Tokens ?? [], resolved)); break;
                 case "strong": result.Append(theme.Bold(RenderInline(token.Tokens ?? [], resolved))).Append(prefix); break;
@@ -296,7 +327,11 @@ public sealed partial class Markdown : IComponent
                 }
                 case "br": result.Append('\n'); break;
                 case "del": result.Append(theme.Strikethrough(RenderInline(token.Tokens ?? [], resolved))).Append(prefix); break;
-                case "html": result.Append(WithNewlines(token.Raw)); break;
+                case "html":
+                    if (token.Raw.StartsWith("<!--", StringComparison.Ordinal))
+                        dropLeadingSpace = i == 0 || tokens[i - 1].Raw.EndsWith(' ') || tokens[i - 1].Raw.EndsWith('\t');
+                    else result.Append(WithNewlines(token.Raw));
+                    break;
                 default: result.Append(WithNewlines(token.Text)); break;
             }
         }

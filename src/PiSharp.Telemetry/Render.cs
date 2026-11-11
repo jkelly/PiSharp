@@ -41,13 +41,13 @@ public static class TraceRenderer
             if (span.Status.IsError)
             {
                 error = " error";
-                if (span.Status.Error is { } detail) error += $" {detail.Name}: {detail.Message}";
+                if (span.Status.Error is { } detail) error += $" {Escaped(detail.Name)}: {Escaped(detail.Message)}";
             }
-            lines.Add($"{indent}{span.Name}{FormatAttributes(span.Attributes)} ({JsText.Number(span.EndedMs - span.StartedMs)}ms){error}");
+            lines.Add($"{indent}{Escaped(span.Name)}{FormatAttributes(span.Attributes)} ({JsText.Number(TelemetryClock.RoundMillisecondsToMicrosecond(span.EndedMs - span.StartedMs))}ms){error}");
             foreach (var item in span.Events)
-                lines.Add($"{indent}  · {item.Name}{FormatAttributes(item.Attributes)} (+{JsText.Number(item.TimeMs)}ms)");
+                lines.Add($"{indent}  · {Escaped(item.Name)}{FormatAttributes(item.Attributes)} (+{JsText.Number(TelemetryClock.RoundMillisecondsToMicrosecond(item.TimeMs))}ms)");
             foreach (var link in span.Links)
-                lines.Add($"{indent}  → link trace {link.TraceId} span {link.SpanId}{FormatAttributes(link.Attributes)}");
+                lines.Add($"{indent}  → link trace {Escaped(link.TraceId)} span {Escaped(link.SpanId)}{FormatAttributes(link.Attributes)}");
             if (children.TryGetValue(span.Id, out var descendants))
                 for (var index = descendants.Count - 1; index >= 0; index--) pending.Push((descendants[index], depth + 1));
         }
@@ -60,11 +60,21 @@ public static class TraceRenderer
         var sb = new StringBuilder();
         foreach (var (name, value) in attributes)
         {
-            sb.Append(' ').Append(name).Append('=');
+            sb.Append(' ').Append(Escaped(name)).Append('=');
             // JSON.stringify(undefined) is undefined, which the template writes as text.
             if (value is null) sb.Append("undefined");
             else JsText.Write(sb, value);
         }
         return sb.ToString();
+    }
+
+    private static string Escaped(string text)
+    {
+        var result = new StringBuilder(text.Length);
+        foreach (var character in text)
+            if (character <= '\u001f' || character is >= '\u007f' and <= '\u009f')
+                result.Append("\\u").Append(((int)character).ToString("x4", System.Globalization.CultureInfo.InvariantCulture));
+            else result.Append(character);
+        return result.ToString();
     }
 }

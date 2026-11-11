@@ -18,12 +18,19 @@ internal sealed class SkillInvocationMessageComponent : Box
     private bool expanded;
     private readonly ParsedSkillBlock skillBlock;
     private readonly MarkdownTheme markdownTheme;
+    private readonly IReadOnlyList<MarkdownTransformer> markdownTransformers;
+    private readonly string? messageId;
+    private readonly string? timestamp;
 
-    public SkillInvocationMessageComponent(ParsedSkillBlock skillBlock, MarkdownTheme? markdownTheme = null, int outputPad = 1)
+    public SkillInvocationMessageComponent(ParsedSkillBlock skillBlock, MarkdownTheme? markdownTheme = null, int outputPad = 1,
+        IReadOnlyList<MarkdownTransformer>? markdownTransformers = null, string? messageId = null, string? timestamp = null)
         : base(outputPad, 1, t => theme.Bg("customMessageBg", t))
     {
         this.skillBlock = skillBlock;
         this.markdownTheme = markdownTheme ?? Themes.GetMarkdownTheme();
+        this.markdownTransformers = markdownTransformers ?? [];
+        this.messageId = messageId;
+        this.timestamp = timestamp;
         UpdateDisplay();
     }
 
@@ -52,7 +59,9 @@ internal sealed class SkillInvocationMessageComponent : Box
             var label = theme.Fg("customMessageLabel", "\u001b[1m[skill]\u001b[22m");
             content.AddChild(new Text(label, 0, 0));
             var header = $"**{skillBlock.Name}**\n\n";
-            content.AddChild(new Markdown(header + skillBlock.Content, 0, 0, markdownTheme, new DefaultTextStyle(Color: text => theme.Fg("customMessageText", text))));
+            var transform = MarkdownTransform.CreateMarkdownTransform(MarkdownMessageType.Custom, () => false, markdownTransformers, messageId, timestamp);
+            content.AddChild(new Markdown(skillBlock.Content, 0, 0, markdownTheme, new DefaultTextStyle(Color: text => theme.Fg("customMessageText", text)),
+                new MarkdownOptions(Transform: (markdown, width) => header + transform(markdown, width))));
         }
         else
         {

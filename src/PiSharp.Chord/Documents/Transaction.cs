@@ -23,6 +23,7 @@ using PiSharp.Chord.Data;
 using PiSharp.Chord.Delta;
 using PiSharp.Chord.Store;
 using PiSharp.Chord.Jobs;
+using PiSharp.Chord.Contracts;
 
 namespace PiSharp.Chord.Documents;
 
@@ -38,11 +39,17 @@ public interface ITx
     /// <inheritdoc cref="DraftAsync(ISingletonHandle)"/>
     Task<JsonObject> DraftAsync(IKeyedHandle handle, string key);
 
+    /// <summary>Drafts an owned document keyed by a host address.</summary>
+    Task<JsonObject> DraftAsync(IHostKeyedHandle handle, Address key);
+
     /// <summary>Retires the document when the transaction commits (its address reads <c>initial()</c> again); a no-op when it is absent.</summary>
     Task RetireAsync(ISingletonHandle handle);
 
     /// <inheritdoc cref="RetireAsync(ISingletonHandle)"/>
     Task RetireAsync(IKeyedHandle handle, string key);
+
+    /// <summary>Retires an owned document keyed by a host address.</summary>
+    Task RetireAsync(IHostKeyedHandle handle, Address key);
 
     /// <summary>The row with <paramref name="key"/> as this transaction leaves it (its own put, update and delete overlaid; W10), null when
     /// absent.</summary>
@@ -113,6 +120,9 @@ internal sealed class Transaction : ITx, ILineHolder
     private (IChordStore Store, List<IStagedWrite> Staged)? writes;
     // The tables written, each with its writes and overlay.
     private Dictionary<TableHandle, TableChanges>? tables;
+    private QueryRefresh? queryRefresh;
+    private IReadOnlyList<Adoption> committedAdoptions = [];
+    private long committedRows;
     // tx reads underway: a callback settling with one is refused (rule 3, as Durable's).
     private int pending;
     // tx reads started so far: a callback that completed without yielding after starting one awaited none (Documents.TxAsync, rule 3).
@@ -148,6 +158,18 @@ internal sealed class Transaction : ITx, ILineHolder
 
     public SealToken Token { get; }
 
+    internal bool Admitted { get { lock (gate) return state is TxState.Stepping or TxState.Committed; } }
+
+    internal (long Documents, long Ops, long Writes, long Rows) CommittedCounts()
+    {
+        lock (gate)
+        {
+            if (state != TxState.Committed) return (0, 0, 0, 0);
+            return (committedAdoptions.Count, committedAdoptions.Sum(adoption => (long)(adoption.Prepared?.Ops.Length ?? 0)),
+                writes?.Staged.Count ?? 0, committedRows);
+        }
+    }
+
     public IJobRun Start(IJobHandle job, JsonNode? args, StartOptions? options = null)
     {
         AssertOpen();
@@ -176,6 +198,21 @@ internal sealed class Transaction : ITx, ILineHolder
         ArgumentNullException.ThrowIfNull(key);
         return Draft(handle, key);
     }
+
+    public Task<JsonObject> DraftAsync(IHostKeyedHandle handle, Address key)
+    {
+        try { var keyed = OwnedHostHandle(handle); return Draft(keyed.Inner, keyed.Key(key)); }
+        catch (Exception error) { return Task.FromException<JsonObject>(error); }
+    }
+
+    public Task RetireAsync(IHostKeyedHandle handle, Address key)
+    {
+        try { var keyed = OwnedHostHandle(handle); return Retire(keyed.Inner, keyed.Key(key)); }
+        catch (Exception error) { return Task.FromException(error); }
+    }
+
+    private static HostKeyed OwnedHostHandle(IHostKeyedHandle handle) => handle as HostKeyed
+        ?? throw new ArgumentException("A transaction takes the handles self.state made.", nameof(handle));
 
     /// <summary>
     /// The draft of the document at <paramref name="key"/> of <paramref name="slot"/> (Chord's own slots, a job's run states). A cold
@@ -336,6 +373,7 @@ internal sealed class Transaction : ITx, ILineHolder
             // Cut from another thread while preparing (its drafts aborted under the loop): the cut's error, not the overlay's.
             throw CutError();
         }
+        committedAdoptions = adoptions;
         if (writes is not { } store)
         {
             // Admitted as the store's step admits (a cut from another thread now is too late to stop it), then adopted at once (W12).
@@ -347,6 +385,11 @@ internal sealed class Transaction : ITx, ILineHolder
             AdoptAll(adoptions);
             lock (gate) state = TxState.Committed;
             return null;
+        }
+        if (tables is { Count: > 0 })
+        {
+            queryRefresh = StoreInternal.RefreshOf(tables.Values.Where(changes => changes.HasWrites).Select(changes => changes.Handle), ChordContext.WithoutAbortSignal(context));
+            if (queryRefresh is not null) store.Staged.Add(queryRefresh.Write);
         }
         return StepAsync(store.Store, store.Staged, adoptions);
     }
@@ -400,6 +443,7 @@ internal sealed class Transaction : ITx, ILineHolder
     {
         try
         {
+            persisted.Persistence.CheckHost(found.Host, persisted.Definition.Current);
             DocumentsInternal.CheckReadable(found.Stored.Version, found.Fingerprint, persisted.Definition.Current);
         }
         catch (Exception error)
@@ -479,7 +523,7 @@ internal sealed class Transaction : ITx, ILineHolder
                 state = TxState.Stepping;
                 return true;
             }
-        }, (_, _) => AdoptAll(adoptions));
+        }, (_, _) => AdoptAll(adoptions)) { Rows = rows => committedRows = rows };
         var cut = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         lock (gate)
         {
@@ -524,7 +568,7 @@ internal sealed class Transaction : ITx, ILineHolder
     private void AdoptAll(List<Adoption> adoptions)
     {
         var changes = staged;
-        if (adoptions.Count == 0 && changes is null) return;
+        if (adoptions.Count == 0 && changes is null && queryRefresh is null) return;
         documents.Batch.Commit(() =>
         {
             foreach (var (entry, prepared, retires, stored) in adoptions)
@@ -535,6 +579,7 @@ internal sealed class Transaction : ITx, ILineHolder
             }
             if (changes is not null)
                 foreach (var each in changes.Values) each.Adopt();
+            queryRefresh?.Adopt();
         }, context);
     }
 

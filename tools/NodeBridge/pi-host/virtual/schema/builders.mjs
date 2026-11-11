@@ -1,4 +1,4 @@
-// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/schema/src/builders.ts.
+// Pi b4afdddf44e059c67ccf5097e5317d913521b470 (MIT): packages/schema/src/builders.ts.
 // Ported to plain ESM for the PiSharp Node extension bridge (TypeScript types stripped mechanically; behaviour unchanged).
 export function str(options = {}) {
     return {
@@ -15,6 +15,12 @@ export function num(options = {}) {
 export function int(options = {}) {
     return {
         type: "integer",
+        ...options
+    };
+}
+export function bigint(options = {}) {
+    return {
+        type: "bigint",
         ...options
     };
 }
@@ -85,6 +91,17 @@ export function map(value, options = {}) {
         type: "object",
         additionalProperties: value,
         ...options
+    };
+}
+export function unsafe(schema = {}) {
+    return schema;
+}
+export function recursive(id, build) {
+    return {
+        ...build({
+            $ref: id
+        }),
+        $id: id
     };
 }
 export function bytes(options = {}) {

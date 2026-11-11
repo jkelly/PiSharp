@@ -603,16 +603,20 @@ internal static partial class Program
 
     private static IEnumerable<(string, Func<Task>)> DeterministicDifferentialCases() =>
     [
-        // The prelude is upstream's byte for byte, so its fingerprint part equals upstream's.
+        // The captured fingerprint remains Pi 1.2.0. The current prelude is independently verified byte for byte
+        // against frozen Pi 1.5.2, whose added nonfinite formatter changes its FNV-1a fingerprint.
         Case("differential.deterministic-prelude-hash", async () =>
         {
             var golden = DeterministicGoldens();
             await using var sandbox = new CodemodeSandbox();
             var recorded = StartRun(sandbox, "return 1");
             await recorded.Run.Result;
+            Equal("8c6c9242", golden.GetProperty("preludeHash").GetString(), "preserved Pi 1.2.0 capture");
             Check(golden.GetProperty("upstreamFingerprint").GetString()!.Contains($"prelude {golden.GetProperty("preludeHash").GetString()},", StringComparison.Ordinal), "golden fingerprint");
-            Check(recorded.Fingerprint!.Contains($"prelude {golden.GetProperty("preludeHash").GetString()},", StringComparison.Ordinal),
-                $"PiSharp {recorded.Fingerprint} against upstream {golden.GetProperty("upstreamFingerprint").GetString()}");
+            // Derived from b4afdddf44e059c67ccf5097e5317d913521b470 PRELUDE_SOURCE; see the offline
+            // AI_DOCS/agent-reports/sync-1.5.2-codemode-prelude-check.mjs verification, not a recaptured 1.2.0 fixture.
+            Check(recorded.Fingerprint!.Contains("prelude 4dce1bde,", StringComparison.Ordinal),
+                $"PiSharp {recorded.Fingerprint} against current Pi 1.5.2 prelude 4dce1bde");
         }),
         .. Hosts.Select(host => Case($"differential.deterministic-runs.{host.Name}", async () =>
         {

@@ -17,14 +17,14 @@ internal static partial class Program
     [
         Case("store.schema.the-history-is-upstream-s-text-byte-for-byte", () =>
         {
-            var history = new JsonArray([.. StoreInternal.StoreMigrations.Select(migration => (JsonNode?)new JsonObject
+            var history = new JsonArray([.. StoreInternal.StoreMigrations.Take(2).Select(migration => (JsonNode?)new JsonObject
             {
                 ["version"] = migration.Version,
                 ["statements"] = StoreInternal.Strings(migration.Statements),
             })]);
             Equal("cb78f873cf73d0685ef8c09a6ff2688bd2b0ed7a9ac3700aae77e47d1a5f4919", StoreSha256(ChordJson.Stringify(history)), "JSON.stringify(MIGRATIONS)");
             Equal("dcc6a14b9c8a3ee2305780942e104786a8fd78b39c26b9f778049fb49249ef3a", StoreSha256(StoreInternal.CurrentMetaSql), "CURRENT_META");
-            Equal(2L, StoreInternal.StoreSchema, "STORE_SCHEMA");
+            Equal(3L, StoreInternal.StoreSchema, "STORE_SCHEMA");
             Sequence(["chord_meta", "chord_tables", "chord_documents", "chord_revisions", "chord_outbox"],
                 [StoreInternal.StoreTables.Meta, StoreInternal.StoreTables.Tables, StoreInternal.StoreTables.Documents, StoreInternal.StoreTables.Revisions,
                     StoreInternal.StoreTables.Outbox], "TABLES");

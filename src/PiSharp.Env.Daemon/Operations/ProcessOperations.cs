@@ -28,9 +28,9 @@ public static class EnvProcessOperations
                 if (request.Json["target"] is not JsonValue target || !target.TryGetValue<uint>(out var id) ||
                     !Processes(request).TryGetValue(id, out var process))
                     throw new EnvDaemonException("EBADF", "The program is no longer running");
-                // ReadOnlyMemory<T> accepts a null array as an empty memory. Keep this conditional nullable so EOF
-                // cannot silently become a zero-byte write through that implicit conversion.
-                await process.InputAsync(name == "processWrite" ? request.Payload : (ReadOnlyMemory<byte>?)null, request.CancellationToken).ConfigureAwait(false);
+                // Admission runs on the frame reader: enqueue now, without waiting for a blocked child pipe.
+                // A nullable memory distinguishes EOF from a valid zero-byte write.
+                process.QueueInput(name == "processWrite" ? request.Payload : (ReadOnlyMemory<byte>?)null);
                 return EnvDaemonReply.Empty;
             }
             var input = Parse(request.Json, name == "process");
@@ -157,10 +157,42 @@ public static class EnvProcessOperations
     private sealed class Run(EnvDaemonRequest request, Child child, bool piped, Input options)
     {
         private readonly SemaphoreSlim inputGate = new(1, 1);
+        private readonly Channel<ReadOnlyMemory<byte>?> inputs = Channel.CreateUnbounded<ReadOnlyMemory<byte>?>(new()
+        { SingleReader = true, SingleWriter = true, AllowSynchronousContinuations = false });
         private readonly object killGate = new();
         private Task? killTask;
         private bool inputClosed;
         private Task Stop() { lock (killGate) return killTask ??= Task.Run(async () => await child.KillAsync().ConfigureAwait(false)); }
+        public void QueueInput(ReadOnlyMemory<byte>? bytes)
+        {
+            // Snapshot the frame payload because the writer outlives request admission.
+            // A conditional with Memory<byte> and null can bind null through its array conversion,
+            // turning EOF into an empty memory. Preserve the nullable sentinel explicitly.
+            ReadOnlyMemory<byte>? snapshot = null;
+            if (bytes is { } data) snapshot = data.ToArray();
+            if (!inputs.Writer.TryWrite(snapshot)) throw new EnvDaemonException("EBADF", "The program's stdin is closed");
+        }
+
+        private async Task WriteInputAsync(CancellationToken token)
+        {
+            try
+            {
+                await foreach (var input in inputs.Reader.ReadAllAsync(token).ConfigureAwait(false))
+                {
+                    if (input is not { } data) break;
+                    await child.Stdin.WriteAsync(data, token).ConfigureAwait(false);
+                    await child.Stdin.FlushAsync(token).ConfigureAwait(false);
+                }
+            }
+            catch (OperationCanceledException) when (token.IsCancellationRequested) { }
+            catch (Exception error) when (error is IOException or System.ComponentModel.Win32Exception or ObjectDisposedException) { }
+            finally
+            {
+                inputs.Writer.TryComplete();
+                while (inputs.Reader.TryRead(out _)) { }
+                await child.Stdin.DisposeAsync().ConfigureAwait(false);
+            }
+        }
         public async ValueTask InputAsync(ReadOnlyMemory<byte>? bytes, CancellationToken token)
         {
             await inputGate.WaitAsync(token).ConfigureAwait(false);
@@ -178,6 +210,7 @@ public static class EnvProcessOperations
         public async Task<EnvDaemonReply> ExecuteAsync()
         {
             using var pumpsStop = new CancellationTokenSource();
+            var writer = piped ? WriteInputAsync(pumpsStop.Token) : Task.CompletedTask;
             await using var spill = !piped && options.Spill is not null ? new ProcessSpill(options.Spill) : null;
             var window = !piped && options.Window is not null ? new ProcessOutputWindow(options.Window) : null;
             var chunks = Channel.CreateBounded<Chunk>(new BoundedChannelOptions(8) { FullMode = BoundedChannelFullMode.Wait, SingleReader = true });
@@ -295,11 +328,13 @@ public static class EnvProcessOperations
             finally
             {
                 Processes(request).TryRemove(request.Id, out _);
+                inputs.Writer.TryComplete();
                 stop ??= Stop();
                 pumpsStop.Cancel();
                 // Drain the bounded queue while joining readers so a last EOF cannot deadlock cleanup.
                 while (!pumps.IsCompleted) { while (chunks.Reader.TryRead(out _)) { } await Task.WhenAny(pumps, Task.Delay(10)).ConfigureAwait(false); }
                 try { await pumps.ConfigureAwait(false); } catch (Exception error) { failure ??= error; }
+                try { await writer.ConfigureAwait(false); } catch (Exception error) { failure ??= error; }
                 try { await stop.ConfigureAwait(false); } catch (Exception error) { failure ??= error; }
                 try { await delivery.ConfigureAwait(false); } catch (Exception error) { failure ??= error; }
             }

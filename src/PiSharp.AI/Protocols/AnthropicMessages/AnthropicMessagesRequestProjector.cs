@@ -30,12 +30,12 @@ public sealed class AnthropicRequestException : Exception
 }
 public sealed record AnthropicMessagesRequestOptions(
     int MaximumTokens, bool ModelReasoning = false, bool ModelSupportsImages = true,
-    bool? ThinkingEnabled = null, bool ForceAdaptiveThinking = false, double ThinkingBudgetTokens = 1024,
+    bool? ThinkingEnabled = null, bool? ForceAdaptiveThinking = null, double ThinkingBudgetTokens = 1024,
     string ThinkingDisplay = "summarized", string? Effort = null, bool SupportsThinkingOff = true,
-    decimal? Temperature = null, bool SupportsTemperature = true, bool AllowEmptyThinkingSignatures = false,
-    AnthropicCacheRetention CacheRetention = AnthropicCacheRetention.Short, bool SupportsLongCacheRetention = true,
-    bool SupportsEagerToolInputStreaming = true, bool SupportsStrictTools = false, bool SupportsCacheControlOnTools = true,
-    bool OAuthProjection = false, bool InterleavedThinking = true, bool SupportsMidConversationSystemMessages = false,
+    decimal? Temperature = null, bool? SupportsTemperature = null, bool? AllowEmptyThinkingSignatures = null,
+    AnthropicCacheRetention CacheRetention = AnthropicCacheRetention.Short, bool? SupportsLongCacheRetention = null,
+    bool? SupportsEagerToolInputStreaming = null, bool? SupportsStrictTools = null, bool? SupportsCacheControlOnTools = null,
+    bool OAuthProjection = false, bool InterleavedThinking = true, bool? SupportsMidConversationSystemMessages = null,
     ImmutableArray<string> AllowedFallbackModels = default, ImmutableArray<string> BetaFeatures = default,
     JsonData? ToolChoice = null, string? UserId = null,
     int MaximumMessages = PiRequestBudget.RequestMessages, int MaximumEntryCharacters = PiRequestBudget.RequestEntryCharacters, int MaximumInputCharacters = PiRequestBudget.RequestPayloadBytes,
@@ -43,7 +43,7 @@ public sealed record AnthropicMessagesRequestOptions(
     int MaximumContentBlocks = PiRequestBudget.RequestItems, int MaximumDeclarations = int.MaxValue, int MaximumActiveTools = int.MaxValue,
     int MaximumProjectedMessages = PiRequestBudget.RequestItems, int MaximumJsonDepth = PiSharp.Contracts.JsonData.MaximumDepth,
     int MaximumOutputCharacters = PiRequestBudget.RequestPayloadBytes, int MaximumOutputBytes = PiRequestBudget.RequestPayloadBytes,
-    bool SupportsMidConversationToolChanges = false, bool SupportsMidConversationEffort = false)
+    bool? SupportsMidConversationToolChanges = null, bool? SupportsMidConversationEffort = null)
 {
     /// <summary>Optional per-level token budgets used by native thinking bindings.</summary>
     public JsonData? ThinkingBudgets { get; init; }
@@ -55,7 +55,7 @@ public sealed record AnthropicMessagesRequestOptions(
     internal bool ThinkingDisabled => ModelReasoning && ThinkingEnabled == false && SupportsThinkingOff;
     /// <summary>Upstream buildParams effortMessages: effort cannot change between messages while thinking is disabled, so "off"
     /// sends no effort markers.</summary>
-    internal bool EffortMessages => SupportsMidConversationEffort && !ThinkingDisabled;
+    internal bool EffortMessages => SupportsMidConversationEffort == true && !ThinkingDisabled;
     /// <summary>Pi 1.2.0 buildParams(disablePreferredStrictTools): strict "prefer" tools are sent non-strict (the one fallback
     /// request after Anthropic rejects the strict tool set); strict "require" tools stay strict.</summary>
     public bool DisablePreferredStrictTools { get; init; }
@@ -125,7 +125,7 @@ public sealed class AnthropicMessagesRequestProjector
         private long _inputCharacters;
         private int _projectedBlocks;
         private JsonObject? Cache => options.CacheRetention == AnthropicCacheRetention.None ? null :
-            options.CacheRetention == AnthropicCacheRetention.Long && options.SupportsLongCacheRetention
+            options.CacheRetention == AnthropicCacheRetention.Long && options.SupportsLongCacheRetention != false
                 ? new() { ["type"] = "ephemeral", ["ttl"] = "1h" } : new() { ["type"] = "ephemeral" };
         public JsonData Run()
         {
@@ -145,7 +145,7 @@ public sealed class AnthropicMessagesRequestProjector
                 token.ThrowIfCancellationRequested(); var entry = _entries[index];
                 if (entry.Role == "system")
                 {
-                    if (options.SupportsMidConversationSystemMessages && index != 0)
+                    if (options.SupportsMidConversationSystemMessages == true && index != 0)
                     {
                         var text = RenderUpdate(entry.Body.Value);
                         var blocks = new JsonArray();
@@ -191,7 +191,7 @@ public sealed class AnthropicMessagesRequestProjector
                             {
                                 var signed = signature is not null && Trim(signature).Length > 0;
                                 if (Trim(thinking.Thinking).Length == 0 && !signed) continue;
-                                blocks.Add(signed || options.AllowEmptyThinkingSignatures
+                                blocks.Add(signed || options.AllowEmptyThinkingSignatures == true
                                     ? new JsonObject { ["type"] = "thinking", ["thinking"] = thinking.Thinking, ["signature"] = signed ? signature : "" }
                                     : TextBlock(thinking.Thinking));
                             }
@@ -241,12 +241,12 @@ public sealed class AnthropicMessagesRequestProjector
             CloseCalls(); FlushSystems(); AttachLastCache();
             if (options.EffortMessages) InsertEffortMessages();
             var root = new JsonObject { ["model"] = request.Model.Id, ["messages"] = _messages, ["max_tokens"] = options.MaximumTokens, ["stream"] = true };
-            var system = options.SupportsMidConversationSystemMessages ? InitialSystem() : FoldedSystem();
+            var system = options.SupportsMidConversationSystemMessages == true ? InitialSystem() : FoldedSystem();
             var systemBlocks = new JsonArray();
             if (options.OAuthProjection) systemBlocks.Add(CacheText("You are Claude Code, Anthropic's official CLI for Claude."));
             if (system.Length > 0) systemBlocks.Add(CacheText(system));
             if (systemBlocks.Count > 0) root["system"] = systemBlocks;
-            if (options.Temperature is { } temperature && options.ThinkingEnabled != true && !options.SupportsMidConversationEffort && options.SupportsTemperature) root["temperature"] = JsonNode.Parse(Number((double)temperature), documentOptions: PiSharp.Contracts.JsonData.DocumentOptions);
+            if (options.Temperature is { } temperature && options.ThinkingEnabled != true && options.SupportsMidConversationEffort != true && options.SupportsTemperature != false) root["temperature"] = JsonNode.Parse(Number((double)temperature), documentOptions: PiSharp.Contracts.JsonData.DocumentOptions);
             var tools = ConvertTools(); if (tools.Count > 0) root["tools"] = tools;
             var betas = Betas(); if (betas.Count > 0) root["betas"] = betas;
             // No effort is sent while thinking is disabled, so the model default applies; Anthropic rejects block_binding with it.
@@ -262,10 +262,10 @@ public sealed class AnthropicMessagesRequestProjector
             }
             else if (options.ModelReasoning && options.ThinkingEnabled == true)
             {
-                root["thinking"] = options.ForceAdaptiveThinking
+                root["thinking"] = options.ForceAdaptiveThinking == true
                     ? new JsonObject { ["type"] = "adaptive", ["display"] = options.ThinkingDisplay }
                     : new JsonObject { ["type"] = "enabled", ["budget_tokens"] = JsonNumber.Node(options.ThinkingBudgetTokens == 0 ? 1024 : options.ThinkingBudgetTokens), ["display"] = options.ThinkingDisplay };
-                if (options.ForceAdaptiveThinking && options.Effort is not null) root["output_config"] = new JsonObject { ["effort"] = options.Effort };
+                if (options.ForceAdaptiveThinking == true && options.Effort is not null) root["output_config"] = new JsonObject { ["effort"] = options.Effort };
             }
             if (options.UserId is not null) { Unicode(options.UserId); root["metadata"] = new JsonObject { ["user_id"] = options.UserId }; }
             if (options.ToolChoice is { } choice)
@@ -346,7 +346,7 @@ public sealed class AnthropicMessagesRequestProjector
         private bool SameModel(AssistantMessage message) => message.Api == request.Model.Api && message.Provider == request.Model.Provider && message.Model == request.Model.Id;
         private void PrepareNativeTools()
         {
-            if (!options.SupportsMidConversationSystemMessages || !options.SupportsMidConversationToolChanges ||
+            if (options.SupportsMidConversationSystemMessages != true || options.SupportsMidConversationToolChanges != true ||
                 _entries.Count == 0 || _entries[0].Role != "system" ||
                 !_entries[0].Body.Value.TryGetUtf16Property("toolsAdded", out var initial) || initial.GetArrayLength() == 0) return;
             // inline-tools-2026-09-15: the request-level list stays the initial tools plus the placeholder. Every later
@@ -528,7 +528,7 @@ public sealed class AnthropicMessagesRequestProjector
                 if (!names.Add(name)) throw Fail(AnthropicRequestFailure.IdentityCollision);
                 var tool = ConvertTool(declarations[position], name);
                 // Native changes keep the breakpoint on the last initial tool; the placeholder follows uncached.
-                if (options.SupportsCacheControlOnTools && position == declarations.Count - 1 && Cache is { } cache) tool["cache_control"] = cache;
+                if (options.SupportsCacheControlOnTools != false && position == declarations.Count - 1 && Cache is { } cache) tool["cache_control"] = cache;
                 Charge(tool); result.Add(tool);
             }
             if (_nativeToolChanges)
@@ -553,7 +553,7 @@ public sealed class AnthropicMessagesRequestProjector
                     var preference = String(config, "strict"); if (preference is not ("prefer" or "require")) throw Fail(AnthropicRequestFailure.UnsupportedContent);
                     // Pi 1.2.0 convertTools(disablePreferredStrictTools): the fallback request sends "prefer" tools with their original schema.
                     if (preference == "prefer" && options.DisablePreferredStrictTools) strict = false;
-                    else if (options.SupportsStrictTools)
+                    else if (options.SupportsStrictTools == true)
                     {
                         try { var candidate = schema.DeepClone().AsObject(); MakeStrict(candidate); if (!IsType(candidate, "object")) throw new StrictSchemaException(); schema = candidate; strict = true; }
                         catch (StrictSchemaException) { if (preference == "require") throw Fail(AnthropicRequestFailure.UnsupportedStrictSchema); }
@@ -573,7 +573,7 @@ public sealed class AnthropicMessagesRequestProjector
                 foreach (var definitions in new[] { "$defs", "definitions" })
                     if (schema.TryGetPropertyValue(definitions, out var value)) input[definitions] = value?.DeepClone();
             var tool = new JsonObject { ["name"] = name, ["description"] = String(declaration, "description"), ["input_schema"] = input };
-            if (options.SupportsEagerToolInputStreaming) tool["eager_input_streaming"] = true;
+            if (options.SupportsEagerToolInputStreaming != false) tool["eager_input_streaming"] = true;
             if (strict) tool["strict"] = true;
             if (strict && declaration.GetUtf16Property("constrainedSampling").GetUtf16Property("strict").GetString() == "prefer") HasPreferredStrictTools = true;
             return tool;
@@ -589,10 +589,10 @@ public sealed class AnthropicMessagesRequestProjector
             else
             {
                 if (options.OAuthProjection) values.AddRange(["claude-code-20250219", "oauth-2025-04-20"]);
-                if (_tools.Count > 0 && !options.SupportsEagerToolInputStreaming) values.Add("fine-grained-tool-streaming-2025-05-14");
-                if (options.ModelReasoning && options.ThinkingEnabled == true && options.InterleavedThinking && !options.ForceAdaptiveThinking) values.Add("interleaved-thinking-2025-05-14");
+                if (_tools.Count > 0 && options.SupportsEagerToolInputStreaming == false) values.Add("fine-grained-tool-streaming-2025-05-14");
+                if (options.ModelReasoning && options.ThinkingEnabled == true && options.InterleavedThinking && options.ForceAdaptiveThinking != true) values.Add("interleaved-thinking-2025-05-14");
                 if (!options.AllowedFallbackModels.IsDefaultOrEmpty) values.Add("server-side-fallback-2026-07-01");
-                if (options.SupportsMidConversationEffort) values.AddRange(["mid-conversation-output-config-2026-07-01", "thinking-binding-controls-2026-08-01"]);
+                if (options.SupportsMidConversationEffort == true) values.AddRange(["mid-conversation-output-config-2026-07-01", "thinking-binding-controls-2026-08-01"]);
                 if (_nativeToolChanges) values.Add("inline-tools-2026-09-15");
             }
             return new JsonArray(values.Select(value => (JsonNode?)JsonValue.Create(value)).ToArray());

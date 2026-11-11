@@ -1,7 +1,7 @@
-// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/ai/src/api/lazy.ts.
+// Pi b4afdddf44e059c67ccf5097e5317d913521b470 (MIT): packages/ai/src/api/lazy.ts.
 // Ported to plain ESM for the PiSharp Node extension bridge (TypeScript types stripped mechanically; behaviour unchanged).
 import { AssistantMessageEventStream } from "../utils/event-stream.mjs";
-function createSetupErrorMessage(model, error, timestamp) {
+function createSetupErrorMessage(model, error, timestamp, stopReason) {
     return {
         role: "assistant",
         content: [],
@@ -22,7 +22,7 @@ function createSetupErrorMessage(model, error, timestamp) {
                 total: 0
             }
         },
-        stopReason: "error",
+        stopReason,
         errorMessage: error instanceof Error ? error.message : String(error),
         timestamp
     };
@@ -42,7 +42,7 @@ async function forwardStream(target, source, observer, observeResult) {
     target.end(result);
     observeResult(result);
 }
-export function lazyStream(model, setup, observer) {
+export function lazyStream(model, setup, observer, signal) {
     const startedAt = Date.now();
     const outer = new AssistantMessageEventStream();
     let observedResult = false;
@@ -52,10 +52,11 @@ export function lazyStream(model, setup, observer) {
         observer?.onResult?.(result);
     };
     setup().then((inner)=>forwardStream(outer, inner, observer, observeResult)).catch((error)=>{
-        const message = createSetupErrorMessage(model, error, startedAt);
+        const reason = signal?.aborted ? "aborted" : "error";
+        const message = createSetupErrorMessage(model, error, startedAt, reason);
         const event = {
             type: "error",
-            reason: "error",
+            reason,
             error: message
         };
         outer.push(event);
@@ -67,15 +68,15 @@ export function lazyStream(model, setup, observer) {
 }
 export function lazyApi(load, capabilities) {
     const api = {
-        stream: (model, context, options)=>lazyStream(model, async ()=>(await load()).stream(model, context, options)),
-        streamSimple: (model, context, options)=>lazyStream(model, async ()=>(await load()).streamSimple(model, context, options))
+        stream: (model, context, options)=>lazyStream(model, async ()=>(await load()).stream(model, context, options), undefined, options?.signal),
+        streamSimple: (model, context, options)=>lazyStream(model, async ()=>(await load()).streamSimple(model, context, options), undefined, options?.signal)
     };
     if (capabilities?.fetchDeferred) {
         api.fetchDeferred = (model, handle, options)=>lazyStream(model, async ()=>{
                 const implementation = await load();
                 if (!implementation.fetchDeferred) throw new Error("API does not support deferred responses");
                 return implementation.fetchDeferred(model, handle, options);
-            });
+            }, undefined, options?.signal);
     }
     if (capabilities?.cancelDeferred) {
         api.cancelDeferred = async (model, handle, options)=>{

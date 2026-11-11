@@ -13,8 +13,11 @@ internal sealed class BinaryCodec : ICodec
     {
         var w = new Writer(); var kind = Array.IndexOf(Kinds, message.Kind);
         if (kind < 0) throw new ArgumentException("binary: an unknown kind");
-        w.Byte((byte)(kind | (message.Origin is null ? 0 : 128)));
+        var trace = message switch { HoldMessage hold => hold.Trace, CallMessage call => call.Trace, _ => null };
+        var old = message is CallMessage { Old: true };
+        w.Byte((byte)(kind | (message.Origin is null ? 0 : 128) | (trace is null ? 0 : 64) | (old ? 32 : 0)));
         if (message.Origin is { } origin) w.Number(origin);
+        if (trace is not null) w.Json(MessageCheck.CarrierJson(trace));
         switch (message)
         {
             case HelloMessage x: w.Number(x.Protocol); w.Hex(x.Incarnation.Replace("-", ""), 16); w.Number(x.Calls); break;
@@ -65,8 +68,12 @@ internal sealed class BinaryCodec : ICodec
     public Message Decode(ReadOnlyMemory<byte> bytes)
     {
         var r = new Reader(bytes); var header = r.Byte();
-        long? origin = (header & 128) == 0 ? null : r.Number(); var kind = header & 127;
+        long? origin = (header & 128) == 0 ? null : r.Number();
+        var trace = (header & 64) == 0 ? null : MessageCheck.ReadCarrier(r.Json());
+        var old = (header & 32) != 0;
+        var kind = header & 31;
         if (kind >= Kinds.Length) throw new ArgumentException("binary: an unknown kind");
+        if (trace is not null && kind is not (1 or 3) || old && kind != 3) throw MessageCheck.Invalid("kind flags");
         Message result;
         switch (kind)
         {
@@ -80,11 +87,11 @@ internal sealed class BinaryCodec : ICodec
                 var incarnation = (flags & 2) == 0 ? null : r.Uuid();
                 var chain = (flags & 4) == 0 ? null : r.List(r.Uuid);
                 long? limit = (flags & 8) == 0 ? null : r.Number();
-                result = new HoldMessage(hold,type,version,fingerprint,p,address,principal,incarnation,chain,limit); break;
+                result = new HoldMessage(hold,type,version,fingerprint,p,address,principal,incarnation,chain,limit,trace); break;
             case 2: result = new ReleaseMessage(r.Number()); break;
             case 3:
                 var call = r.Number(); var h = r.Number(); var method = r.Number(); var args = r.Payload();
-                result = new CallMessage(call,h,method,args.Part,args.Segments); break;
+                result = new CallMessage(call,h,method,args.Part,args.Segments,trace,old ? true : null); break;
             case 4: result = new AbortMessage(r.Number()); break;
             case 5:
                 result = new BoundMessage(r.List(() => new BoundEntry(r.Number(),r.Number(),

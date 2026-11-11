@@ -73,6 +73,9 @@ public sealed class StateOptions
     /// <summary>Many documents per object, each by a string key, instead of a singleton.</summary>
     public bool Keyed { get; init; }
 
+    /// <summary>Keys are addresses of this host kind. Implies <see cref="Keyed"/>.</summary>
+    public HostKind? KeyHost { get; init; }
+
     /// <summary>Stored in the host's store; only in <c>local</c> types with empty params (P3). Requires <see cref="CheckpointWhen"/>.</summary>
     public bool Persist { get; init; }
 
@@ -93,7 +96,7 @@ public sealed class StateDefinition
     private volatile bool initialChecked;
 
     private StateDefinition(string name, JsonNode schema, long version, Func<JsonObject> initial, Func<JsonObject, long, JsonObject>? migrate,
-        bool keyed, bool persist, CheckpointWhen? checkpointWhen)
+        bool keyed, bool persist, CheckpointWhen? checkpointWhen, HostKind? keyHost)
     {
         Name = name;
         Schema = schema;
@@ -101,6 +104,7 @@ public sealed class StateDefinition
         this.initial = initial;
         this.migrate = migrate;
         Keyed = keyed;
+        KeyHost = keyHost;
         Persist = persist;
         this.checkpointWhen = checkpointWhen ?? Never;
         Fingerprint = ContractsInternal.FingerprintOf(ContractsInternal.SnapshotSchema(schema, name).Normal);
@@ -117,6 +121,9 @@ public sealed class StateDefinition
 
     /// <summary>Whether its documents are many per object, by key.</summary>
     public bool Keyed { get; }
+
+    /// <summary>The address kind used for document keys, or null for ordinary string keys.</summary>
+    public HostKind? KeyHost { get; }
 
     /// <summary>Whether its documents are stored in the host's store.</summary>
     public bool Persist { get; }
@@ -140,8 +147,9 @@ public sealed class StateDefinition
         // Upstream's types: `persist: true` takes a required checkpointWhen, `persist: false` none.
         if (options.Persist && options.CheckpointWhen is null) throw new ArgumentException($"{name}: persist: true requires checkpointWhen");
         if (!options.Persist && options.CheckpointWhen is not null) throw new ArgumentException($"{name}: checkpointWhen requires persist: true");
-        return new StateDefinition(name, options.Schema, options.Version, options.Initial, options.Migrate, options.Keyed, options.Persist,
-            options.CheckpointWhen);
+        if (options.KeyHost is not null) ContractsInternal.KindParams(options.KeyHost);
+        return new StateDefinition(name, options.Schema, options.Version, options.Initial, options.Migrate, options.Keyed || options.KeyHost is not null, options.Persist,
+            options.CheckpointWhen, options.KeyHost);
     }
 
     /// <summary>Whether a persisted document's change is stored as a new base (its checkpoint rule); never asked in memory.</summary>

@@ -50,7 +50,7 @@ public sealed record ExtensionCustomComponentCallbacks(ExtensionCustomComponentI
     Func<string, IExtensionContext, CancellationToken, Task> Input,
     Func<IExtensionContext, Task> Dispose)
 {
-    /// <summary>Pi 1.5.0: report pi as blocked while this inline component is visible; null reports nothing. Overlays ignore it.</summary>
+    /// <summary>Report pi as blocked while this component is open; null reports nothing. Overlay status remains active while hidden.</summary>
     [Experimental("PISHARP_EXTUI001")]
     public ExtensionCustomComponentBlocked? Blocked { get; init; }
 

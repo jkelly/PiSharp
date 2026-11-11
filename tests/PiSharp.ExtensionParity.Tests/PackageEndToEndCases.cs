@@ -121,15 +121,15 @@ internal static partial class Program
         Equal($"User packages:\n  npm:fixture-pkg@1.0.0\n    {Path.Combine(userRoot, "node_modules", "fixture-pkg")}\n", stdout, "list");
 
         (code, stdout, _) = await RunPackages(sandbox, processes, "update", "--extensions");
-        Equal(0, code, "pinned update"); Equal("Unchanged npm:fixture-pkg@1.0.0 [user] (1.0.0)\n", stdout, "pinned versions are not updated"); Equal("1.0.0", Version(userRoot, "fixture-pkg"), "still pinned");
+        Equal(0, code, "pinned update"); Equal("Packages are already up to date\n", stdout, "pinned versions are not updated"); Equal("1.0.0", Version(userRoot, "fixture-pkg"), "still pinned");
 
         sandbox.Write(settingsPath, Jstr(new { packages = new[] { "npm:fixture-pkg@^1.0.0" } }));
         (code, stdout, stderr) = await RunPackages(sandbox, processes, "update", "--extensions");
         Equal(0, code, "range update; " + stderr);
-        Check(stdout.StartsWith("Updating npm:fixture-pkg@^1.0.0...\n", StringComparison.Ordinal) && stdout.EndsWith("Updated npm:fixture-pkg@^1.0.0 [user] (1.0.0 -> 1.1.0)\n", StringComparison.Ordinal), "range update output: " + stdout);
+        Check(stdout.StartsWith("Updating npm:fixture-pkg@^1.0.0...\n", StringComparison.Ordinal) && stdout.EndsWith("Updated 1 package:\n  npm:fixture-pkg@^1.0.0 1.0.0 -> 1.1.0\n", StringComparison.Ordinal), "range update output: " + stdout);
         Equal("1.1.0", Version(userRoot, "fixture-pkg"), "updated within the range");
         (code, stdout, _) = await RunPackages(sandbox, processes, "update", "npm:fixture-pkg");
-        Equal(0, code, "targeted update"); Equal("Unchanged npm:fixture-pkg@^1.0.0 [user] (1.1.0)\n", stdout, "already current");
+        Equal(0, code, "targeted update"); Equal("npm:fixture-pkg is already up to date\n", stdout, "already current");
 
         var run = await sandbox.Run("-p", "--provider", "anthropic", "--model", "claude-sonnet-4-5", "hi");
         Equal(0, run.Code, "session; " + run.Err);
@@ -208,11 +208,11 @@ internal static partial class Program
         var v2 = await Commit("prompts/second.md", "Second");
         (code, stdout, stderr) = await RunPackages(sandbox, processes, "update", "--extensions");
         Equal(0, code, "update; " + stderr);
-        Check(stdout.StartsWith($"Updating {source}...\n", StringComparison.Ordinal) && stdout.EndsWith($"Updated {source} [user] ({v1.Trim()} -> {v2.Trim()})\n", StringComparison.Ordinal), "update output: " + stdout);
+        Check(stdout.StartsWith($"Updating {source}...\n", StringComparison.Ordinal) && stdout.EndsWith($"Updated 1 package:\n  {source} {v1.Trim()[..7]} -> {v2.Trim()[..7]}\n", StringComparison.Ordinal), "update output: " + stdout);
         Check(File.Exists(Path.Combine(target, "prompts", "second.md")), "new commit pulled");
         Equal(v2, await Git(target, "rev-parse", "HEAD"), "at the remote head");
         (code, stdout, _) = await RunPackages(sandbox, processes, "update", source);
-        Equal(0, code, "targeted update"); Check(stdout.EndsWith($"Unchanged {source} [user] ({v2.Trim()})\n", StringComparison.Ordinal), "targeted update output");
+        Equal(0, code, "targeted update"); Check(stdout.EndsWith($"{source} is already up to date\n", StringComparison.Ordinal), "targeted update output");
 
         var run = await sandbox.Run("-p", "--provider", "anthropic", "--model", "claude-sonnet-4-5", "hi");
         Equal(0, run.Code, "session; " + run.Err);
@@ -240,13 +240,19 @@ internal static partial class Program
         Equal(Jstr(new[] { source }), Packages(Path.Combine(sandbox.Cwd, ".pi", "settings.json")), "project settings");
 
         // Temporary -e checkouts are refreshed on each resolve.
+        using var temporaryOutput = new StringWriter();
+        using var temporaryError = new StringWriter();
         var manager = new PiPackageManager(sandbox.Cwd, sandbox.AgentDir, sandbox.Home, PiSettings.Load(sandbox.Cwd, sandbox.AgentDir, true), _ => null,
-            new PiPackageProcesses { Environment = environment, Output = TextWriter.Null, ErrorOutput = TextWriter.Null });
+            new PiPackageProcesses { Environment = environment, Output = temporaryOutput, ErrorOutput = temporaryError });
         var temporary = await manager.ResolveExtensionSourcesAsync([source], temporary: true);
+        Check(temporary.InstallFailures.IsEmpty, "temporary checkout install: " +
+            string.Join("; ", temporary.InstallFailures.Select(failure => failure.Message)) + "\n" + temporaryError);
         var tempPrompt = temporary.Prompts.First(r => r.Path.EndsWith("third.md", StringComparison.Ordinal)).Path;
         Check(tempPrompt.StartsWith(Path.Combine(sandbox.AgentDir, "tmp", "extensions", "git-example.test") + Path.DirectorySeparatorChar, StringComparison.Ordinal), "temporary checkout location");
         await Commit("prompts/fourth.md", "Fourth");
         temporary = await manager.ResolveExtensionSourcesAsync([source], temporary: true);
+        Check(temporary.InstallFailures.IsEmpty, "temporary checkout refresh: " +
+            string.Join("; ", temporary.InstallFailures.Select(failure => failure.Message)) + "\n" + temporaryError);
         Check(temporary.Prompts.Any(r => r.Path.EndsWith("fourth.md", StringComparison.Ordinal)), "temporary checkout refreshed");
     }
 }

@@ -8,7 +8,7 @@ internal static partial class Program
 {
     private static IEnumerable<(string, Func<Task>)> HostReloadJobCases() =>
     [
-        Case("host.reload.handed-over-job-keeps-old-code-beyond-call-drain-bound", async () =>
+        Case("host.reload.pure-restart-aborts-old-in-memory-job", async () =>
         {
             var type = H2Type(); var started = H2Signal(); var finish = H2Signal(); var aborted = false;
             var definition = JobDefinition.Define("work", new() { Version = 1, Args = Nul(), Result = Str() });
@@ -33,14 +33,14 @@ internal static partial class Program
             var oldRun = await oldHandle!.StartAsync(null, ChordContext.Background);
             await started.Task;
             await host.ReloadAsync([Plugin("new")], ChordContext.Background);
-            await Task.Delay(300); // Host close timeout is 200 ms: a handover must not apply it to this invocation.
-            Check(!aborted, "ordinary reload leaves handed-over invocation context alive");
+            await host.DrainReloadsAsync(ChordContext.Background);
+            Check(aborted, "every reload cancels the old in-memory invocation");
+            var oldOutcome = await oldRun.OutcomeAsync(ChordContext.Background);
+            Equal("aborted", oldOutcome.Error!.Kind, "old run abort kind");
+            Equal("reload", oldOutcome.Error.Reason, "old run abort reason");
             var newRun = await newHandle!.StartAsync(null, ChordContext.Background);
             var newOutcome = await newRun.OutcomeAsync(ChordContext.Background);
             Equal("new", ((JsonNode)newOutcome.Result!).GetValue<string>(), "new invocations use new code");
-            finish.TrySetResult();
-            var oldOutcome = await oldRun.OutcomeAsync(ChordContext.Background);
-            Equal("old", ((JsonNode)oldOutcome.Result!).GetValue<string>(), "old invocation returns with old code");
             await host.DrainReloadsAsync(ChordContext.Background);
         }),
         Case("host.reload.native-restart-cuts-transient-job-with-reload-reason", async () =>

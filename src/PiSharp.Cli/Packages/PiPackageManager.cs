@@ -278,7 +278,7 @@ internal sealed class PiPackageManager
 
     private async Task<PiPackageUpdateSummary> UpdateConfiguredSources(List<(string Source, string Scope)> sources, CancellationToken cancellationToken)
     {
-        if (OfflineModeEnabled) return new([.. sources.Select(entry => new PiPackageUpdateResult(entry.Source, entry.Scope, PiPackageUpdateStatus.Offline))]);
+        if (OfflineModeEnabled) return new([.. sources.Select(entry => new PiPackageUpdateResult(entry.Source, entry.Scope, PiPackageUpdateStatus.Offline))], Offline: true);
         var results = new System.Collections.Concurrent.ConcurrentBag<PiPackageUpdateResult>();
         var npmCandidates = new List<(string Source, string Scope, PiNpmSource Parsed)>();
         var gitCandidates = new List<(string Source, string Scope, PiGitSource Parsed)>();
@@ -326,7 +326,10 @@ internal sealed class PiPackageManager
                 return true;
             })).ToList(), GitUpdateConcurrency));
         await Task.WhenAll(tasks).ConfigureAwait(false);
-        return new([.. sources.Select(entry => results.First(result => result.Source == entry.Source && result.Scope == entry.Scope))]);
+        var summary = new PiPackageUpdateSummary([.. sources.Select(entry => results.First(result => result.Source == entry.Source && result.Scope == entry.Scope))]);
+        // Emit after all workers finish, in configured order rather than completion order.
+        foreach (var result in summary.Results()) EmitProgress(new("result", "update", result.Source, result.Message));
+        return summary;
     }
 
     private async Task<string?> ReadGitHead(string path, CancellationToken token)

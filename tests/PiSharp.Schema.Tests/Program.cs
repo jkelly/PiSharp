@@ -15,6 +15,7 @@ internal static partial class Program
         var cases = new List<(string Id, Func<Task> Run)>();
         cases.AddRange(Sync150Cases);
         cases.AddRange(GapCases);
+        cases.AddRange(Sync152Cases);
         var results = new List<object>(); var failures = 0;
         foreach (var test in cases)
         {

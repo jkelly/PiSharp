@@ -1,5 +1,5 @@
 // Builds compatibility/durable-port-map.json from a Pi git repository that holds the pinned commit and the previous pin (decision 0005).
-// Usage: node tools/DurablePortMap/build-port-map.mjs --upstream <Pi git repository with both commits> [--check]
+// Usage: node tools/DurablePortMap/build-port-map.mjs --upstream <Pi git repository with both commits> [--map <map path>] [--check]
 // Everything is read from git objects, so the checkout's HEAD and work tree do not matter.
 // Each upstream file to port gets its git blob and line count at the pinned commit, the planned C# location, the phase and a status. A
 // rebuild keeps the status and note already recorded for a file. Against the previous pin it also records what changed upstream
@@ -15,8 +15,10 @@ const PREVIOUS_COMMIT = '06a466935536f8c9bcacb2d5efc0fc021be1bdff'; // Pi v1.2.0
 const PREVIOUS_VERSION = '1.2.0';
 const SYNC_PHASE = `sync-${UPSTREAM_VERSION}`; // phase of files new in the pinned commit; the work list groups them
 const WORKLIST = `compatibility/durable-sync-${UPSTREAM_VERSION}-worklist.json`;
-const OUT = 'compatibility/durable-port-map.json';
 const args = process.argv.slice(2);
+const mapIndex = args.indexOf('--map');
+if (mapIndex >= 0 && (!args[mapIndex + 1] || args[mapIndex + 1].startsWith('--'))) throw new Error('--map requires a path');
+const OUT = mapIndex >= 0 ? args[mapIndex + 1] : 'compatibility/durable-port-map.json';
 const upstream = args[args.indexOf('--upstream') + 1];
 if (!args.includes('--upstream') || !upstream) throw new Error('--upstream <Pi git repository> is required');
 const git = (...command) => execFileSync('git', ['-C', upstream, ...command], { encoding: 'utf8', maxBuffer: 1 << 30 });

@@ -1,7 +1,7 @@
-// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/schema/src/compiler.ts.
+// Pi b4afdddf44e059c67ccf5097e5317d913521b470 (MIT): packages/schema/src/compiler.ts.
 // Ported to plain ESM for the PiSharp Node extension bridge (TypeScript types stripped mechanically; behaviour unchanged).
 import { ANNOTATING_FALSE, ANNOTATING_TRUE, annotateAll, annotateAny, annotateArray, annotateDependent, annotateIf, annotateObject, ignoreAnnotations, indirectAnnotating, isolateAnnotations, scopedAnnotating, unevaluatedItems, unevaluatedProperties, withFreshAnnotations } from "./annotations.mjs";
-import { ALWAYS, and, anyCheck, bytesCheck, constCheck, containsCheck, declaredObject, dependentRequiredCheck, dependentSchemasCheck, enumCheck, GUARD_LOOSE, GUARD_NONE, GUARD_STRICT, guardArray, guardObject, INHERITED, IS_ARRAY, IS_OBJECT, ifCheck, indirect, itemsCheck, LEAF_CODES, lengthCheck, listCheck, NEVER, notCheck, numberCheck, oneCheck, openObject, propertyCountCheck, propertyNamesCheck, REQUIRED, scopedCheck, stringCheck, TYPE_CHECKS, taggedCheck, typeCheck, uniqueCheck } from "./checks.mjs";
+import { ALWAYS, and, anyCheck, bytesCheck, constCheck, containsCheck, declaredObject, dependentRequiredCheck, dependentSchemasCheck, enumCheck, GUARD_LOOSE, GUARD_NONE, GUARD_STRICT, guardArray, guardObject, INHERITED, IS_ARRAY, IS_OBJECT, ifCheck, indirect, itemsCheck, leafOf, lengthCheck, listCheck, maskedAnyCheck, NEVER, notCheck, numberCheck, oneCheck, openObject, propertyCountCheck, propertyNamesCheck, REQUIRED, scopedCheck, stringCheck, TYPE_CHECKS, taggedCheck, typeCheck, typeMask, uniqueCheck } from "./checks.mjs";
 import { documentOf, isSchemaObject, Resolver, resolveUri } from "./resolver.mjs";
 import { sharedRegex } from "./shared.mjs";
 export const RESTART = Symbol("restart");
@@ -72,8 +72,9 @@ export class Compiler {
         } else {
             const string = this.stringGroup(node, single === "string");
             if (string !== undefined) parts.push(string);
-            const numeric = single === "number" || single === "integer";
-            const number = this.numberGroup(node, single === "number" ? 1 : single === "integer" ? 2 : 0);
+            const numeric = single === "number" || single === "integer" || single === "bigint";
+            const mode = single === "number" ? 1 : single === "integer" ? 2 : single === "bigint" ? 3 : 0;
+            const number = this.numberGroup(node, mode);
             if (number !== undefined) parts.push(number);
             const object = this.objectGroup(node, base, single === "object");
             if (object !== undefined) parts.push(object);
@@ -104,7 +105,7 @@ export class Compiler {
     }
     union(branches, base, exactlyOne) {
         const checks = ()=>branches.map((s)=>this.check(s, base));
-        return constUnion(branches, exactlyOne) ?? this.tagged(branches, base) ?? (exactlyOne ? oneCheck(checks()) : anyCheck(checks()));
+        return constUnion(branches, exactlyOne) ?? this.tagged(branches, base) ?? (exactlyOne ? oneCheck(checks()) : anyOf(checks()));
     }
     ref(ref, base) {
         const target = this.r.resolve(ref, base);
@@ -179,11 +180,11 @@ export class Compiler {
         return stringCheck(strict, min, max, re, format);
     }
     numberGroup(node, mode) {
-        const min = number(node.minimum);
-        const max = number(node.maximum);
-        const xmin = number(node.exclusiveMinimum);
-        const xmax = number(node.exclusiveMaximum);
-        const multipleOf = number(node.multipleOf);
+        const min = bound(node.minimum);
+        const max = bound(node.maximum);
+        const xmin = bound(node.exclusiveMinimum);
+        const xmax = bound(node.exclusiveMaximum);
+        const multipleOf = bound(node.multipleOf);
         if ([
             min,
             max,
@@ -247,8 +248,9 @@ export class Compiler {
         const entries = [];
         for (const k of keys){
             const check = this.check(properties[k], base);
-            const flags = (LEAF_CODES.get(check) ?? 0) | (required.includes(k) ? REQUIRED : 0) | (k in Object.prototype ? INHERITED : 0);
-            entries.push(k, check, flags);
+            const leaf = leafOf(check);
+            const flags = (leaf?.[0] ?? 0) | (required.includes(k) ? REQUIRED : 0) | (k in Object.prototype ? INHERITED : 0);
+            entries.push(k, leaf === undefined ? check : leaf[1], flags);
         }
         const extraRequired = required.filter((k)=>!Object.hasOwn(properties, k));
         const pats = patternKeys.map((p)=>[
@@ -437,12 +439,31 @@ function constUnion(branches, exactlyOne) {
     }
     return enumCheck(values);
 }
+function anyOf(checks) {
+    const types = [];
+    const rest = [];
+    for (const check of checks){
+        const type = BARE_TYPES.get(check);
+        if (type === undefined) rest.push(check);
+        else types.push(type);
+    }
+    return types.length === 0 ? anyCheck(rest) : maskedAnyCheck(typeMask(types), rest);
+}
+const BARE_TYPES = new Map([
+    ...TYPE_CHECKS
+].map(([type, check])=>[
+        check,
+        type
+    ]));
 function tagOf(branch, key) {
     const properties = branch.properties;
     if (branch.type !== "object" || !Array.isArray(branch.required) || !branch.required.includes(key)) return undefined;
     const tag = isSchemaObject(properties) ? properties[key] : undefined;
     if (!isSchemaObject(tag) || !Object.hasOwn(tag, "const")) return undefined;
     return typeof tag.const === "object" && tag.const !== null ? undefined : tag.const;
+}
+function bound(value) {
+    return typeof value === "number" || typeof value === "bigint" ? value : undefined;
 }
 function number(value) {
     return typeof value === "number" ? value : undefined;

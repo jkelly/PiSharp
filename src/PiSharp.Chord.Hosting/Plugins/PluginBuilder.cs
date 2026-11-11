@@ -12,19 +12,23 @@ public sealed class PluginBuildOptions
     public TimeSpan Timeout { get; init; } = TimeSpan.FromMinutes(2);
     public string? PackageDirectory { get; init; }
     public bool Restore { get; init; }
+    public PluginManagerOptions? Policy { get; init; }
 }
 
 /// <summary>Plain data suitable for sending to a native worker on the same machine.</summary>
-public sealed record BuiltPlugin(NativePlugin Plugin, string? AssemblyPath, string? Digest, string? Error);
+public sealed record BuiltPlugin(NativePlugin Plugin, string? AssemblyPath, string? Digest, string? Error, BaseInputs? Inputs = null);
 public sealed record PluginBuildSet(IReadOnlyList<BuiltPlugin> Plugins, IReadOnlyList<DiscoveryProblem> Problems);
 
 public sealed class PluginBuilder(PluginBuildOptions options)
 {
+    public PluginManagerOptions? Policy => options.Policy;
     public async Task<BuiltPlugin> BuildAsync(NativePlugin plugin, CancellationToken cancellationToken = default)
     {
         string? output = null;
         try
         {
+            PluginPolicy.ValidateManifest(plugin, options.Policy);
+            var inputs = PluginPolicy.Inputs(plugin, options.Policy);
             var source = PluginScanner.ContainedPath(plugin.Directory, plugin.Manifest.Assembly);
             if (plugin.Manifest.Project is { } project)
             {
@@ -60,10 +64,10 @@ public sealed class PluginBuilder(PluginBuildOptions options)
                 output = Path.Combine(Path.GetFullPath(options.ArtifactDirectory), Guid.NewGuid().ToString("N"));
                 Directory.CreateDirectory(output);
                 var sourceDirectory = Path.GetDirectoryName(source)!;
-                var inputs = Directory.EnumerateFiles(sourceDirectory, "*", SearchOption.AllDirectories)
+                var copyInputs = Directory.EnumerateFiles(sourceDirectory, "*", SearchOption.AllDirectories)
                     .Where(file => !Path.GetFullPath(file).StartsWith(output + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
                     .Where(file => Path.GetExtension(file) is ".dll" or ".pdb" or ".json" or ".so" or ".dylib" || Path.GetRelativePath(sourceDirectory, file).StartsWith("runtimes" + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)).ToArray();
-                foreach (var file in inputs)
+                foreach (var file in copyInputs)
                 {
                     var target = Path.Combine(output, Path.GetRelativePath(sourceDirectory, file));
                     Directory.CreateDirectory(Path.GetDirectoryName(target)!); File.Copy(file, target);
@@ -71,6 +75,7 @@ public sealed class PluginBuilder(PluginBuildOptions options)
                 source = Path.Combine(output, Path.GetFileName(source));
             }
             if (!File.Exists(source)) throw new FileNotFoundException("plugin assembly was not produced", source);
+            PluginPolicy.ValidateAssemblies(output, options.Policy);
             using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
             hash.AppendData(Encoding.UTF8.GetBytes(plugin.Manifest.Name + "\n" + plugin.Manifest.Type));
             foreach (var file in Directory.EnumerateFiles(output, "*", SearchOption.AllDirectories)
@@ -79,12 +84,35 @@ public sealed class PluginBuilder(PluginBuildOptions options)
                 hash.AppendData(Encoding.UTF8.GetBytes(Path.GetRelativePath(output, file).Replace(Path.DirectorySeparatorChar, '/')));
                 hash.AppendData(await File.ReadAllBytesAsync(file, cancellationToken).ConfigureAwait(false));
             }
-            return new(plugin, source, Convert.ToHexString(hash.GetHashAndReset()), null);
+            return new(plugin, source, Convert.ToHexString(hash.GetHashAndReset()), null, inputs);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
         catch (AggregateException error) when (cancellationToken.IsCancellationRequested) { throw new OperationCanceledException("Plugin build cancelled during owned cleanup", error, cancellationToken); }
-        catch (Exception error) when (error is IOException or InvalidDataException or UnauthorizedAccessException or InvalidOperationException or OperationCanceledException or AggregateException or ArgumentException or System.ComponentModel.Win32Exception)
+        catch (Exception error) when (error is IOException or InvalidDataException or UnauthorizedAccessException or InvalidOperationException or OperationCanceledException or AggregateException or ArgumentException or System.ComponentModel.Win32Exception or System.Xml.XmlException)
         { return new(plugin, null, null, error is OperationCanceledException ? "plugin build timed out" : error.Message); }
+    }
+
+    /// <summary>Explicit dependency installation, using the same production policy and bounded child ownership as builds.</summary>
+    public async Task RestoreDependenciesAsync(NativePlugin plugin, CancellationToken cancellationToken = default)
+    {
+        PluginPolicy.ValidateManifest(plugin, options.Policy);
+        _ = PluginPolicy.Inputs(plugin, options.Policy);
+        if (plugin.Manifest.Project is not { } project) return;
+        var start = new ProcessStartInfo(options.DotnetPath) { WorkingDirectory = plugin.Directory, UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true };
+        foreach (var argument in new[] { "restore", PluginScanner.ContainedPath(plugin.Directory, project), "--locked-mode", "--disable-build-servers", "--nologo", "-v:q", "-p:RestoreDisableParallel=true" }) start.ArgumentList.Add(argument);
+        if (options.PackageDirectory is { } packages) start.Environment["NUGET_PACKAGES"] = Path.GetFullPath(packages);
+        start.Environment["MSBUILDDISABLENODEREUSE"] = "1";
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken); timeout.CancelAfter(options.Timeout);
+        await using var process = await OwnedChildProcess.StartAsync(start, timeout.Token).ConfigureAwait(false);
+        var stdout = ReadBoundedAsync(process.StandardOutput, 128 * 1024); var stderr = ReadBoundedAsync(process.StandardError, 128 * 1024);
+        process.OwnReader(stdout); process.OwnReader(stderr);
+        try
+        {
+            await process.WaitForExitAsync(timeout.Token).ConfigureAwait(false);
+            await Task.WhenAll(stdout, stderr).WaitAsync(timeout.Token).ConfigureAwait(false);
+            if (process.ExitCode != 0) throw new PluginError("dependency restore failed: " + stdout.Result + stderr.Result);
+        }
+        catch { await process.StopAsync().ConfigureAwait(false); throw; }
     }
 
     internal static async Task<string> ReadBoundedAsync(StreamReader reader, int limit)

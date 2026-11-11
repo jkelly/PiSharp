@@ -53,7 +53,9 @@ internal static partial class Program
                 Methods = new() { ["read"] = new() { Result = value => JsonValue.Create(int.Parse(((JsonNode)value!).GetValue<string>())) } },
             } }))));
             var report = await host.ReloadAsync([fresh], ChordContext.Background);
-            Equal("swapped", report.Objects.Single().Fate, "state migration is in-place");
+            await host.DrainReloadsAsync(ChordContext.Background);
+            Equal("restarted", report.Objects.Single().Fate, "state migration restarts while preserving slots");
+            await host.DrainReloadsAsync(ChordContext.Background);
             Check(ReferenceEquals(slots, host.Dispatcher.Invoke(() => host.Objects.Values.Single().Documents)), "document slot container retained");
             Equal(4, oldReference.Member("count").Value!.GetValue<int>(), "state mapping preserves v1 view");
             Equal(4, ((JsonNode)(await oldReference.CallAsync("read", null, ChordContext.Background))!).GetValue<int>(), "result mapping preserves v1 view");
@@ -77,6 +79,7 @@ internal static partial class Program
             { ["first"] = Watchables.Constant(JsonValue.Create("Ada")), ["last"] = Watchables.Constant(JsonValue.Create("Lovelace")) }), new(new AcceptsTable
             { [1] = new() { State = new() { ["name"] = new StateMapping(value => { mappings++; var state = (JsonObject)value!; return JsonValue.Create(state["first"]!.GetValue<string>() + " " + state["last"]!.GetValue<string>()); }) } } }))));
             await host.ReloadAsync([fresh], ChordContext.Background);
+            await host.DrainReloadsAsync(ChordContext.Background);
             Equal("Ada Lovelace", one.Member("name").Value!.GetValue<string>(), "removed member maps whole state");
             Equal("Ada Lovelace", two.Member("name").Value!.GetValue<string>(), "second reader sees same view");
             Equal(1, mappings, "one mapping derive shared by both references");
@@ -92,6 +95,7 @@ internal static partial class Program
             var fresh = new PluginFacet("profile", Facet.Define((h, _) => h.Serve(v2, (_, _, _) => new(new Dictionary<string, object?>()),
                 new(new AcceptsTable { [1] = new() { State = new() { ["name"] = StateMapping.Refuse } } }))));
             await host.ReloadAsync([fresh], ChordContext.Background);
+            await host.DrainReloadsAsync(ChordContext.Background);
             var error = Throws<ChordError>(() => _ = reference.Member("name").Value, "refused old member");
             Equal("contract_mismatch", error.Code, "explicit refusal surfaces contract mismatch");
         }),
@@ -150,6 +154,7 @@ internal static partial class Program
             await host.LoadAsync([Plugin(before, JsonValue.Create("old"))], ChordContext.Background);
             using var old = await host.GetAsync(before, new(), ChordContext.Background);
             await host.ReloadAsync([Plugin(after, JsonValue.Create(4))], ChordContext.Background);
+            await R1Until(() => old.State.Value.Kind == "failed");
             Equal("failed", old.State.Value.Kind, "old fingerprint no longer binds");
             Equal("contract_mismatch", old.State.Value.Cause!.Error.Code, "fingerprint mismatch classified");
             using var current = await host.GetAsync(after, new(), ChordContext.Background);
