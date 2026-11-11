@@ -311,10 +311,12 @@ internal static partial class Program
             var pair = MemoryLinkPair.Create(); using var raw = new R1Peer(pair.Second); host.Accept(pair.First, new() { Principal = R1User }, ChordContext.Background);
             raw.Send(R1Hold(type)); await raw.Next<BoundMessage>(); raw.Send(new CallMessage(0, 0, 0)); await raw.Next<ResultMessage>(); await raw.Next<StateMessage>();
             raw.Send(new CallMessage(1, 0, 1)); await started.Task;
-            var reload = host.ReloadAsync([Plugin("new")], ChordContext.Background);
-            Check(!reload.IsCompleted, "reload waits for old original callback");
+            // Pi 1.5.2 reports readiness while the admitted old call still drains.
+            await host.ReloadAsync([Plugin("new")], ChordContext.Background);
+            Check(!raw.All.OfType<ResultMessage>().Any(x => x.Call == 1), "readiness preserves the pending old call");
+            Check(!raw.All.OfType<BoundMessage>().Any(), "new bound waits for slot at readiness");
             finish.TrySetResult(); Equal("old", Parts.Parse((await raw.Next<ResultMessage>(x => x.Call == 1)).Value!)!.GetValue<string>(), "old call drains");
-            await reload; Check(!raw.All.OfType<BoundMessage>().Any(), "new bound waits for slot");
+            Check(!raw.All.OfType<BoundMessage>().Any(), "new bound waits for slot");
             raw.Send(new CallMessage(2, 0, 1)); Equal("new", Parts.Parse((await raw.Next<ResultMessage>(x => x.Call == 2)).Value!)!.GetValue<string>(), "old indexed names dispatch new call");
             raw.Send(new AckMessage()); await raw.Next<BoundMessage>();
         }),
