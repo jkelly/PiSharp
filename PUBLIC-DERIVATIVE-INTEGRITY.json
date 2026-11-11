@@ -5949,8 +5949,8 @@
       "originalSha256": "bcde4eebde2b95520bd8b32fe29eb057376e4855c83ae5dcfd70b0cc3c08eea2"
     },
     {
-      "currentSha256": "a4c7ff1f4fb82c91c8f2309781ff67e3adf8af65a685bc8c67035379a05231d9",
-      "currentBytes": 47639,
+      "currentSha256": "752a168c301af9a0c6eed3397f85b057bc22e6ddd8e290bf7ba1f14365009c6b",
+      "currentBytes": 47673,
       "originalBytes": 40459,
       "path": "src/PiSharp.Agent/Agent.cs",
       "originalSha256": "194437367f4ea72a556556a050c1a1fe6a7f435481b91cfa3f4f297c909a9aad"

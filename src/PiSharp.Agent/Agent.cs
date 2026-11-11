@@ -649,7 +649,7 @@ public sealed class Agent : IAsyncDisposable
                 run.CallbackFailed = true; _cancellationCallbackFailed = true;
                 IEnumerable<Exception> originals = error is AggregateException aggregate ? aggregate.Flatten().InnerExceptions : [error];
                 foreach (var original in originals)
-                    if (!run.CallbackFailures.Contains(original)) run.CallbackFailures = run.CallbackFailures.Add(original);
+                    if (!run.CallbackFailures.Any(existing => ReferenceEquals(existing, original))) run.CallbackFailures = run.CallbackFailures.Add(original);
             }
         }
         finally
