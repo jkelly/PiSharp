@@ -647,9 +647,9 @@ public sealed class Agent : IAsyncDisposable
             lock (_gate)
             {
                 run.CallbackFailed = true; _cancellationCallbackFailed = true;
-                IEnumerable<Exception> originals = error is AggregateException aggregate ? aggregate.Flatten().InnerExceptions : [error];
-                foreach (var original in originals)
-                    if (!run.CallbackFailures.Any(existing => ReferenceEquals(existing, original))) run.CallbackFailures = run.CallbackFailures.Add(original);
+                // Keep the caught tree intact; the owning session flattens its leaves in
+                // callback order and deduplicates original instances across cancellation paths.
+                if (!run.CallbackFailures.Any(existing => ReferenceEquals(existing, error))) run.CallbackFailures = run.CallbackFailures.Add(error);
             }
         }
         finally
