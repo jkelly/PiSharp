@@ -46,6 +46,9 @@ internal static class AppLayoutTests
                 VerifyPermissions(layout.CookieSecretFile, directory: false);
 
                 var loose = Path.Combine(layout.ServerDirectory, "loose");
+                // Ordinary creation deliberately exercises Windows' token default owner,
+                // which can be Administrators for an elevated runner. PrivateFile must
+                // still leave the account SID as owner and remove the broader grant.
                 File.WriteAllText(loose, "test");
                 if (OperatingSystem.IsWindows())
                 {

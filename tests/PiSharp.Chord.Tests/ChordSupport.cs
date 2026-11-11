@@ -222,7 +222,9 @@ internal static class ChordSupport
     {
         for (var round = 0; round < 5; round++)
         {
-            await Task.Yield();
+            // A queued continuation can run while another worker still holds its completed
+            // iterator frame. Use a macrotask turn, as upstream does, before collecting.
+            await Flushed();
             GC.Collect();
             GC.WaitForPendingFinalizers();
         }

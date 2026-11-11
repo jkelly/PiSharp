@@ -107,8 +107,8 @@ public static class Layout
         CheckNotRootOrHome(CanonicalPath(full));
         RefuseLinks(full);
         CreateMissingDirectories(full);
-        CheckOwner(full, directory: true);
-        if (OperatingSystem.IsWindows()) new DirectoryInfo(full).SetAccessControl(DirectorySecurity(includeOwner: false));
+        var normalizeOwner = CheckOwner(full, directory: true);
+        if (OperatingSystem.IsWindows()) new DirectoryInfo(full).SetAccessControl(DirectorySecurity(includeOwner: normalizeOwner));
         else File.SetUnixFileMode(full, DirectoryMode);
     }
 
@@ -122,8 +122,8 @@ public static class Layout
             try { using var created = CreatePrivateFile(full); }
             catch (IOException) when (File.Exists(full)) { }
         }
-        CheckOwner(full, directory: false);
-        if (OperatingSystem.IsWindows()) new System.IO.FileInfo(full).SetAccessControl(FileSecurity(includeOwner: false));
+        var normalizeOwner = CheckOwner(full, directory: false);
+        if (OperatingSystem.IsWindows()) new System.IO.FileInfo(full).SetAccessControl(FileSecurity(includeOwner: normalizeOwner));
         else File.SetUnixFileMode(full, FileModeBits);
     }
 
@@ -219,28 +219,35 @@ public static class Layout
         else Directory.CreateDirectory(path, DirectoryMode);
     }
 
-    private static void CheckOwner(string path, bool directory)
+    private static bool CheckOwner(string path, bool directory)
     {
         if (OperatingSystem.IsWindows())
         {
-            var current = WindowsIdentity.GetCurrent().User ?? throw new UnauthorizedAccessException("No current Windows owner identity.");
+            using var identity = WindowsIdentity.GetCurrent();
+            var current = identity.User ?? throw new UnauthorizedAccessException("No current Windows owner identity.");
             var owner = directory ? new DirectoryInfo(path).GetAccessControl(AccessControlSections.Owner).GetOwner(typeof(SecurityIdentifier))
                 : new System.IO.FileInfo(path).GetAccessControl(AccessControlSections.Owner).GetOwner(typeof(SecurityIdentifier));
-            if (!current.Equals(owner)) throw new UnauthorizedAccessException("The app data path belongs to another user.");
-            return;
+            // Windows applies the token's default owner to ordinary and SQLite-created files.
+            // For an elevated token this may be Administrators rather than the account SID.
+            // Admit that exact default owner, then PrivateDirectory/PrivateFile set the account
+            // owner and protected ACL explicitly; membership in other token groups is not enough.
+            if (!current.Equals(owner) && identity.Owner?.Equals(owner) != true)
+                throw new UnauthorizedAccessException("The app data path belongs to another user.");
+            return !current.Equals(owner);
         }
         var status = UnixStatus(path);
         if (status.Owner != geteuid()) throw new UnauthorizedAccessException("The app data path belongs to another user.");
         if ((status.Mode & 0xF000) != (directory ? 0x4000 : 0x8000)) throw new IOException("The app data path has an invalid file type.");
         if (!directory && status.Links != 1) throw new IOException("App data files must not have hard-link aliases.");
+        return false;
     }
 
     [SupportedOSPlatform("windows")]
     private static DirectorySecurity DirectorySecurity(bool includeOwner = true)
     {
         var security = new DirectorySecurity(); var owner = WindowsIdentity.GetCurrent().User!;
-        // Existing paths have already passed CheckOwner. Changing only their DACL avoids
-        // requesting WRITE_OWNER, which an owner need not have on a preexisting directory.
+        // Account-owned paths need only a DACL update. The token's alternate default owner
+        // is normalized once; avoid requesting WRITE_OWNER again on account-owned paths.
         if (includeOwner) security.SetOwner(owner);
         security.SetAccessRuleProtection(true, false);
         foreach (var identity in new[] { owner, new SecurityIdentifier(WellKnownSidType.LocalSystemSid, null) })
