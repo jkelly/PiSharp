@@ -21,7 +21,15 @@ test('the exact prior source lock and historical evidence remain preserved', () 
   assert.deepEqual(target.previousBaseline, previous.previousBaseline);
   for (const path of ['compatibility/surfaces.json', 'compatibility/parity.json'])
     assert.equal(resolveSourceLock(read, target, read(path).sourceSha).source.commit, previous.source.commit);
-  assert.equal(resolveSourceLock(read, target, read('compatibility/public-release.json').upstream.commit).source.commit, previous.source.commit);
+  const release = read('compatibility/public-release.json');
+  const priorRelease = release.version === '1.5.0.1' ? release : release.previousReleases.find(entry => entry.version === '1.5.0.1');
+  assert(priorRelease, 'The 1.5.0.1 release record must remain available');
+  assert.equal(resolveSourceLock(read, target, priorRelease.upstream.commit).source.commit, previous.source.commit);
+  assert.equal(priorRelease.publication.tagCommit, '8144e3eaa138a5faf56f5cbb0de477a56fd48f8f');
+  assert.equal(priorRelease.publication.nugetPackagesPublished, true);
+  const releaseLock = resolveSourceLock(read, target, release.upstream.commit);
+  assert.equal(releaseLock.source.tag, release.upstream.tag);
+  if (release.version === '1.5.2') assert.equal(releaseLock.source.commit, target.source.commit);
   assert.throws(() => resolveSourceLock(read, target, 'missing'), /No preserved source lock/);
 });
 
