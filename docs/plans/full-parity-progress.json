@@ -304,7 +304,11 @@
       "status": "published",
       "branch": "release/1.2.0.2",
       "ships": "PiSharp-only, experimental: the media library and tools and service tiers (decision 0007, PRs #26, #29), custom agents as three new packages (decision 0012, PRs #25, #31), ask_user_question and plan mode in pisharp durable (PR #24), the durable device server and its commands in the CLI (decisions 0008-0010, PR #40), the maintained catalog layer (PR #36). pisharp fixes: write cap (PR #30), codemode model headers (PR #30), MCP close races (PRs #32, #34, #39), session switch, shutdown and JSON cancel (PR #37), RPC exit hang (PR #43). Source only: Web Agent, Durable Web, Durable.MSSQL (PRs #23, #40)",
-      "decisions": ["docs/decisions/0007-media-generation.md", "docs/decisions/0012-custom-agents.md", "docs/decisions/0008-durable-network-host-and-web.md"],
+      "decisions": [
+        "docs/decisions/0007-media-generation.md",
+        "docs/decisions/0012-custom-agents.md",
+        "docs/decisions/0008-durable-network-host-and-web.md"
+      ],
       "notes": "docs/release-notes/1.2.0.2.md",
       "changelog": "website/src/content/changelog/1.2.0.2.md (date 2026-11-01)",
       "tag": "v1.2.0.2 (92e2f8b, merge of PR #49), release run 41376026307",
@@ -327,6 +331,32 @@
       "tag": "v1.5.0 (ab4754a, merge of PR #54), release run 42138967030",
       "publishedOn": "2026-11-06",
       "blockers": []
+    },
+    "1.5.0.1": {
+      "version": "1.5.0.1",
+      "kind": "patch",
+      "baseline": "v1.5.0",
+      "status": "published",
+      "branch": "codex/prepare-1.5.0.1",
+      "notes": "docs/release-notes/1.5.0.1.md",
+      "tag": "v1.5.0.1 (8144e3eaa138a5faf56f5cbb0de477a56fd48f8f), release run 42558097795",
+      "publishedOn": "2026-11-09",
+      "blockers": []
+    },
+    "1.5.2": {
+      "version": "1.5.2",
+      "kind": "sync",
+      "baseline": "v1.5.2",
+      "status": "release-candidate",
+      "branch": "release/1.5.2",
+      "ships": "PR #60: Pi and Pi Durable v1.5.2 source sync, including v1.5.1; 28 libraries and the CLI.",
+      "decision": "docs/decisions/0014-pi-1.5.2-sync.md",
+      "applicability": "compatibility/sync-1.5.2-applicability.json",
+      "notes": "docs/release-notes/1.5.2.md",
+      "changelog": "website/src/content/changelog/1.5.2.md",
+      "blockers": [
+        "Exact-tag release gates and verified publication."
+      ]
     }
   },
   "messageCaps": {

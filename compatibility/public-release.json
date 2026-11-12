@@ -1,32 +1,32 @@
 {
   "schemaVersion": 1,
   "product": "PiSharp",
-  "version": "1.5.0.1",
-  "proposedReleaseTag": "v1.5.0.1",
+  "version": "1.5.2",
+  "proposedReleaseTag": "v1.5.2",
   "upstream": {
     "repository": "https://github.com/earendil-works/pi",
-    "tag": "v1.5.0",
-    "commit": "f9a26365568127461c47a07a37dcb42c140a3ac5"
+    "tag": "v1.5.2",
+    "commit": "b4afdddf44e059c67ccf5097e5317d913521b470"
   },
   "versionMeaning": "Upstream porting baseline, not a claim of complete behavioral parity.",
-  "productAndPackageVersion": "1.5.0.1",
+  "productAndPackageVersion": "1.5.2",
   "assemblyIdentityPolicy": {
-    "defaultSdkDerivedVersion": "1.5.0.1",
+    "defaultSdkDerivedVersion": "1.5.2.0",
     "fixedSupervisorAssembly": "PiSharp.ExtensionHost",
     "fixedSupervisorAssemblyVersion": "1.0.0.0",
     "fixedSupervisorReason": "Retain the exact existing approved system-import identity; no loader guard is relaxed."
   },
   "qualification": {
-    "versionSpecificProductsQualified": true,
-    "versionSpecificPackageConsumptionQualified": true,
+    "versionSpecificProductsQualified": false,
+    "versionSpecificPackageConsumptionQualified": false,
     "fullProviderParity": false,
-    "completeNativeGateReady": true,
-    "status": "Released 2026-11-09 from immutable source 8144e3eaa138a5faf56f5cbb0de477a56fd48f8f. All required exact-source release gates passed. The release publishes 28 libraries plus the CLI (29 packages), including five new experimental libraries, and native daemon archives for linux-x64, osx-arm64 and win-x64. All 29 archives and a fresh external consumer of the five new libraries passed preparation checks; publication evidence records official NuGet downloads and released asset integrity. Native provenance retains its repositoryDirty=true manifests alongside hosted trackedChanges=[] evidence. Explicit skips and live-provider, real-SSH-host, physical macOS input and other-platform qualification limits remain. No complete upstream, provider or all-platform parity is claimed."
+    "completeNativeGateReady": false,
+    "status": "Release preparation for 1.5.2. PR #60 and all post-merge workflows passed at 8223a2f77ce7cf80157c30614e7d52472603cf38. The exact tagged release must pass all required release gates and package validation before publication is recorded. Frozen local validation and all historical release evidence remain separate; no complete upstream, provider or all-platform parity is claimed."
   },
   "releaseCandidate": {
-    "branch": "codex/prepare-1.5.0.1",
-    "decision": "docs/decisions/0013-pi-1.5.0-sync.md",
-    "applicability": "compatibility/sync-1.5.0-applicability.json",
+    "branch": "release/1.5.2",
+    "decision": "docs/decisions/0014-pi-1.5.2-sync.md",
+    "applicability": "compatibility/sync-1.5.2-applicability.json",
     "experimental": [
       "PiSharp.Telemetry (PISHARP_TELEMETRY001)",
       "PiSharp.Contracts.Schema, the pi-schema port (PISHARP_SCHEMA001)",
@@ -38,7 +38,7 @@
       "code mode worker admission (PISHARP_CODEMODE001)",
       "ToolSearchDocument.NamespaceText (PISHARP_TOOLSEARCH001)",
       "TUI additions (PISHARP_TUI001)",
-      "PiSharp.Durable, PiSharp.Durable.Tools and PiSharp.Durable.Sqlite on pi-durable v1.5.0 (PISHARP_DURABLE001)",
+      "PiSharp.Durable, PiSharp.Durable.Tools and PiSharp.Durable.Sqlite on pi-durable v1.5.2 (PISHARP_DURABLE001)",
       "PiSharp.Chord and PiSharp.Chord.Hosting (PISHARP_CHORD001)",
       "PiSharp.Durable.Store (PISHARP_DURABLE001 and PISHARP_CHORD001)",
       "PiSharp.Env.Protocol and PiSharp.Env (PISHARP_ENV001; Env also uses PISHARP_DURABLE001)"
@@ -55,20 +55,14 @@
       "PiSharp.Env.Daemon (separate NativeAOT artifact)",
       "PiSharp.Evals (repository tool)"
     ],
-    "notes": "docs/release-notes/1.5.0.1.md",
-    "changelog": "website/src/content/changelog/1.5.0.1.md",
-    "gapStatus": "compatibility/gap-status-2026-11-08.json",
-    "reviewedUpstreamThrough": "7d073328e44337d3292a7db9b0f0308f679c5e97"
+    "notes": "docs/release-notes/1.5.2.md",
+    "changelog": "website/src/content/changelog/1.5.2.md",
+    "reviewedUpstreamThrough": "b4afdddf44e059c67ccf5097e5317d913521b470"
   },
   "publication": {
-    "tagCreated": true,
-    "binaryReleasePublished": true,
-    "nugetPackagesPublished": true,
-    "publishedOn": "2026-11-09",
-    "publishedAt": "2026-11-09T04:11:05Z",
-    "tagCommit": "8144e3eaa138a5faf56f5cbb0de477a56fd48f8f",
-    "releaseRun": "42558097795",
-    "evidence": "AI_DOCS/release-1.5.0.1-publication-results.md"
+    "tagCreated": false,
+    "binaryReleasePublished": false,
+    "nugetPackagesPublished": false
   },
   "previousReleases": [
     {
@@ -275,6 +269,89 @@
       "publishedOn": "2026-11-06",
       "tagCommit": "ab4754a5f3bcd1d68a71f3eaed1b4426803921c7",
       "releaseRun": "42138967030"
+    },
+    {
+      "schemaVersion": 1,
+      "product": "PiSharp",
+      "version": "1.5.0.1",
+      "proposedReleaseTag": "v1.5.0.1",
+      "upstream": {
+        "repository": "https://github.com/earendil-works/pi",
+        "tag": "v1.5.0",
+        "commit": "f9a26365568127461c47a07a37dcb42c140a3ac5"
+      },
+      "versionMeaning": "Upstream porting baseline, not a claim of complete behavioral parity.",
+      "productAndPackageVersion": "1.5.0.1",
+      "assemblyIdentityPolicy": {
+        "defaultSdkDerivedVersion": "1.5.0.1",
+        "fixedSupervisorAssembly": "PiSharp.ExtensionHost",
+        "fixedSupervisorAssemblyVersion": "1.0.0.0",
+        "fixedSupervisorReason": "Retain the exact existing approved system-import identity; no loader guard is relaxed."
+      },
+      "qualification": {
+        "versionSpecificProductsQualified": true,
+        "versionSpecificPackageConsumptionQualified": true,
+        "fullProviderParity": false,
+        "completeNativeGateReady": true,
+        "status": "Released 2026-11-09 from immutable source 8144e3eaa138a5faf56f5cbb0de477a56fd48f8f. All required exact-source release gates passed. The release publishes 28 libraries plus the CLI (29 packages), including five new experimental libraries, and native daemon archives for linux-x64, osx-arm64 and win-x64. All 29 archives and a fresh external consumer of the five new libraries passed preparation checks; publication evidence records official NuGet downloads and released asset integrity. Native provenance retains its repositoryDirty=true manifests alongside hosted trackedChanges=[] evidence. Explicit skips and live-provider, real-SSH-host, physical macOS input and other-platform qualification limits remain. No complete upstream, provider or all-platform parity is claimed."
+      },
+      "releaseCandidate": {
+        "branch": "codex/prepare-1.5.0.1",
+        "decision": "docs/decisions/0013-pi-1.5.0-sync.md",
+        "applicability": "compatibility/sync-1.5.0-applicability.json",
+        "experimental": [
+          "PiSharp.Telemetry (PISHARP_TELEMETRY001)",
+          "PiSharp.Contracts.Schema, the pi-schema port (PISHARP_SCHEMA001)",
+          "client identity (PISHARP_IDENTITY001)",
+          "streaming tool-call arguments (PISHARP_AI001)",
+          "device-code sign-in hints (PISHARP_AUTH001)",
+          "pi.exec() output limits (PISHARP_EXEC001)",
+          "extension UI additions (PISHARP_EXTUI001)",
+          "code mode worker admission (PISHARP_CODEMODE001)",
+          "ToolSearchDocument.NamespaceText (PISHARP_TOOLSEARCH001)",
+          "TUI additions (PISHARP_TUI001)",
+          "PiSharp.Durable, PiSharp.Durable.Tools and PiSharp.Durable.Sqlite on pi-durable v1.5.0 (PISHARP_DURABLE001)",
+          "PiSharp.Chord and PiSharp.Chord.Hosting (PISHARP_CHORD001)",
+          "PiSharp.Durable.Store (PISHARP_DURABLE001 and PISHARP_CHORD001)",
+          "PiSharp.Env.Protocol and PiSharp.Env (PISHARP_ENV001; Env also uses PISHARP_DURABLE001)"
+        ],
+        "sourceOnly": [
+          "PiSharp.WebAgent",
+          "PiSharp.Durable.Web",
+          "PiSharp.Durable.MSSQL",
+          "PiSharp.Durable.Hosting",
+          "PiSharp.Durable.Server",
+          "PiSharp.Durable.Client",
+          "PiSharp.ModelRuntime",
+          "PiSharp.Web.Common",
+          "PiSharp.Env.Daemon (separate NativeAOT artifact)",
+          "PiSharp.Evals (repository tool)"
+        ],
+        "notes": "docs/release-notes/1.5.0.1.md",
+        "changelog": "website/src/content/changelog/1.5.0.1.md",
+        "gapStatus": "compatibility/gap-status-2026-11-08.json",
+        "reviewedUpstreamThrough": "7d073328e44337d3292a7db9b0f0308f679c5e97"
+      },
+      "publication": {
+        "tagCreated": true,
+        "binaryReleasePublished": true,
+        "nugetPackagesPublished": true,
+        "publishedOn": "2026-11-09",
+        "publishedAt": "2026-11-09T04:11:05Z",
+        "tagCommit": "8144e3eaa138a5faf56f5cbb0de477a56fd48f8f",
+        "releaseRun": "42558097795",
+        "evidence": "AI_DOCS/release-1.5.0.1-publication-results.md"
+      },
+      "historicalArtifacts": "Earlier private versions and their qualification receipts retain their original identities; no artifact is renamed or relabeled.",
+      "tag": "v1.5.0.1",
+      "upstreamTag": "v1.5.0",
+      "upstreamCommit": "f9a26365568127461c47a07a37dcb42c140a3ac5",
+      "tagCreated": true,
+      "githubReleasePublished": true,
+      "nugetPackagesPublished": true,
+      "publishedOn": "2026-11-09",
+      "tagCommit": "8144e3eaa138a5faf56f5cbb0de477a56fd48f8f",
+      "releaseRun": "42558097795"
     }
   ],
   "historicalArtifacts": "Earlier private versions and their qualification receipts retain their original identities; no artifact is renamed or relabeled."
