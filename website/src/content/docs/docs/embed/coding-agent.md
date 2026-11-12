@@ -8,8 +8,8 @@ description: "Embed the full coding agent: persistent sessions, settings, prompt
 ## Install
 
 ```powershell
-dotnet add package PiSharp.CodingAgent --version 1.5.0.1
-dotnet add package PiSharp.Tools --version 1.5.0.1
+dotnet add package PiSharp.CodingAgent --version 1.5.2
+dotnet add package PiSharp.Tools --version 1.5.2
 ```
 
 `PiSharp.CodingAgent` references `PiSharp.Agent` and `PiSharp.Sessions`, but not `PiSharp.Tools`. Add `PiSharp.Tools` yourself to get the built-in tools. Your project targets `net10.0`.

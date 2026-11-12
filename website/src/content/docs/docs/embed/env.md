@@ -4,7 +4,7 @@ description: Use the pi-env protocol, reconnecting client, remote adapters and n
 ---
 
 :::caution[Experimental — from 1.5.0.1]
-`PiSharp.Env.Protocol` and `PiSharp.Env` are available on NuGet at version **1.5.0.1**, with diagnostic `PISHARP_ENV001`. The daemon is a separate NativeAOT executable, excluded from library packing. Qualified native ZIPs for Linux x64, macOS arm64 and Windows x64 are attached to the [release](https://github.com/jkelly/PiSharp/releases/tag/v1.5.0.1). Keep each binary's accompanying notices and verify the release integrity records before deployment.
+`PiSharp.Env.Protocol` and `PiSharp.Env` are available on NuGet at version **1.5.2**, with diagnostic `PISHARP_ENV001`. The daemon is a separate NativeAOT executable, excluded from library packing. The previous 1.5.0.1 native ZIPs for Linux x64, macOS arm64 and Windows x64 retain their own qualification and are attached to the [release](https://github.com/jkelly/PiSharp/releases/tag/v1.5.0.1). Keep each binary's accompanying notices and verify the release integrity records before deployment.
 :::
 
 `PiSharp.Env.Protocol` defines [framing and bounds](https://github.com/jkelly/PiSharp/blob/main/src/PiSharp.Env.Protocol/FrameCodec.cs). `PiSharp.Env` adds a lazy reconnecting `Connection`, remote filesystem/process/terminal/watch adapters, and SSH bootstrap. `RemoteExecutionEnv` implements Durable's `IExecutionEnv`. These are explicit host choices, not a default dependency or remote mode added to the CLI.

@@ -16,7 +16,7 @@ PiSharp's version is the Pi version it matches, and a fourth number marks a C#-o
 The release scripts enforce this:
 
 - The version must match `^[0-9]+\.[0-9]+\.[0-9]+(\.[0-9]+)?(-[0-9A-Za-z.-]+)?$`.
-- Its first three numbers must equal the tag in `compatibility/target.lock.json` (`v1.5.0` today). A sync to a new Pi release therefore comes before its release. See [How the port tracks Pi](/docs/contribute/porting/).
+- Its first three numbers must equal the tag in `compatibility/target.lock.json` (`v1.5.2` today). A sync to a new Pi release therefore comes before its release. See [How the port tracks Pi](/docs/contribute/porting/).
 - A version with a `-` suffix becomes a GitHub prerelease.
 
 Every assembly gets the release version, except `PiSharp.ExtensionHost`, which keeps assembly version `1.0.0.0`.
@@ -40,7 +40,13 @@ Releases are prepared on a `release/<version>` branch, such as `release/1.5.0`, 
 
 A separate commit then re-seals the derivative integrity table, because `Directory.Build.props`, `README.md`, `THIRD-PARTY-NOTICES.md` and other files above are pinned there. See [Derivative integrity pins](/docs/contribute/porting/#derivative-integrity-pins).
 
-### Published release: 1.5.0.1
+### Published release: 1.5.2
+
+Release **1.5.2** publishes 28 libraries plus the CLI (29 packages) on the Pi v1.5.2 baseline. Tag [`v1.5.2`](https://github.com/jkelly/PiSharp/releases/tag/v1.5.2) identifies source `f786a55dc32d1767ac220ed1ad4c44748bccba97`. The [publication record](https://github.com/jkelly/PiSharp/blob/main/AI_DOCS/release-1.5.2-publication-results.md) records exact-tag validation and official NuGet verification.
+
+<a id="published-release-1501"></a>
+
+### Earlier release: 1.5.0.1
 
 Release **1.5.0.1** keeps the Pi v1.5.0 source pin and publishes 28 libraries plus the CLI (29 packages). Chord, Chord.Hosting, Durable.Store, Env.Protocol and Env are added experimental libraries. Validation of all 29 archives and a fresh external consumer of the five new libraries passed against the release source and exact sibling references. Three qualified native daemon ZIPs remain separate from NuGet.
 
@@ -75,11 +81,11 @@ The package list is written out in several places. A new library needs all of th
 
 ## Dry run
 
-Run the release workflow by hand from the Actions tab to build and check a version without publishing anything. Set `version` explicitly to the intended version; `1.5.0.1` is the latest published version. It takes two inputs:
+Run the release workflow by hand from the Actions tab to build and check a version without publishing anything. Set `version` explicitly to the intended version; `1.5.2` is the latest published version. It takes two inputs:
 
 | Input | Default | Effect |
 | --- | --- | --- |
-| `version` | `1.5.0` | The version to build and validate. |
+| `version` | `1.5.2` | The version to build and validate. |
 | `skip_tests` | `false` | Skip the 22 release-list suites in a dry run. Core and Durable validation still run. |
 
 A dry run runs the build and the reusable validation gates. The publish and GitHub release jobs run only for a pushed tag.
@@ -91,8 +97,8 @@ You can also build the packages locally. See [Install your build as a tool](/doc
 Once the release branch is merged, tag the merge commit and push the tag:
 
 ```sh
-git tag v1.5.0.1 <qualified merge commit>
-git push origin v1.5.0.1
+git tag v1.5.2 <qualified merge commit>
+git push origin v1.5.2
 ```
 
 ## The release workflow

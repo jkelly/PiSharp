@@ -17,11 +17,11 @@
     "fixedSupervisorReason": "Retain the exact existing approved system-import identity; no loader guard is relaxed."
   },
   "qualification": {
-    "versionSpecificProductsQualified": false,
-    "versionSpecificPackageConsumptionQualified": false,
+    "versionSpecificProductsQualified": true,
+    "versionSpecificPackageConsumptionQualified": true,
     "fullProviderParity": false,
-    "completeNativeGateReady": false,
-    "status": "Release preparation for 1.5.2. PR #60 and all post-merge workflows passed at 8223a2f77ce7cf80157c30614e7d52472603cf38. The exact tagged release must pass all required release gates and package validation before publication is recorded. Frozen local validation and all historical release evidence remain separate; no complete upstream, provider or all-platform parity is claimed."
+    "completeNativeGateReady": true,
+    "status": "Released 2026-11-12 from immutable source f786a55dc32d1767ac220ed1ad4c44748bccba97. All required tagged release gates passed. All 29 NuGet packages were downloaded from the official feed and matched the GitHub package payloads, excluding NuGet's repository signature. A fresh official-feed consumer and private CLI install passed. Native daemon validation remains separate; this package release does not replace the historical 1.5.0.1 native ZIPs. Explicit platform and provider limitations remain; no complete upstream, provider or all-platform parity is claimed."
   },
   "releaseCandidate": {
     "branch": "release/1.5.2",
@@ -60,9 +60,14 @@
     "reviewedUpstreamThrough": "b4afdddf44e059c67ccf5097e5317d913521b470"
   },
   "publication": {
-    "tagCreated": false,
-    "binaryReleasePublished": false,
-    "nugetPackagesPublished": false
+    "tagCreated": true,
+    "binaryReleasePublished": true,
+    "nugetPackagesPublished": true,
+    "publishedOn": "2026-11-12",
+    "publishedAt": "2026-11-12T07:25:31Z",
+    "tagCommit": "f786a55dc32d1767ac220ed1ad4c44748bccba97",
+    "releaseRun": "43171815825",
+    "evidence": "AI_DOCS/release-1.5.2-publication-results.md"
   },
   "previousReleases": [
     {

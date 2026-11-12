@@ -40,7 +40,7 @@ Starlight renders the title, so a page starts with an intro paragraph and uses `
 
 No link checker runs when the site builds. Check new links yourself, and write internal links root-relative with a trailing slash, such as `/docs/reference/settings/`.
 
-`src/data/site.ts` reads the published version from `compatibility/public-release.json`, including `previousReleases` while a future candidate's publication flags are false. PiSharp 1.5.0.1 publishes 29 packages, including five new experimental libraries. Promote a changelog to `status: released` and add its actual UTC date only after publication is verified; released entries enter RSS and gain their GitHub release link. Future candidate changelogs use `status: in-progress` and stay out of released RSS. Mark any future unpublished SDK library with `unpublished: true` and provide a source guide instead of a NuGet install command.
+`src/data/site.ts` reads the published version from `compatibility/public-release.json`, including `previousReleases` while a future candidate's publication flags are false. PiSharp 1.5.2 publishes 29 packages, including the five experimental libraries introduced in 1.5.0.1. Promote a changelog to `status: released` and add its actual UTC date only after publication is verified; released entries enter RSS and gain their GitHub release link. Future candidate changelogs use `status: in-progress` and stay out of released RSS. Mark any future unpublished SDK library with `unpublished: true` and provide a source guide instead of a NuGet install command.
 
 ## The sidebar
 

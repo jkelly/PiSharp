@@ -10,7 +10,7 @@ Pi runs scripts in QuickJS compiled to WebAssembly. PiSharp runs them in [Jint](
 ## Install
 
 ```powershell
-dotnet add package PiSharp.Codemode --version 1.5.0.1
+dotnet add package PiSharp.Codemode --version 1.5.2
 ```
 
 The package depends on `PiSharp.Contracts`, `PiSharp.Extensions.Abstractions` and Jint, pinned to exactly 4.16.3. Jint's and its parser Acornima's license notices are in the package under `licenses/`. Everything is in the `PiSharp.Codemode` namespace.
