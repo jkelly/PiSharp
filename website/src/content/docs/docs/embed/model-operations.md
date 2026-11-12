@@ -14,7 +14,7 @@ Embeddings, image editing, video, speech, transcription, music and reranking liv
 ## Install
 
 ```powershell
-dotnet add package PiSharp.AI --version 1.5.0.1
+dotnet add package PiSharp.AI --version 1.5.2
 ```
 
 `PiSharp.AI` brings `PiSharp.Contracts`. Add these namespaces:

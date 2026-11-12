@@ -8,7 +8,7 @@ description: "Stream from any provider with PiSharp.AI: transports, models, auth
 ## Install
 
 ```powershell
-dotnet add package PiSharp.AI --version 1.5.0.1
+dotnet add package PiSharp.AI --version 1.5.2
 ```
 
 `PiSharp.AI` brings `PiSharp.Contracts`, which holds the message and event types.

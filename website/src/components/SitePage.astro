@@ -12,7 +12,7 @@ const path = Astro.url.pathname;
 ---
 
 <StarlightPage frontmatter={{ title, description, template: 'splash', editUrl: false, prev: false, next: false }}>
-	<div class="ps-page not-content">
+	<div id="_top" class="ps-page not-content">
 		<nav class="ps-mobilenav" aria-label="Site">
 			<a href="/" aria-current={path === '/' ? 'page' : undefined}>Home</a>
 			{nav.map((item) => <a href={item.href} aria-current={path.startsWith(item.href) ? 'page' : undefined}>{item.label}</a>)}

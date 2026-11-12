@@ -2,12 +2,13 @@
   "sourceCandidate": {
     "version": "1.5.2",
     "commit": "b4afdddf44e059c67ccf5097e5317d913521b470",
-    "status": "tested-with-limitations",
+    "status": "released-with-limitations",
     "applicability": "https://github.com/jkelly/PiSharp/blob/main/compatibility/sync-1.5.2-applicability.json",
-    "publishedRelease": "1.5.0.1",
-    "publishedBaseline": "Pi v1.5.0",
+    "publishedRelease": "1.5.2",
+    "publishedBaseline": "Pi v1.5.2",
     "historicalAssessmentPreserved": true,
-    "acceptance": "https://github.com/jkelly/PiSharp/blob/main/compatibility/sync-1.5.2-acceptance.json"
+    "acceptance": "https://github.com/jkelly/PiSharp/blob/main/compatibility/sync-1.5.2-acceptance.json",
+    "publication": "https://github.com/jkelly/PiSharp/blob/main/AI_DOCS/release-1.5.2-publication-results.md"
   },
   "$comment": "Status per area: ported | partial | planned | wont-port | unknown. Notes and evidence are optional; evidence is a URL. Assessed against the repository, not docs claims: authored test suites, goldens captured from Pi 1.1.0 with authored Pi 1.2.0 text changes, compatibility/*.v1.5.0 inventories, and compatibility/sync-1.2.0-applicability.json and sync-1.5.0-applicability.json. deviations lists the differences that remain, intentional ones first.",
   "assessedOn": "2026-11-05",

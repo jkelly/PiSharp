@@ -30,16 +30,16 @@ const assessedOn = new Date(`${parity.assessedOn}T00:00:00Z`).toLocaleDateString
 <SitePage title="Parity" description="How close PiSharp is to Pi, across three separate compatibility promises.">
 	<div class="ps-pagehead">
 		<h1 class="ps-h1">How close to Pi are we?</h1>
-		<p class="ps-lede">PiSharp tracks compatibility separately from source updates. The historical assessment below retains its published-release baseline; the current source candidate is shown separately.</p>
+		<p class="ps-lede">PiSharp tracks compatibility separately from source updates. The historical assessment below retains its published-release baseline; the current 1.5.2 release is shown separately.</p>
 		<p class="ps-muted assessed">
 			The historical assessment below uses the {parity.baseline} baseline, from PiSharp's own test suites and its <a href={links.compatibility}>compatibility inventories</a>. Assessed on {assessedOn} for release {parity.release}. "Ported" means it works and PiSharp's tests cover it. Some suites compare against output captured from Pi 1.1.0 itself, such as session files; the rest are authored tests. Released 1.5.0.1 coverage is listed separately below, preserving the original assessment and evidence pins.
 		</p>
 	</div>
 
 	<section class="ps-section candidate">
-		<h2 class="ps-h2">Unreleased source candidate: Pi {versions.target}</h2>
-		<p class="ps-muted">The source target is <a href={versions.targetUrl}>{versions.targetCommit.slice(0, 8)}</a>. Local source validation is recorded with explicit suite and platform limitations; it does not establish complete parity. The latest published PiSharp release remains {versions.pisharp}, on Pi {versions.baseline}.</p>
-		<p class="ps-muted"><a href="https://github.com/jkelly/PiSharp/blob/main/compatibility/sync-1.5.2-applicability.json">Review the complete source applicability map</a> and <a href="https://github.com/jkelly/PiSharp/blob/main/docs/release-notes/1.5.2.md">unreleased candidate notes</a>. Earlier assessment counts, captures and qualification records are preserved below.</p>
+		<h2 class="ps-h2">PiSharp {versions.pisharp}: Pi {versions.baseline}</h2>
+		<p class="ps-muted">The source target is <a href={versions.targetUrl}>{versions.targetCommit.slice(0, 8)}</a>. The exact-tag release workflow validates source, package contents and the required hosted gates before publishing all 29 packages. Results retain explicit suite and platform limitations and do not establish complete parity.</p>
+		<p class="ps-muted"><a href="https://github.com/jkelly/PiSharp/blob/main/compatibility/sync-1.5.2-applicability.json">Review the complete source applicability map</a> and <a href="https://github.com/jkelly/PiSharp/blob/main/docs/release-notes/1.5.2.md">release notes</a>. See the <a href="https://github.com/jkelly/PiSharp/blob/main/AI_DOCS/release-1.5.2-publication-results.md">publication evidence</a>. Earlier assessment counts, captures and qualification records are preserved below.</p>
 	</section>
 
 	<section class="ps-section released">

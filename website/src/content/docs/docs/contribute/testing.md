@@ -88,7 +88,7 @@ The release and the macOS workflow run these. Each covers one area of Pi, with e
 | `PiSharp.McpParity.Tests` | MCP configuration and completion. |
 | `PiSharp.SessionParity.Tests` | Events, session features, export and extension events. |
 | `PiSharp.InteractiveParity.Tests` | Interactive mode, slash commands, and the `CHANGELOG.md` sync. |
-| `PiSharp.ExtensionParity.Tests` | Extensions, the Node bridge and packages. It builds and loads the sample extensions and needs Node.js 22.19 or later and npm for the current 1.5.2 source candidate. Use the committed `tools/NodeBridge/runtime-fixture-152` manifest/lock with `npm ci` and set `PISHARP_TEST_PI152_NODE_MODULES` to its installed `node_modules`. CI directly verifies that runtime's ABI before running the suites. Ordinary sandbox startup does not install packages. The separate production installer provenance case requires `PISHARP_TEST_INSTALL_PI_RUNTIME=1` and a fresh private runtime cache. |
+| `PiSharp.ExtensionParity.Tests` | Extensions, the Node bridge and packages. It builds and loads the sample extensions and needs Node.js 22.19 or later and npm for PiSharp 1.5.2. Use the committed `tools/NodeBridge/runtime-fixture-152` manifest/lock with `npm ci` and set `PISHARP_TEST_PI152_NODE_MODULES` to its installed `node_modules`. CI directly verifies that runtime's ABI before running the suites. Ordinary sandbox startup does not install packages. The separate production installer provenance case requires `PISHARP_TEST_INSTALL_PI_RUNTIME=1` and a fresh private runtime cache. |
 | `PiSharp.Durable.Tests` | The [durable](/docs/guides/durable/) port, with cases ported from upstream's tests. The `compat.*` cases read sessions upstream wrote. |
 | `PiSharp.DurableCli.Tests` | `pisharp durable`, including the device server commands. |
 | `PiSharp.CustomAgents.Tests` | [Custom agents](/docs/custom-agents/overview/), from 1.2.0.2. See [Custom agents](#custom-agents). |
@@ -109,7 +109,7 @@ Most of these test one library each. `core.yml` runs all ten as Windows console 
 
 This hosted source-build lane uses the exact SDK from `global.json` and explicitly restores from nuget.org. It is separate from `tools/test-native.ps1`, whose reviewed source manifest, pinned products, Node-absent launch boundary and companion admission remain required for that native qualification workflow. Hosted CI does not issue those admission receipts.
 
-The current-source checks target Pi **1.5.2** and verify the complete frozen inventory, applicability map and Durable candidate overlay. Separate historical checks retain the v1.5.0/v1.2.0 source objects and the preserved `durable-port-map.v1.5.0.json`; they do not relabel old acceptance as 1.5.2 coverage. The published release remains **1.5.0.1** until a new release is separately qualified and published.
+The current-source checks target Pi **1.5.2** and verify the complete frozen inventory, applicability map and Durable candidate overlay. Separate historical checks retain the v1.5.0/v1.2.0 source objects and the preserved `durable-port-map.v1.5.0.json`; they do not relabel old acceptance as 1.5.2 coverage. The published **1.5.2** release has separate exact-tag qualification and publication evidence; historical receipts retain their original scope.
 
 | Suite | Covers |
 | --- | --- |

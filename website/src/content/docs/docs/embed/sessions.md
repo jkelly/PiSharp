@@ -8,7 +8,7 @@ description: Read, write and transform Pi session files with PiSharp.Sessions.
 The [coding agent](/docs/embed/coding-agent/) builds its persistent sessions on this library. Use `PiSharp.Sessions` directly when you want to inspect, index, convert or generate session files without running an agent. For what users see (resume, branch, fork, compact), read the [Sessions guide](/docs/guides/sessions/). For where the files live, see [Files and locations](/docs/reference/configuration/#sessions).
 
 ```powershell
-dotnet add package PiSharp.Sessions --version 1.5.0.1
+dotnet add package PiSharp.Sessions --version 1.5.2
 ```
 
 ## Namespaces

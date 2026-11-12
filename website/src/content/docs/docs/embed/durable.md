@@ -19,9 +19,9 @@ Add the packages and suppress the experimental diagnostic:
   <NoWarn>$(NoWarn);PISHARP_DURABLE001</NoWarn>
 </PropertyGroup>
 <ItemGroup>
-  <PackageReference Include="PiSharp.Durable" Version="1.5.0.1" />
-  <PackageReference Include="PiSharp.Durable.Sqlite" Version="1.5.0.1" />
-  <PackageReference Include="PiSharp.Durable.Tools" Version="1.5.0.1" />
+  <PackageReference Include="PiSharp.Durable" Version="1.5.2" />
+  <PackageReference Include="PiSharp.Durable.Sqlite" Version="1.5.2" />
+  <PackageReference Include="PiSharp.Durable.Tools" Version="1.5.2" />
 </ItemGroup>
 ```
 
@@ -31,7 +31,7 @@ Add the packages and suppress the experimental diagnostic:
 | `PiSharp.Durable.Sqlite` | `PiSharp.Durable.Sqlite` | SQLite storage over `Microsoft.Data.Sqlite` |
 | `PiSharp.Durable.Tools` | `PiSharp.Durable.Tools`, `PiSharp.Durable.Tools.Env` | The local execution environment, the coding tools, `tool_search`, durable code mode, and, from 1.2.0.2, the media tools |
 
-The harness's telemetry types come from `PiSharp.Telemetry`, which `PiSharp.Durable` references. PiSharp **1.5.0.1** includes [Chord and native hosting](/docs/embed/chord/) and [PiSharp.Durable.Store](/docs/embed/durable-store/). Use version 1.5.0.1 for every PiSharp sibling package.
+The harness's telemetry types come from `PiSharp.Telemetry`, which `PiSharp.Durable` references. PiSharp **1.5.0.1** includes [Chord and native hosting](/docs/embed/chord/) and [PiSharp.Durable.Store](/docs/embed/durable-store/). Use version 1.5.2 for every PiSharp sibling package.
 
 ## Upgrading from 1.2.0.x
 

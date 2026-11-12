@@ -4,7 +4,7 @@ description: Share storage, followed views and plugin registries with the real C
 ---
 
 :::caution[Experimental — from 1.5.0.1]
-`PiSharp.Durable.Store` is available on NuGet at version **1.5.0.1** and retains `PISHARP_DURABLE001`. [Chord and hosting](/docs/embed/chord/) have separate experimental and framework requirements. Keep all PiSharp sibling references at the same exact version.
+`PiSharp.Durable.Store` is available on NuGet at version **1.5.2** and retains `PISHARP_DURABLE001`. [Chord and hosting](/docs/embed/chord/) have separate experimental and framework requirements. Keep all PiSharp sibling references at the same exact version.
 :::
 
 `StoreStorage` implements Durable's `IStorage` over a real Chord v2 store. It declares records under an owner, uses the shared allocator, and commits through the store queue. The application owns the underlying store: closing the adapter releases its claims after calls drain and leaves the store open. A separate owner can share the same store; duplicate claims are refused. The [implementation](https://github.com/jkelly/PiSharp/blob/main/src/PiSharp.Durable.Store/Storage.cs) requires a store opened by Chord's `Tables.OpenStoreAsync`.

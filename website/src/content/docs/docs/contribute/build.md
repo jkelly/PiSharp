@@ -64,7 +64,7 @@ Every project gets these settings from `Directory.Build.props`:
 
 | Setting | Value | Effect |
 | --- | --- | --- |
-| `VersionPrefix` | `1.5.0` | The version a build reports, unless you pass `-p:VersionPrefix`. A build of `main` reports it even when it holds unreleased features. |
+| `VersionPrefix` | `1.5.2` | The version a build reports, unless you pass `-p:VersionPrefix`. A build of `main` reports it even when it holds unreleased features. |
 | `TargetFramework` | `net10.0` | |
 | `Nullable`, `ImplicitUsings` | `enable` | |
 | `TreatWarningsAsErrors` | `true` | Any compiler warning fails the build. |
@@ -124,7 +124,7 @@ Then install the tool from a folder outside the repository, because the reposito
 
 ```powershell
 cd ..
-dotnet tool install PiSharp.Cli --tool-path ./pisharp-dev --add-source PiSharp/artifacts/packages --version 1.5.0.1
+dotnet tool install PiSharp.Cli --tool-path ./pisharp-dev --add-source PiSharp/artifacts/packages --version 1.5.2
 ./pisharp-dev/pisharp --version
 ```
 
