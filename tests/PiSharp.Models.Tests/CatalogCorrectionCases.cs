@@ -15,7 +15,7 @@ internal static partial class Program
             var current = ModelRegistry.Create(new() { MaintainedCatalogPath = Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".absent") });
             var expected = CurrentModelCatalog.Providers.SelectMany(p => CurrentModelCatalog.Get(p)!.Models)
                 .Where(m => m.Type == CatalogModelType.Chat).ToArray();
-            Equal(1643, expected.Length, "released current chat count");
+            Equal(1698, expected.Length, "released current chat count (Pi 1.6.0)");
             Equal(expected.Length, current.GetAll().Count, "no removed historical entries leak into current catalog");
             foreach (var row in expected)
             {

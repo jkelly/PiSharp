@@ -98,7 +98,7 @@ internal static partial class Program
     {
         Check(Absent("openai-codex", "gpt-5.5") && Absent("openai-codex", "gpt-5.3-codex-spark"), "codex drops the ChatGPT-rejected models");
         Check(!Absent("openai", "gpt-5.5"), "openai keeps gpt-5.5");
-        Equal("gpt-6.1-sol", ModelResolver.DefaultModelFor("openai-codex"), "codex default");
+        Equal("gpt-6.2-sol", ModelResolver.DefaultModelFor("openai-codex"), "codex default (gpt-6.1-sol until Pi 1.6.0)");
     }
 
     private static void Sync150MiniMaxFlash()
@@ -317,9 +317,9 @@ internal static partial class Program
 
     private static void Sync150DefaultOpenAiModel()
     {
-        Equal("gpt-6.1-sol", ModelResolver.DefaultModelFor("openai"), "openai default");
+        Equal("gpt-6.2-sol", ModelResolver.DefaultModelFor("openai"), "openai default (gpt-6.1-sol until Pi 1.6.0)");
         Registry(out var registry, Env(("OPENAI_API_KEY", "k")));
-        Equal("openai/gpt-6.1-sol", ModelResolver.FindInitialModel([], false, null, null, null, null, registry).Model?.Reference, "startup fallback");
+        Equal("openai/gpt-6.2-sol", ModelResolver.FindInitialModel([], false, null, null, null, null, registry).Model?.Reference, "startup fallback");
         Equal("openai/gpt-5.5", ModelResolver.FindInitialModel([], false, "openai", "gpt-5.5", null, null, registry).Model?.Reference,
             "the saved gpt-5.5 selection is never replaced");
         Equal("openai/gpt-5.5", ModelResolver.ResolveCliModel("openai", "gpt-5.5", null, registry.GetAll(), registry.HasConfiguredAuth).Model?.Reference, "--model gpt-5.5 kept");

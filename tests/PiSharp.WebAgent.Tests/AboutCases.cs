@@ -151,6 +151,8 @@ internal static partial class Program
             var live = CatalogFacts.Read(faux, new ModelsSettings([]), new WebAgentOptions { DataDirectory = @"C:\data" });
             Check(live.Builtin is { Shards: > 0, Providers: > 0, ChatModels: > 0 } builtin && Regex.IsMatch(builtin.ManifestSha256, "^[0-9a-f]{64}$"),
                 "the built-in catalog's shards, providers, models and manifest hash");
+            Check(live.Builtin!.Shards == PiSharp.AI.Catalogs.CurrentModelCatalog.Providers.Length && live.Builtin.ManifestSha256 == PiSharp.AI.Catalogs.CurrentModelCatalog.ManifestSha256,
+                "the built-in catalog is the current release, whose models are the ones counted");
             Check(live.NotBuiltin.SequenceEqual(["faux"]), "faux is not a built-in provider");
         }),
 

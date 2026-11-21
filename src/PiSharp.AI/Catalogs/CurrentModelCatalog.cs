@@ -1,10 +1,7 @@
-// PiSharp-only (no upstream Pi source): native loader byte-verifies the exact catalog data
-// shipped in @earendil-works/pi-ai@1.5.2, source b4afdddf44e059c67ccf5097e5317d913521b470 (MIT).
-// Historical package shards remain in their original catalogs.
-using System.Collections.Concurrent;
+// PiSharp-only (no upstream Pi source): the current release is the exact catalog data shipped in
+// @earendil-works/pi-ai@1.6.0, source faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT), byte-verified by ReleasedModelCatalog.
+// The Pi 1.5.2 release and the historical package shards remain in their original catalogs.
 using System.Collections.Immutable;
-using System.Security.Cryptography;
-using System.Text.Json;
 
 namespace PiSharp.AI.Catalogs;
 
@@ -12,52 +9,19 @@ namespace PiSharp.AI.Catalogs;
 /// Host, maintained-catalog and explicit user overrides are applied by callers after this snapshot.</summary>
 public static class CurrentModelCatalog
 {
-    public const string PackageVersion = "1.5.2";
-    public const string SourceCommit = "b4afdddf44e059c67ccf5097e5317d913521b470";
-    public const string PackageSha256 = "d5715efa834c23bfdf10a042b49df4ee169cc99000bf16d7998fab2d533b45f8";
-    public const string PackageIntegrity = "sha512-2tWPSnV3qzfiDIY3aWluBag3vC++Vs+VsXt/UquSU5onPMohPih72FUhIhaqmDdMYubOgB3Byl9uF4Vk40JLvQ==";
-    public const string ManifestSha256 = "71375843feaa116c7d928e74e0500a22cc267e12bfb6869efb92dfd39acf7fee";
-    public const long GeneratedAtUnixMilliseconds = 1_794_312_337_628;
-    private const string ResourcePrefix = "PiSharp.AI.Catalogs.Releases.1.5.2.";
-    private static readonly ImmutableDictionary<string, string> ShardHashes = ReadManifest();
-    private static readonly ConcurrentDictionary<string, FrozenModelCatalog> Loaded = new(StringComparer.Ordinal);
+    public const string PackageVersion = "1.6.0";
+    public const string SourceCommit = "faac585884ae2c013a6b1400f3e9e77f10b34bac";
+    public const string PackageSha256 = "d68312ec574bc959cb7fee26da4f4876d067aed9bbbe76e876359e60d2294747";
+    public const string PackageIntegrity = "sha512-9hL+eygFDEiFp//cydeUfmFsKmEqpmvsNPb10Y1W8+m5K9O+sx1hMStfu6nukrBD5sl6mP4RykCYBBNEgsVLfw==";
+    public const string ManifestSha256 = "cc46553f3f008788e667600a873d3d83a4df8fe46c67b06c65b16fd828450e8b";
+    public const long GeneratedAtUnixMilliseconds = 1_795_171_729_496;
+
+    internal static ReleasedModelCatalog Release { get; } = new(PackageVersion, SourceCommit, PackageSha256, PackageIntegrity,
+        ManifestSha256, GeneratedAtUnixMilliseconds);
 
     /// <summary>Every released provider, including providers absent from historical snapshots.</summary>
-    public static ImmutableArray<string> Providers { get; } = [.. ShardHashes.Keys.Order(StringComparer.Ordinal)];
+    public static ImmutableArray<string> Providers => Release.Providers;
 
     /// <summary>The exact released provider snapshot, or null for an unknown provider.</summary>
-    public static FrozenModelCatalog? Get(string provider)
-    {
-        ArgumentNullException.ThrowIfNull(provider);
-        return ShardHashes.ContainsKey(provider) ? Loaded.GetOrAdd(provider, id =>
-        {
-            var bytes = ReadResource(id + ".json");
-            if (Convert.ToHexStringLower(SHA256.HashData(bytes)) != ShardHashes[id])
-                throw new InvalidOperationException("Current model catalog differs from its pinned package manifest: " + id);
-            return FrozenModelCatalog.ReadProviderJson(id, bytes);
-        }) : null;
-    }
-
-    private static ImmutableDictionary<string, string> ReadManifest()
-    {
-        var bytes = ReadResource(".manifest.json");
-        if (Convert.ToHexStringLower(SHA256.HashData(bytes)) != ManifestSha256)
-            throw new InvalidOperationException("Current model catalog manifest differs from its pinned package.");
-        using var document = JsonDocument.Parse(bytes);
-        var manifest = document.RootElement;
-        if (manifest.GetProperty("schemaVersion").GetInt32() != 6 ||
-            DateTimeOffset.Parse(manifest.GetProperty("generatedAt").GetString()!, System.Globalization.CultureInfo.InvariantCulture).ToUnixTimeMilliseconds() != GeneratedAtUnixMilliseconds)
-            throw new InvalidOperationException("Current model catalog manifest metadata differs from its pinned package.");
-        return manifest.GetProperty("files").EnumerateObject().ToImmutableDictionary(
-            entry => entry.Name[..^5], entry => entry.Value.GetString()!, StringComparer.Ordinal);
-    }
-
-    private static byte[] ReadResource(string name)
-    {
-        using var resource = typeof(CurrentModelCatalog).Assembly.GetManifestResourceStream(ResourcePrefix + name)
-            ?? throw new InvalidOperationException("Current model catalog resource is missing: " + name);
-        using var buffer = new MemoryStream();
-        resource.CopyTo(buffer);
-        return buffer.ToArray();
-    }
+    public static FrozenModelCatalog? Get(string provider) => Release.Get(provider);
 }

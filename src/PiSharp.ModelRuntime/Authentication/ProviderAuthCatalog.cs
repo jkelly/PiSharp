@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/ai/src/providers/all.ts (builtinProviders), each provider's auth
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/ai/src/providers/all.ts (builtinProviders), each provider's auth
 // (providers/*.ts: envApiKeyAuth names and variables, amazon-bedrock.ts bedrockAuth, google-vertex.ts vertexAuth,
 // cloudflare-auth.ts cloudflareWorkersAIAuth/cloudflareAIGatewayAuth, the lazyOAuth flows), auth/helpers.ts (envApiKeyAuth login)
 // and auth/oauth/load.ts; packages/coding-agent/src/extensions/index.ts (builtInExtensions: the host supplies their providers' auth,
@@ -68,10 +68,11 @@ internal static class ProviderAuthCatalog
         Key("opencode-go", "OpenCode Go", "OpenCode API key", "OPENCODE_API_KEY"),
         Key("openrouter", "OpenRouter", "OpenRouter API key", "OPENROUTER_API_KEY") with
         { OAuth = new("OpenRouter OAuth", false, "Sign in with OpenRouter", context => new OpenRouterOAuth(context.Http, context.Environment, context.Time)) },
-        Key("qwen-token-plan", "Qwen Token Plan", "Qwen Token Plan API key", "QWEN_TOKEN_PLAN_API_KEY"),
-        Key("qwen-token-plan-cn", "Qwen Token Plan CN", "Qwen Token Plan CN API key", "QWEN_TOKEN_PLAN_CN_API_KEY"),
-        Key("qwen-token-plan-individual", "Qwen Token Plan Individual", "Qwen Token Plan Individual API key", "QWEN_TOKEN_PLAN_API_KEY"),
-        Key("qwen-token-plan-individual-cn", "Qwen Token Plan Individual CN", "Qwen Token Plan Individual CN API key", "QWEN_TOKEN_PLAN_CN_API_KEY"),
+        // Qwen Token Plan: the per-plan variable first, then the region variable both plans used to share.
+        Key("qwen-token-plan", "Qwen Token Plan Team", "Qwen Token Plan Team API key", "QWEN_TOKEN_PLAN_TEAM_API_KEY", "QWEN_TOKEN_PLAN_API_KEY"),
+        Key("qwen-token-plan-cn", "Qwen Token Plan Team CN", "Qwen Token Plan Team CN API key", "QWEN_TOKEN_PLAN_TEAM_CN_API_KEY", "QWEN_TOKEN_PLAN_CN_API_KEY"),
+        Key("qwen-token-plan-individual", "Qwen Token Plan Individual", "Qwen Token Plan Individual API key", "QWEN_TOKEN_PLAN_INDIVIDUAL_API_KEY", "QWEN_TOKEN_PLAN_API_KEY"),
+        Key("qwen-token-plan-individual-cn", "Qwen Token Plan Individual CN", "Qwen Token Plan Individual CN API key", "QWEN_TOKEN_PLAN_INDIVIDUAL_CN_API_KEY", "QWEN_TOKEN_PLAN_CN_API_KEY"),
         Key("radius", "Radius", "Radius API key", "RADIUS_API_KEY") with
         { OAuth = new("Radius", false, null, context => new RadiusOAuth(context.Http, "Radius", RadiusOAuth.DefaultGateway, context.Time)) },
         Key("together", "Together", "Together API key", "TOGETHER_API_KEY"),

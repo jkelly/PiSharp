@@ -14,9 +14,9 @@ internal static partial class Program
                 amazon-bedrock/us.anthropic.claude-opus-5-5
                 ant-ling/Ring-2.6-1T
                 anthropic/claude-opus-5-5
-                openai/gpt-6.1-sol
-                azure/gpt-6.1-sol
-                openai-codex/gpt-6.1-sol
+                openai/gpt-6.2-sol
+                azure/gpt-6.2-sol
+                openai-codex/gpt-6.2-sol
                 radius/balanced
                 nvidia/nvidia/nemotron-3.5-super-vl-120b-a12b
                 deepseek/deepseek-v4-pro
@@ -58,7 +58,7 @@ internal static partial class Program
             var registry = ModelRegistry.Create(new());
             foreach (var (provider, id) in ModelResolver.DefaultModelPerProvider)
                 Check(registry.Find(provider, id) is not null, provider + " default is available");
-            Equal(1773, Enum.GetValues<CatalogModelType>().Sum(type => registry.GetAllOfType(type).Count), "complete released 1.5.2 entries");
+            Equal(1853, Enum.GetValues<CatalogModelType>().Sum(type => registry.GetAllOfType(type).Count), "complete released 1.6.0 entries");
             var exactAzure = LiveSessionSelection.Parse("azure", "gpt-6.1-sol", null);
             Equal(1050000d, exactAzure.Definition.Raw.Value.GetProperty("contextWindow").GetDouble(), "exact-identity path uses reviewed corrections");
             Equal("qwen3.8-max", LiveSessionSelection.Parse("qwen-token-plan-individual-cn", "qwen3.8-max", null).Model.Id, "exact-identity path admits new provider");
@@ -71,11 +71,14 @@ internal static partial class Program
             var missingShard = Throws<BuiltinCatalogException>(() => BuiltinModelCatalog.Get(provider), "no historical shard");
             Equal("LiveCatalogUnavailable", missingShard.Code, "missing shard retains explicit failure");
             var reviewed = ReviewedModelCatalog.Apply(provider, null)!;
-            Equal(10, reviewed.Models.Length, "reviewed-only provider admits its exact model set");
+            Equal(13, reviewed.Models.Length, "reviewed-only provider admits its exact model set (Pi 1.6.0 added three)");
             var registry = ModelRegistry.Create(new());
             var models = registry.GetAll().Where(m => m.Provider == "qwen-token-plan-individual-cn").OrderBy(m => m.Id, StringComparer.Ordinal).ToArray();
-            Names(["deepseek-v4-flash-0731", "deepseek-v4-pro", "deepseek-v4-pro-0813", "glm-5.2", "glm-5.3", "qwen3.6-flash", "qwen3.7-max", "qwen3.7-plus", "qwen3.8-flash", "qwen3.8-max"], models.Select(m => m.Id), "individual CN allowlist");
-            var source = BuiltinModelCatalog.Get("qwen-token-plan-cn");
+            Names(["deepseek-v4-flash-0731", "deepseek-v4-pro", "deepseek-v4-pro-0813", "deepseek-v4.1-flash", "deepseek-v4.1-flash-1017", "glm-5.2", "glm-5.3", "qwen3.6-flash", "qwen3.7-max",
+                "qwen3.7-plus", "qwen3.8-flash", "qwen3.8-max", "qwen4-max-preview"], models.Select(m => m.Id), "individual CN allowlist");
+            // The Individual CN rows are the Team CN rows of the same release under another provider id. Until Pi 1.6.0 that release was the
+            // historical shard; 1.6.0 moved the gateway and dropped the explicit developer-role flag on both, so the current Team CN rows are the source.
+            var source = CurrentModelCatalog.Get("qwen-token-plan-cn")!;
             foreach (var model in models)
             {
                 var original = source.Models.Single(m => m.Id == model.Id);
@@ -86,7 +89,7 @@ internal static partial class Program
             var wrongKey = ModelRegistry.Create(new() { Environment = Env(("QWEN_TOKEN_PLAN_API_KEY", "fixture-international")) });
             Check(!wrongKey.GetAvailable().Any(m => m.Provider == "qwen-token-plan-individual-cn"), "international key does not enable China provider");
             var chinaKey = ModelRegistry.Create(new() { Environment = Env(("QWEN_TOKEN_PLAN_CN_API_KEY", "fixture-china")) });
-            Equal(10, chinaKey.GetAvailable().Count(m => m.Provider == "qwen-token-plan-individual-cn"), "China key enables exact allowlist");
+            Equal(13, chinaKey.GetAvailable().Count(m => m.Provider == "qwen-token-plan-individual-cn"), "China key enables exact allowlist");
             Check(registry.Find("qwen-token-plan-individual", "glm-5.3") is not null, "international individual adds GLM 5.3");
         }));
         yield return ("catalog-f09.classifier-is-not-chat-and-user-overrides-win", () => WithTemp("catalog-f09", async root =>

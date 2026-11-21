@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/ai/src/providers/all.ts (builtinProviders order), the provider
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/ai/src/providers/all.ts (builtinProviders order), the provider
 // factories packages/ai/src/providers/*.ts (id, name, baseUrl, auth and APIs), packages/ai/src/auth/helpers.ts (envApiKeyAuth),
 // packages/ai/src/providers/{anthropic,google-vertex,amazon-bedrock,cloudflare-auth}.ts (ambient auth) and
 // packages/ai/src/models.ts (checkProviderAuth).
@@ -42,6 +42,14 @@ public static class BuiltinProviders
     private static BuiltinProviderDefinition P(string id, string name, string? baseUrl, string? variable, string? oauth, params string[] apis) =>
         new(id, name, baseUrl, variable is null ? [] : [variable], ProviderAuthKind.EnvironmentKey, oauth, [.. apis]);
 
+    /// <summary>A Qwen Token Plan provider: the per-plan key variable, then the region variable both plans used to share.</summary>
+    private static BuiltinProviderDefinition Qwen(string id, string name, string baseUrl, string planVariable, string sharedVariable) =>
+        new(id, name, baseUrl, [planVariable, sharedVariable], ProviderAuthKind.EnvironmentKey, null, [Completions]);
+
+    // The former token-plan.{ap-southeast-1,cn-beijing}.maas.aliyuncs.com hosts resolve to the same gateways.
+    private const string QwenInternational = "https://token-plan.maas.qwencloudapi.com/compatible-mode/v1",
+        QwenChina = "https://token-plan.maas.qianwenaiapi.com/compatible-mode/v1";
+
     private const string Completions = "openai-completions", Messages = "anthropic-messages", Responses = "openai-responses";
 
     public static ImmutableArray<BuiltinProviderDefinition> All { get; } =
@@ -80,12 +88,10 @@ public static class BuiltinProviders
         P("opencode-go", "OpenCode Go", null, "OPENCODE_API_KEY", null, Messages, "google-generative-ai", Completions, Responses),
         P("openrouter", "OpenRouter", "https://openrouter.ai/api/v1", "OPENROUTER_API_KEY", "OpenRouter OAuth", Messages, Completions,
             "openrouter-images", "typesafe-system-one"),
-        P("qwen-token-plan", "Qwen Token Plan", "https://token-plan.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1", "QWEN_TOKEN_PLAN_API_KEY", null, Completions),
-        P("qwen-token-plan-cn", "Qwen Token Plan CN", "https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1", "QWEN_TOKEN_PLAN_CN_API_KEY", null, Completions),
-        P("qwen-token-plan-individual", "Qwen Token Plan Individual", "https://token-plan.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1",
-            "QWEN_TOKEN_PLAN_API_KEY", null, Completions),
-        P("qwen-token-plan-individual-cn", "Qwen Token Plan Individual CN", "https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1",
-            "QWEN_TOKEN_PLAN_CN_API_KEY", null, Completions),
+        Qwen("qwen-token-plan", "Qwen Token Plan Team", QwenInternational, "QWEN_TOKEN_PLAN_TEAM_API_KEY", "QWEN_TOKEN_PLAN_API_KEY"),
+        Qwen("qwen-token-plan-cn", "Qwen Token Plan Team CN", QwenChina, "QWEN_TOKEN_PLAN_TEAM_CN_API_KEY", "QWEN_TOKEN_PLAN_CN_API_KEY"),
+        Qwen("qwen-token-plan-individual", "Qwen Token Plan Individual", QwenInternational, "QWEN_TOKEN_PLAN_INDIVIDUAL_API_KEY", "QWEN_TOKEN_PLAN_API_KEY"),
+        Qwen("qwen-token-plan-individual-cn", "Qwen Token Plan Individual CN", QwenChina, "QWEN_TOKEN_PLAN_INDIVIDUAL_CN_API_KEY", "QWEN_TOKEN_PLAN_CN_API_KEY"),
         P("radius", "Radius", null, "RADIUS_API_KEY", "Radius", "pi-messages"),
         P("together", "Together", "https://api.together.ai/v1", "TOGETHER_API_KEY", null, Completions),
         P("typesafe", "TypeSafe", null, "TYPESAFE_API_KEY", null, "typesafe-system-one"),
