@@ -80,6 +80,7 @@ internal static class Program
     private static async Task<int> Main(string[] args)
     {
         if (args.Contains("--worker-snapshot-fixture")) return await WorkerSnapshotCases.RunChildAsync();
+        if (args.Contains("--worker-160-fixture")) return await Sync160WorkerCases.RunChildAsync();
         if (args.Contains("--sleep-child")) { await Task.Delay(Timeout.InfiniteTimeSpan); return 0; }
         if (args.Length >= 2 && (args[0] == "--spawn-descendant" || args[0] == "build"))
         {
@@ -163,6 +164,14 @@ internal static class Program
             ("terminal.160.scope-variant-one-watch-per-state", Sync160EdgeCases.ScopeVariantOneWatchPerState),
             ("terminal.160.scope-variant-of-foreign-reference", Sync160EdgeCases.ScopeVariantOfForeignReference),
             ("terminal.160.scope-keeps-no-released-reference", Sync160EdgeCases.ScopeKeepsNoReleasedReference),
+            // Pi 1.6.0, the chord-workers package (Sync160WorkerCases.cs): one contiguous block.
+            ("workers.160.passes-admit-to-its-route", Sync160WorkerCases.PassesAdmitToItsRoute),
+            ("workers.160.report-and-exit-in-the-same-turn-commits-nothing", Sync160WorkerCases.ReportAndExitInTheSameTurn),
+            ("workers.160.queued-commit-lands-before-the-exit-is-published", Sync160WorkerCases.QueuedCommitLandsBeforeTheExitIsPublished),
+            ("workers.160.stop-resolves-after-the-exit-was-published", Sync160WorkerCases.StopResolvesAfterTheExitWasPublished),
+            ("workers.160.incarnation-before-the-first-call", Sync160WorkerCases.IncarnationBeforeTheFirstCall),
+            ("workers.160.link-ended-at-exit-told-as-neither-lost-nor-closed", () => { Sync160WorkerCases.LinkEndedAtExitIsToldAsNeitherLostNorClosed(); return Task.CompletedTask; }),
+            ("terminal.160.scope-on-calls-the-listener-until-dispose", Sync160WorkerCases.ScopeOnCallsTheListenerUntilDispose),
             ("plugins.discovery-validates-and-orders", Discovery),
             ("plugins.rollout-continues-failures-and-stops-explicitly", RolloutOrder),
             ("plugins.new-failed-plugin-retains-dirty-mark", FailedAddedPlugin),
@@ -493,7 +502,7 @@ internal static class Program
         await using var workers = new ProcessWorkers("tests", host, PluginTestContracts.Worker, new()
         {
             Executable = Sdk, Arguments = [Assembly.GetExecutingAssembly().Location, "--worker"], Authorize = (_, _) => true,
-            Principal = _ => new() { ["kind"] = "worker" }, Plugins = (_, _) => Task.FromResult(new PluginBuildSet([], [])), LockDirectory = root, OnError = (_, _) => { },
+            Principal = _ => new() { ["kind"] = "worker" }, Plugins = (_, _) => Task.FromResult(new PluginBuildSet([], [])), LockDirectory = root, Store = null, OnError = (_, _) => { },
             StartTimeout = TimeSpan.FromSeconds(25), CloseTimeout = TimeSpan.FromSeconds(3), IdleTimeout = TimeSpan.FromMilliseconds(500),
         }, Context);
         var parent = Facet.Define((h, _) => h.Serve(PluginTestContracts.ParentService, (_, _, _) => new(new Dictionary<string, object?> { ["ready"] = (HostMethod)((_, _) => Task.FromResult<object?>(JsonValue.Create(1))) }, "reader")));
@@ -645,7 +654,7 @@ internal static class Program
         {
             Executable = Sdk, Arguments = [Assembly.GetExecutingAssembly().Location, "--worker", "--hold-startup"], Authorize = (_, _) => true,
             Principal = _ => new() { ["kind"] = "worker" }, Plugins = (_, _) => Task.FromResult(new PluginBuildSet([], [])), Data = _ => new JsonObject { ["closeMarker"] = marker },
-            LockDirectory = root, OnError = (_, _) => { }, CloseTimeout = TimeSpan.FromSeconds(5), StartTimeout = TimeSpan.FromSeconds(20),
+            LockDirectory = root, Store = null, OnError = (_, _) => { }, CloseTimeout = TimeSpan.FromSeconds(5), StartTimeout = TimeSpan.FromSeconds(20),
         }, Context);
         var core = Facet.Define((facet, _) => facet.Serve(PluginTestContracts.ParentService, (_, _, _) => new(new Dictionary<string, object?> { ["ready"] = (HostMethod)((_, _) => Task.FromResult<object?>(JsonValue.Create(1))) }, "reader")));
         await host.LoadAsync([new("test.parent", core), new("test.workers", workers.Facet)], Context);

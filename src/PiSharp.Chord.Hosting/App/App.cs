@@ -1,6 +1,6 @@
-// Pi b4afdddf44e059c67ccf5097e5317d913521b470 (MIT): packages/chord/src/node/app/app.ts.
-// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/chord/src/node/app/app.ts sign-in names (`chord.app.sign-ins`, `signIns.opened`) and the telemetry
-// ingest's `admit`. Not yet at v1.6.0: the workers component's `store` is the chord-workers package's.
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/chord/src/node/app/app.ts.
+// 1.6.0: the sign-in names (`chord.app.sign-ins`, `signIns.opened`), the telemetry ingest's `admit`, and the server's store given to each
+// workers component (a worker's exit is published after the commits its calls queued there).
 using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using System.Text;
@@ -162,6 +162,8 @@ public sealed class App : IAsyncDisposable
                 Environment = specification.Environment, Principal = Principal, ParentPrincipal = options.Principal.Server,
                 Plugins = (_, ctx) => workerManager.BuildAsync(ctx.AbortSignal ?? CancellationToken.None),
                 Authorize = specification.Authorize,
+                // The server's: a worker's exit is published after the commits its calls queued there.
+                Store = store,
                 LockDirectory = Layout.WorkersDirectory, IdleTimeout = specification.IdleTimeout, TimeProvider = options.TimeProvider,
                 CloseTimeout = options.Timeouts.Close ?? TimeSpan.FromSeconds(30), StartTimeout = options.Timeouts.Ready ?? TimeSpan.FromSeconds(60),
                 OnError = (address, error) => Report(new("workers", error, address.Kind)),
