@@ -1,10 +1,11 @@
-// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/chord/src/next/store/step.ts
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/chord/src/store/step.ts
 //
 // The commit step's working state (slice 6a §3, slice 6b §1.3) and the shape every write takes into it: a write staged before the queue
 // (serialized, rule 8), applied inside the step, returning the writes it recorded. Upstream's StagedWrite is an object type that an adapter's
 // class implements (Durable's DurableCommit), so here it is the interface IStagedWrite. Upstream passes a Step wherever a function reads
 // through Pick<SqliteExecutor, "get" | "all"> (the engine's reads, a series commit's check); here Step implements ISqliteExecutor for that,
-// its ExecAsync counted as a statement like the others.
+// its ExecAsync counted as a statement like the others. Upstream's reads tell the steps of one backend transaction apart by the executor
+// object (read.ts); an adapter here may hand every transaction the same executor, so a step carries a Transaction token of its own.
 using PiSharp.Chord.Sqlite;
 
 namespace PiSharp.Chord.Store;
@@ -51,6 +52,12 @@ public sealed class Step : ISqliteExecutor
 
     /// <summary>The step's backend transaction.</summary>
     public ISqliteExecutor Executor { get; }
+
+    /// <summary>The identity of the step's backend transaction: the steps of one transaction (a series) share it, and no step of another
+    /// has it. The executor unless the store gave one.</summary>
+    internal object Transaction { get => transaction ?? Executor; init => transaction = value; }
+
+    private readonly object? transaction;
 
     /// <summary>The seq this step commits.</summary>
     public long Seq { get; }

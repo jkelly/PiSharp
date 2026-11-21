@@ -1,4 +1,4 @@
-// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/chord/src/next/store/table-evolve.ts
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/chord/src/store/table-evolve.ts
 //
 // Tables.EvolveTable(previous, t => t...) (slice 6a §9; decision "Second spec review: the majority"): the next version of a table from
 // the edits of one migration. Upstream's editor types order the edits (rename, add and json before the data step, drop, index and
@@ -6,7 +6,8 @@
 // made, and materializes the new version at the end. C# has no such types, so there is one editor, TableEditor (as cv2-evolve's one
 // ContractEditor), and the order is the runtime check upstream's editor makes for JavaScript callers. Upstream's TableTailEditor,
 // AddedColumn, PatchOf and the Renamed/With/Without/Next types are type-level only. A declaration refusal is an ArgumentException with
-// upstream's message (a compileWhere or compileSet refusal of an update step stays their ChordError).
+// upstream's message (a compileWhere or compileSet refusal of an update step stays their ChordError). Upstream's EvolveOptions.exposes is
+// `ColumnSet | "none"`; here it is Exposes and the flag ExposesNone.
 using System.Text.Json.Nodes;
 using PiSharp.Chord.Contracts;
 
@@ -17,14 +18,24 @@ public static partial class Tables
     /// <summary>Appends the next version (<c>previous.Version + 1</c>) with the edits <paramref name="edit"/> makes; it must return the
     /// editor it was given. Every version is materialized and fingerprinted here; the definition serves the newest, and its activation
     /// migrates a store at an older version through each one (upstream <c>evolveTable</c>).</summary>
-    public static TableDefinition EvolveTable(TableDefinition previous, Func<TableEditor, TableEditor> edit)
+    public static TableDefinition EvolveTable(TableDefinition previous, Func<TableEditor, TableEditor> edit, EvolveOptions? options = null)
     {
         ArgumentNullException.ThrowIfNull(previous);
         ArgumentNullException.ThrowIfNull(edit);
-        var editor = new TableEditor(previous);
+        var editor = new TableEditor(previous, options ?? new EvolveOptions());
         ContractsInternal.EditWith(editor, edit, $"{previous.Name}: evolveTable");
         return editor.Finish();
     }
+}
+
+/// <summary>What <see cref="Tables.EvolveTable"/> takes besides the edits (upstream <c>EvolveOptions</c>).</summary>
+public sealed class EvolveOptions
+{
+    /// <summary>The column set the new version exposes: the previous version's when left out.</summary>
+    public ColumnSet? Exposes { get; init; }
+
+    /// <summary>The new version exposes no column set (upstream's <c>exposes: "none"</c>); <see cref="Exposes"/> is ignored then.</summary>
+    public bool ExposesNone { get; init; }
 }
 
 /// <summary>The edits of one <see cref="Tables.EvolveTable"/> call (upstream's <c>TableEditor</c> and <c>TableTailEditor</c>, and the
@@ -44,10 +55,13 @@ public sealed class TableEditor
     private readonly List<TableEdit> before = [];
     private DataStep? step;
     private readonly List<TableEdit> afterStep = [];
+    /// <summary>The set the finished version exposes; the versions a data step reads expose none.</summary>
+    private readonly ColumnSet? exposes;
 
-    internal TableEditor(TableDefinition previous)
+    internal TableEditor(TableDefinition previous, EvolveOptions options)
     {
         this.previous = previous;
+        exposes = options.ExposesNone ? null : options.Exposes ?? previous.Exposes;
         what = $"{previous.Name} version {previous.Version + 1}";
         schemas = new OrderedDictionary<string, Property>(previous.ColumnSchemas, StringComparer.Ordinal);
         key = [.. previous.Key];
@@ -192,18 +206,19 @@ public sealed class TableEditor
 
     /// <summary>The new version, materialized and fingerprinted, linked to the previous one and the migration from it.</summary>
     internal TableDefinition Finish() =>
-        new(previous.Name, Options(), new Evolution(previous, new Migration([.. before], step, [.. afterStep])));
+        new(previous.Name, Options(exposes), new Evolution(previous, new Migration([.. before], step, [.. afterStep])));
 
     /// <summary>The table as the edits so far leave it, at the new version: what a data step reads and writes.</summary>
     private TableDefinition Current() => new(previous.Name, Options());
 
     /// <summary>The key and indexes are names the edits kept; the constructor checks them as it checks a base's.</summary>
-    private TableOptions Options() => new()
+    private TableOptions Options(ColumnSet? exposed = null) => new()
     {
         Version = previous.Version + 1,
         Columns = new OrderedDictionary<string, Property>(schemas, StringComparer.Ordinal),
         Key = [.. key],
         Indexes = new OrderedDictionary<string, IReadOnlyList<string>>(indexes, StringComparer.Ordinal),
+        Exposes = exposed,
     };
 
     private void AssertBefore(string edit)

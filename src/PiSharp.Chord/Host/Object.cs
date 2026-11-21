@@ -19,8 +19,12 @@ internal sealed partial class ChordObject : ITarget, IDocumentsOwner, ITableOwne
     internal readonly ITelemetryContext Trigger;
     internal Attempt? Current;
     internal readonly Documents.Documents Documents;
-    internal readonly LiveQueries LiveQueries = new();
-    LiveQueries ITableOwner.Queries => LiveQueries;
+    // The column sets its tables exposed are served no more (slice 14 §5): reads over them fail unavailable.
+    internal void UnbindSets()
+    {
+        if (Host.Store?.ReadIndex is not { } reads) return;
+        foreach (var set in reads.BoundBy(this)) reads.Unbind(set, this);
+    }
     internal readonly List<Attempt> OldAttempts = [];
     internal long LiveOrder;
     internal readonly HashSet<IHolder> Holders = new(ReferenceEqualityComparer.Instance);

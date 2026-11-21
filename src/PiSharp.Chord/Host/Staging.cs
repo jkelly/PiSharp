@@ -197,6 +197,7 @@ internal sealed partial class RecordingSelf(ChordObject owner, ServedType served
         var store = Persistable($"table \"{definition.Name}\"");
         if (!tables.TryAdd(definition.Name, definition)) throw new ArgumentException($"{owner.Label}: table \"{definition.Name}\" is declared twice");
         store.Claims.AssertTable(StoreInternal.TableSqlName(served.Contract.Name, definition.Name), owner);
+        StoreInternal.CheckExposedOnce(definition, tables.Values.Where(other => !ReferenceEquals(other, definition)), owner.Label);
         return new RecordingTable(definition);
     }
     public void Contribute<C, V>(Registry<C, V> registry, object? value)

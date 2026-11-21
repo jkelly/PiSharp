@@ -327,6 +327,7 @@ public sealed partial class ChordHost : IAsyncDisposable
         var failures = new List<Exception>();
         foreach (var obj in objects)
             try { await obj.EndAsync(HostErrors.Closed(), NativeCloseReason.Close); } catch (Exception error) { failures.Add(error); }
+        foreach (var obj in objects) obj.UnbindSets();
         foreach (var contribution in facetContributions) contribution.Record.Remove(contribution);
         facetContributions.Clear();
         foreach (var record in RegistryRecords.Values) record.Close();

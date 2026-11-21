@@ -132,6 +132,7 @@ internal sealed partial class ChordObject
                 else holder.End(new ChordError("unavailable", $"{Served.Contract.Name} is not served here"));
         }
         finally { ending = false; }
+        UnbindSets();
         Host.TrackReloadWork(EndAsync(new ChordError("released", $"{Label}: removed", "ended"), NativeCloseReason.End), Label);
     }
 }

@@ -201,10 +201,14 @@ internal sealed partial class Attempt : IOldWorkSource
         {
         Owner.Documents.Hydrate(Self.Definitions, Self.Pins, Owner.Context);
         if (Self.Tables.Count > 0)
+        {
+            Self.HoldTables();
             await StoreInternal.PrepareTablesAsync(Self.Tables.Select(t => new DeclaredTable(t.Definition, t.Sql.Table)).ToArray(), Owner.Host.Store!,
                 new(() => !Token.Sealed, (_, _) => { }), Owner.Label, Self.Context);
+        }
+        Self.BindSets();
         if (Owner.Documents.Load(Self.Context) is { } loading) await loading;
-        foreach (var query in Self.Queries) await query.LoadAsync(Self.Context);
+        await Self.LoadQueriesAsync();
         }
         finally { Owner.Host.HostDataGate.Leave(); }
         foreach (var job in Self.Jobs) await job.LoadAsync(Self.Context);
@@ -375,7 +379,7 @@ internal sealed partial class Self : IStoreSelf, IKeyDeclarer, IJobOwner, IWrita
     internal readonly List<FollowSource> Follows = [];
     internal readonly List<IHostedJob> Jobs = [];
     internal readonly List<TableHandle> Tables = [];
-    internal readonly List<LiveQuery> Queries = [];
+    internal readonly List<(LiveQuery Live, LiveTarget Target)> Queries = [];
     internal readonly List<ContributionDeclaration> Contributions = [];
     internal readonly List<RegistryContribution> PublishedContributions = [];
     private readonly List<Action<Exception>> detach = [];
@@ -471,6 +475,7 @@ internal sealed partial class Self : IStoreSelf, IKeyDeclarer, IJobOwner, IWrita
     {
         Declare("table"); if (Store is not { } storage) throw new ArgumentException("tables need a local empty-param object and store");
         if (Tables.Any(t => t.Definition.Name == definition.Name)) throw new ArgumentException("table declared twice");
+        StoreInternal.CheckExposedOnce(definition, Tables.Select(t => t.Definition), Attempt.Owner.Label);
         var name = StoreInternal.TableSqlName(storage.Owner, definition.Name);
         storage.Store.Claims.Table(name, Attempt.Owner);
         var table = new TableHandle(definition, name, storage.Store, Attempt.Owner); Tables.Add(table); return table;
@@ -490,7 +495,7 @@ internal sealed partial class Self : IStoreSelf, IKeyDeclarer, IJobOwner, IWrita
     {
         foreach (var action in detach) action(error); detach.Clear();
         foreach (var derive in Derives) derive.Detach(error);
-        foreach (var query in Queries) query.Detach(error);
+        RetireReads(error);
         foreach (var follow in Follows)
             try { follow.Detach(); } catch (Exception failure) { Report(new("follow_detach_failed", failure, Attempt.Owner.Label)); }
     }

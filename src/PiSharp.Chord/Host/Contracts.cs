@@ -33,7 +33,10 @@ public sealed class HostOptions
 public sealed record HostError(string Kind, Exception? Error = null, string? Object = null, string? Member = null,
     FailureCause? Failure = null, int? Position = null, string? Job = null, string? Id = null, int? Restarts = null,
     string? WaitingFor = null, string? State = null, double? Since = null, string? Registry = null,
-    string? Plugin = null, long? Version = null, string? Message = null, IReadOnlyList<string>? Plugins = null, string? Table = null);
+    string? Plugin = null, long? Version = null, string? Message = null, IReadOnlyList<string>? Plugins = null, string? Query = null);
+/// <summary>What <c>DeleteHostDataAsync</c> takes besides the address: <paramref name="Plugin"/> limits the delete to the records and rows
+/// the named plugin's objects own (upstream <c>HostDeleteOptions</c>).</summary>
+public sealed record HostDeleteOptions(string? Plugin = null);
 public sealed record GetOptions(TimeSpan? ReadyTimeout = null);
 public sealed class RootOptions
 {
