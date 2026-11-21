@@ -1,4 +1,4 @@
-// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/tui/src/components/editor.ts and packages/tui/src/editor-component.ts.
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/tui/src/components/editor.ts and packages/tui/src/editor-component.ts.
 using System.Globalization;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -417,9 +417,13 @@ public partial class Editor : IEditorComponent, IFocusable, IMouseHandler
             {
                 if (autocompleteList.GetSelectedItem() is { } selected && autocompleteProvider is not null)
                 {
+                    // Enter runs a slash command only from the command-name menu. Path and argument menus can also have a "/"
+                    // prefix ("look at /tmp/fi", "/open /tm"), so the prefix alone does not identify the menu. Read the context
+                    // before applying the completion: the completed "/model " already contains a space.
+                    var submitsCommand = autocompletePrefix.StartsWith('/') && IsInSlashCommandNameContext(state.Lines[state.CursorLine][..state.CursorCol]);
                     PushUndoSnapshot(); lastAction = null;
                     ApplyCompletionResult(autocompleteProvider.ApplyCompletion(state.Lines, state.CursorLine, state.CursorCol, new(selected.Value, selected.Label, selected.Description), autocompletePrefix));
-                    if (autocompletePrefix.StartsWith('/')) CancelAutocomplete();
+                    if (submitsCommand) CancelAutocomplete();
                     else { CancelAutocomplete(); OnChange?.Invoke(GetText()); return; }
                 }
             }
@@ -1051,6 +1055,8 @@ public partial class Editor : IEditorComponent, IFocusable, IMouseHandler
         return before.Length == 0 || before == "/";
     }
     private bool IsInSlashCommandContext(string before) => IsSlashMenuAllowed() && TextUtils.JsTrimStart(before).StartsWith('/');
+    // A slash command name is being typed: "/mo", not "/model cla" or "/open /tm".
+    private bool IsInSlashCommandNameContext(string before) => IsInSlashCommandContext(before) && !TextUtils.JsTrimStart(before).Contains(' ');
 
     private static int BestMatchIndex(List<AutocompleteItem> items, string prefix)
     {
@@ -1084,7 +1090,7 @@ public partial class Editor : IEditorComponent, IFocusable, IMouseHandler
     {
         if (autocompleteProvider is null) return;
         var before = state.Lines[state.CursorLine][..state.CursorCol];
-        if (IsInSlashCommandContext(before) && !TextUtils.JsTrimStart(before).Contains(' ')) RequestAutocomplete(false, true);
+        if (IsInSlashCommandNameContext(before)) RequestAutocomplete(false, true);
         else RequestAutocomplete(true, true);
     }
 
