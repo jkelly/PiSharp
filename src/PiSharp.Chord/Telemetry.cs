@@ -1,5 +1,8 @@
-// Pi b4afdddf44e059c67ccf5097e5317d913521b470 (MIT): packages/chord/src/telemetry.ts.
-// Pi v1.5.2 (MIT): packages/chord/src/telemetry.ts.
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/chord/src/telemetry.ts.
+// Pi v1.6.0 (MIT): packages/chord/src/telemetry.ts. 1.6.0 schema rows: the counters chord.query.probes, chord.query.skips and
+// chord.query.rows, chord.events.emitted, chord.events.sent, chord.events.dropped (reason: window, too_large or mapping) and
+// chord.events.encodes, and the span event chord.admit on chord.relay, chord.hold and chord.activate. The store, remote and admission
+// layers emit them through ChordTelemetry.Metrics(...).Counter(name), ChordContext.Count(name) and ChordTelemetry.Admitted(span, allowed).
 using System.Runtime.CompilerServices;
 using System.Text.Json;
 using PiSharp.Chord.Contracts;
@@ -23,6 +26,14 @@ public static class ChordTelemetry
     public static ChordMetrics Metrics(ITelemetryMetrics? metrics) => metrics is null || ReferenceEquals(metrics, NoopTelemetry.Metrics)
         ? NoopMetrics : Instruments.GetValue(metrics, value => new ChordMetrics(value));
     public static string Capped(string text) => text.Length > 256 ? text[..256] : text;
+    /// <summary>Records an admission's decision on <paramref name="span"/> (the span event <c>chord.admit</c>, outcome <c>allow</c> or
+    /// <c>deny</c>): on the <c>chord.activate</c> span of an admitted type's attempt, or on the <c>chord.hold</c> or <c>chord.relay</c> span
+    /// a route's admission decided for.</summary>
+    public static void Admitted(ITelemetrySpan span, bool allowed) =>
+        span.AddEvent("chord.admit", new SpanAttributes { ["outcome"] = allowed ? "allow" : "deny" });
+    /// <summary>The attributes of one <c>chord.events.dropped</c> count: <paramref name="reason"/> is <c>window</c>, <c>too_large</c> or
+    /// <c>mapping</c>.</summary>
+    public static SpanAttributes EventsDropped(string reason) => new() { ["reason"] = reason };
     public static string HostAttribute(Address? address) => Capped(address?.Key ?? "client");
     public static void SpanFailed(ITelemetrySpan span, string category, Exception error) =>
         span.SetStatus(SpanStatus.Failed(category, error.Message.Length > MaxMessage ? error.Message[..MaxMessage] : error.Message));
@@ -239,6 +250,18 @@ public static class ChordTelemetry
           "description": "How it ended; a cancel is no error (status ok)."
         }
       },
+      "events": {
+        "chord.admit": {
+          "description": "An admission's decision (slice 14): an admitted type's attempt read it, or a route's for the hold's principal.",
+          "attributes": {
+            "outcome": {
+              "type": "string",
+              "required": true,
+              "description": "`allow` or `deny`."
+            }
+          }
+        }
+      },
       "status": {
         "default": "ok",
         "errorWhen": "The error's category (`call_failed`, `method_failed`, `relay_failed`, `hold_failed`, `activation_failed`, `open_failed`, `close_failed`, `load_failed`, `reload_failed`, `resolve_failed`, `routine_failed`, `job_failed`, `http_failed`, `trace_failed` for `ctx.trace`) and its message, at most 500 characters; a cancel keeps status ok."
@@ -282,6 +305,18 @@ public static class ChordTelemetry
             "ended"
           ],
           "description": "How it ended; a cancel is no error (status ok)."
+        }
+      },
+      "events": {
+        "chord.admit": {
+          "description": "An admission's decision (slice 14): an admitted type's attempt read it, or a route's for the hold's principal.",
+          "attributes": {
+            "outcome": {
+              "type": "string",
+              "required": true,
+              "description": "`allow` or `deny`."
+            }
+          }
         }
       },
       "status": {
@@ -348,6 +383,16 @@ public static class ChordTelemetry
               "type": "number",
               "required": true,
               "description": "Milliseconds until the next attempt."
+            }
+          }
+        },
+        "chord.admit": {
+          "description": "An admission's decision (slice 14): an admitted type's attempt read it, or a route's for the hold's principal.",
+          "attributes": {
+            "outcome": {
+              "type": "string",
+              "required": true,
+              "description": "`allow` or `deny`."
             }
           }
         }
@@ -896,6 +941,21 @@ public static class ChordTelemetry
       "description": "Live query runs.",
       "attributes": {}
     },
+    "chord.query.probes": {
+      "kind": "counter",
+      "description": "Keyed probes a commit asked before running a live query again.",
+      "attributes": {}
+    },
+    "chord.query.skips": {
+      "kind": "counter",
+      "description": "Live queries a commit writing their tables did not run again.",
+      "attributes": {}
+    },
+    "chord.query.rows": {
+      "kind": "counter",
+      "description": "Rows live query runs returned (output, not what the backend scanned).",
+      "attributes": {}
+    },
     "chord.cycle.visits": {
       "kind": "counter",
       "description": "Objects a cycle check visited.",
@@ -978,6 +1038,37 @@ public static class ChordTelemetry
       "kind": "histogram",
       "unit": "ms",
       "description": "How long a link origin's state waited for a slot of its window.",
+      "attributes": {}
+    },
+    "chord.events.emitted": {
+      "kind": "counter",
+      "description": "Event values this host's sources emitted.",
+      "attributes": {}
+    },
+    "chord.events.sent": {
+      "kind": "counter",
+      "description": "Event entries this host sent of its own in `event` messages (one per hold).",
+      "attributes": {}
+    },
+    "chord.events.dropped": {
+      "kind": "counter",
+      "description": "Event entries dropped: an origin's event window full at a flush (`window`, at the emitting host), a value past a part limit where parsed (`too_large`), an older version's mapping that threw (`mapping`, one per emit and version).",
+      "attributes": {
+        "reason": {
+          "type": "string",
+          "required": true,
+          "values": [
+            "window",
+            "too_large",
+            "mapping"
+          ],
+          "description": "Why it was dropped."
+        }
+      }
+    },
+    "chord.events.encodes": {
+      "kind": "counter",
+      "description": "Event values encoded for links: once per representation (the current version, each mapped one).",
       "attributes": {}
     }
   }

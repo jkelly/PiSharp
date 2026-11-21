@@ -1,9 +1,9 @@
-// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/chord/src/next/data/failure.ts
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/chord/src/data/failure.ts
 //
-// Failure causes: transient (the object's own effect failed: retry later), broken (its own code, a cycle or authority: retry by hand) or
-// waiting (not its fault: no provider, no fitting version, a dependency that failed; woken by an event). The failing stage decides, never
-// the error code. Upstream's FailureCause is a union of three { kind, error } shapes; here it is one record with a FailureKind. Message
-// lengths count UTF-16 code units, as JavaScript's do.
+// Failure causes: transient (the object's own effect failed: retry later), broken (its own code, a cycle or authority: retry by hand),
+// waiting (not its fault: no provider, no fitting version, a dependency that failed; woken by an event) or denied (an admission refused the
+// caller: woken by the decision; 1.6.0). The failing stage decides, never the error code. Upstream's FailureCause is a union of four
+// { kind, error } shapes; here it is one record with a FailureKind. Message lengths count UTF-16 code units, as JavaScript's do.
 namespace PiSharp.Chord.Data;
 
 /// <summary>The kind of a failure cause.</summary>
@@ -17,6 +17,9 @@ public enum FailureKind
 
     /// <summary>Not its fault (no provider, no fitting version, a dependency that failed): woken by an event.</summary>
     Waiting,
+
+    /// <summary>Its admission, a dependency's or a route's refused the caller (slice 14): no backoff, woken by the decision.</summary>
+    Denied,
 }
 
 /// <summary>Why an object, or a request, is failed (upstream <c>FailureCause</c>); the kind comes from the failing stage, never from the

@@ -1,4 +1,4 @@
-// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/chord/src/next/contracts/accepts.ts
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/chord/src/contracts/accepts.ts
 //
 // Accepted versions: the older versions a provider still serves, with the direct mappings their edits require. Upstream's AcceptsTable
 // is a type computed from the contract's history (AcceptsOf, VersionMappings, Section, OmitNever, StateMappings, KeyedMappings,
@@ -10,7 +10,9 @@
 // number (`accepts[other]`), an unknown key in a version's mappings or a method mapping, and a method side that is no function. A null
 // section, like an absent one, maps nothing; a null mapping or version entry is a value that is neither a function nor "refuse" nor an
 // object, as upstream's undefined is. The table's entries are read in JavaScript's own-key order, as Object.entries reads them: array
-// indexes ascending, then the other keys in insertion order. checkAccepts never calls a mapping.
+// indexes ascending, then the other keys in insertion order. checkAccepts never calls a mapping. 1.6.0: an events section
+// (VersionMappings.Events), shaped as the state section is (by variant for a remote contract, flat for a local one) and built from the
+// same StateEntry, StateSection and StateMapping, since an event mapping is the same thing: the current value to the old one, or Refuse.
 using System.Globalization;
 
 namespace PiSharp.Chord.Contracts;
@@ -35,6 +37,12 @@ public sealed class VersionMappings
     /// <summary>A local contract's keyed members (slice 7b): a changed one maps each document of the current version back, or refuses; a
     /// removed one refuses (no document maps from the whole state).</summary>
     public OrderedDictionary<string, StateMapping> Keyed { get; init; } = new(StringComparer.Ordinal);
+
+    /// <summary>Event member mappings (decision "Events: fire-and-forget members"), shaped as <see cref="State"/> is: a remote contract's
+    /// are by variant, a <see cref="StateSection"/> each; a local contract's table is flat. A changed event member (still declared) maps
+    /// each current value back to the old version's, or refuses, which leaves the older version's binding of that variant refused; a
+    /// removed one needs nothing (an older consumer receives none of it), nor an added one.</summary>
+    public OrderedDictionary<string, StateEntry> Events { get; init; } = new(StringComparer.Ordinal);
 }
 
 /// <summary>One remote variant's state mappings, by member.</summary>
@@ -138,11 +146,13 @@ internal static partial class ContractsInternal
     }
 
     /// <summary>What an accepted version needs, by edit and never by schema comparison: per variant, per state member; per method; per
-    /// keyed member (local contracts). Each map is in the order upstream's Maps fill.</summary>
+    /// keyed member (local contracts); per variant, per event member still declared and changed since (always
+    /// <see cref="StateNeed.Changed"/>). Each map is in the order upstream's Maps fill.</summary>
     private sealed record Needs(
         OrderedDictionary<string, OrderedDictionary<string, StateNeed>> State,
         OrderedDictionary<string, MethodNeed> Methods,
-        OrderedDictionary<string, StateNeed> Keyed);
+        OrderedDictionary<string, StateNeed> Keyed,
+        OrderedDictionary<string, OrderedDictionary<string, StateNeed>> Events);
 
     private enum StateNeed { Changed, Removed, Rekeyed }
 
@@ -157,9 +167,15 @@ internal static partial class ContractsInternal
         var state = new OrderedDictionary<string, OrderedDictionary<string, StateNeed>>(StringComparer.Ordinal);
         var methods = new OrderedDictionary<string, MethodNeed>(StringComparer.Ordinal);
         var keyed = new OrderedDictionary<string, StateNeed>(StringComparer.Ordinal);
+        var events = new OrderedDictionary<string, OrderedDictionary<string, StateNeed>>(StringComparer.Ordinal);
         foreach (var (variant, members) in old.Variants)
         {
             var now = current.Variants[variant];
+            // A removed event needs no mapping: an older consumer receives none of it.
+            var eventNeeds = new OrderedDictionary<string, StateNeed>(StringComparer.Ordinal);
+            foreach (var member in members.Events.Keys)
+                if (now.Events.ContainsKey(member) && Changed(variant, member, ChangeSide.Event)) eventNeeds[member] = StateNeed.Changed;
+            if (eventNeeds.Count > 0) events[variant] = eventNeeds;
             foreach (var member in members.Keyed.Keys)
             {
                 if (!now.Keyed.ContainsKey(member)) keyed[member] = StateNeed.Removed;
@@ -186,19 +202,25 @@ internal static partial class ContractsInternal
             if (need.Removed) methodNeeds[member] = need with { Args = false, Result = false };
             else if (need.Args || need.Result) methodNeeds[member] = need;
         }
-        return new Needs(state, methodNeeds, keyed);
+        return new Needs(state, methodNeeds, keyed, events);
     }
 
     private static void CheckMappings(VersionMappings? mappings, Needs needs, ContractKind kind, string path)
     {
         if (mappings is null) throw new ArgumentException($"{path}: expected an object");
-        // A local table is flat: its state section is the one variant's.
+        // A local table is flat: its state and events sections are the one variant's.
         if (kind == ContractKind.Local)
         {
             var localNeeds = needs.State.GetValueOrDefault(Local) ?? new OrderedDictionary<string, StateNeed>(StringComparer.Ordinal);
             CheckSection(mappings.State, localNeeds, $"{path}.state", (entry, need, at) => CheckStateMapping(entry.Value, need, at));
+            var localEvents = needs.Events.GetValueOrDefault(Local) ?? new OrderedDictionary<string, StateNeed>(StringComparer.Ordinal);
+            CheckSection(mappings.Events, localEvents, $"{path}.events", (entry, _, at) => CheckEventMapping(entry.Value, at));
         }
-        else CheckSection(mappings.State, needs.State, $"{path}.state", CheckVariant);
+        else
+        {
+            CheckSection(mappings.State, needs.State, $"{path}.state", CheckVariant);
+            CheckSection(mappings.Events, needs.Events, $"{path}.events", CheckEventVariant);
+        }
         CheckSection(mappings.Methods, needs.Methods, $"{path}.methods", CheckMethodMapping);
         CheckSection(mappings.Keyed, needs.Keyed, $"{path}.keyed", CheckKeyedMapping);
     }
@@ -208,6 +230,20 @@ internal static partial class ContractsInternal
     {
         if (entry.Value is not (null or StateSection)) throw new ArgumentException($"{path}: expected an object");
         CheckSection((StateSection?)entry.Value, needs, path, (mapping, need, at) => CheckStateMapping(mapping, need, at));
+    }
+
+    /// <summary>A remote variant's event mappings: a section (nothing is an empty one) with exactly the needed members.</summary>
+    private static void CheckEventVariant(StateEntry entry, OrderedDictionary<string, StateNeed> needs, string path)
+    {
+        if (entry.Value is not (null or StateSection)) throw new ArgumentException($"{path}: expected an object");
+        CheckSection((StateSection?)entry.Value, needs, path, (mapping, _, at) => CheckEventMapping(mapping, at));
+    }
+
+    /// <summary>An event mapping: a function or <see cref="StateMapping.Refuse"/>.</summary>
+    private static void CheckEventMapping(object? mapping, string path)
+    {
+        if (mapping is StateMapping { Map: not null } or StateMapping { Refuses: true }) return;
+        throw new ArgumentException($"{path}: expected a function or \"refuse\"");
     }
 
     /// <summary>Exactly the needed keys: no missing and no unnecessary mapping; absent only when nothing is needed.</summary>

@@ -41,7 +41,7 @@ internal sealed class HostLink : IChannelHandler
         if (Host.Options.Compression is null && part is Part.Deflated { Inflated: null } zipped && Parts.Oversized(part, limits.Part) is null)
             await Parts.InflateAsync(zipped, limits.Decoded, channel.ClosedToken, Context);
     }
-    public void Opened() => Host.Dispatcher.Invoke(() => { if (Open && !Host.Closed) { Consumer.Opened(channel.PeerCalls); Host.LinkOpened(this); } });
+    public void Opened() => Host.Dispatcher.Invoke(() => { if (Open && !Host.Closed) { Consumer.Opened(channel.PeerCalls ?? long.MaxValue); Host.LinkOpened(this); } });
     public ValueTask MessageAsync(Message message) => new(Host.Dispatcher.RunAsync(async () =>
     {
         if (!Open || Host.Closed) return;

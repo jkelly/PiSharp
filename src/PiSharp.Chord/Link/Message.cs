@@ -1,4 +1,7 @@
-// Port of Pi f9a26365568127461c47a07a37dcb42c140a3ac5 next/link/message.ts.
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/chord/src/link/message.ts.
+// 1.6.0 wire delta (protocol version stays 1): hello.calls is optional (null: this side announced no call window), ack.events (null: a
+// state ack; a number: the event messages of the origin consumed since the last event ack, never a state ack), the message kind event
+// with its WireEvent entries, and the failure cause kind denied.
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using PiSharp.Chord.Data;
@@ -6,7 +9,7 @@ using PiSharp.Chord.Data;
 namespace PiSharp.Chord.Link;
 
 internal abstract record Message(string Kind) { public long? Origin { get; init; } }
-internal sealed record HelloMessage(long Protocol, string Incarnation, long Calls) : Message("hello");
+internal sealed record HelloMessage(long Protocol, string Incarnation, long? Calls = null) : Message("hello");
 internal sealed record HoldMessage(long Hold, string Type, long Version, string Fingerprint, Part Params, WireAddress Address,
     JsonNode? Principal = null, string? Incarnation = null, IReadOnlyList<string>? Chain = null, long? Limit = null,
     IReadOnlyDictionary<string, string>? Trace = null) : Message("hold");
@@ -17,7 +20,7 @@ internal sealed record AbortMessage(long Call) : Message("abort");
 internal sealed record RetryMessage(long Hold, long Hops) : Message("retry");
 internal sealed record BoundMessage(IReadOnlyList<BoundEntry> Holds) : Message("bound");
 internal sealed record StateMessage(IReadOnlyList<StateEntry> Holds) : Message("state");
-internal sealed record AckMessage() : Message("ack");
+internal sealed record AckMessage(long? Events = null) : Message("ack");
 internal sealed record ClosedMessage() : Message("closed");
 internal sealed record RevokeMessage(JsonNode? Revocation) : Message("revoke");
 internal sealed record PingMessage() : Message("ping");
@@ -27,6 +30,12 @@ internal sealed record LoadingMessage(long Hold) : Message("loading");
 internal sealed record ResultMessage(long Call, Part? Value = null, IReadOnlyList<ReadOnlyMemory<byte>>? Segments = null) : Message("result");
 internal sealed record ErrorMessage(long Call, WireError Error) : Message("error");
 internal sealed record GoneMessage(long Hold, WireError Error) : Message("gone");
+/// <summary>Events of bound holds (decision "Events: fire-and-forget members"): one message per flush per link and origin, possibly without
+/// entries (a relay forwards what is left after filtering).</summary>
+internal sealed record EventMessage(IReadOnlyList<WireEvent> Events) : Message("event");
+/// <summary>One entry of an <see cref="EventMessage"/>: <paramref name="Member"/> an index into the bound variant's event members (sorted,
+/// <c>VariantNames.Events</c>), <paramref name="At"/> the emitting host's Unix time in milliseconds at the emit, <paramref name="Value"/> a part.</summary>
+internal sealed record WireEvent(long Hold, long Member, long At, Part Value);
 internal sealed record WireAddress(string Kind, JsonNode? Params);
 internal sealed record BoundMember(long Member, Part Value);
 internal sealed record StateMember(long Member, Part Ops);
@@ -84,6 +93,9 @@ internal static class MessageCheck
     internal const int NameLength = 256;
     internal const int CarrierKeys = 8;
     internal const int CarrierLength = 256;
+    /// <summary>The kinds of a <c>failed</c> message's cause, in their codes' order (the binary codec's byte, the text codec's letter:
+    /// upstream <c>CAUSE_KINDS</c>). They are <see cref="FailureKind"/>'s names in lower case, in its order.</summary>
+    internal static readonly string[] CauseKinds = ["transient", "broken", "waiting", "denied"];
     private static readonly Regex Uuid = new("^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", RegexOptions.CultureInvariant);
     private static readonly Regex Fingerprint = new("^[0-9a-f]{16}$", RegexOptions.CultureInvariant);
     internal static ArgumentException Invalid(string detail) => new("message: fails the message schema (" + detail + ")");
@@ -98,7 +110,9 @@ internal static class MessageCheck
         }
         switch (m)
         {
-            case HelloMessage x: Number(x.Protocol); Number(x.Calls, 1); if (!Uuid.IsMatch(x.Incarnation)) throw Invalid("incarnation"); break;
+            case HelloMessage x:
+                Number(x.Protocol); if (x.Calls is { } calls) Number(calls, 1);
+                if (!Uuid.IsMatch(x.Incarnation)) throw Invalid("incarnation"); break;
             case HoldMessage x:
                 Number(x.Hold); Number(x.Version, 1); if (!Fingerprint.IsMatch(x.Fingerprint)) throw Invalid("fingerprint");
                 if (x.Type.Length > NameLength || x.Address.Kind.Length > NameLength) throw Invalid("name");
@@ -118,9 +132,11 @@ internal static class MessageCheck
                 foreach (var e in x.Holds) { Ids([e.Hold,e.Variant]); foreach(var a in e.Members) Number(a.Member); Failures(e.Failed); } break;
             case StateMessage x:
                 foreach (var e in x.Holds) { Number(e.Hold); foreach(var a in e.Members) Number(a.Member); Failures(e.Failed); Ids(e.Retired); } break;
+            case AckMessage x: if (x.Events is { } consumed) Number(consumed, 1); break;
+            case EventMessage x: foreach (var e in x.Events) Ids([e.Hold, e.Member, e.At]); break;
             case ClosedMessage: if (m.Origin is null) throw Invalid("closed origin"); break;
             case FailedMessage x:
-                Number(x.Hold); if (x.Cause.Kind is not ("transient" or "broken" or "waiting")) throw Invalid("cause");
+                Number(x.Hold); if (Array.IndexOf(CauseKinds, x.Cause.Kind) < 0) throw Invalid("cause");
                 x.Cause.Error.Check(); if (x.RetryIn is { } retry) Number(retry); break;
             case LoadingMessage x: Number(x.Hold); break;
             case ResultMessage x: Number(x.Call); break;
