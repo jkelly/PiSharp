@@ -1,7 +1,7 @@
 // Decision 0011 (run W3, unit AP): Settings › About's model catalog numbers. What chats can use is IModelCatalog's: its providers, chat
 // models, reasoning models and models that read images (the catalog the Routing area built, plus what other areas add to it, such as custom
-// providers). With live providers, the About page also describes the built-in catalog behind it: PiSharp.ModelRuntime's embedded provider
-// shards, each SHA-256 verified before it is parsed (BuiltinModelCatalog), with their chat, image and classifier models and the manifest's
+// providers). With live providers, the About page also describes the built-in catalog behind it: the current release's embedded provider
+// shards, each SHA-256 verified before it is parsed (CurrentModelCatalog), with their chat, image and classifier models and the manifest's
 // hash. That registry is credential-blind (no environment, no key, no file, no network), read once and kept. With --faux the catalog is the
 // faux one and nothing of the built-in catalog is read.
 using PiSharp.AI.Catalogs;
@@ -62,9 +62,9 @@ public static class CatalogFacts
         var registry = ModelRegistry.Create(new ModelRegistryOptions());
         var entries = registry.GetAll();
         var providers = entries.Select(entry => entry.Provider).ToHashSet(StringComparer.Ordinal);
-        return new BuiltinCatalogStats(BuiltinModelCatalog.ShardHashes.Count, providers.Count,
+        return new BuiltinCatalogStats(CurrentModelCatalog.Providers.Length, providers.Count,
             entries.Count(entry => entry.Type == CatalogModelType.Chat), entries.Count(entry => entry.Type == CatalogModelType.Image),
-            entries.Count(entry => entry.Type == CatalogModelType.Classifier), BuiltinModelCatalog.ManifestSha256)
+            entries.Count(entry => entry.Type == CatalogModelType.Classifier), CurrentModelCatalog.ManifestSha256)
         {
             ProviderIds = providers,
         };
