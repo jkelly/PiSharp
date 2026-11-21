@@ -384,8 +384,8 @@
   ],
   "files": [
     {
-      "currentSha256": "c24903c1de67d5bd620726a81540cfb00dee08807323ec6cba3951c6cd2ee371",
-      "currentBytes": 3568,
+      "currentSha256": "573bbd84e6b0e4bf233d1d8df708340bf23ba196660665631f49b40ec5462150",
+      "currentBytes": 3621,
       "originalBytes": 599,
       "path": ".gitattributes",
       "originalSha256": "d822f3dd8f0a9debf094103c543358b6c14a043dd79caad455b854dcc9ba0706"
@@ -615,8 +615,8 @@
       "originalSha256": "20013de8c1947b9e57f46bbfa414224d1fff778f5501de6a89fb6cd9e5d43c6c"
     },
     {
-      "currentSha256": "0fe37ddaf78e0d200f88d906200e55a767934658876ac25390000f608ea19e8c",
-      "currentBytes": 702610,
+      "currentSha256": "cc3e836381d0f91db6e5c5f06e34f9630fae302834210325d61a9f2be87b7623",
+      "currentBytes": 703529,
       "originalBytes": 696580,
       "path": "compatibility/implementation-status.json",
       "originalSha256": "2fde7e0cfd5526f5c4ec197d533244189ac6fa2940ff6cf0bebe832d4e5d8abc"
@@ -1014,7 +1014,7 @@
       "originalSha256": "2551376cd09efe8406c1558c4e98f334f34756d1fa900e8e30a5a5dcf400421c"
     },
     {
-      "currentSha256": "f51e5f54f8cbca44c91447743d86d031e4eb145e3c99281b2278a7a6148344a0",
+      "currentSha256": "8fca25975e51a542d1d9530ed12b2a5a18f93d6089c18da5ae94cfe867597ba3",
       "currentBytes": 762,
       "originalBytes": 380,
       "path": "Directory.Build.props",
@@ -1105,8 +1105,8 @@
       "originalSha256": "b17d6fdf7fbef642be6a2ecfc697a74fc2c18faa613801e2809fb861be6b6291"
     },
     {
-      "currentSha256": "9ee3f25c43aff04c2ef75d06f273cb787430558cf6d35abbe0004f373a60f581",
-      "currentBytes": 16006,
+      "currentSha256": "21844ea5ee50aa929f91dc77197b2f7dd0dededc57fad5d2a4a551c41cbe057a",
+      "currentBytes": 19283,
       "originalBytes": 2925,
       "path": "docs/compatibility/baseline.md",
       "originalSha256": "60becce63e58e74237d4be073fb63b8d48ef2a227f9f8e52db3754df7fd704b6"
@@ -5844,8 +5844,8 @@
       "originalSha256": "9969064a379ad96f0fd9358b4133bf2652018a32c60d44f37a0638168381a90d"
     },
     {
-      "currentSha256": "133da1463abaf888404d3f1aa627cdc5ebd29da62308ddedb184c2aa244171c0",
-      "currentBytes": 65795,
+      "currentSha256": "18473daa2022b57614f8c311e6b297d4eddf7b7907d98b2a2c10704fd77d5919",
+      "currentBytes": 67992,
       "originalBytes": 61541,
       "path": "IMPLEMENTATION_STATUS.md",
       "originalSha256": "374b440732e7495d87bead963ef3df91052983a62e9bc95ba24f0966f2dd171b"
@@ -5872,8 +5872,8 @@
       "originalSha256": "0f5f73cc466a7aa3c8939d483b171da02d34d7fff0518ab80964f1311c92e6a9"
     },
     {
-      "currentSha256": "700a0f5bbaff38bcc351e680b9b5e9a44f0fb12c61e17537818db74399afe6e0",
-      "currentBytes": 9049,
+      "currentSha256": "8dc792bd96a26e04130695b51f69b0cc9c3dc1c29f0c66dcab20b4bafd0bedd1",
+      "currentBytes": 9805,
       "originalBytes": 3622,
       "path": "README.md",
       "originalSha256": "1b053b228b07ff43b8ba7d37d19e4ea3a1d6214731dfa4a1f2ef6f3240f292df"
@@ -6033,8 +6033,8 @@
       "originalSha256": "cc00f439401cdecba2711e3c898ac6242b0a9ee57ab82b3cd8b262ff509f7e8a"
     },
     {
-      "currentSha256": "839f097a40e7221dc2881b49a04efaf4640ea81098f867251dcba62c7639afff",
-      "currentBytes": 28087,
+      "currentSha256": "d76ccdda3ecb0afbde15c2171402f840fb14aecca49128d857f7ba7da6ef099f",
+      "currentBytes": 28410,
       "originalBytes": 25420,
       "path": "src/PiSharp.Agent/ToolBatchScheduler.cs",
       "originalSha256": "e2471706459f4bde64ecf67dc0bbbb654555c296c03359c3d75ad1eadb8c93a6"
@@ -6138,8 +6138,8 @@
       "originalSha256": "be2ade70016cbef1be0584f8d323534a6c3918312702a039533e5d9428c88c6f"
     },
     {
-      "currentSha256": "b6baee5a829026ef8266692c5eb18c43e31a53d5408849d5edc9f94be6e3b21b",
-      "currentBytes": 9181,
+      "currentSha256": "d373471fc570078d879c44eb0d3eccdacd263f1fc872d0d7836b32aca3b6e820",
+      "currentBytes": 9833,
       "originalBytes": 7234,
       "path": "src/PiSharp.AI/Authentication/InjectedAuthenticationResolver.cs",
       "originalSha256": "3687f0d3f993c73a6a1c8326a3978662bd09b025f31014dae2a683dacab4d48b"
@@ -6194,8 +6194,8 @@
       "originalSha256": "0e5f6f28f29923ab04babc7a59b174f7ee76a26524d34fc28567480d0cdcf3e0"
     },
     {
-      "currentSha256": "d595a2036d75600e005468c6f0fc6024cbbca708b4a57a06bbc891e0bc65bed5",
-      "currentBytes": 1584,
+      "currentSha256": "d9e7c6f5adf3ef433d6481b6283892551da2a7c6cc31c2a1a5ec0cdc9f7386c8",
+      "currentBytes": 1932,
       "originalBytes": 155,
       "path": "src/PiSharp.AI/PiSharp.AI.csproj",
       "originalSha256": "b7e3054f8844ae019166e87b004abd147d40890e35d1ca4bcd8c82711384cf4a"
@@ -6229,15 +6229,15 @@
       "originalSha256": "fb234e544705070730bcb550928f20e9df0601e053f61421c6300c749b3649a9"
     },
     {
-      "currentSha256": "cf72440217989a205b6c67102131197ea7f4619f8fd15f82bf9405cc3f159084",
-      "currentBytes": 29399,
+      "currentSha256": "321ab3a5815802d5f1c9fdc2b607f0c0d11e12e9cd8488baa430048127373064",
+      "currentBytes": 29418,
       "originalBytes": 17067,
       "path": "src/PiSharp.AI/Protocols/AnthropicMessages/AnthropicMessagesKeyAuthRequestFactory.cs",
       "originalSha256": "8cad779d44c97098c2dee23881907a1c694338c8fa07e8049132a0391f6ae32b"
     },
     {
-      "currentSha256": "d6b1a203e14593fd57c50e2fa78e8c7030c7163acdd920eb7d3a9739e2987697",
-      "currentBytes": 57868,
+      "currentSha256": "d2547c22ca6b8dc7684a7e70305ac87c644e428980ad927502acdc442697a2e0",
+      "currentBytes": 58391,
       "originalBytes": 47530,
       "path": "src/PiSharp.AI/Protocols/AnthropicMessages/AnthropicMessagesRequestProjector.cs",
       "originalSha256": "05c0b00876a896f2177fdcce15972aa1c08c948e0c71e92cc4b96745e2b79fa5"
@@ -6320,8 +6320,8 @@
       "originalSha256": "78986051ee53abcfb5758ecb22e157750464f3f532a74b00b8d5bcce83ca0b1d"
     },
     {
-      "currentSha256": "a56bc905def3291f752e907392dddca6770f685efe18814d23fef856635ea544",
-      "currentBytes": 17075,
+      "currentSha256": "7d0793cd355e367f6253481ea6f54c5e1c754718f1a78d453e455b53546c4204",
+      "currentBytes": 17582,
       "originalBytes": 14190,
       "path": "src/PiSharp.AI/Protocols/GoogleGenerativeAI/GoogleEventMapper.cs",
       "originalSha256": "06722686fc8364e6fc8b728fea1d4ff6ffc81399f9e07dc396352961c35c2f5f"
@@ -6348,8 +6348,8 @@
       "originalSha256": "b10fdf2a3b3e5a14a8a5da38ee841dbf4d3076ecdd56e0a0bdb5e797c370aa19"
     },
     {
-      "currentSha256": "912ba86f6be9f8568d11a39eb79a85a5386327f66db2bfa605714923b67083fc",
-      "currentBytes": 34902,
+      "currentSha256": "07e22680bbb6839b02e64eb8c1c97dcae2d00c9a5de65b0afbd32af37707ec2a",
+      "currentBytes": 35947,
       "originalBytes": 23713,
       "path": "src/PiSharp.AI/Protocols/GoogleGenerativeAI/GoogleRequestProjector.cs",
       "originalSha256": "d284585db1c5b0dc3e847fe8b36e1baf8c707e5f457f9d7a0c0b83b730b4ce8b"
@@ -6467,8 +6467,8 @@
       "originalSha256": "f003dafd782c5bbbfaae8248ed2ec15a97a6ebe17b8a487fb4e3248b50276b30"
     },
     {
-      "currentSha256": "1b4cdf88ed2eec643f1fd72e4c803459ad6191e6125aa333413c4ea2ad5331ec",
-      "currentBytes": 10449,
+      "currentSha256": "3d6ff2ef93324aca2dfe13c026409d8b275699b9329d87f8e9a3a83f9af90ba3",
+      "currentBytes": 10916,
       "originalBytes": 10194,
       "path": "src/PiSharp.AI/Protocols/MistralConversations/MistralSimpleHttpSseTransport.cs",
       "originalSha256": "d19f0a18e5f9b02b8310d8ba324cd3b1e17e5130ab7263e35aad9cfbeff814fd"
@@ -6481,15 +6481,15 @@
       "originalSha256": "39642a478391fc017fcae25c95156b3a231ba5db753909e54ba110e09ffcde1b"
     },
     {
-      "currentSha256": "021151f7183db1a3a96653434af29df1113d84c2a435c6c3b1c45aa61ec5f9be",
-      "currentBytes": 7552,
+      "currentSha256": "6f07ada5dad00b4ca0d8da4fed87ebe13d5e5a88f7571293e6e660e2a66b6e82",
+      "currentBytes": 7850,
       "originalBytes": 5759,
       "path": "src/PiSharp.AI/Protocols/MistralConversations/MistralTextOptions.cs",
       "originalSha256": "b3ac3b1f00edba50d65b2686470d9cbbd93001722e2e270b955a329dd9bb28d2"
     },
     {
-      "currentSha256": "469b46409127d05a414cd1f3adbd1a1fe929217d7b3977d766010c378ff5888f",
-      "currentBytes": 12502,
+      "currentSha256": "a24ec768435a95d875f2c7319cfedfaed534ac3ac65fa7aea4e8bf84827b20b5",
+      "currentBytes": 13115,
       "originalBytes": 12185,
       "path": "src/PiSharp.AI/Protocols/MistralConversations/MistralTools.cs",
       "originalSha256": "6ac214ffb5d800ceb3d0f83487247c69d26cd98c296740415dce9181e8d689e2"
@@ -6523,8 +6523,8 @@
       "originalSha256": "842f9fec74a14796fc22c66524e3ecf97f2a568216189c7a99a424d01c58e7ea"
     },
     {
-      "currentSha256": "f05b47a66bee5756507bb40126486e4673bcd0d3338331827ad982c3202daade",
-      "currentBytes": 61933,
+      "currentSha256": "b37d67b98c63c25d929bebcace6bbcaf65d1a786cb551838909e850d3f223051",
+      "currentBytes": 62349,
       "originalBytes": 54271,
       "path": "src/PiSharp.AI/Protocols/OpenAICompletions/CompletionsKeyAuthRequestFactory.cs",
       "originalSha256": "afd7554db4b7ce515f0376eb575892b71702cdff3a72339c1c5d248542ac2bc5"
@@ -6635,8 +6635,8 @@
       "originalSha256": "099efece246da6c8e3a89096f173c880884f187a0057435c0a45983edc7a3f00"
     },
     {
-      "currentSha256": "80d61ba6118907e85b148938ed3e5d8f975537dcd9a096a047bc517404ae480d",
-      "currentBytes": 32387,
+      "currentSha256": "8da1905bfb36441b575816341d7ff587f1d2e78baffce7af756dc2fc71aca507",
+      "currentBytes": 32406,
       "originalBytes": 24683,
       "path": "src/PiSharp.AI/Protocols/OpenAIResponses/ResponsesKeyAuthRequestFactory.cs",
       "originalSha256": "9cdaf692ca2a6397d9f73e5ba04e82b22fe8a0baac35a62915b2e699fa7aa491"
@@ -6649,15 +6649,15 @@
       "originalSha256": "d44748e689072a118796dabb7eb6592b9b96739542231337ecc0f16ada08ac79"
     },
     {
-      "currentSha256": "5a8a2bbe8f27cef8824c29497993eaf48d0af293896fbd9f87fc2aab25e0679d",
-      "currentBytes": 48056,
+      "currentSha256": "71e5e96a7670872ffc4186a8b374ac7a9009e187157a292accb584576be607ae",
+      "currentBytes": 51158,
       "originalBytes": 37130,
       "path": "src/PiSharp.AI/Protocols/OpenAIResponses/ResponsesTextToolTransport.cs",
       "originalSha256": "333c89b9dc31113414d0b1d1ad35f81982ba293ebee216f2ab03de4a144f7f4a"
     },
     {
-      "currentSha256": "979776a1edcda67e123b8e7debcc9a485d3a4962f0f82f10c342ecd11024e257",
-      "currentBytes": 19548,
+      "currentSha256": "1239dd63adc6d0442a525bcf3db0fe957fe11e3f36d4f4f280e2f1ef84d509cc",
+      "currentBytes": 20115,
       "originalBytes": 15505,
       "path": "src/PiSharp.AI/Protocols/OpenAIResponses/ResponsesToolDeclarationProjector.cs",
       "originalSha256": "bab05585f8f40e91bd8d8ca3f22a6f63f856cde117bac97c6fc29b847f049933"
@@ -6768,8 +6768,8 @@
       "originalSha256": "15e7d8fc10cf31a0585659bc39272fd3078914e54829350c150fa73348f79c3d"
     },
     {
-      "currentSha256": "6d69cf1dbc04488ecba4aa98b9b442ba7177f11bac765d0de81d895597648417",
-      "currentBytes": 51513,
+      "currentSha256": "11b515115e053f33a878275ab6c083e650e30ed8f0da23151da9ec6c9a74e9f7",
+      "currentBytes": 51963,
       "originalBytes": 49040,
       "path": "src/PiSharp.AI/Providers/OpenAICompletionsWireSource.cs",
       "originalSha256": "3d11bcbfd79a1e7c0b18f1ed542d6d7f0778dda32452c2dbd5210a6f9dfc0b33"
@@ -6866,8 +6866,8 @@
       "originalSha256": "65c66478795c86401af3cb9e8e926943d745e7cbdcde7d7c418241c2bf631a5f"
     },
     {
-      "currentSha256": "f0d1e6a258a7144ce80f56e527336f1daf2fcc04d8caf1eab5709e3d72d34892",
-      "currentBytes": 94120,
+      "currentSha256": "5d8c1927b84bdc1dde8e81839657930261255688c60571379c623fd4d3a83a05",
+      "currentBytes": 94179,
       "originalBytes": 66429,
       "path": "src/PiSharp.Cli/Commands/OfflineSessionProfile.cs",
       "originalSha256": "a9ecf8651fccb0ef388995f0157c31debaec8b04a26e594c4c6943fcd30015f1"
@@ -6999,8 +6999,8 @@
       "originalSha256": "ac4185de41a3f75fe616e925ee0c6528ff00e1a688d1fb1af374f0f41865f2d4"
     },
     {
-      "currentSha256": "939b89afdbf4c5820eb6e183d92389b2af77dee547ed6ffefa49cf0ea651e560",
-      "currentBytes": 73232,
+      "currentSha256": "8f73d413e7efde328a337dcb16545e87c25f2615491efecebfb9200a577ee0a1",
+      "currentBytes": 78076,
       "originalBytes": 36723,
       "path": "src/PiSharp.Cli/Commands/RpcSessionCommand.cs",
       "originalSha256": "4793ca264fd6d25e04bc7670c3b07e4112d4759f2051d9af5dc93f633948e5dc"
@@ -7062,8 +7062,8 @@
       "originalSha256": "6f51dfa79bb95915b4e50435e75adccda5a0889ce9b46e6db891b83186655d74"
     },
     {
-      "currentSha256": "b7c7a39fcfb61c0d782524416d9505cfaa6e3dd9c0c626039295cd16bc6e8d08",
-      "currentBytes": 14378,
+      "currentSha256": "bc31f7810683b15b74f221f4ca5ebe5b8ffe2cf60d19169b20161d0ca114debc",
+      "currentBytes": 16639,
       "originalBytes": 12254,
       "path": "src/PiSharp.Cli/Extensions/Execution/NativeExtensionExecHost.cs",
       "originalSha256": "5c59aa3cfda349b1aabdb8c0782865474ce470db2ad93aeb854e3dabc42661fb"
@@ -7090,8 +7090,8 @@
       "originalSha256": "e44e1bbf7297c5d605b1c7a9b2ee6bbae8faf33cc898f468f792d82c45d90baf"
     },
     {
-      "currentSha256": "b5b6a65041f02f41b89e1cf1d29233e31a40f3b6c287826b96fda255ccef5b50",
-      "currentBytes": 25148,
+      "currentSha256": "5a5aa032c9079f01a42b070458b56b1fa964469212b1bcb48be035ba36866a6b",
+      "currentBytes": 25591,
       "originalBytes": 22189,
       "path": "src/PiSharp.Cli/Extensions/NativeExtensionActivation.cs",
       "originalSha256": "f9b55fdf0311da1ea7995a2c7c39010450a5847fb5414efd96ca77a18e0624b6"
@@ -7832,8 +7832,8 @@
       "originalSha256": "77c5c37da46021a7db63d48a9d7972cca2376d14024016b5558d3b8cc8cb477a"
     },
     {
-      "currentSha256": "5da7949651e186ba234fbc2c1fb62183cdda791ab4eb06495312908a12bb8820",
-      "currentBytes": 11585,
+      "currentSha256": "3d7adac87052bc81583ac97c20707c988997530e27f27e412e4a0c1ab8f876ae",
+      "currentBytes": 11586,
       "originalBytes": 2949,
       "path": "src/PiSharp.Cli/Settings/SettingsModelSelection.cs",
       "originalSha256": "58846ad3a10c0aa491807e33fa4c8d867a09baa721005595357ef3c4689c2983"
@@ -7874,8 +7874,8 @@
       "originalSha256": "c0c3d3eb4ca632ebcc1ceb3d621aeee9fff59d8e8ddf69b0672916da7262b0b1"
     },
     {
-      "currentSha256": "b73aabce9c43ed58f50ca05f4c1f55134cc35f22b1fee117afa4ddf5207501fb",
-      "currentBytes": 5008,
+      "currentSha256": "75141619ed727ef50add7387f4f4d6f21f4d059205baca0ed1653752b910dedb",
+      "currentBytes": 6330,
       "originalBytes": 3766,
       "path": "src/PiSharp.CodingAgent/Configuration/AgentRetryPolicy.cs",
       "originalSha256": "da8a1bc5a3e263a9fa6c75f2ac1fcd2da95880de24c0a1b68765faae10d9fb3e"
@@ -7937,8 +7937,8 @@
       "originalSha256": "eb38ac88a184b445d2b52e9b0b480d83c25394a17b37adb74c1ac0a120d008d1"
     },
     {
-      "currentSha256": "338be2fb03fa6b1e1fcf26235baa0401437b66d02ec005a7645508792a3829c4",
-      "currentBytes": 9199,
+      "currentSha256": "1d81d0e7a52aa8e5acc47271b36c19d30cccb5292e35750f8bab6f75c0e3e305",
+      "currentBytes": 9442,
       "originalBytes": 7855,
       "path": "src/PiSharp.CodingAgent/PersistentAgentSession.Catalog.cs",
       "originalSha256": "6175af6ff1b40ac86178e2a680dedbd1e49fe1ddea5786ea91bf42e729e3deee"
@@ -7965,8 +7965,8 @@
       "originalSha256": "b21f3c7aa7daba9fa02e839bcbc1d26855c46deaf2902267369750b3f19333dd"
     },
     {
-      "currentSha256": "3d3f7d688d75adaaa99e179c00a5318d9054850bbacacb63c18dca09295b144c",
-      "currentBytes": 111545,
+      "currentSha256": "fbd79892e50809a8d62b8ce0ed06d5adf3f8e6fdd62c6325559e97ca282575e7",
+      "currentBytes": 111563,
       "originalBytes": 85510,
       "path": "src/PiSharp.CodingAgent/PersistentAgentSession.cs",
       "originalSha256": "dc5fad54e78e8759b1e1057ff0028a19948515435436f18d515232d5c7697d55"
@@ -8000,8 +8000,8 @@
       "originalSha256": "649d6f155505fb43134f79708059101e341074716c53910377556d39cddb186c"
     },
     {
-      "currentSha256": "b8661c0f00f1aa6c1f89a199e8e179d83a61f03609d2da6c6b5226b96ee7b770",
-      "currentBytes": 19075,
+      "currentSha256": "72b8ccda7f545a5652559e5f0a4471942cb3e484bd2f313c7864956ee7ce0fc6",
+      "currentBytes": 19301,
       "originalBytes": 15075,
       "path": "src/PiSharp.CodingAgent/PersistentAgentSession.Navigation.cs",
       "originalSha256": "90b1d15dba522afab2b911d20fa75440845fe402252ee5fe80191e0c8ad919d4"
@@ -8329,8 +8329,8 @@
       "originalSha256": "3479dc79f85c7ec9914de7a7cf61976fa6c4e295c45236580e5ea61290d82233"
     },
     {
-      "currentSha256": "0ebce5410d809ae4d35ae9a9341db6911de49b4e3495ca5deb53ed84d3b0bb72",
-      "currentBytes": 52356,
+      "currentSha256": "04fea36aa7f78c0293116f9675dbc035ebeab864c2c682ab233f3d21af798e28",
+      "currentBytes": 53777,
       "originalBytes": 31787,
       "path": "src/PiSharp.CodingAgent/SessionRuntimeRegistry.cs",
       "originalSha256": "afa51c40106e322cdad5308c0a58cd01fb5315bbf1ddfc513f51875a1c4967d3"
@@ -8777,8 +8777,8 @@
       "originalSha256": "b16e673de5d93626921977ffe8c0264099468346bd4103645ad9479ac54af243"
     },
     {
-      "currentSha256": "749fe9001a884a2e7cf95e4df382727425a315e31d5a83f68a7ac27b0fd5a8f8",
-      "currentBytes": 1230,
+      "currentSha256": "9db274081dc2b7e4a176e5bf211c2644f7f09afa6bb3b0861bfd5e30f2ad35a3",
+      "currentBytes": 1730,
       "originalBytes": 663,
       "path": "src/PiSharp.Extensions.Abstractions/Facade/Execution/ExtensionExecContracts.cs",
       "originalSha256": "1054b5dce29c913a78968cd6a5addbb7723a1135a755ee795b5e264e5e22037e"
@@ -8833,8 +8833,8 @@
       "originalSha256": "24543650d0384f577c628ca34848e5d8c09fe327029561077b7743994fc849a8"
     },
     {
-      "currentSha256": "bf6c7d8dcd6d4ebe21807087fe411c4640eef82878da082ecc912e123ef6061c",
-      "currentBytes": 12030,
+      "currentSha256": "f2eb5e532b9cb328296f5d5ff0a44d2f90d13c329f61049ec35c6d41e9c769b4",
+      "currentBytes": 12830,
       "originalBytes": 7893,
       "path": "src/PiSharp.Extensions.Abstractions/Mcp/Configuration/McpCatalogPlanner.cs",
       "originalSha256": "dea08b498f4a0cc71511fd75c50a4cf6a7915d69ca361de466826c64d2e9a828"
@@ -9393,15 +9393,15 @@
       "originalSha256": "4d5a08878a69cf953171e55a229c8e52c99323b6027f0696384934ccdb0a1474"
     },
     {
-      "currentSha256": "98a557574cce956214b47f583f5a39271fe120f1b5431226bc5c6d93e6614c4c",
-      "currentBytes": 68188,
+      "currentSha256": "013706f012b88b71ada2106f49f4b0b213b196a7bf146e1cbf3f1990176cb8b0",
+      "currentBytes": 68454,
       "originalBytes": 59758,
       "path": "src/PiSharp.Extensions.Runtime/Registration/ExtensionRegistry.cs",
       "originalSha256": "d19f0e6717ec37bf285705fef95c9249052eb6ddb8f682ec1b8dc2facc271ec6"
     },
     {
-      "currentSha256": "9a875279cc405e132526c72111c136ade74e602288bbe17d831f588677b8fb7e",
-      "currentBytes": 8342,
+      "currentSha256": "49c3b3e21360c93d86d8f6ae9a1a9cf7bab78e20845b7fe9ef8133be54f74c7f",
+      "currentBytes": 10379,
       "originalBytes": 8018,
       "path": "src/PiSharp.Extensions.Runtime/Registration/ExtensionRegistry.EventBus.cs",
       "originalSha256": "4b0f5f407ddb0603ce5b6dbcd3bc9a5c613f462db80071657247720e70d1b0f7"
@@ -9442,8 +9442,8 @@
       "originalSha256": "3d50fc106850eb45ee52283673d2aae631419ce5296b393477e8cd4f0cb34db7"
     },
     {
-      "currentSha256": "a22f2b4c8f0732e5c855e586db292d6a3868ef5ec786abdee945b92f2546969b",
-      "currentBytes": 8185,
+      "currentSha256": "6194be18c44b4e01535a680eebc2b9980663fd3430cf31ad069368e1b316815a",
+      "currentBytes": 8485,
       "originalBytes": 7557,
       "path": "src/PiSharp.Extensions.Runtime/Registration/RegistrationScope.cs",
       "originalSha256": "67f922fce0ca10553af27d9df7208a254758438b7931bffa58ba5301a75cc905"
@@ -9694,8 +9694,8 @@
       "originalSha256": "9c8f5640ad018ac7e67cb13a46a9d3ecb9833a8c9af8d06b5ad7bd65a45f96c2"
     },
     {
-      "currentSha256": "c099afb48149aad47231a8ee4c6085c5328f98132c598cbaf75939b85b6e46c5",
-      "currentBytes": 99979,
+      "currentSha256": "c0a86adb7956358f28b3e08f78276a34deecfdfc5f8bf3ff39a74bc540121123",
+      "currentBytes": 100443,
       "originalBytes": 88195,
       "path": "src/PiSharp.Rpc/Protocol/RpcSessionDispatcher.cs",
       "originalSha256": "5806aaf5a9d730d0135afb2e43ad926b6094b7df02cffee96f51cbe5502e6602"
@@ -10009,8 +10009,8 @@
       "originalSha256": "a539a3796746dd586d2604377e87ef62e6d1639e86a224ee1b95937b358329cd"
     },
     {
-      "currentSha256": "bedd06ea78184f2c704fa8feebc8660af7176a10a07e2317605a4d4c2a5992ee",
-      "currentBytes": 9579,
+      "currentSha256": "02db98961b7fbd3a12f65b38841846b5f5dca4b5328cae32e35f60a8caf73d4e",
+      "currentBytes": 9959,
       "originalBytes": 7808,
       "path": "src/PiSharp.Tools/Files/FileOperations.cs",
       "originalSha256": "c0f52f73aa90ea84b5526d21d8665460c9fb6f98f3ea57f2af0a82f8face978b"
@@ -10086,8 +10086,8 @@
       "originalSha256": "02d6af5f65c72be5dbe25146ac4c4a3801a2585fb28041992b7edf916354be17"
     },
     {
-      "currentSha256": "e9cee06e6cd90c0f50840243d777b49c75f1ea8c98f67cef1d8f260df36fbdb0",
-      "currentBytes": 33790,
+      "currentSha256": "eb19dfd4b812f977a54e0e2ea742f3af34abe572e3c2d10f97a353105d3436de",
+      "currentBytes": 36474,
       "originalBytes": 17599,
       "path": "src/PiSharp.Tools/Files/ReadWriteTools.cs",
       "originalSha256": "bc2d8d0d6891169cc008939914c377d1440324e74a56610346f3c4877aaf9f9c"
@@ -10156,8 +10156,8 @@
       "originalSha256": "fef6723b86bfa2806b694cf08dd0588a20688e96f7f743f3aa9b24d7f0e2d87f"
     },
     {
-      "currentSha256": "0c5434f0803dc18401270a8351f9eff9803c51ce368a4641d66ed51fdf457e56",
-      "currentBytes": 8522,
+      "currentSha256": "cff4f68fd682a970ea1a3a351dacc610cd1aaa31ee7a1031f4b9ddfa2d5dd4f1",
+      "currentBytes": 8996,
       "originalBytes": 8522,
       "path": "src/PiSharp.Tools/Processes/ShellOutputAccumulator.cs",
       "originalSha256": "0c5434f0803dc18401270a8351f9eff9803c51ce368a4641d66ed51fdf457e56"
@@ -10786,8 +10786,8 @@
       "originalSha256": "4da2139055de673969f980f14f668c9957226e0fbdbd6cd23c877c7e522e9a52"
     },
     {
-      "currentSha256": "864f5d2b7e3013406cf2d02102e897ccddbf6a409db837ba7f1a9f66eecfa1e0",
-      "currentBytes": 66434,
+      "currentSha256": "374ecf8c738ecfd5285a08cf33d3ce62f73b17aaeb185ec7270fcf4d6cd0b85e",
+      "currentBytes": 67709,
       "originalBytes": 65157,
       "path": "tests/PiSharp.Agent.Tests/Program.cs",
       "originalSha256": "e701a6216bb8c1d462eb6578d7b10df42aafb75317685973507c5195bdf08435"
@@ -10996,8 +10996,8 @@
       "originalSha256": "5b39ed009ad7fad5a5972ae64105cad9242c73b3a0a050dac5b0f972f3594582"
     },
     {
-      "currentSha256": "4cddd213c87c2418e5d77de2e1b381d631c0fba596fc85fb3446e6ed64786c01",
-      "currentBytes": 18176,
+      "currentSha256": "4ff1e5652dbd30a046ce1e73a07ca0467c7a9ac1f4eab8f3e83936a3cc6fa81f",
+      "currentBytes": 20116,
       "originalBytes": 18193,
       "path": "tests/PiSharp.Authentication.Tests/Program.cs",
       "originalSha256": "e66279505934e5001d5131e117ebba4e41d3a8d5964f6afef7a8f1eec927d5b9"
@@ -11507,8 +11507,8 @@
       "originalSha256": "bbcd348294fbe1e24ac490eb0501aefdf50a68c98573f6fc377d9c7798025556"
     },
     {
-      "currentSha256": "995730ec27b07869ee462af748bf8461b96300b41bca86f51136ba0aa17b9a80",
-      "currentBytes": 11495,
+      "currentSha256": "39060f876c602d61acf19a6d93b1ad74ac120e5126a6d3247ef7f9e95a04d16b",
+      "currentBytes": 11665,
       "originalBytes": 9758,
       "path": "tests/PiSharp.CodingAgent.Tests/MistralLiveSelectionTests.cs",
       "originalSha256": "2f3be62d3699609449498d11dd5144f11b6414f0de7282108c3cb6dae32e3ec6"
@@ -11892,8 +11892,8 @@
       "originalSha256": "61647158edf1350b3ed4becc2bdbc9efc6219bd7396b8982933bece1656de365"
     },
     {
-      "currentSha256": "5adf9984fde5272ddc9b14474896a4b0d95bc909b91d0c23cd32c4c15abfd7c9",
-      "currentBytes": 26550,
+      "currentSha256": "c5979243f5fb7096c0adc05578d11b5d33b78ca25a66359afb395cacef1c6929",
+      "currentBytes": 30712,
       "originalBytes": 26550,
       "path": "tests/PiSharp.CodingAgent.Tests/PersistentAgentSessionTests.cs",
       "originalSha256": "5adf9984fde5272ddc9b14474896a4b0d95bc909b91d0c23cd32c4c15abfd7c9"
@@ -11941,8 +11941,8 @@
       "originalSha256": "eb7861c78891bd4a07178d8230bcad814c4f1cb1378d8b740b5b0a5176519f6d"
     },
     {
-      "currentSha256": "552aa7b784f084e5bbfba9b262a06976e424eeb5e4292e49d800ad2a825f499b",
-      "currentBytes": 24531,
+      "currentSha256": "e20364e24a0c612f9448ad4d4aecd9752ea280eb8a74d1e6bce0faf558d0d2ba",
+      "currentBytes": 24612,
       "originalBytes": 22105,
       "path": "tests/PiSharp.CodingAgent.Tests/Program.cs",
       "originalSha256": "3301f05129a2baddc3e0128721e64ce5a1509352533cd549c946ae6bf1e1cc08"
@@ -12522,8 +12522,8 @@
       "originalSha256": "d192d19373d5ff5242cb1fa9642985463edfa4b13f5b17b46a96943c7aece1ba"
     },
     {
-      "currentSha256": "92acfadfa4b39e8ce55a971395d446c6b306767054c82840d89c78a1b539c58d",
-      "currentBytes": 44251,
+      "currentSha256": "243548840b187e7880ce8860f249e50a9a7e4bb3672f5fc602cde9a529efa1eb",
+      "currentBytes": 44521,
       "originalBytes": 41232,
       "path": "tests/PiSharp.Compatibility.Tests/AnthropicMessagesRequestTests.cs",
       "originalSha256": "9c52e559c05ab57c247f836041eda13d138af58a0394763259d6a5cd71460109"
@@ -13418,8 +13418,8 @@
       "originalSha256": "36f4d498cfe7860d4eba1ef0d4fcb779d7161e93037a458a7b2b0b6e41130375"
     },
     {
-      "currentSha256": "f7e329c14b1d27241ca2b6c853d6f26eed2a829e9f1a2a7805e0e1050775957d",
-      "currentBytes": 7312,
+      "currentSha256": "3d20c9871d0d3946c37c84cb36a830b9296573b42fa4f9e2dcaf65ec0c91616c",
+      "currentBytes": 9506,
       "originalBytes": 7312,
       "path": "tests/PiSharp.GoogleGenerativeAI.Tests/GoogleStrictSchemaCases.cs",
       "originalSha256": "f7e329c14b1d27241ca2b6c853d6f26eed2a829e9f1a2a7805e0e1050775957d"
@@ -14293,8 +14293,8 @@
       "originalSha256": "705147d9f2b5df53cb7045c6b1d5ddba85c759f3c6c8124d6f7a8a69ecfa0321"
     },
     {
-      "currentSha256": "1e6ae5ac0cedc6b8d4f1e75772db5b72e9cd62fe7e37fb869ff59e7704dea278",
-      "currentBytes": 26779,
+      "currentSha256": "c11ea9a785f57d9a74ae698788a4ca7c927937fcf36acb02543854f7a535bea6",
+      "currentBytes": 26975,
       "originalBytes": 25972,
       "path": "tests/PiSharp.ProviderOfflineDifferential.Tests/OfflineCases.cs",
       "originalSha256": "8486a4c811b130aabf7a06dd91856d2d0f414620b486c8cd8088fcb4693ba758"
@@ -14489,8 +14489,8 @@
       "originalSha256": "c9a2fddc327e9034cf111fe47baf9ba6b2baf7f9a9e543e14011e861eaada47b"
     },
     {
-      "currentSha256": "69e67381fed8caac28f4578ac0fb5f362cf74a2411b4e0ad0e650e7e2c4e558b",
-      "currentBytes": 4274,
+      "currentSha256": "fdbc1098a7da9c2504ddc3e0ba0dcbbf537273669e3dc76b77b9d42728d69d5d",
+      "currentBytes": 4323,
       "originalBytes": 4274,
       "path": "tests/PiSharp.Rpc.Tests/Program.cs",
       "originalSha256": "69e67381fed8caac28f4578ac0fb5f362cf74a2411b4e0ad0e650e7e2c4e558b"
@@ -14643,8 +14643,8 @@
       "originalSha256": "b8a132d4ec7eb2841e0d082215f630e6695bc23f32499fffcdb851e9d4239092"
     },
     {
-      "currentSha256": "e9fb8b8cc2ac9d192d4ee27e4a53c3eff1834f0ad575af64091ad70d46ea11d4",
-      "currentBytes": 21961,
+      "currentSha256": "ab7072ddab69b31cfcb5667cd282254e5b1c301b161f5ca90f6fdf18db3fb694",
+      "currentBytes": 22083,
       "originalBytes": 21961,
       "path": "tests/PiSharp.SdkAsyncEventBus.Tests/Program.cs",
       "originalSha256": "e9fb8b8cc2ac9d192d4ee27e4a53c3eff1834f0ad575af64091ad70d46ea11d4"
@@ -14657,8 +14657,8 @@
       "originalSha256": "01983c4305f69a87bd80b8d88c43850aac7f573c0bc6836887c7fea0a1031159"
     },
     {
-      "currentSha256": "4a21f1e4ca127ef8fc442424af88aa23d829eecbfbd1c77dc209220d10ea4fdb",
-      "currentBytes": 16475,
+      "currentSha256": "56f7f9a7c95c90d41b02c11a04e6d02d1c1520f066e9b36711d248d463f19d47",
+      "currentBytes": 16597,
       "originalBytes": 16475,
       "path": "tests/PiSharp.SdkEventBus.Tests/Program.cs",
       "originalSha256": "4a21f1e4ca127ef8fc442424af88aa23d829eecbfbd1c77dc209220d10ea4fdb"
@@ -15336,8 +15336,8 @@
       "originalSha256": "c5d0dada6dccf4e9105f77dab9dac26e1f92f5bd03897e406ca5bf6819e4b32e"
     },
     {
-      "currentSha256": "06e6666bf1bf641cf187a29277990edcd97d2038d8d127830ccafd867b990354",
-      "currentBytes": 4951,
+      "currentSha256": "11e6c3c1d96f0d16a84a162b3d25455343a8d7246065074482aa36a5f3a92693",
+      "currentBytes": 4985,
       "originalBytes": 4536,
       "path": "tests/PiSharp.Tools.Tests/Program.cs",
       "originalSha256": "4b40a5e945b38258562371e76d38bec23fe70edb1130fb48c2014deeb7d9a924"
@@ -17205,15 +17205,15 @@
       "originalSha256": "55665657df1ef52b9419d1fd3a589c705e1ba81ae924d6f9f270d14e15c52692"
     },
     {
-      "currentSha256": "8248728f6031dc7fb3e7afb0937aef0879b3cf792890c1e6c8b497262bd6556b",
-      "currentBytes": 220,
+      "currentSha256": "fa50d041139a5ec4d3e841b77dcb627323e408505f77d386be8c55d892f03f86",
+      "currentBytes": 266,
       "originalBytes": 220,
       "path": "tests/PiSharp.Tui.Tests/PiSharp.Tui.Tests.csproj",
       "originalSha256": "8248728f6031dc7fb3e7afb0937aef0879b3cf792890c1e6c8b497262bd6556b"
     },
     {
-      "currentSha256": "f29f329d7ced4013ae3447928779026b269807ede2619c578640645a69e23da6",
-      "currentBytes": 3604,
+      "currentSha256": "9984b23b50f7699dc25071642a0bc53bfbec213503fe76f4e9227996d1ab3d72",
+      "currentBytes": 3641,
       "originalBytes": 3567,
       "path": "tests/PiSharp.Tui.Tests/Program.cs",
       "originalSha256": "11d43af8278c1c3965bf5814c1c33d49dada45e5fba63739ac1dcf57da623301"
@@ -17345,8 +17345,8 @@
       "originalSha256": "e19cf1c735524baa2df474154c117399e4a3ecf2c7ba98e337cd12afecc77071"
     },
     {
-      "currentSha256": "68355fbdb37898c2e936a27981c5dbdc1ff246d85b3696bbf66953185d6579de",
-      "currentBytes": 37864,
+      "currentSha256": "2880389a89ab72978b8d9b13682f31288eed8dcbb0b5cc182cb541f8b9b02e67",
+      "currentBytes": 39427,
       "originalBytes": 11780,
       "path": "THIRD-PARTY-NOTICES.md",
       "originalSha256": "24221bb14cd6d8e6e579012398de5ef553806f67eaa182a5900d142fc20faf09"
