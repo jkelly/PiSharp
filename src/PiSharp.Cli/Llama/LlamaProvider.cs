@@ -1,4 +1,4 @@
-// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/coding-agent/src/extensions/llama/provider.ts.
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/coding-agent/src/extensions/llama/provider.ts.
 using System.Collections.Concurrent;
 using System.Text.Json.Nodes;
 using PiSharp.AI.Authentication.OAuth;
@@ -230,13 +230,9 @@ internal sealed class LlamaCatalog
         json["cost"] = FreeCost();
         json["contextWindow"] = contextWindow.DeepClone();
         json["maxTokens"] = contextWindow;
-        // Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (#12134) drops supportsDeveloperRole here: pi-ai's openai-completions detectCompat
-        // now sends the developer role only to api.openai.com. The explicit false stays until that default is native
-        // (CompletionsKeyAuthRequestFactory still defaults a local server's reasoning models to the developer role); the wire role is
-        // the same either way (CliParity sync160.llama.reasoning-models-send-the-system-role).
         var compat = new JsonObject
         {
-            ["supportsStore"] = false, ["supportsDeveloperRole"] = false, ["supportsReasoningEffort"] = false, ["supportsUsageInStreaming"] = true,
+            ["supportsStore"] = false, ["supportsReasoningEffort"] = false, ["supportsUsageInStreaming"] = true,
             ["supportsStrictMode"] = false, ["maxTokensField"] = "max_tokens"
         };
         if (reasoning) compat["thinkingFormat"] = "qwen-chat-template";

@@ -193,7 +193,7 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
         return new LiveSessionConnection.SummaryLevelTransport(OfflineSummaryTransport(summary), null, offWhenOffered: false);
     }
     private static bool ValidSummaryMaximum(double? maximum) =>
-        maximum is not { } value || value is > 0 and <= 1_000_000 && value == Math.Floor(value);
+        maximum is not { } value || value is > 0 and <= PiRequestBudget.OutputTokens && value == Math.Floor(value);
     /// <summary>The summary's output cap, or the route's own limit when the request sets none (the offline profile's is 8192).</summary>
     private static int SummaryMaximum(SessionSummaryRequest summary, int routeMaximum = 8192) =>
         summary.MaximumOutputTokens is { } maximum ? (int)maximum : routeMaximum;
@@ -995,7 +995,7 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
             request.Options.TryGetValue(SummaryRequestKey, out var summary);
             var outputBudget = summary is null ? 8192 : SummaryMaximum(summary);
             if (summary is not null && (summary.Model != model || summary.CacheRetention != "none" ||
-                summary.ThinkingLevel is not null || outputBudget <= 0 || outputBudget > 1_000_000 ||
+                summary.ThinkingLevel is not null || outputBudget <= 0 ||
                 root.TryGetProperty("tools", out _) || !anthropic && !completions &&
                 (!root.TryGetProperty("max_output_tokens", out var maximum) || maximum.GetInt32() != outputBudget)))
                 throw new SessionCommandException(SessionCommandFailure.InvalidScript);

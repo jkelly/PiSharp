@@ -89,7 +89,7 @@ internal static partial class Program
         var models = catalog.ChatModels;
         Names(["loaded", "sleeping"], models.Select(model => model.Id), "chat models");
         Equal("""{"id":"loaded","name":"loaded","api":"openai-completions","provider":"llama.cpp","baseUrl":"http://localhost:9931/v1","reasoning":false,"input":["text","image"],"cost":""" + LlamaFree +
-            ""","contextWindow":65536,"maxTokens":65536,"compat":{"supportsStore":false,"supportsDeveloperRole":false,"supportsReasoningEffort":false,"supportsUsageInStreaming":true,"supportsStrictMode":false,"maxTokensField":"max_tokens"}}""",
+            ""","contextWindow":65536,"maxTokens":65536,"compat":{"supportsStore":false,"supportsReasoningEffort":false,"supportsUsageInStreaming":true,"supportsStrictMode":false,"maxTokensField":"max_tokens"}}""",
             models[0].ToJsonString(), "loaded model");
         Equal(128000d, models[1].ContextWindow, "sleeping model without metadata");
         Names(["loaded \"llama-cpp-classify\" \"http://localhost:9931\" 65536", "sleeping \"llama-cpp-classify\" \"http://localhost:9931\" 128000"],
@@ -111,7 +111,7 @@ internal static partial class Program
         Check(server.Requests.All(request => request.Header("authorization") == "Bearer local"), "bearer key on every request");
         Equal("""{"id":"qwen","name":"qwen","api":"openai-completions","provider":"llama.cpp","baseUrl":""" + "\"" + server.Url + "/v1\"" +
             ""","reasoning":true,"thinkingLevelMap":{"off":"off","minimal":null,"low":null,"medium":"medium","high":null,"xhigh":null},"input":["text"],"cost":""" + LlamaFree +
-            ""","contextWindow":32768,"maxTokens":32768,"compat":{"supportsStore":false,"supportsDeveloperRole":false,"supportsReasoningEffort":false,"supportsUsageInStreaming":true,"supportsStrictMode":false,"maxTokensField":"max_tokens","thinkingFormat":"qwen-chat-template"}}""",
+            ""","contextWindow":32768,"maxTokens":32768,"compat":{"supportsStore":false,"supportsReasoningEffort":false,"supportsUsageInStreaming":true,"supportsStrictMode":false,"maxTokensField":"max_tokens","thinkingFormat":"qwen-chat-template"}}""",
             catalog.ChatModels.Single().ToJsonString(), "reasoning chat model");
         Check(publish.Persisted?.CheckedAt is > 0 && publish.Persisted.LastModified is null, "persisted with checkedAt only");
     }

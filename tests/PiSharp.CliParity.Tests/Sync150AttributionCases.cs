@@ -48,11 +48,8 @@ internal static partial class Program
                 provider.ApiKeyVariables.IsDefaultOrEmpty || CurrentModelCatalog.Get(provider.Id) is not { } catalog) continue;
             // Anthropic keeps the sandbox's API key only: no subscription or OAuth token.
             if (provider.Id != "anthropic") foreach (var variable in provider.ApiKeyVariables) sandbox.Vars[variable] = "test-key";
-            // The Completions route refuses a maxTokens above 1,000,000 (MaximumTokenMagnitude) before sending, so those models are passed over.
-            // The rows are the current release's, which is where the CLI resolves --model: Pi 1.6.0 raised kimi-coding/k3 (the first
-            // Chat Completions row of the 1.5.0 shard) to 1,048,576.
-            foreach (var model in catalog.Models.Where(model => model.Type == CatalogModelType.Chat &&
-                    !(model.Raw.Value.TryGetProperty("maxTokens", out var max) && max.GetDouble() > 1_000_000))
+            // The rows are the current release's, which is where the CLI resolves --model.
+            foreach (var model in catalog.Models.Where(model => model.Type == CatalogModelType.Chat)
                 .GroupBy(model => model.DeclaredApi, StringComparer.Ordinal).Select(group => group.First()))
                 targets.Add((provider.Id, model.Id));
         }
