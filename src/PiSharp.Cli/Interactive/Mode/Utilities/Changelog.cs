@@ -89,7 +89,7 @@ internal static partial class Changelog
             match.Groups[1].Value + NormalizeChangelogLinkTarget(match.Groups[2].Value, tag) + match.Groups[3].Value);
 
     /// <summary>Parse changelog entries from CHANGELOG.md: scans for <c>## </c> lines and collects content until the next one or EOF.</summary>
-    public static List<ChangelogEntry> ParseChangelog(string changelogPath, Action<string>? warn = null)
+    public static List<ChangelogEntry> ParseChangelog(string changelogPath)
     {
         if (!File.Exists(changelogPath)) return [];
         try
@@ -128,7 +128,8 @@ internal static partial class Changelog
         }
         catch (Exception error) when (error is IOException or UnauthorizedAccessException)
         {
-            (warn ?? Console.Error.WriteLine)($"Warning: Could not parse changelog: {error.Message}");
+            // Pi faac585884ae2c013a6b1400f3e9e77f10b34bac changelog.ts (#11264): shown in the TUI (startup notes, /changelog), where
+            // printing would draw over the screen. An unreadable changelog shows no notes instead.
             return [];
         }
     }
