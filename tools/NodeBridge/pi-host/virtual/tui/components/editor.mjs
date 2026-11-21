@@ -1,4 +1,4 @@
-// Pi b4afdddf44e059c67ccf5097e5317d913521b470 (MIT): packages/tui/src/components/editor.ts.
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/tui/src/components/editor.ts.
 // Ported to plain ESM for the PiSharp Node extension bridge (TypeScript types stripped mechanically; behaviour unchanged).
 import { getKeybindings } from "../keybindings.mjs";
 import { decodePrintableKey, matchesKey } from "../keys.mjs";
@@ -545,13 +545,15 @@ export class Editor {
             if (kb.matches(data, "tui.select.confirm")) {
                 const selected = this.autocompleteList.getSelectedItem();
                 if (selected && this.autocompleteProvider) {
+                    const beforeCursor = (this.state.lines[this.state.cursorLine] || "").slice(0, this.state.cursorCol);
+                    const submitsCommand = this.autocompletePrefix.startsWith("/") && this.isInSlashCommandNameContext(beforeCursor);
                     this.pushUndoSnapshot();
                     this.lastAction = null;
                     const result = this.autocompleteProvider.applyCompletion(this.state.lines, this.state.cursorLine, this.state.cursorCol, selected, this.autocompletePrefix);
                     this.state.lines = result.lines;
                     this.state.cursorLine = result.cursorLine;
                     this.setCursorCol(result.cursorCol);
-                    if (this.autocompletePrefix.startsWith("/")) {
+                    if (submitsCommand) {
                         this.cancelAutocomplete();
                     } else {
                         this.cancelAutocomplete();
@@ -1515,6 +1517,9 @@ export class Editor {
     isInSlashCommandContext(textBeforeCursor) {
         return this.isSlashMenuAllowed() && textBeforeCursor.trimStart().startsWith("/");
     }
+    isInSlashCommandNameContext(textBeforeCursor) {
+        return this.isInSlashCommandContext(textBeforeCursor) && !textBeforeCursor.trimStart().includes(" ");
+    }
     getBestAutocompleteMatchIndex(items, prefix) {
         if (!prefix) return -1;
         let firstPrefixIndex = -1;
@@ -1555,7 +1560,7 @@ export class Editor {
         if (!this.autocompleteProvider) return;
         const currentLine = this.state.lines[this.state.cursorLine] || "";
         const beforeCursor = currentLine.slice(0, this.state.cursorCol);
-        if (this.isInSlashCommandContext(beforeCursor) && !beforeCursor.trimStart().includes(" ")) {
+        if (this.isInSlashCommandNameContext(beforeCursor)) {
             this.handleSlashCommandCompletion();
         } else {
             this.forceFileAutocomplete(true);

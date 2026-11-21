@@ -1,5 +1,5 @@
-// Pi b4afdddf44e059c67ccf5097e5317d913521b470 (MIT): packages/coding-agent/src/core/extensions/loader.ts (getAliases: extensions resolve
-// Pi's own packages, and jiti loads them) and packages/coding-agent/package.json (the Pi 1.5.2 dependency set).
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/coding-agent/src/core/extensions/loader.ts (getAliases: extensions resolve
+// Pi's own packages, and jiti loads them) and packages/coding-agent/package.json (the Pi 1.6.0 dependency set).
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -8,7 +8,7 @@ using PiSharp.Cli.Pi;
 namespace PiSharp.Cli.Extensions.Pi;
 
 /// <summary>
-/// The Pi packages extensions run against: on first extension use the exact Pi 1.5.2 packages are
+/// The Pi packages extensions run against: on first extension use the exact Pi 1.6.0 packages are
 /// installed with the user's npm into a version/policy-isolated child of <c>&lt;agentDir&gt;/pisharp/pi-runtime</c>
 /// (or <c>PISHARP_PI_RUNTIME_DIR</c>), every
 /// installed package's lockfile integrity is checked against the npm registry's <c>dist.integrity</c>, and the result is recorded in
@@ -19,15 +19,15 @@ namespace PiSharp.Cli.Extensions.Pi;
 /// </summary>
 internal static class PiNodeRuntime
 {
-    internal const string PiVersion = "1.5.2";
+    internal const string PiVersion = "1.6.0";
     internal const string RuntimePolicy = "no-default-attribution-v1";
     internal const string CacheVersion = PiVersion + "-" + RuntimePolicy;
     internal const string ProvenanceFile = "provenance.json";
-    /// <summary>Pi 1.5.2's packages/coding-agent/package.json undici, retained as an exact npm override.</summary>
-    internal const string UndiciVersion = "8.12.3";
+    /// <summary>Pi 1.6.0's packages/coding-agent/package.json undici, retained as an exact npm override.</summary>
+    internal const string UndiciVersion = "8.12.4";
 
     /// <summary>The pinned set: the packages upstream's getAliases resolves for extensions, their loader (jiti) and, through overrides,
-    /// every @earendil-works package in the aliases at exactly 1.5.2 and
+    /// every @earendil-works package in the aliases at exactly 1.6.0 and
     /// undici at exactly <see cref="UndiciVersion"/>.</summary>
     internal static JsonObject PackageJson() => new()
     {

@@ -1,4 +1,4 @@
-// Pi b4afdddf44e059c67ccf5097e5317d913521b470 (MIT): packages/ai/src/utils/retry.ts.
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/ai/src/utils/retry.ts.
 // Ported to plain ESM for the PiSharp Node extension bridge (TypeScript types stripped mechanically; behaviour unchanged).
 function buildProviderErrorPattern(patterns) {
     return new RegExp(patterns.join("|"), "i");
@@ -39,10 +39,13 @@ const RETRYABLE_PROVIDER_ERROR_PATTERN = buildProviderErrorPattern([
     "connection.?error",
     "connection.?refused",
     "connection.?lost",
+    "connection.?closed",
     "other side closed",
     "fetch failed",
     "request to \\S+ failed, reason:",
     "getaddrinfo",
+    "(?<![a-z0-9_])(?:ECONNRESET|ECONNABORTED|ECONNREFUSED|ETIMEDOUT|EPIPE)(?![a-z0-9_])",
+    "connection reset by peer",
     "ENOTFOUND",
     "EAI_AGAIN",
     "upstream.?connect",
@@ -54,6 +57,7 @@ const RETRYABLE_PROVIDER_ERROR_PATTERN = buildProviderErrorPattern([
     "terminated",
     "websocket.?closed",
     "websocket.?error",
+    "websocket.?connection.?limit.?reached",
     "ended without",
     "stream ended before message_stop",
     "stream ended before a terminal response event",

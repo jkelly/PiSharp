@@ -1,4 +1,4 @@
-// Pi b4afdddf44e059c67ccf5097e5317d913521b470 (MIT): packages/ai/src/env-api-keys.ts.
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/ai/src/env-api-keys.ts.
 // Ported to plain ESM for the PiSharp Node extension bridge (TypeScript types stripped mechanically; behaviour unchanged).
 let _existsSync = null;
 let _homedir = null;
@@ -65,10 +65,22 @@ function getApiKeyEnvVars(provider) {
     }
     const envMap = {
         "ant-ling": "ANT_LING_API_KEY",
-        "qwen-token-plan": "QWEN_TOKEN_PLAN_API_KEY",
-        "qwen-token-plan-cn": "QWEN_TOKEN_PLAN_CN_API_KEY",
-        "qwen-token-plan-individual": "QWEN_TOKEN_PLAN_API_KEY",
-        "qwen-token-plan-individual-cn": "QWEN_TOKEN_PLAN_CN_API_KEY",
+        "qwen-token-plan": [
+            "QWEN_TOKEN_PLAN_TEAM_API_KEY",
+            "QWEN_TOKEN_PLAN_API_KEY"
+        ],
+        "qwen-token-plan-cn": [
+            "QWEN_TOKEN_PLAN_TEAM_CN_API_KEY",
+            "QWEN_TOKEN_PLAN_CN_API_KEY"
+        ],
+        "qwen-token-plan-individual": [
+            "QWEN_TOKEN_PLAN_INDIVIDUAL_API_KEY",
+            "QWEN_TOKEN_PLAN_API_KEY"
+        ],
+        "qwen-token-plan-individual-cn": [
+            "QWEN_TOKEN_PLAN_INDIVIDUAL_CN_API_KEY",
+            "QWEN_TOKEN_PLAN_CN_API_KEY"
+        ],
         openai: "OPENAI_API_KEY",
         azure: "AZURE_OPENAI_API_KEY",
         nvidia: "NVIDIA_API_KEY",
@@ -104,10 +116,10 @@ function getApiKeyEnvVars(provider) {
         "xiaomi-token-plan-ams": "XIAOMI_TOKEN_PLAN_AMS_API_KEY",
         "xiaomi-token-plan-sgp": "XIAOMI_TOKEN_PLAN_SGP_API_KEY"
     };
-    const envVar = envMap[provider];
-    return envVar ? [
-        envVar
-    ] : undefined;
+    const envVars = envMap[provider];
+    return typeof envVars === "string" ? [
+        envVars
+    ] : envVars;
 }
 export function findEnvKeys(provider, env) {
     const envVars = getApiKeyEnvVars(provider);

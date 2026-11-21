@@ -1,9 +1,10 @@
-// Pi b4afdddf44e059c67ccf5097e5317d913521b470 (MIT): packages/tui/src/terminal-image.ts.
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/tui/src/terminal-image.ts.
 // Ported to plain ESM for the PiSharp Node extension bridge (TypeScript types stripped mechanically; behaviour unchanged).
 import { execSync } from "node:child_process";
 import { homedir } from "node:os";
 import { isAbsolute } from "node:path";
 import { pathToFileURL } from "node:url";
+import { visibleWidth } from "./utils.mjs";
 let cachedCapabilities = null;
 let capabilityOverrides = {};
 let cellDimensions = {
@@ -201,6 +202,37 @@ export function isImageLine(line) {
         return true;
     }
     return line.includes(KITTY_PREFIX) || line.includes(ITERM2_PREFIX);
+}
+export function getImageLineExtent(line) {
+    const kittyStart = line.indexOf(KITTY_PREFIX);
+    if (kittyStart !== -1) {
+        const controls = /\x1b_G([^;]*);/.exec(line)?.[1] ?? "";
+        const columnValue = /(?:^|,)c=(\d+)(?:,|$)/.exec(controls)?.[1];
+        const columns = columnValue === undefined ? getRegisteredKittyImageMetadataFromControls(controls)?.columns : Number.parseInt(columnValue, 10);
+        const startCol = visibleWidth(line.slice(0, kittyStart));
+        const rows = getKittyImagePlacementRows(line) ?? 1;
+        return {
+            firstRow: 0,
+            lastRow: rows - 1,
+            startCol,
+            endCol: startCol + (columns ?? Infinity)
+        };
+    }
+    const iterm2Start = line.indexOf(ITERM2_PREFIX);
+    if (iterm2Start === -1) return undefined;
+    const before = line.slice(0, iterm2Start);
+    const moveUp = /\x1b\[(\d+)A$/.exec(before);
+    const columnValue = /[;=]width=(\d+)[;:]/.exec(line.slice(iterm2Start))?.[1];
+    const startCol = visibleWidth(moveUp ? before.slice(0, moveUp.index) : before);
+    return {
+        firstRow: moveUp ? -Number.parseInt(moveUp[1], 10) : 0,
+        lastRow: 0,
+        startCol,
+        endCol: startCol + (columnValue === undefined ? Infinity : Number.parseInt(columnValue, 10))
+    };
+}
+export function stripImageSequences(line) {
+    return line.replace(/\x1b_G[^\x1b]*\x1b\\/g, "").replace(/(?:\x1b\[\d+A)?\x1b\]1337;File=[^\x07]*\x07/g, "");
 }
 export function allocateImageId() {
     return Math.floor(Math.random() * 0xfffffffe) + 1;

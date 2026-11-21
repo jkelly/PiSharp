@@ -1,9 +1,9 @@
-// Pi b4afdddf44e059c67ccf5097e5317d913521b470 (MIT): packages/tui/src/tui.ts.
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/tui/src/tui.ts.
 // Ported to plain ESM for the PiSharp Node extension bridge (TypeScript types stripped mechanically; behaviour unchanged).
 import { performance } from "node:perf_hooks";
 import { isKeyRelease, matchesKey } from "./keys.mjs";
 import { parseOscColorResponse, parseTerminalColorSchemeReport } from "./terminal-colors.mjs";
-import { getCapabilities, isImageLine, setCellDimensions } from "./terminal-image.mjs";
+import { getCapabilities, getImageLineExtent, getMaxKittyImageRows, isImageLine, setCellDimensions, stripImageSequences } from "./terminal-image.mjs";
 import { extractSegments, normalizeTerminalOutput, sliceByColumn, sliceWithWidth, visibleWidth } from "./utils.mjs";
 export function dispatchMouseEvent(component, event) {
     const result = component.handleMouse?.(event);
@@ -66,9 +66,50 @@ function parseSizeValue(value, referenceSize) {
     }
     return undefined;
 }
+function sameLines(a, b) {
+    if (a === b) return true;
+    if (a.length !== b.length) return false;
+    for(let index = 0; index < a.length; index++){
+        if (a[index] !== b[index]) return false;
+    }
+    return true;
+}
+export function renderChildLines(children, width, previous) {
+    const parts = children.map((child)=>child.render(width));
+    if (previous?.width === width && previous.children.length === children.length && children.every((child, index)=>child === previous.children[index] && sameLines(parts[index], previous.parts[index]))) {
+        return previous;
+    }
+    const lines = [];
+    for (const part of parts){
+        for (const line of part)lines.push(line);
+    }
+    return {
+        width,
+        children: [
+            ...children
+        ],
+        parts,
+        lines
+    };
+}
+export function dispatchMouseToChildLines(layout, event) {
+    let childY = 0;
+    for(let index = 0; index < layout.children.length; index++){
+        const childHeight = layout.parts[index].length;
+        if (event.y >= childY && event.y < childY + childHeight) {
+            return dispatchMouseEvent(layout.children[index], {
+                ...event,
+                y: event.y - childY,
+                height: childHeight
+            });
+        }
+        childY += childHeight;
+    }
+    return undefined;
+}
 export class Container {
     children = [];
-    mouseLayout;
+    childLines;
     addChild(component) {
         this.children.push(component);
     }
@@ -88,46 +129,17 @@ export class Container {
     }
     handleMouse(event) {
         if (event.y < 0 || event.y >= event.height) return undefined;
-        const mouseChildren = this.mouseLayout?.width === event.width ? this.mouseLayout.children : this.children.map((component)=>({
-                component,
-                height: component.render(event.width).length
-            }));
-        let childY = 0;
-        for (const { component: child, height: childHeight } of mouseChildren){
-            if (event.y >= childY && event.y < childY + childHeight) {
-                const result = dispatchMouseEvent(child, {
-                    ...event,
-                    y: event.y - childY,
-                    height: childHeight
-                });
-                if (result?.focus && this.handleInput) return {
-                    ...result,
-                    focusTarget: this
-                };
-                return result;
-            }
-            childY += childHeight;
-        }
-        return undefined;
+        const layout = this.childLines?.width === event.width ? this.childLines : renderChildLines(this.children, event.width, undefined);
+        const result = dispatchMouseToChildLines(layout, event);
+        if (result?.focus && this.handleInput) return {
+            ...result,
+            focusTarget: this
+        };
+        return result;
     }
     render(width) {
-        const lines = [];
-        const mouseChildren = [];
-        for (const child of this.children){
-            const childLines = child.render(width);
-            mouseChildren.push({
-                component: child,
-                height: childLines.length
-            });
-            for (const line of childLines){
-                lines.push(line);
-            }
-        }
-        this.mouseLayout = {
-            width,
-            children: mouseChildren
-        };
-        return lines;
+        this.childLines = renderChildLines(this.children, width, this.childLines);
+        return this.childLines.lines;
     }
 }
 const SEGMENT_RESET = "\x1b[0m\x1b]8;;\x07";
@@ -145,6 +157,19 @@ export function compositeTuiLine(baseLine, overlayLine, startCol, overlayWidth, 
     const result = base.before + " ".repeat(beforePad) + SEGMENT_RESET + overlay.text + " ".repeat(overlayPad) + SEGMENT_RESET + base.after + " ".repeat(afterPad);
     return visibleWidth(result) <= totalWidth ? result : sliceByColumn(result, 0, totalWidth, true);
 }
+function hideImagesUnderOverlay(lines, overlay, viewportStart) {
+    if (overlay.height === 0) return;
+    for(let index = Math.max(0, viewportStart - getMaxKittyImageRows()); index < lines.length; index++){
+        const line = lines[index];
+        const extent = getImageLineExtent(line);
+        if (!extent) continue;
+        const firstRow = index + extent.firstRow - viewportStart;
+        const lastRow = index + extent.lastRow - viewportStart;
+        if (firstRow < overlay.row + overlay.height && lastRow >= overlay.row && extent.startCol < overlay.col + overlay.width && extent.endCol > overlay.col) {
+            lines[index] = stripImageSequences(line);
+        }
+    }
+}
 export const VIEWPORT_TUI = Symbol.for("@earendil-works/pi-tui/viewport");
 export function isViewportTUI(tui) {
     return tui[VIEWPORT_TUI] === true;
@@ -154,7 +179,12 @@ export class TuiBase extends Container {
     focusedComponent = null;
     inputListeners = new Set();
     onDebug;
+    suspendSignalHandler;
+    suspendSignalListener = ()=>this.suspendSignalHandler?.();
+    ownsTerminal = false;
+    suspendSignalListening = false;
     renderRequested = false;
+    contentChanged = true;
     immediateRenderScheduled = false;
     renderTimer;
     lastRenderAt = 0;
@@ -231,6 +261,7 @@ export class TuiBase extends Container {
         });
     }
     setFocusInternal({ component, overlayFocusRestore }) {
+        this.contentChanged = true;
         const previousFocus = this.focusedComponent;
         let nextFocus = component;
         const previousFocusedOverlay = previousFocus ? this.overlayStack.find((entry)=>entry.component === previousFocus && this.isOverlayVisible(entry)) : undefined;
@@ -510,6 +541,8 @@ export class TuiBase extends Container {
         this.stopped = false;
         process.off("exit", this.exitRestoreHandler);
         process.on("exit", this.exitRestoreHandler);
+        this.ownsTerminal = true;
+        this.updateSuspendSignalListener();
         this.beforeTerminalStart();
         this.terminal.start((data)=>this.handleTerminalInput(data), ()=>this.requestRender());
         this.afterTerminalStart();
@@ -544,6 +577,17 @@ export class TuiBase extends Container {
             this.terminal.write(enabled ? "\x1b[?2031h" : "\x1b[?2031l");
         }
     }
+    setSuspendSignalHandler(handler) {
+        this.suspendSignalHandler = handler;
+        this.updateSuspendSignalListener();
+    }
+    updateSuspendSignalListener() {
+        const listen = this.ownsTerminal && this.suspendSignalHandler !== undefined;
+        if (listen === this.suspendSignalListening) return;
+        this.suspendSignalListening = listen;
+        if (listen) process.on("SIGTSTP", this.suspendSignalListener);
+        else process.off("SIGTSTP", this.suspendSignalListener);
+    }
     queryCellSize() {
         if (!getCapabilities().images) {
             return;
@@ -561,9 +605,12 @@ export class TuiBase extends Container {
         this.terminal.showCursor();
         this.terminal.stop();
         this.afterTerminalStop(options);
+        this.ownsTerminal = false;
+        this.updateSuspendSignalListener();
     }
     renderNow(force = false) {
         if (force) this.resetRenderState();
+        this.contentChanged = true;
         this.renderRequested = false;
         this.cancelRenderTimer();
         this.lastRenderAt = performance.now();
@@ -575,11 +622,16 @@ export class TuiBase extends Container {
             this.requestImmediateRender();
             return;
         }
+        this.contentChanged = true;
+        this.requestViewRender();
+    }
+    requestViewRender() {
         if (this.renderRequested) return;
         this.renderRequested = true;
         process.nextTick(()=>this.scheduleRender());
     }
     requestImmediateRender() {
+        this.contentChanged = true;
         this.cancelRenderTimer();
         this.renderRequested = true;
         if (this.immediateRenderScheduled) return;
@@ -907,6 +959,12 @@ export class TuiBase extends Container {
         }
         const viewportStart = Math.max(0, workingHeight - termHeight);
         for (const { overlayLines, row, col, w } of rendered){
+            hideImagesUnderOverlay(result, {
+                row,
+                col,
+                width: w,
+                height: overlayLines.length
+            }, viewportStart);
             for(let i = 0; i < overlayLines.length; i++){
                 const idx = viewportStart + row + i;
                 if (idx >= 0 && idx < result.length) {
