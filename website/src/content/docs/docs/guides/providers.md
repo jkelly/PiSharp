@@ -56,9 +56,10 @@ Some providers need more than a key:
 | `opencode` | OpenCode Zen | `anthropic-messages`, `google-generative-ai`, `openai-completions`, `openai-responses`, `typesafe-system-one` | `OPENCODE_API_KEY` | |
 | `opencode-go` | OpenCode Go | `anthropic-messages`, `google-generative-ai`, `openai-completions`, `openai-responses` | `OPENCODE_API_KEY` | |
 | `openrouter` | OpenRouter | `anthropic-messages`, `openai-completions`, `openrouter-images`, `typesafe-system-one` | `OPENROUTER_API_KEY` | OpenRouter OAuth |
-| `qwen-token-plan` | Qwen Token Plan | `openai-completions` | `QWEN_TOKEN_PLAN_API_KEY` | |
-| `qwen-token-plan-cn` | Qwen Token Plan CN | `openai-completions` | `QWEN_TOKEN_PLAN_CN_API_KEY` | |
-| `qwen-token-plan-individual` | Qwen Token Plan Individual | `openai-completions` | `QWEN_TOKEN_PLAN_API_KEY` | |
+| `qwen-token-plan` | Qwen Token Plan Team | `openai-completions` | `QWEN_TOKEN_PLAN_TEAM_API_KEY`, then `QWEN_TOKEN_PLAN_API_KEY` | |
+| `qwen-token-plan-cn` | Qwen Token Plan Team CN | `openai-completions` | `QWEN_TOKEN_PLAN_TEAM_CN_API_KEY`, then `QWEN_TOKEN_PLAN_CN_API_KEY` | |
+| `qwen-token-plan-individual` | Qwen Token Plan Individual | `openai-completions` | `QWEN_TOKEN_PLAN_INDIVIDUAL_API_KEY`, then `QWEN_TOKEN_PLAN_API_KEY` | |
+| `qwen-token-plan-individual-cn` | Qwen Token Plan Individual CN | `openai-completions` | `QWEN_TOKEN_PLAN_INDIVIDUAL_CN_API_KEY`, then `QWEN_TOKEN_PLAN_CN_API_KEY` | |
 | `radius` | Radius | `pi-messages` | `RADIUS_API_KEY` | Radius |
 | `together` | Together | `openai-completions` | `TOGETHER_API_KEY` | |
 | `typesafe` | TypeSafe | `typesafe-system-one` | `TYPESAFE_API_KEY` | |
@@ -70,6 +71,10 @@ Some providers need more than a key:
 | `xiaomi-token-plan-sgp` | Xiaomi Token Plan SGP | `openai-completions` | `XIAOMI_TOKEN_PLAN_SGP_API_KEY` | |
 | `zai` | Z.AI | `openai-completions` | `ZAI_API_KEY` | |
 | `zai-coding-cn` | Z.AI Coding CN | `openai-completions` | `ZAI_CODING_CN_API_KEY` | |
+
+The Qwen Token Plan rows describe the unreleased 1.6.0 source candidate, which follows Pi 1.6.0: the Team names, a key variable per plan read before the shared one, and the gateways `token-plan.maas.qwencloudapi.com` (international) and `token-plan.maas.qianwenaiapi.com` (China). PiSharp 1.5.2 names the Team providers "Qwen Token Plan" and "Qwen Token Plan CN" and reads only the shared `QWEN_TOKEN_PLAN_API_KEY` and `QWEN_TOKEN_PLAN_CN_API_KEY`. The shared variables keep working in 1.6.0.
+
+In the 1.6.0 source candidate, `openai`, `azure` and `openai-codex` default to `gpt-6.2-sol` when no model is selected; PiSharp 1.5.2 defaults to `gpt-6.1-sol`.
 
 The `llama.cpp` provider comes from a [built-in extension](/docs/reference/configuration/#built-in-extensions), not this list. Extensions and `models.json` can add more providers.
 

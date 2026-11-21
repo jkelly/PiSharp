@@ -65,7 +65,7 @@ export const versions = {
 	targetCommit: target.commit,
 	targetUrl: `${target.repository}/tree/${target.commit}`,
 	/** Update by hand when Pi ships a new release. */
-	latestPi: '1.5.2',
+	latestPi: '1.6.0',
 };
 
 export const inSync = versions.baseline === versions.latestPi;

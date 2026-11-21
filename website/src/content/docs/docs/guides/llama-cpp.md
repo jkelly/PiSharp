@@ -21,14 +21,14 @@ llama cli --version
 Start `llama serve` without `--model`, `-m` or `-hf`, so it runs in router mode:
 
 ```sh
-llama serve --no-models-autoload --host 127.0.0.1 --port 8080 -ngl all -c 32768
+llama serve --no-models-autoload --host 127.0.0.1 --port 9931 -ngl all -c 32768
 ```
 
-`-ngl all` puts every layer on the GPU; leave it out to let llama.cpp decide. `-c 32768` sets the context size in tokens, shared across the server's parallel slots, and `-c 0` uses the model's full context window, which can take much more memory. Put multimodal and multi-shard models in their own subfolders of the model directory, and restart the router after you add files by hand. The router also serves cached models and preset files (`--models-preset`); see the [llama.cpp server guide](https://llama.app/docs/serve#serving-multiple-models-router-mode).
+`--port 9931` is llama-server's current default port, stated here so the URL below is certain. `-ngl all` puts every layer on the GPU; leave it out to let llama.cpp decide. `-c 32768` sets the context size in tokens, shared across the server's parallel slots, and `-c 0` uses the model's full context window, which can take much more memory. Put multimodal and multi-shard models in their own subfolders of the model directory, and restart the router after you add files by hand. The router also serves cached models and preset files (`--models-preset`); see the [llama.cpp server guide](https://llama.app/docs/serve#serving-multiple-models-router-mode).
 
 ## Connect PiSharp
 
-In the terminal UI, run `/login llama.cpp` and enter the router's URL (the default is `http://127.0.0.1:8080`) and an API key if the server needs one. The URL and key are saved in `~/.pi/agent/auth.json`, which Pi uses too.
+In the terminal UI, run `/login llama.cpp` and enter the router's URL and an API key if the server needs one. The URL the prompt offers is `http://127.0.0.1:8080` in PiSharp 1.5.2 and earlier. The unreleased 1.6.0 source candidate offers `http://127.0.0.1:9931`, as Pi 1.6.0 does. Enter the URL your server listens on; a URL you saved earlier is still used. The URL and key are saved in `~/.pi/agent/auth.json`, which Pi uses too.
 
 The environment variables `LLAMA_BASE_URL` and `LLAMA_API_KEY` do the same without `/login`.
 

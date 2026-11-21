@@ -13,6 +13,10 @@ Pi Durable ships as experimental from PiSharp 1.2.0.1: the `pisharp durable` com
 :::note[Updated in 1.5.2]
 PiSharp 1.5.2 targets Pi Durable 1.5.2, including 1.5.1 changes to read-only JSONL recovery, SQLite batching, compaction and scheduling. Source and hosted validation retain explicit suite and platform limitations. The earlier compatibility and upgrade evidence below remains historical. The [1.5.2 overlay](https://github.com/jkelly/PiSharp/blob/main/compatibility/durable-sync-1.5.2-overlay.json) preserves that earlier map and records current source work separately.
 :::
+
+:::note[Unreleased 1.6.0 source candidate]
+The source on `main` targets Pi Durable 1.6.0: signals, tools that park, gates, hooks that start tasks, code-mode namespaces declared by extensions and image fitting. It is not released; the published release is PiSharp 1.5.2. A session written by the 1.6.0 source is not meant to be opened by PiSharp 1.5.2 (`pi.tool` version 4, `pi.generation` version 3). In `pisharp durable` a parked tool call shows as sleeping or waiting, but no host delivers a signal yet and none installs image fitting. Applicable work remains pending integrated validation. See [The 1.6.0 source candidate](/docs/embed/durable/#the-160-source-candidate) and the [1.6.0 overlay](https://github.com/jkelly/PiSharp/blob/main/compatibility/durable-sync-1.6.0-overlay.json).
+:::
 :::
 
 Pi includes `pi-durable`, an experimental agent harness that saves every step of a conversation before it shows it. PiSharp ports it as a set of .NET libraries and as an interactive mode, `pisharp durable`.
