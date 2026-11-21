@@ -1,4 +1,4 @@
-// Pi 7d073328e44337d3292a7db9b0f0308f679c5e97 (MIT): packages/env/daemon/src/{exec,process}.rs.
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/env/daemon/src/{exec,process,output}.rs.
 using System.Collections.Concurrent;
 using System.Text;
 using System.Text.Json.Nodes;
@@ -305,7 +305,6 @@ public static class EnvProcessOperations
                     if (ready != read) { await delay.ConfigureAwait(false); continue; }
                     var chunk = await read.ConfigureAwait(false); read = null;
                     if (chunk.Bytes is null) { ended++; continue; }
-                    if (observedExit) idleUntil = Environment.TickCount64 + (piped ? 0 : 100);
                     if (spill is not null) await spill.PushAsync(chunk.Bytes).ConfigureAwait(false);
                     if (piped) await request.EmitEventAsync(new() { ["kind"] = "output", ["stream"] = chunk.Stream == 1 ? "stderr" : "stdout" }, chunk.Bytes, request.SessionCancellationToken).ConfigureAwait(false);
                     else
@@ -314,6 +313,10 @@ public static class EnvProcessOperations
                         if (window is null) await Send(chunk.Stream, text).ConfigureAwait(false);
                         else window.Push(chunk.Stream, text);
                     }
+                    // Source output.rs Gate::held: the grace after exit counts silence of the pipes, not the time a chunk waits
+                    // for the link. It restarts once the chunk is handed over, so a backed-up link cannot end the reading while
+                    // the readers still hold output or the pipe still has some.
+                    if (observedExit) idleUntil = Environment.TickCount64 + (piped ? 0 : 100);
                 }
                 if (!piped)
                     for (var stream = 0; stream < 2; stream++)

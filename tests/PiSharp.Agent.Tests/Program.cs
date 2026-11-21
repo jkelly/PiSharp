@@ -27,10 +27,10 @@ internal static class Program
             ("blocked B and failing A settle independently", BlockAndFailure),
             ("sequential override anywhere serializes batch", SequentialOverrides),
             ("blocked sequential tool still serializes batch", BlockedSequentialOverride),
-            ("cancellation during preflight prevents execution", CancellationDuringPreflight),
+            ("cancellation during preflight prevents execution and answers every call", CancellationDuringPreflight),
             ("preflight deadline joins original batch and stops admission", PreflightDeadlineCleanup),
             ("preflight early hook failure joins original batch", PreflightEarlyHookFailureCleanup),
-            ("cancellation before batch prevents execution", CancellationBeforeBatch),
+            ("cancellation before batch prevents execution and answers the call", CancellationBeforeBatch),
             ("execution cancellation preserves completed outcomes", CancellationDuringExecution),
             ("sink cancellation remains a task cancellation", SinkCancellation),
             ("all termination hints suppress continuation; mixed continues", TerminationHints),
@@ -64,7 +64,7 @@ internal static class Program
             .Concat(SourceProgressDifferentialTests.Cases()).Concat(SourceProgressOwnershipTests.Cases())
             .Concat(SourceToolResultValueTests.Cases()).Concat(BoundedToolProgressDeliveryTests.Cases())
             .Concat(CompletionsHttpTurnTests.Cases()).Concat(CompletionsImageProducingToolTests.Cases()).Concat(ToolImageContentValueTests.Cases()).Concat(ToolImageResumeTests.Cases()).Concat(FailedAssistantSettlementTests.Cases())
-            .Concat(PiMessagesAgentIntegrationTests.Cases()).Concat(OriginalPiMessagesToolContinuationTests.Cases()).Concat(NestedToolInvocationTests.Cases()).Concat(Sync150Cases.Cases()).Concat(Sync150IdentityCases.Cases())
+            .Concat(PiMessagesAgentIntegrationTests.Cases()).Concat(OriginalPiMessagesToolContinuationTests.Cases()).Concat(NestedToolInvocationTests.Cases()).Concat(Sync150Cases.Cases()).Concat(Sync150IdentityCases.Cases()).Concat(Sync160AgentCases.Cases())
             .Select(test => (Id: $"agent.case.{test.Name}", test.Name, test.Run)).ToArray();
         // Registration names include parameter values; method names can be shared by distinct cases.
         // Validate the entire inventory before admitting any case, using exact ordinal identity.
@@ -737,9 +737,13 @@ internal static class Program
         Check(!fixture.Entered.Task.IsCompleted, "Early failure admitted B.");
         Equal(0, fixture.Executed);
         Sequence(["A"], fixture.Before);
-        Sequence(["A"], fixture.Sink.Completions);
-        Sequence(["A"], fixture.Sink.Transcript);
-        Equal(ToolFailureKind.HookError, fixture.Batch!.Outcomes.Single().Result.Failure!.Kind);
+        // Pi 1.6.0 (#9986): B and C, skipped by the abort, each get an "Operation aborted" result without their hook being asked.
+        Sequence(["A", "B", "C"], fixture.Sink.Completions);
+        Sequence(["A", "B", "C"], fixture.Sink.Transcript);
+        Equal(3, fixture.Batch!.Outcomes.Length);
+        Equal(ToolFailureKind.HookError, fixture.Batch.Outcomes[0].Result.Failure!.Kind);
+        Check(fixture.Batch.Outcomes.Skip(1).All(outcome => outcome.Result.Failure?.Kind == ToolFailureKind.Canceled &&
+            outcome.Result.Content.Single().Text == "Operation aborted"), "Calls skipped by the abort lack their aborted result.");
     }
 
     private sealed class PreflightCancellationFixture(bool failEarlyHook = false) : IDisposable
@@ -822,14 +826,16 @@ internal static class Program
             Check(OriginalJoined && Release.Task.IsCompleted, "Original batch or gate was abandoned.");
             Check(bToken.IsCancellationRequested, "Caller cancellation did not reach B's captured hook token.");
             Equal(0, Executed);
-            Sequence(["A", "B"], Before); // C must never be prepared.
-            Sequence(["B", "A"], Sink.Completions);
-            Sequence(["A", "B"], Sink.Transcript);
+            Sequence(["A", "B"], Before); // C's hook must never be asked.
+            // Pi 1.6.0 (#9986): C, skipped by the abort, still gets its start, an "Operation aborted" result and its end. B and C end
+            // during preparation; A, prepared before the abort, ends when the deferred executions run.
+            Sequence(["B", "C", "A"], Sink.Completions);
+            Sequence(["A", "B", "C"], Sink.Transcript);
             var batch = Batch ?? throw new InvalidOperationException("Original batch result was not retained.");
-            Equal(2, batch.Outcomes.Length);
+            Equal(3, batch.Outcomes.Length);
             Check(batch.IsCanceled && !batch.ShouldContinue, "Cancellation permitted automatic continuation.");
-            Check(batch.Outcomes.All(outcome => outcome.Result.Failure?.Kind == ToolFailureKind.Canceled),
-                "Prepared calls lack cancellation outcomes.");
+            Check(batch.Outcomes.All(outcome => outcome.Result.Failure?.Kind == ToolFailureKind.Canceled &&
+                outcome.Result.Content.Single().Text == "Operation aborted"), "Calls of the aborted batch lack cancellation outcomes.");
         }
 
         public void Dispose() => cancellation.Dispose();
@@ -842,8 +848,12 @@ internal static class Program
         var sink = new Sink();
         var batch = await new ToolBatchScheduler([new("A", tool)]).RunAsync(Message("A"), sink, cancellation.Token);
         Check(!tool.Started.Task.IsCompleted, "Pre-canceled tool started.");
-        Equal(1, sink.Events.Count);
-        Equal(0, batch.Outcomes.Length);
+        // Pi 1.6.0 (#9986): the call of a usable assistant message is answered "Operation aborted" instead of being left without a
+        // result: the assistant end, then the call's start, end and result message.
+        Equal(5, sink.Events.Count);
+        Sequence(["A"], sink.Completions); Sequence(["A"], sink.Transcript);
+        Equal(ToolFailureKind.Canceled, batch.Outcomes.Single().Result.Failure!.Kind);
+        Equal("Operation aborted", batch.Messages.Single().Content.Single().Text);
         Check(batch.IsCanceled && !batch.ShouldContinue, "Pre-cancellation was lost.");
     }
 

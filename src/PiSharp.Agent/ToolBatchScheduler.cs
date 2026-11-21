@@ -1,4 +1,4 @@
-// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/agent/src/agent-loop.ts.
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/agent/src/agent-loop.ts.
 using System.Collections.Immutable;
 using System.Runtime.ExceptionServices;
 using System.Text.Json;
@@ -71,7 +71,8 @@ public sealed class ToolBatchScheduler
             invocations = failed ? [] : Invocations(message, sink);
         }
         if (failed) return new([], [], message.StopReason == StopReason.Aborted || cancellationToken.IsCancellationRequested) { Assistant = replaced };
-        if (cancellationToken.IsCancellationRequested) return new([], [], true) { Assistant = replaced };
+        // Source executeToolCalls runs whatever the signal: once it is aborted, every call of a usable assistant message still gets a
+        // start, an "Operation aborted" error result and an end, so no call is left without a result (#9986).
         return await RunInvocationsAsync(invocations, sink, cancellationToken).ConfigureAwait(false) with { Assistant = replaced };
     }
 
@@ -154,7 +155,7 @@ public sealed class ToolBatchScheduler
         var messages = ImmutableArray.CreateBuilder<ToolResultMessage>();
         foreach (var invocation in invocations)
         {
-            if (cancellationToken.IsCancellationRequested) break;
+            // No break on cancellation: PrepareAsync answers each remaining call with "Operation aborted" (#9986).
             await sink.EmitAsync(new ToolExecutionStarted(invocation), cancellationToken).ConfigureAwait(false);
             var prepared = await PrepareAsync(invocation, cancellationToken).ConfigureAwait(false);
             Exception? sinkFailure = null;
@@ -174,7 +175,6 @@ public sealed class ToolBatchScheduler
             await sink.EmitAsync(new ToolExecutionEnded(outcome), cancellationToken).ConfigureAwait(false);
             outcomes.Add(outcome);
             messages.Add(await EmitMessageAsync(outcome, sink, cancellationToken).ConfigureAwait(false));
-            if (cancellationToken.IsCancellationRequested) break;
         }
         return CreateBatch(outcomes.ToImmutable(), messages.ToImmutable(), cancellationToken);
     }
@@ -185,7 +185,7 @@ public sealed class ToolBatchScheduler
         var ordered = new List<(ToolInvocation Invocation, Preparation Preparation)>();
         foreach (var invocation in invocations)
         {
-            if (cancellationToken.IsCancellationRequested) break;
+            // No break on cancellation: PrepareAsync answers each remaining call with "Operation aborted" (#9986).
             await sink.EmitAsync(new ToolExecutionStarted(invocation), cancellationToken).ConfigureAwait(false);
             var preparation = await PrepareAsync(invocation, cancellationToken).ConfigureAwait(false);
             ordered.Add((invocation, preparation));
@@ -241,13 +241,12 @@ public sealed class ToolBatchScheduler
         var ordered = new List<(ToolInvocation Invocation, Preparation Preparation)>();
         foreach (var invocation in invocations)
         {
-            if (cancellationToken.IsCancellationRequested) break;
+            // No break on cancellation: PrepareAsync answers each remaining call with "Operation aborted" (#9986).
             await sink.EmitAsync(new ToolExecutionStarted(invocation), cancellationToken).ConfigureAwait(false);
             var preparation = await PrepareAsync(invocation, cancellationToken).ConfigureAwait(false);
             ordered.Add((invocation, preparation));
             if (preparation.Immediate is { } immediate)
                 await sink.EmitAsync(new ToolExecutionEnded(immediate), cancellationToken).ConfigureAwait(false);
-            if (cancellationToken.IsCancellationRequested) break;
         }
 
         using var lifetime = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
@@ -333,9 +332,11 @@ public sealed class ToolBatchScheduler
     {
         if (invocation.AssistantMessage.StopReason == StopReason.Length)
             return Immediate(ToolFailureKind.Truncated, "Tool call came from an output-length-truncated assistant message.");
+        // Source prepareToolCall: once aborted, skip the lookup and the hooks; callers still record this result, so no call is left
+        // without one (#9986).
+        if (cancellationToken.IsCancellationRequested) return Immediate(ToolFailureKind.Canceled, "Operation aborted");
         if (!tools.TryGetValue(invocation.Call.Name, out var tool))
             return Immediate(ToolFailureKind.UnknownTool, $"Tool {invocation.Call.Name} not found");
-        if (cancellationToken.IsCancellationRequested) return Immediate(ToolFailureKind.Canceled, "Operation aborted");
         try
         {
             var decision = hooks is null ? ToolPreflightDecision.Allow :

@@ -1,4 +1,4 @@
-// Pi 7d073328e44337d3292a7db9b0f0308f679c5e97 (MIT): packages/env/daemon/src/pty.rs.
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/env/daemon/src/pty.rs.
 using System.Collections.Concurrent;
 using System.ComponentModel;
 using System.Text.Json.Nodes;
@@ -90,7 +90,8 @@ public static class TerminalOperations
             output = ReadOutputAsync(request, terminal);
             terminal.Output = output;
             var exitCode = await child.Exit.ConfigureAwait(false);
-            // A background job may retain the slave. Drain only until 100 ms of silence after exit.
+            // A background job may retain the slave. Drain only until 100 ms of silence after exit. A chunk the reader is handing
+            // to the link is not silence (source output.rs Gate::held): OutputPending keeps the drain going while the link is backed up.
             terminal.LastOutput = Environment.TickCount64;
             while (!output.IsCompleted)
             {
