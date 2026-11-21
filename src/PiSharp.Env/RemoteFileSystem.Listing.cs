@@ -38,9 +38,6 @@ public sealed partial class RemoteExecutionEnv
             } while (!done);
         }
         finally { await handle.CloseAsync().ConfigureAwait(false); }
-        // Like the local listing and both directory readers, leave out entries removed between enumeration and lstat; any other
-        // entry error fails the listing. The daemon's lstat also reports a name that is not valid UTF-8 as missing (it looks the
-        // replacement-decoded name up), so such names are left out the same way (#11994).
         if (!RemotePaths.IsWindows(info)) entries.Sort((a, b) => a.Sort.AsSpan().SequenceCompareTo(b.Sort));
         var result = ImmutableArray.CreateBuilder<FileMetadata>();
         foreach (var (_, entry) in entries)
@@ -49,6 +46,9 @@ public sealed partial class RemoteExecutionEnv
             var entryPath = RemotePaths.Resolve(info, resolved, entry["name"]!.GetValue<string>());
             if (entry["error"] is JsonObject error)
             {
+                // Like the directory reader, leave out entries removed between enumeration and lstat; any other entry error fails
+                // the listing. The daemon's lstat also reports a name that is not valid UTF-8 as missing (it looks the
+                // replacement-decoded name up), so such names are left out the same way (#11994).
                 if (error["code"]?.GetValue<string>() == "ENOENT") continue;
                 throw FileFailure(new RemoteError(error), entryPath);
             }
