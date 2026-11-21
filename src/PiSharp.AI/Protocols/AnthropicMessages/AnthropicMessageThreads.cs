@@ -1,3 +1,5 @@
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/ai/src/api/anthropic-messages.ts (message threads: the per-session thread state,
+// its hash, the create/continue request member, the fallback reasons and getAnthropicCompat's supportsMessageThreads default).
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -106,9 +108,12 @@ internal sealed record AnthropicThreadContext(AnthropicMessageThreadStore Store,
 {
     internal const string Beta = "message-threads-2026-08-12";
     internal static readonly HttpRequestOptionsKey<AnthropicThreadContext> RequestKey = new("PiSharp.Anthropic.MessageThread");
+    // Pi 1.6.0 getAnthropicCompat (#11987): on by default for any provider whose endpoint is api.anthropic.com, not only the
+    // anthropic provider (a models.json alias such as "anthropic-1-api"). Gateways stay off unless compat.supportsMessageThreads says
+    // otherwise: one that drops unknown request fields would turn a continue into a request without the earlier conversation.
     internal static bool Eligible(AnthropicMessagesRequestOptions projection, ModelDescriptor model, Uri endpoint, string? session) =>
         projection.CacheRetention != AnthropicCacheRetention.None && !string.IsNullOrEmpty(session) &&
-        (projection.SupportsMessageThreads ?? (model.Provider == "anthropic" && endpoint.Host.Equals("api.anthropic.com", StringComparison.OrdinalIgnoreCase)));
+        (projection.SupportsMessageThreads ?? endpoint.Host.Equals("api.anthropic.com", StringComparison.OrdinalIgnoreCase));
     internal static JsonData WithBeta(JsonData payload)
     {
         var root = AnthropicThreadJson.Parse(payload.ToString()).AsObject();
