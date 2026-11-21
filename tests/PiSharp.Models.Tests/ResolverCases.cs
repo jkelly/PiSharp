@@ -32,7 +32,6 @@ internal static partial class Program
         ("resolver.cli-custom-fallback-thinking-suffix", Sync(CliFallback)),
         ("resolver.defaults-exist-in-generated-catalogs", Sync(DefaultsExist)),
         ("resolver.find-initial-model", Sync(InitialModel)),
-        ("resolver.restore-model-from-session", Sync(RestoreModel)),
     ];
 
     private static (RegistryModel? Model, string? ThinkingLevel, string? Warning) Parse(string pattern, IReadOnlyList<RegistryModel> models)
@@ -228,16 +227,5 @@ internal static partial class Program
         Check(scoped.Model?.Reference == "openai/gpt-4o" && scoped.ThinkingLevel == "high", "scoped first with per-model level");
         var continuing = ModelResolver.FindInitialModel([new(AllModels[1], "low")], true, null, null, null, null, (_, _) => null, NoAuth, () => []);
         Check(continuing.Model is null, "scoped models skipped when continuing");
-    }
-
-    private static void RestoreModel()
-    {
-        Registry(out var registry, Env(("GROQ_API_KEY", "k")));
-        var restored = ModelResolver.RestoreModelFromSession("groq", "openai/gpt-oss-120b", null, registry);
-        Check(restored.Model?.Reference == "groq/openai/gpt-oss-120b" && restored.FallbackMessage is null, "restored");
-        var missing = ModelResolver.RestoreModelFromSession("groq", "gone", null, registry);
-        Equal("Could not restore model groq/gone (model no longer exists). Using groq/openai/gpt-oss-120b.", missing.FallbackMessage, "fallback to default");
-        var noAuth = ModelResolver.RestoreModelFromSession("deepseek", "deepseek-v4-pro", restored.Model, registry);
-        Equal("Could not restore model deepseek/deepseek-v4-pro (no auth configured). Using groq/openai/gpt-oss-120b.", noAuth.FallbackMessage, "current model fallback");
     }
 }

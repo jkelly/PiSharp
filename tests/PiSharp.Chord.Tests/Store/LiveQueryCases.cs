@@ -25,9 +25,10 @@ using static PiSharp.Chord.Store.Expressions;
 // - "a refresh applied again" stubs a Read upstream; here a real read over a counting executor is applied twice.
 // - delivered() and flushed() are a short wait: a host delivers its frames on its dispatcher.
 // - The three publication cases that compare a frame's ops watch the live query itself (the member's source in its attempt), not the
-//   reference's member as upstream does: the native reference member relays values and diffs them again, and its first frame after it
-//   was made is a replacement of the whole value (a 1.5.2 trait of Host/Reference.cs, outside this package). The values are read through
-//   the reference, as upstream reads them.
+//   reference's member as upstream does. They were written when the native reference member relayed values and made its first frame a
+//   replacement of the whole value; since chord-queries it passes its source's ops on when that frame is the batch's only change of the
+//   member (Host/Reference.cs, ReferenceMember, pinned by host.query-reader.160-a-references-member-* and host.list.160-through-a-
+//   reference-*), so watching the source is now equivalent. The values are read through the reference, as upstream reads them.
 //
 // The authored cases (store.live-query.160-*) replace the seven 1.5.2 ones, which were written against the per-owner LiveQueries registry
 // and QueryRefresh that 1.6.0 removed: they cover the same ground over the store's reads, a LiveQuery standing alone on a batch.
@@ -103,9 +104,9 @@ internal static partial class Program
 
         internal IWatchable<JsonNode?> Items => board.Member("items");
 
-        /// <summary>The live query itself, the member's source in the board's current attempt. The publication cases watch it here: a
-        /// reference's member (Host/Reference.cs, ReferenceMember) relays values, not ops, and the first frame it makes after it was made
-        /// or retargeted replaces the value whole, whatever its source published.</summary>
+        /// <summary>The live query itself, the member's source in the board's current attempt. The publication cases watch it here, as
+        /// they did when a reference's member (Host/Reference.cs, ReferenceMember) relayed values only; it now forwards its source's ops
+        /// when that frame is the batch's only change of the member.</summary>
         internal IWatchable<JsonNode?> Source =>
             host.Dispatcher.Invoke(() => host.Objects.Values.Single(owner => owner.Served.Contract.Name == LiveBoard.Name).Current!.Self.Queries.Single().Live);
 
