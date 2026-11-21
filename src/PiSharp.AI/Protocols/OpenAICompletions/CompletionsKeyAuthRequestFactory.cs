@@ -18,7 +18,7 @@ public sealed record CompletionsKeyAuthRequestOptions(double? MaxTokens = null, 
     string SessionAffinityFormat = "openai", JsonData? ToolChoice = null, JsonData? ModelHeaders = null, JsonData? Headers = null,
     int MaximumKeyCharacters = 4096, int MaximumEndpointCharacters = 4096, int MaximumModelCharacters = 1024,
     int MaximumPayloadBytes = PiRequestBudget.RequestPayloadBytes, int MaximumPayloadDepth = PiSharp.Contracts.JsonData.MaximumDepth, int MaximumHeaders = 128,
-    int MaximumHeaderCharacters = 8192, int MaximumTotalHeaderCharacters = 32_768, double MaximumTokenMagnitude = 1_000_000,
+    int MaximumHeaderCharacters = 8192, int MaximumTotalHeaderCharacters = 32_768, double MaximumTokenMagnitude = PiRequestBudget.OutputTokens,
     double MaximumTemperatureMagnitude = 2)
 {
     /// <summary>Null inherits model compatibility; otherwise explicitly overrides it. Effective default is false.</summary>

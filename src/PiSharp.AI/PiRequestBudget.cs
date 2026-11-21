@@ -40,4 +40,11 @@ public static class PiRequestBudget
     public const int RequestItems = 4 * RequestMessages;
     /// <summary>The largest message or content-block count an options record admits.</summary>
     public const int MaximumCountBound = 16 * RequestMessages;
+    /// <summary>
+    /// An output token limit (maxTokens, max_tokens, max_completion_tokens, max_output_tokens). Pi sends the model's or the caller's
+    /// value as it is and has no ceiling. The native routes carry token counts as 32-bit integers, so that range is the default
+    /// bound of the request factories (formerly 1,000,000, which refused the catalog models whose maxTokens is 1,048,576 before any
+    /// request was sent: the Fireworks, OpenCode Go and Together default models of Pi 1.6.0 among them).
+    /// </summary>
+    public const int OutputTokens = int.MaxValue;
 }

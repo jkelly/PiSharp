@@ -11,7 +11,7 @@ namespace PiSharp.AI.Protocols.AnthropicMessages;
 public sealed record AnthropicMessagesKeyAuthRequestOptions(double? MaxTokens = null,
     JsonData? ModelHeaders = null, JsonData? Headers = null, JsonData? RuntimeHeaders = null,
     string? SessionId = null, bool? SendSessionAffinityHeaders = null, string? SessionAffinityHeader = null,
-    double MaximumTokenMagnitude = 1_000_000, int MaximumKeyCharacters = 4096, int MaximumBaseUriCharacters = 4096,
+    double MaximumTokenMagnitude = PiRequestBudget.OutputTokens, int MaximumKeyCharacters = 4096, int MaximumBaseUriCharacters = 4096,
     int MaximumPayloadBytes = PiRequestBudget.RequestPayloadBytes, int MaximumPayloadDepth = PiSharp.Contracts.JsonData.MaximumDepth, int MaximumHeaders = 128,
     int MaximumHeaderCharacters = 8192, int MaximumTotalHeaderCharacters = 32_768)
 {

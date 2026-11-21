@@ -104,7 +104,9 @@ internal static class AnthropicPayloadHookTests
 
     internal static async Task RejectedReplacementAndPriorAdmission()
     {
-        JsonData[] invalid = [JsonData.Null, JsonData.Parse("[]"), JsonData.Parse("""{"max_tokens":1000001}"""),
+        // PiSharp-only bound: a replacement's max_tokens above the factory's MaximumTokenMagnitude. Its default follows the 32-bit token
+        // range since the Pi 1.6.0 sync (1,000,000 before, below the catalog's 1,048,576), so the value here is one above that.
+        JsonData[] invalid = [JsonData.Null, JsonData.Parse("[]"), JsonData.Parse("""{"max_tokens":2147483648}"""),
             JsonData.Parse("""{"number":1e999}"""), JsonData.Parse("""{"betas":["bad\nheader"]}"""),
             JsonData.Parse("{\"large\":" + JsonSerializer.Serialize(new string('x', 5000)) + "}"),
             JsonData.Parse("""{"a":{"b":{"c":{"d":{"e":{"f":0}}}}}}""")];
