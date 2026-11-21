@@ -47,7 +47,7 @@ public static class McpServersSection
         var lines = listed.Take(kept).Select((server, index) =>
         {
             // Pi faac585884ae2c013a6b1400f3e9e77f10b34bac: the library's mcpServerSummary replaces the extension's own serverSummary.
-            var summary = perServer > 0 ? Truncate(ServerSummary(server.Entry.Config.Description, server.Instructions), perServer) : "";
+            var summary = perServer > 0 ? Truncate(McpCatalogPlanner.ServerSummary(server.Entry.Config.Description, server.Instructions), perServer) : "";
             return summary.Length > 0 ? $"{heads[index]}: {summary}" : heads[index];
         });
         return string.Join("\n", lines.Prepend(intro).Concat(Omitted(listed.Length - kept)));
@@ -62,19 +62,6 @@ public static class McpServersSection
     {
         var desired = rendered is null ? null : Tag(rendered);
         return string.Equals(current, desired, StringComparison.Ordinal) ? null : new(Name, desired);
-    }
-
-    // MERGE(sync-1.6.0): replace with the core-small mcpServerSummary port
-    /// <summary>Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/mcp/src/naming.ts mcpServerSummary. A server's one-line
-    /// summary for the system prompt: the first line of its configured description, else of the instructions it sent in
-    /// initialize; empty when it has neither. Both are trimmed before their first line is taken, so instructions that start
-    /// with blank lines still give a summary (the extension's own serverSummary, before 1.6.0, took the untrimmed instructions'
-    /// first line).</summary>
-    private static string ServerSummary(string? description, string? instructions)
-    {
-        var text = description is null ? "" : McpJson.JsTrim(description);
-        if (text.Length == 0) text = instructions is null ? "" : McpJson.JsTrim(instructions);
-        return McpJson.JsTrim(text.Split('\n', 2)[0]);
     }
 
     private static string Truncate(string text, int max)
