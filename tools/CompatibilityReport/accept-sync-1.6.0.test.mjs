@@ -105,6 +105,16 @@ test('freezing needs a current full-solution build and verified current sources'
   assert.equal(read('AI_DOCS/validation.json').status, 'validation-in-progress');
 }));
 
+test('a waived full-solution build is kept in the ledger and becomes a limitation of the acceptance', () => fixture(({ root, write, read, policy, bytes }) => {
+  write('AI_DOCS/validation.json', collectLedger({ root, policy, verifyCurrentSources: true, waiveSolutionBuild: 'every required suite built its own closure' }));
+  write('AI_DOCS/coverage.json', collectCoverage({ root, spec: { groups: [{ group: 'unit', project: suiteProject('Unit'), sources: ['tests/cases.cs'], prefix: 'sync160.', count: 1 }] } }));
+  freezeValidation({ root, ledgerPath: 'AI_DOCS/validation.json', coveragePath: 'AI_DOCS/coverage.json', policy });
+  assert.deepEqual(read(policy.ledger).fullSolution, { waived: 'every required suite built its own closure' });
+  const plan = assessAcceptance({ root, ledgerPath: policy.ledger, ledgerSha256: hash(bytes(policy.ledger)), coveragePath: policy.coverage, coverageSha256: hash(bytes(policy.coverage)), policy });
+  assert.equal(plan.eligible, true, plan.problems.join('\n'));
+  assert.deepEqual([plan.status, plan.limitations], ['tested-with-limitations', ['No full-solution build receipt was recorded: every required suite built its own closure']]);
+}));
+
 test('the coverage audit stops when the static inventory differs from the pinned count', () => fixture(({ root, project }) => {
   assert.throws(() => collectCoverage({ root, spec: { groups: [{ group: 'unit', project, sources: ['tests/cases.cs'], count: 1 }] } }), /static inventory mismatch: expected 1, extracted 2/);
   const coverage = collectCoverage({ root, spec: { groups: [{ group: 'unit', project, sources: ['tests/cases.cs'], prefix: 'sync160.', expectedIds: ['not-run'], count: 2 }] } });

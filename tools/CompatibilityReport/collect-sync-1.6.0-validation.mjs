@@ -5,7 +5,7 @@
 // this is the Node form of the 1.5.2 update-validation-report, Audit-Sync152Coverage and Freeze-Sync152SourceValidation scripts.
 //
 //   node tools/CompatibilityReport/collect-sync-1.6.0-validation.mjs ledger [--receipts artifacts/gap-validation] [--verify-current-sources]
-//        [--solution-receipt <receipt.json>] [--out AI_DOCS/sync-1.6.0-validation.json]
+//        [--solution-receipt <receipt.json> | --waive-solution-build <reason>] [--out AI_DOCS/sync-1.6.0-validation.json]
 //   node tools/CompatibilityReport/collect-sync-1.6.0-validation.mjs coverage --spec <coverage-spec.json> [--receipts ...]
 //        [--out AI_DOCS/sync-1.6.0-coverage.json]
 //   node tools/CompatibilityReport/collect-sync-1.6.0-validation.mjs freeze [--ledger AI_DOCS/sync-1.6.0-validation.json]
@@ -16,6 +16,8 @@
 // A coverage spec is { schemaVersion: 1, groups: [{ group, project, sources?: [case files], prefix?, expectedIds?: [ids], count }] }:
 // a group's expected ids are the ids its case files declare (the 1.5.2 audit's pattern) that start with prefix, plus
 // expectedIds for ids built at run time; count pins the static inventory, and a different count stops the audit.
+// A full-solution build is pending until a passing receipt on the current source is given, or root waives it with a reason;
+// a waiver stays in the frozen ledger and accept-sync-1.6.0.mjs records it as a limitation.
 import { readFileSync, writeFileSync, existsSync, readdirSync, mkdirSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { resolve, relative, dirname, isAbsolute } from 'node:path';
@@ -92,7 +94,7 @@ function ledgerRow(root, { path, data }, verify) {
 }
 
 // The mutable run ledger: every run, the latest run per project, and the suites the policy still needs.
-export function collectLedger({ root = repository, receiptsDir = DEFAULTS.receipts, policy = readPolicy(), verifyCurrentSources = false, solutionReceipt } = {}) {
+export function collectLedger({ root = repository, receiptsDir = DEFAULTS.receipts, policy = readPolicy(), verifyCurrentSources = false, solutionReceipt, waiveSolutionBuild } = {}) {
   root = resolve(root);
   const receipts = readReceipts(root, receiptsDir);
   const byProject = new Map();
@@ -102,6 +104,8 @@ export function collectLedger({ root = repository, receiptsDir = DEFAULTS.receip
   const required = requiredSuites(table, policy);
   const pendingSuites = required.filter(name => !latest.some(row => row.project === suiteProject(name) && row.accepted));
   let fullSolution = null;
+  if (solutionReceipt && waiveSolutionBuild) throw new Error('Give a solution receipt or a waiver, not both');
+  if (waiveSolutionBuild) fullSolution = { waived: String(waiveSolutionBuild) };
   if (solutionReceipt) {
     const receipt = json(inside(root, solutionReceipt));
     const passed = receipt.result === 'passed' && (receipt.stages ?? []).every(stage => stage.exitCode === 0) && receipt.source?.changedDuringRun === false;
@@ -110,7 +114,7 @@ export function collectLedger({ root = repository, receiptsDir = DEFAULTS.receip
   }
   const additionalPending = [
     ...(verifyCurrentSources ? [] : ['current-final-source fingerprint verification']),
-    ...(fullSolution?.currentSourceMatches ? [] : ['full solution build']),
+    ...(fullSolution?.currentSourceMatches || fullSolution?.waived ? [] : ['full solution build']),
   ];
   return {
     schemaVersion: 1, target: `Pi/Pi Durable ${SYNC.version}`, generatedUtc: new Date().toISOString(),
@@ -162,7 +166,7 @@ export function freezeValidation({ root = repository, ledgerPath = DEFAULTS.ledg
     const problems = sourceCurrent(root, json(inside(root, row.receipt)));
     if (problems.length) throw new Error(`${row.project}: source changed since the ledger: ${problems.join('; ')}`);
   }
-  if (ledger.fullSolution) {
+  if (ledger.fullSolution?.receipt) {
     const problems = sourceCurrent(root, json(inside(root, ledger.fullSolution.receipt)));
     if (problems.length) throw new Error(`Full-solution source changed: ${problems.join('; ')}`);
   }
@@ -189,7 +193,7 @@ export function runCollectorCli(argv = process.argv.slice(2)) {
   }
   const receiptsDir = args.receipts ?? DEFAULTS.receipts;
   if (command === 'ledger') {
-    const ledger = collectLedger({ receiptsDir, verifyCurrentSources: args.verify, solutionReceipt: args['solution-receipt'] });
+    const ledger = collectLedger({ receiptsDir, verifyCurrentSources: args.verify, solutionReceipt: args['solution-receipt'], waiveSolutionBuild: args['waive-solution-build'] });
     writeFileSync(inside(repository, args.out ?? DEFAULTS.ledger), text(ledger));
     console.log(`Validation ledger: ${ledger.latest.length} projects, ${ledger.latest.filter(row => row.accepted).length} accepted, ${ledger.pendingSuites.length} of ${ledger.requiredSuites.length} required suites pending, additional pending: ${ledger.additionalPending.join(', ') || 'none'}.`);
   } else if (command === 'coverage') {

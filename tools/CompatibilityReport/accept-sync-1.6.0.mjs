@@ -132,9 +132,11 @@ export function assessAcceptance({ root = repository, ledgerPath, ledgerSha256, 
     const full = resolve(root, path);
     require(existsSync(full) && readFileSync(full, 'utf8').includes(from), `${path}: a documentation edit's exact text is not there`);
   }
+  const limitations = [...(policy.limitations ?? []),
+    ...(ledger.value.fullSolution?.waived ? [`No full-solution build receipt was recorded: ${ledger.value.fullSolution.waived}`] : [])];
   return { schemaVersion: 1, eligible: problems.length === 0, sync: SYNC.version, scope: policy.scope, source: table.to,
-    status: policy.limitations?.length || Object.values(workPackages).some(item => item.status === LIMITED) ? LIMITED : TESTED,
-    limitations: policy.limitations ?? [],
+    status: limitations.length || Object.values(workPackages).some(item => item.status === LIMITED) ? LIMITED : TESTED,
+    limitations,
     problems: unique(problems), ledger: { path: ledger.path, sha256: ledger.sha256 }, coverage: { path: coverage.path, sha256: coverage.sha256 },
     packageValidation: { status: 'pending-not-asserted', record: policy.packageValidationRecord ?? `AI_DOCS/sync-${SYNC.version}-packaging.json`, note: 'Packaging is a later, separately recorded stage. This source acceptance does not claim package or install validation.' },
     applicabilityInput: { path: SYNC.table, sha256: digest(readFileSync(inside(root, SYNC.table))) },
