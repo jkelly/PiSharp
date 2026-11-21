@@ -11,7 +11,8 @@ internal static partial class Program
         yield return Case("telemetry.152.schema-and-cached-instruments", () =>
         {
             Equal(14, ChordTelemetry.Schema.Spans.Count, "span count");
-            Equal(25, ChordTelemetry.Schema.Metrics!.Count, "metric count");
+            // 25 at Pi v1.5.2; v1.6.0 adds three query counters and four event counters (Telemetry160Cases.cs).
+            Equal(32, ChordTelemetry.Schema.Metrics!.Count, "metric count");
             Check(ChordTelemetry.Schema.Spans.All(pair => pair.Value.StartAttributes.ContainsKey("chord.host")), "every span names its host");
             Check(ChordTelemetry.Schema.Spans["chord.method"].Events!["chord.commit"].Attributes.ContainsKey("rows"), "commits count table rows");
             var memory = new InMemoryTelemetryContext();
