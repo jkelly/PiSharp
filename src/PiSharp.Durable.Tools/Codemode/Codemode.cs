@@ -1,7 +1,8 @@
-// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/src/codemode/codemode.ts and codemode/index.ts, the
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/durable/src/codemode/codemode.ts and codemode/index.ts, the
 // `@earendil-works/pi-durable/codemode` entry point. Upstream's CODEMODE_MODULE_VERSION, CODEMODE_TOOL_NAME, createCodemodeTool,
 // createCodemodeExtension, CodemodeStoreDoc, CodemodeRunDoc and CodemodeJournalDoc are DurableCodemode.ModuleVersion, ToolName, CreateTool,
-// CreateExtension, StoreDoc, RunDoc and JournalDoc; CodemodeToolOptions, CodemodeGlobal and CodemodeNamespace keep their names; the
+// CreateExtension, StoreDoc, RunDoc and JournalDoc; namespacesOf is DurableCodemode.NamespacesOf; CodemodeToolOptions and CodemodeGlobal
+// keep their names (CodemodeNamespace and CodemodeToolOptions.Namespaces are removed, Pi v1.6.0: namespaces are Extension.Namespace); the
 // CodemodeToolInput type is the tool's `{ code }` arguments, and CodemodeToolDetails and CodemodeNestedCall are the result's details JSON
 // (`{ calls: [{ id, name, args, status, durationMs?, error? }], fullOutputPath? }`).
 //
@@ -47,8 +48,6 @@ public sealed record CodemodeToolOptions
 {
     /// <summary>Runs the scripts.</summary>
     public required CodemodeSandbox Sandbox { get; init; }
-    /// <summary>Groups of tools by name prefix, such as MCP servers, for the <c>codemode</c> section and tool search.</summary>
-    public IReadOnlyList<CodemodeNamespace>? Namespaces { get; init; }
     /// <summary>Estimated tokens the tool declarations in the <c>codemode</c> section may use. Default 3000.</summary>
     public int? InlineBudget { get; init; }
     /// <summary>Give scripts <c>models.*</c>: the model catalog, classifiers, and image generation. Default true.</summary>
@@ -142,12 +141,19 @@ public static class DurableCodemode
         });
     }
 
+    /// <summary>The namespace of each tool the extensions bring, by tool name: its extension's <see cref="Extension.Namespace"/> (upstream
+    /// <c>namespacesOf</c>). A tool several extensions name belongs to the first one's, and to none when the first declares none.</summary>
+    public static IReadOnlyDictionary<string, ToolNamespace> NamespacesOf(IEnumerable<Extension> extensions)
+    {
+        ArgumentNullException.ThrowIfNull(extensions);
+        return CodemodeDescribe.NamespacesOf(extensions);
+    }
+
     /// <summary>The <c>codemode</c> extension (upstream <c>createCodemodeExtension</c>): the code mode tool, the internal tools behind
     /// <c>models.*</c>, and the <c>codemode</c> prompt section listing the tools scripts can call.</summary>
     public static Extension CreateExtension(CodemodeToolOptions options)
     {
         ArgumentNullException.ThrowIfNull(options);
-        var namespaces = options.Namespaces ?? [];
         var budget = options.InlineBudget ?? DefaultInlineBudget;
         return Define.Extension(new Extension
         {
@@ -158,7 +164,7 @@ public static class DurableCodemode
                 Define.Section("codemode", (input, _) => ValueTask.FromResult(CodemodeDescribe.Section(
                     // Deferred tools are found with `searchTools()`, as the coding agent leaves them out too.
                     [.. input.Agent.Callable.Where(tool => !tool.Name.StartsWith(CodemodeModels.InternalPrefix, StringComparison.Ordinal) && !tool.Deferred)],
-                    namespaces, budget))),
+                    input.Agent.Extensions, budget))),
             ],
         });
     }
@@ -311,19 +317,11 @@ internal sealed class DurableCodemodeCall
             .. models.Select(name => (name, true)),
             .. (options.Globals ?? []).Select(global => (global.Name, global.Spread)),
         ];
-        var namespaces = new List<(string Name, string? Description, string? Instructions, List<string> Tools)>();
-        foreach (var tool in callable)
-        {
-            var found = CodemodeDescribe.NamespaceOf(tool.Name, options.Namespaces ?? []);
-            if (found is null) continue;
-            var index = namespaces.FindIndex(candidate => candidate.Name == found.Name);
-            if (index < 0)
-            {
-                namespaces.Add((found.Name, found.Description, found.Instructions, []));
-                index = namespaces.Count - 1;
-            }
-            namespaces[index].Tools.Add(tool.Name);
-        }
+        // The namespaces the selected extensions declare, with their tools; one without tools yet is listed too.
+        var toolNamespaces = CodemodeDescribe.NamespacesOf(agent.Extensions);
+        var namespaces = CodemodeDescribe.DeclaredNamespaces(agent.Extensions).Select(found => (found.Name, Description: (string?)found.Description,
+            found.Instructions, Tools: callable.Where(tool => toolNamespaces.TryGetValue(tool.Name, out var own) && own.Name == found.Name)
+                .Select(tool => tool.Name).ToList())).ToList();
         var now = Now();
         var seed = BitConverter.ToUInt32(RandomNumberGenerator.GetBytes(4));
         var startJson = new List<KeyValuePair<string, JsonValue>>
