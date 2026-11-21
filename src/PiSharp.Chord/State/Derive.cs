@@ -1,4 +1,4 @@
-// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/chord/src/next/state/derive.ts
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/chord/src/state/derive.ts
 //
 // Derives (§12): values computed from watchables, pulled when read and marked dirty by commits; and mapShared, which keeps unchanged
 // elements identical so a derive's diff stays cheap. Mappings:
@@ -36,7 +36,8 @@ internal sealed class Derive : Source, IDependent
     private DeriveState state = DeriveState.Dirty;
     private JsonNode? value;
     private Exception? error;
-    // The value this derive's watches have, kept from its marking to its frame in the batch (upstream #framed).
+    // The value this derive's watches have, kept from its first marking in a batch to that batch's frame (upstream #framed); None: not
+    // listed in the batch.
     private Framed framed = Framed.None;
     private JsonNode? framedValue;
     // Whether a source's document was retired in the current batch while this derive is watched (rule 21).
@@ -137,20 +138,23 @@ internal sealed class Derive : Source, IDependent
     /// <summary>
     /// A source changed: mark this derive and its dependents dirty, flags only; a failed one too, which recomputes on its next read and heals
     /// when its sources give a value it can compute. An already dirty derive has dirty dependents (every read recomputes its sources first),
-    /// so marking stops there.
+    /// so marking stops there. A watched derive is listed for the batch's frame by its first marking in the batch only, which keeps what
+    /// its watches have: one read between two changes of a batch (clean again, then marked again) is not listed twice (two frames of one
+    /// member in one commit, which a link refuses) and its frame still diffs from the value before the batch.
     /// </summary>
     public void Invalidate()
     {
         if (state is DeriveState.Dirty or DeriveState.Detached) return;
-        if (Watched)
+        if (Watched && framed == Framed.None)
         {
             framed = state == DeriveState.Clean ? Framed.Value : Framed.NoValue;
             framedValue = state == DeriveState.Clean ? value : null;
+            Batch.Changed(this);
         }
         state = DeriveState.Dirty;
         value = null;
         error = null;
-        Changed();
+        foreach (var dependent in Dependents.Items) dependent.Invalidate();
     }
 
     /// <summary>A source's document was retired in this batch: a watched derive's frame carries the flag, and the derives reading this one
@@ -164,8 +168,9 @@ internal sealed class Derive : Source, IDependent
     }
 
     /// <summary>
-    /// Delivers the frame: the diff from the watches' value, a retirement even without ops (rule 21). A compute that throws gives one failure
-    /// call when the watches had a value (one per failure episode), the watches stay open; a retirement waits for the next value.
+    /// Delivers the batch's one frame: the diff from the value its watches had before the batch, a retirement even without ops (rule 21).
+    /// A compute that throws gives one failure call when the watches had a value (one per failure episode), the watches stay open; a
+    /// retirement waits for the next value.
     /// </summary>
     public override void Deliver(ChordContext context)
     {
