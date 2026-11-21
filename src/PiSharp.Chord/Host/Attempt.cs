@@ -183,6 +183,8 @@ internal sealed partial class Attempt : IOldWorkSource
         if (parkedAt is not { } parked) return;
         ChordTelemetry.Metrics(Owner.Host.Telemetry.Metrics).Histogram("chord.park.duration").Record((Owner.Host.Options.TimeProvider.GetUtcNow() - parked).TotalMilliseconds);
         parkedAt = null; StartActivation();
+        // Its own steps follow: loading until its outcome (a failure shows as the failure, not as what it waited for).
+        Owner.SetState(RefState.Loading);
     }
     /// <summary>One check of its factory's dependencies (<c>self.Get</c> references and <c>self.Registry</c> values) in declaration order:
     /// ready once all are live; parked showing <c>loading</c>, or <c>failed</c> waiting on the first that failed; broken for a cycle,
