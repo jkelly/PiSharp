@@ -1,4 +1,4 @@
-// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/tui/src/utils.ts.
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/tui/src/utils.ts.
 using System.Text;
 using System.Text.RegularExpressions;
 using PiSharp.Tui.Input;
@@ -17,17 +17,77 @@ public static partial class TextUtils
         return true;
     }
 
-    /// <summary>The terminal width of one grapheme cluster.</summary>
-    public static int GraphemeWidth(string segment)
+    /// <summary>Whether a UTF-16 unit always forms a grapheme cluster on its own: printable ASCII, Latin, punctuation, arrows, box
+    /// drawing, symbols, kana, CJK ideographs and fullwidth forms. These ranges hold no combining marks, joiners, variation
+    /// selectors, Hangul jamo or surrogates, so no Unicode grapheme rule can join two of them.</summary>
+    private static bool IsStandaloneGraphemeUnit(char code)
     {
-        if (segment.Length == 1)
+        if (code is >= '\u0020' and <= '\u007e') return true;
+        if (code is >= '\u00a0' and <= '\u02ff') return code != '\u00ad';
+        if (code is >= '\u2010' and <= '\u2bff')
         {
-            var code = segment[0];
-            if (code is >= ' ' and <= '~') return 1;
-            if (code == '\t') return 3;
+            // Line and bidi controls, invisible operators and combining marks for symbols.
+            return code is not (>= '\u2028' and <= '\u202e') and not (>= '\u2060' and <= '\u206f') and not (>= '\u20d0' and <= '\u20ff');
         }
-        return segment.Length == 0 ? 0 : TerminalEditorSourceWidth.Grapheme(segment);
+        return code is (>= '\u3040' and <= '\u3096') or (>= '\u30a0' and <= '\u30ff') or (>= '\u4e00' and <= '\u9fff') or (>= '\uff01' and <= '\uff60');
     }
+
+    private static bool IsStandaloneGraphemeRun(string text)
+    {
+        foreach (var c in text) if (!IsStandaloneGraphemeUnit(c)) return false;
+        return true;
+    }
+
+    /// <summary>Grapheme clusters of a text run without ANSI codes, as (start, length) ranges. Standalone units are split per
+    /// character: the segmenter costs far more than the slicing it serves, which made one non-ASCII character slow down every row
+    /// of a fullscreen frame. In a run that also contains complex units, a standalone unit whose neighbours are standalone too is
+    /// its own cluster, since no grapheme rule joins two standalone units. Only the stretches between such units go through the
+    /// segmenter; cutting there is safe because both cut edges are boundaries.</summary>
+    private static IEnumerable<(int Start, int Length)> GraphemeRanges(string text)
+    {
+        if (IsStandaloneGraphemeRun(text))
+        {
+            for (var i = 0; i < text.Length; i++) yield return (i, 1);
+            yield break;
+        }
+        bool Standalone(int index) => index < 0 || index >= text.Length || IsStandaloneGraphemeUnit(text[index]);
+        var complexStart = -1;
+        for (var i = 0; i <= text.Length; i++)
+        {
+            var alone = i < text.Length && Standalone(i) && Standalone(i - 1) && Standalone(i + 1);
+            if (i < text.Length && !alone) { if (complexStart < 0) complexStart = i; continue; }
+            if (complexStart >= 0)
+            {
+                var offsets = TerminalSourceGraphemeSegmenter.GetOffsets(text[complexStart..i]);
+                for (var at = 0; at < offsets.Length; at++)
+                    yield return (complexStart + offsets[at], (at + 1 < offsets.Length ? offsets[at + 1] : i - complexStart) - offsets[at]);
+                complexStart = -1;
+            }
+            if (alone) yield return (i, 1);
+        }
+    }
+
+    // Widths of single UTF-16 units, stored as width + 1 (0 is "not measured"); bounded by the 64K code units. Racing writers store
+    // the same value.
+    private static readonly byte[] SingleUnitWidths = new byte[char.MaxValue + 1];
+
+    private static int SingleUnitWidth(char code)
+    {
+        if (code is >= ' ' and <= '~') return 1;
+        if (code == '\t') return 3;
+        var cached = SingleUnitWidths[code];
+        if (cached != 0) return cached - 1;
+        var width = TerminalEditorSourceWidth.Grapheme(code.ToString());
+        if (width is >= 0 and < byte.MaxValue) SingleUnitWidths[code] = (byte)(width + 1);
+        return width;
+    }
+
+    private static int RangeWidth(string text, int start, int length) =>
+        length == 1 ? SingleUnitWidth(text[start]) : TerminalEditorSourceWidth.Grapheme(text.Substring(start, length));
+
+    /// <summary>The terminal width of one grapheme cluster.</summary>
+    public static int GraphemeWidth(string segment) =>
+        segment.Length == 1 ? SingleUnitWidth(segment[0]) : segment.Length == 0 ? 0 : TerminalEditorSourceWidth.Grapheme(segment);
 
     private static readonly Dictionary<string, int> WidthCache = new(StringComparer.Ordinal);
     private static readonly Queue<string> WidthOrder = new();
@@ -187,9 +247,16 @@ public static partial class TextUtils
         foreach (var (ansi, value) in Runs(line))
         {
             if (ansi) continue;
-            foreach (var segment in Graphemes(value))
+            // Printable ASCII is one cell per character.
+            if (IsPrintableAscii(value))
             {
-                var width = GraphemeWidth(segment);
+                if (column >= current && column < current + value.Length) return (column, column + 1);
+                current += value.Length;
+                continue;
+            }
+            foreach (var (start, length) in GraphemeRanges(value))
+            {
+                var width = RangeWidth(value, start, length);
                 if (width > 0 && column >= current && column < current + width) return (current, current + width);
                 current += width;
             }
@@ -613,12 +680,22 @@ public static partial class TextUtils
                 else if (currentCol < startCol && !value.StartsWith("\u001b_", StringComparison.Ordinal)) pending.Append(value);
                 continue;
             }
-            foreach (var segment in Graphemes(value))
+            // Printable ASCII is one cell per character.
+            if (IsPrintableAscii(value))
             {
-                var w = GraphemeWidth(segment);
+                var from = Math.Max(0, startCol - currentCol);
+                var to = Math.Min(value.Length, endCol - currentCol);
+                if (to > from) { result.Append(pending).Append(value, from, to - from); pending.Clear(); resultWidth += to - from; }
+                currentCol += value.Length;
+                if (currentCol >= endCol) break;
+                continue;
+            }
+            foreach (var (start, segmentLength) in GraphemeRanges(value))
+            {
+                var w = RangeWidth(value, start, segmentLength);
                 var inRange = currentCol >= startCol && currentCol < endCol;
                 var fits = !strict || currentCol + w <= endCol;
-                if (inRange && fits) { result.Append(pending).Append(segment); pending.Clear(); resultWidth += w; }
+                if (inRange && fits) { result.Append(pending).Append(value, start, segmentLength); pending.Clear(); resultWidth += w; }
                 currentCol += w;
                 if (currentCol >= endCol) break;
             }
