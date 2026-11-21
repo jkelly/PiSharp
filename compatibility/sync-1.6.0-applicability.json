@@ -247,12 +247,11 @@
       "evals-version-only": 1
     },
     "pendingByFinding": {
-      "ported": 363,
-      "not-in-report": 2,
+      "ported": 371,
       "already-ported": 17,
-      "pending-package": 15
+      "pending-package": 9
     },
-    "withPendingParts": 23
+    "withPendingParts": 4
   },
   "rows": [
     {
@@ -25433,8 +25432,8 @@
       "status": "implementation-pending-validation",
       "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
       "review": {
-        "finding": "not-in-report",
-        "note": "ai-providers assigns it to ai-catalog (catalog data: gpt-6.2-astra and gpt-6.2-sol join the OpenAI models whose promptCache stays unset); the ai-catalog report names no case for it."
+        "finding": "ported",
+        "note": "Catalog data (gpt-6.2-astra and gpt-6.2-sol join the OpenAI models whose promptCache stays unset), ported with the 1.6.0 catalog; root added the case sync160.catalog.openai-documented-ttl-models-leave-prompt-cache-unset (tests/PiSharp.Models.Tests/Sync160CatalogCases.cs) at closeout."
       },
       "source": {
         "before": {
@@ -27376,7 +27375,8 @@
       "status": "implementation-pending-validation",
       "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
       "review": {
-        "finding": "pending-package"
+        "finding": "ported",
+        "note": "chord-admission: Host/Admission.cs (Admission.Allow/Deny, the decision, IAdmitSelf, the refused admitted job, revoked calls)."
       },
       "source": {
         "before": null,
@@ -27415,9 +27415,6 @@
           "chord-admission"
         ],
         "finding": "ported",
-        "pendingParts": [
-          "chord-admission"
-        ],
         "note": "Differs (chord-queries 4.3): readers open after LoadOwnAsync because the native activation parks on dependencies before preparing tables; ParkAsync has no dependencies parameter."
       },
       "source": {
@@ -27460,10 +27457,7 @@
           "chord-queries",
           "chord-admission"
         ],
-        "finding": "ported",
-        "pendingParts": [
-          "chord-admission"
-        ]
+        "finding": "ported"
       },
       "source": {
         "before": {
@@ -27529,7 +27523,8 @@
       "status": "implementation-pending-validation",
       "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
       "review": {
-        "finding": "pending-package"
+        "finding": "ported",
+        "note": "chord-admission: IFacetHost.Serve(Contract, AdmittedHostFactory, ServeOptions) and ServeOptions.Admit (Host/Contracts.cs); the admit-against-admission check is in Host/Staging.cs."
       },
       "source": {
         "before": {
@@ -27612,10 +27607,7 @@
           "chord-queries",
           "chord-admission"
         ],
-        "finding": "ported",
-        "pendingParts": [
-          "chord-admission"
-        ]
+        "finding": "ported"
       },
       "source": {
         "before": {
@@ -27837,10 +27829,7 @@
           "chord-queries",
           "chord-admission"
         ],
-        "finding": "ported",
-        "pendingParts": [
-          "chord-admission"
-        ]
+        "finding": "ported"
       },
       "source": {
         "before": {
@@ -27971,9 +27960,6 @@
           "chord-admission"
         ],
         "finding": "ported",
-        "pendingParts": [
-          "chord-admission"
-        ],
         "note": "Differs: no native `unseen` seam; a joiner sees nothing from before its join by construction (chord-remote section 1, \"Unseen members\")."
       },
       "source": {
@@ -28018,10 +28004,7 @@
           "chord-queries",
           "chord-admission"
         ],
-        "finding": "ported",
-        "pendingParts": [
-          "chord-admission"
-        ]
+        "finding": "ported"
       },
       "source": {
         "before": {
@@ -28058,7 +28041,8 @@
       "status": "implementation-pending-validation",
       "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
       "review": {
-        "finding": "pending-package"
+        "finding": "ported",
+        "note": "chord-admission: Host/RouteAdmission.cs, RouteOptions.Admit (Host/Route.cs); the cycle refusal passes the holding context through Host/RemoteIntegration.cs."
       },
       "source": {
         "before": null,
@@ -28092,10 +28076,7 @@
           "chord-remote",
           "chord-admission"
         ],
-        "finding": "ported",
-        "pendingParts": [
-          "chord-admission"
-        ]
+        "finding": "ported"
       },
       "source": {
         "before": {
@@ -28141,10 +28122,7 @@
           "chord-queries",
           "chord-admission"
         ],
-        "finding": "ported",
-        "pendingParts": [
-          "chord-admission"
-        ]
+        "finding": "ported"
       },
       "source": {
         "before": {
@@ -29682,9 +29660,6 @@
           "chord-admission"
         ],
         "finding": "ported",
-        "pendingParts": [
-          "chord-admission"
-        ],
         "note": "Differs: on `failed` the native consumer rejects in-flight calls too, where upstream rejects only those waiting for a slot (kept; remote.152.loading-retains-running-rejects-queued-calls asserts it). The event ack is one per event message, not one per inbound turn."
       },
       "source": {
@@ -29727,10 +29702,7 @@
           "chord-remote",
           "chord-admission"
         ],
-        "finding": "ported",
-        "pendingParts": [
-          "chord-admission"
-        ]
+        "finding": "ported"
       },
       "source": {
         "before": {
@@ -29847,10 +29819,7 @@
           "chord-remote",
           "chord-admission"
         ],
-        "finding": "ported",
-        "pendingParts": [
-          "chord-admission"
-        ]
+        "finding": "ported"
       },
       "source": {
         "before": {
@@ -29892,10 +29861,7 @@
           "chord-remote",
           "chord-admission"
         ],
-        "finding": "ported",
-        "pendingParts": [
-          "chord-admission"
-        ]
+        "finding": "ported"
       },
       "source": {
         "before": {
@@ -29937,10 +29903,7 @@
           "chord-remote",
           "chord-admission"
         ],
-        "finding": "ported",
-        "pendingParts": [
-          "chord-admission"
-        ]
+        "finding": "ported"
       },
       "source": {
         "before": {
@@ -29984,10 +29947,7 @@
           "chord-queries",
           "chord-admission"
         ],
-        "finding": "ported",
-        "pendingParts": [
-          "chord-admission"
-        ]
+        "finding": "ported"
       },
       "source": {
         "before": {
@@ -31221,10 +31181,7 @@
           "chord-remote",
           "chord-admission"
         ],
-        "finding": "ported",
-        "pendingParts": [
-          "chord-admission"
-        ]
+        "finding": "ported"
       },
       "source": {
         "before": {
@@ -32591,7 +32548,8 @@
       "status": "implementation-pending-validation",
       "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
       "review": {
-        "finding": "pending-package"
+        "finding": "ported",
+        "note": "chord-admission: all 43 cases in tests/PiSharp.Chord.Tests/Host/Sync160AdmissionCases.cs; microtask orderings become dispatcher turns and fake timers short real timeouts (noted at each case)."
       },
       "source": {
         "before": null,
@@ -32620,7 +32578,8 @@
       "status": "implementation-pending-validation",
       "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
       "review": {
-        "finding": "pending-package"
+        "finding": "ported",
+        "note": "chord-admission: the two denied-dependency cases in tests/PiSharp.Chord.Tests/Host/Sync160AdmissionCases.cs."
       },
       "source": {
         "before": {
@@ -32992,9 +32951,6 @@
           "chord-admission"
         ],
         "finding": "ported",
-        "pendingParts": [
-          "chord-admission"
-        ],
         "note": "Not ported as written: the three \"a member its reference has not seen\" unit cases (no native unseen seam)."
       },
       "source": {
@@ -33069,7 +33025,8 @@
       "status": "implementation-pending-validation",
       "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
       "review": {
-        "finding": "pending-package"
+        "finding": "ported",
+        "note": "chord-admission: all 21 cases (28 with the parameterised settle turns) in tests/PiSharp.Chord.Tests/Remote/Sync160RouteAdmissionCases.cs."
       },
       "source": {
         "before": null,
@@ -33482,8 +33439,8 @@
       "status": "implementation-pending-validation",
       "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
       "review": {
-        "finding": "not-in-report",
-        "note": "Shared test helper of the app tests. Its diff is the Sessions to SignIns rename, which chord-edge ported in the product code and the renamed cases; the report names nothing for the helper itself."
+        "finding": "ported",
+        "note": "Closeout: settled as ported by the renamed app cases chord-edge names, which exercise the renamed helper surface. Shared test helper of the app tests. Its diff is the Sessions to SignIns rename, which chord-edge ported in the product code and the renamed cases; the report names nothing for the helper itself."
       },
       "source": {
         "before": {
@@ -34479,10 +34436,7 @@
           "chord-remote",
           "chord-admission"
         ],
-        "finding": "ported",
-        "pendingParts": [
-          "chord-admission"
-        ]
+        "finding": "ported"
       },
       "source": {
         "before": {
@@ -34562,10 +34516,7 @@
           "chord-remote",
           "chord-admission"
         ],
-        "finding": "ported",
-        "pendingParts": [
-          "chord-admission"
-        ]
+        "finding": "ported"
       },
       "source": {
         "before": {
@@ -34947,9 +34898,6 @@
           "chord-admission"
         ],
         "finding": "ported",
-        "pendingParts": [
-          "chord-admission"
-        ],
         "note": "chord-edge: the desk fixture is principal-driven (a rebind is a reconnect as another principal), not admission-driven."
       },
       "source": {

@@ -91,6 +91,17 @@ internal static partial class Program
             Equal(81, registry.GetAllOfType(CatalogModelType.Classifier).Count, "current classifier rows");
             Equal(1853, Rows(ReleasedModelCatalog.Current).Count(), "current entries of every type");
         }));
+        // cache-retention.test.ts "does not enable cache warming from the documented TTL alone": 1.6.0 adds gpt-6.2-astra and
+        // gpt-6.2-sol to the OpenAI models whose promptCache stays unset.
+        yield return ("sync160.catalog.openai-documented-ttl-models-leave-prompt-cache-unset", Sync(() =>
+        {
+            foreach (var id in new[] { "gpt-6-luna", "gpt-6-sol", "gpt-6.1-terra", "gpt-6.2-astra", "gpt-6.2-sol" })
+            {
+                var row = CurrentModelCatalog.Get("openai")!.Models.SingleOrDefault(model => model.Id == id && model.Type == CatalogModelType.Chat);
+                Check(row is not null, "openai/" + id + " is in the 1.6.0 catalog");
+                Check(!row!.Raw.Value.TryGetProperty("promptCache", out _), "openai/" + id + " has no promptCache");
+            }
+        }));
         yield return ("sync160.catalog.snapshot-equals-the-package-tarball", async () =>
         {
             if (ReleaseTarball is null) return; // Verified when --release-tarball is given (the report records releaseTarballVerified).
