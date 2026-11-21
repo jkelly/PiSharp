@@ -2,6 +2,7 @@ using System.Net;
 using System.Text;
 using System.Text.Json;
 using PiSharp.AI;
+using PiSharp.AI.Catalogs;
 using PiSharp.Cli.Commands;
 using PiSharp.Contracts;
 
@@ -15,18 +16,20 @@ internal static class MistralLiveSelectionTests
     ];
     private static Task Catalog()
     {
-        using var resource = typeof(LiveSessionSelection).Assembly.GetManifestResourceStream("PiSharp.Cli.Models.mistral.json")!;
-        using var document = JsonDocument.Parse(resource); var count = 0;
-        foreach (var row in document.RootElement.GetProperty("mistral-conversations").EnumerateObject())
+        // The rows are the current release's (Pi 1.6.0), which is where the CLI resolves --model. The frozen pi-ai 1.5.0 shard in
+        // PiSharp.Cli.Models differs from it in two rows since 1.6.0: mistral-large-latest (context window and prices) and
+        // deepseek-v4-1-flash-1017 (image input).
+        var count = 0;
+        foreach (var row in CurrentModelCatalog.Get("mistral")!.Models.Where(model => model.Type == CatalogModelType.Chat))
         {
-            var value = row.Value; var selection = LiveSessionSelection.Parse("mistral", value.GetProperty("id").GetString(), null);
+            var value = row.Raw.Value; var selection = LiveSessionSelection.Parse("mistral", row.Id, null);
             Check(selection.Model.Api == "mistral-conversations" && selection.Model.Provider == "mistral");
             Check(selection.Definition.Raw.Value.GetProperty("contextWindow").GetDouble() == value.GetProperty("contextWindow").GetDouble());
             foreach (var field in new[] { "input", "output", "cacheRead", "cacheWrite" })
                 Check(selection.Definition.Raw.Value.GetProperty("cost").GetProperty(field).GetDouble() == value.GetProperty("cost").GetProperty(field).GetDouble());
             Check(selection.Definition.DeclaresImageInput == value.GetProperty("input").EnumerateArray().Any(item => item.GetString() == "image")); count++;
         }
-        // The @earendil-works/pi-ai@1.5.0 shard has 34 chat rows (1.1.0 had 40; the v0.99.1 source catalog had 32).
+        // The @earendil-works/pi-ai@1.6.0 catalog has 34 Mistral chat rows, as 1.5.0 had (1.1.0 had 40; the v0.99.1 source catalog had 32).
         Check(count == 34); return Task.CompletedTask;
     }
     private static async Task Routes()
