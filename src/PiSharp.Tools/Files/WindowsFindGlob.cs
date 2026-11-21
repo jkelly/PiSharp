@@ -24,6 +24,9 @@ internal static class WindowsFindGlob
         // time on "*a*a*a*b". A portion never holds a '/'.
         private bool Wildcard(string file)
         {
+            // minimatch: a wildcard portion matches at least one character, so the empty part after a folder's trailing slash
+            // ("src/" against "src/**/*") is not a match and a listed folder is never inside itself.
+            if (file.Length == 0) return false;
             var tokens = Tokens!;
             int fi = 0, ti = 0, star = -1, resume = 0;
             while (fi < file.Length)
