@@ -1,4 +1,6 @@
-// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): next/remote/replica.ts.
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/chord/src/remote/replica.ts.
+// 1.6.0: a replica counts the values it took (Generation) and can be forked for another remote object of the same reference (decision
+// "References share one wire hold").
 using System.Collections.Immutable;
 using System.Text.Json.Nodes;
 using PiSharp.Chord.Data;
@@ -15,6 +17,15 @@ internal sealed class Replica(Batch batch, MemberSnapshot initial) : Source(batc
     private bool hasLast = initial.Error is null, ended, retired, retiredWhileFailed;
     private ImmutableArray<Op> ops = [];
     private WireDeltaDecoder decoder = new();
+    // How many values it took (its first value included): a reference joining a shared remote object sees a member it found failed or
+    // missing once this passes the count it found.
+    private long generation = initial.Error is null ? 1 : 0;
+    /// <summary>How many values it took: one per adoption (a snapshot's, a change's, a recovery's).</summary>
+    internal long Generation => generation;
+    /// <summary>A copy of it for another remote object of the same reference (a private retry after <c>too_large/part</c>): its state,
+    /// last good value and count, a fresh decoder (that object's next snapshot resets it).</summary>
+    internal Replica Fork(Batch other) => new(other, new MemberSnapshot(null))
+    { value = value, error = error, hasLast = hasLast, ended = ended, generation = generation };
     public override JsonNode? Value => error is null ? value : throw error;
     public override WatchStart Start() => error is null ? WatchStart.Of(value) : WatchStart.Failure(error, hasLast, value);
     internal (JsonNode? Value, ImmutableArray<Op> Ops, WireDeltaDecoder Decoder) Prepare(JsonNode? wire)
@@ -27,7 +38,7 @@ internal sealed class Replica(Batch batch, MemberSnapshot initial) : Source(batc
     }
     internal void Adopt(JsonNode? updated, ImmutableArray<Op> changes, WireDeltaDecoder staged, bool retirement)
     {
-        value = updated; hasLast = true; error = null; decoder = staged; ops = changes;
+        value = updated; hasLast = true; error = null; decoder = staged; ops = changes; generation++;
         retired = retirement || retiredWhileFailed; retiredWhileFailed = false; Changed(); if (retired) RetiredInBatch();
     }
     internal void Reset(MemberSnapshot snapshot)

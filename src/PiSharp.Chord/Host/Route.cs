@@ -1,4 +1,6 @@
-// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): next/host/route.ts.
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/chord/src/host/route.ts.
+// 1.6.0 here: a resolve's result may carry `opened` (the peer's incarnation at the handshake), and a route's path tells whether it is
+// suspended (references sharing one wire hold). A route's admission (`admit`, the path gate, the cycle refusal) is chord-admission's.
 using System.Text.Json.Nodes;
 using PiSharp.Chord.Contracts;
 using PiSharp.Chord.Data;
@@ -8,7 +10,10 @@ using PiSharp.Telemetry;
 
 namespace PiSharp.Chord.Host;
 
-public sealed record ResolvedLink(ILink Link, LinkOptions Options);
+/// <summary>What a route's <c>Resolve</c> returns. <paramref name="Opened"/> (Pi 1.6.0) is called once, when the link's handshake
+/// completed, with the incarnation of the host at the other end: before anything else that host sent is handled and before this host sends
+/// on the link; never for a link that closes before its handshake. It must not throw.</summary>
+public sealed record ResolvedLink(ILink Link, LinkOptions Options, Action<string>? Opened = null);
 public sealed class RouteOptions
 {
     public required Func<JsonObject, Address, bool> Authorize { get; init; }
@@ -63,7 +68,7 @@ internal sealed class HostRoute
         if (!addresses.TryGetValue(address.Key, out var routed))
         {
             routed = new(address); var captured = routed;
-            routed.Path = new RemotePath((change, holder) => Changed(captured, change, holder)); addresses.Add(address.Key, routed);
+            routed.Path = new RemotePath((change, holder) => Changed(captured, change, holder), () => captured.Suspended); addresses.Add(address.Key, routed);
         }
         return routed.Path;
     }
@@ -129,7 +134,7 @@ internal sealed class HostRoute
             var resolved = await options.Resolve(routed.Address, traced);
             routed.Resolving = false;
             if (host.Closed) { resolved.Link.Close(); return; }
-            var link = host.MakeLink(resolved.Link, resolved.Options, LinkRole.Route, context);
+            var link = host.MakeLink(resolved.Link, resolved.Options, LinkRole.Route, context, resolved.Opened);
             if (!link.Open) { Settle(routed, new ChordError("unavailable", $"{routed.Address.Key}: the link closed before its handshake")); return; }
             routed.Failure = null; links.Add(link, (routed, link.Greeted)); routed.Path.Connected(link);
             span?.Span.SetAttributes(new SpanAttributes { ["outcome"] = "linked" });

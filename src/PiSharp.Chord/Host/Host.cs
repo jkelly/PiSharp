@@ -15,6 +15,7 @@ public sealed partial class ChordHost : IAsyncDisposable
     internal readonly HostOptions Options;
     internal readonly OldWork OldWork = new();
     internal readonly ReloadCycles ReloadCycles = new();
+    internal readonly HostEvents Events;
     internal readonly UnboundClock UnboundClock;
     internal TimeSpan ReloadDrainTimeout => Options.ReloadDrainTimeout < Options.CloseTimeout ? Options.ReloadDrainTimeout : Options.CloseTimeout;
     internal readonly Batch Batch;
@@ -30,7 +31,9 @@ public sealed partial class ChordHost : IAsyncDisposable
     internal bool Closed;
     internal event Action? PublishedChanged;
     internal event Action? Closing;
-    internal Func<Contract, CheckedParams, Caller, ChordContext, ITarget?>? RemoteTarget;
+    // Binds a reference to a remote object over the path its address places it on (the one this host holds for its sharing key, or a new
+    // one); false when nothing places it.
+    internal Func<Binding, bool>? BindRemote;
     private readonly List<Binding> bindings = [];
     private readonly List<CallContext> roots = [];
     private readonly List<RegistryContribution> facetContributions = [];
@@ -48,7 +51,8 @@ public sealed partial class ChordHost : IAsyncDisposable
         if (options.Principal is { } principal && ChordJson.AsString(principal["kind"]) is null)
             throw new ArgumentException("A host principal needs a kind", nameof(options));
         if (options.ReadyTimeout < TimeSpan.Zero || options.CloseTimeout < TimeSpan.Zero || options.ReloadDrainTimeout < TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(options));
-        Options = options;
+        if (options.CallWindow < 1 || options.EventWindow < 1) throw new ArgumentOutOfRangeException(nameof(options), "CallWindow and EventWindow are positive");
+        Options = options; Events = new(this);
         UnboundClock = new(options.TimeProvider, Dispatcher.Post, Report);
         Dispatcher.Unhandled = error => Report(new("runtime_failed", error));
         Store = options.Store as ChordStore;
@@ -210,8 +214,7 @@ public sealed partial class ChordHost : IAsyncDisposable
                 binding.Bind(LocalObject(served, binding.Parameters, binding.Caller, binding.AcquisitionContext));
                 return;
             }
-            var remote = RemoteTarget?.Invoke(type, binding.Parameters, binding.Caller, binding.AcquisitionContext);
-            if (remote is not null) { binding.Bind(remote); return; }
+            if (BindRemote?.Invoke(binding) == true) return;
             binding.Waiting(new ChordError("unavailable", $"{type.Name}: no provider"));
         }
         catch (Exception error) { binding.Failed(new FailureCause(FailureKind.Broken, DataInternal.AsChordError(error, binding.Contract.Name))); }

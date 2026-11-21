@@ -58,7 +58,9 @@ internal sealed partial class Attempt : IOldWorkSource
         if (!adapted.TryGetValue(version, out var value))
         {
             value = new(Served, Implementation?.Variant, Owner.Label, Owner.Host.Batch,
-                name => Members[name]!, (name, error) => Owner.Host.Report(new("derive_failed", error, Owner.Label, name))) { Version = version };
+                name => Members[name]!, (name, error) => Owner.Host.Report(new("derive_failed", error, Owner.Label, name)))
+                { Version = version, EventOf = name => eventNodes?.GetValueOrDefault(name), Metrics = Owner.Host.Events.Metrics,
+                  ReportEvent = (name, error) => Owner.Host.Report(new("event_mapping_failed", error, Owner.Label, name, Version: version)) };
             adapted.Add(version, value);
         }
         return value;
@@ -89,12 +91,13 @@ internal sealed partial class Attempt : IOldWorkSource
             {
                 using var factoryLease = Owner.Host.RetainCallback(Served.Factory, Served.DeclaringFacet);
                 Implementation = Served.Factory(Owner.Parameters.Value, Served.Contract.Kind == ContractKind.Local ? null : Owner.Caller.Principal, Self);
-                PluginStaging.ValidateImplementation(Served.Contract, Implementation);
+                PluginStaging.ValidateImplementation(Served.Contract, Implementation, this);
             }
             catch (Exception error) { throw new ActivationException(new(FailureKind.Broken, DataInternal.AsChordError(error, Owner.Label))); }
             finally { Self.Declaring = false; }
             Owner.InstallRetrySources(Self.RetrySources);
             foreach (var (name, member) in Implementation.Members) Members.Add(name, member);
+            BindEventMembers();
             foreach (var derive in Self.Derives) derive.Attach((source, _) => ChordHost.ResolveSource(source) ?? throw new ArgumentException("not a Chord source"),
                 error => Owner.Host.Report(new("derive_failed", error, Owner.Label)));
             // Dependency waits do not consume the object's own activation deadline.
@@ -325,7 +328,7 @@ internal sealed partial class Attempt : IOldWorkSource
     internal void DetachSources(ChordError error)
     {
         if (sourcesDetached) return;
-        sourcesDetached = true; Self.Detach(error);
+        sourcesDetached = true; Self.Detach(error); DetachEvents();
         foreach (var value in adapted.Values) value.Detach(error);
         adapted.Clear();
     }

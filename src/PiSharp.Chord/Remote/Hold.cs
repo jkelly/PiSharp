@@ -1,4 +1,7 @@
-// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): next/remote/hold.ts.
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/chord/src/remote/hold.ts.
+// 1.6.0: a bound hold taps its instance's event members from the counter value of its bound (decision "Events: fire-and-forget
+// members"), until it unbinds or its object no longer shows it live. Its calls are decoded by what its consumer had applied when it sent
+// them: one binding fence per unacknowledged bound, replacing the single previous binding of 1.5.2.
 using System.Collections.Immutable;
 using System.Text.Json.Nodes;
 using PiSharp.Chord.Contracts;
@@ -41,7 +44,20 @@ internal sealed class IncomingHold : IIncomingHold, IHolder, IReloadAwareHolder
     private ServedType? served;
     private VariantNames? names;
     private VariantData? variant;
-    private (VariantNames Names, VariantData Variant, long Until)? previousBinding;
+    // What a call is decoded by: the names of a binding (while the hold rebinds after a loading its object's gate takes the call by name),
+    // or the failure its consumer was told (the call is refused with it: sent before the consumer learnt of the failure, its indexes are of
+    // a binding that is gone). Only contract data: kept after an unbind, it keeps no instance and no source.
+    private sealed record Decoding(VariantNames? Names, VariantData? Variant, ChordError? Error);
+    // What decodes a call of a consumer that applied everything sent so far: the names of the last bound, or the failure it was told
+    // since; null before either.
+    private Decoding? latest;
+    // One fence per bound its consumer has not acknowledged, oldest first: until it acknowledged the bound numbered Until (this host's own
+    // message number), a call it sends was made before it applied that bound, so it is decoded by Before. A, B, C sent before the first
+    // ack are two fences, and a call sent between B's and C's application is decoded by B's names.
+    private readonly List<(long Until, Decoding Before)> fences = [];
+    // Its binding's taps on its instance's event members: their events go into the event flush's message; none for a variant without
+    // event members, and once its object no longer shows it live (state may still follow its instance then).
+    private List<(EventNode Node, Tap Tap)>? taps;
     private ChordError? refusal;
     private object? instance;
     private bool released, counted = true, binding, toldFailed;
@@ -61,11 +77,19 @@ internal sealed class IncomingHold : IIncomingHold, IHolder, IReloadAwareHolder
     private bool FollowsBoundInstance => instance is not null && target is ChordObject local &&
         local.State.Kind != "ended" && ReferenceEquals(local.FollowingAttempt, instance);
     internal bool Bound => !released && !binding && names is not null && FollowsBoundInstance;
-    private (VariantNames Names, VariantData Variant)? CallBinding =>
-        previousBinding is { } previous && !provider.Acknowledged(previous.Until) ? (previous.Names, previous.Variant) :
-        names is not null && variant is not null ? (names, variant) : null;
-    internal bool Callable => !released && target is not null && CallBinding is not null && !toldFailed;
-    internal ChordError Refusal => refusal ?? HostErrors.NotReady("hold " + Id);
+    // What a call arriving now is decoded by: what its consumer had applied when it sent it, which is what the oldest bound it has not
+    // acknowledged replaced (another variant's indexes name other methods), else the latest. Acks arrive in order: the fences they end
+    // are the first ones, so a hold keeps one fence per bound not acknowledged yet, never one per rebinding of its life.
+    private Decoding? Decode()
+    {
+        while (fences.Count > 0 && provider.Acknowledged(fences[0].Until)) fences.RemoveAt(0);
+        return fences.Count > 0 ? fences[0].Before : latest;
+    }
+    /// <summary>Its consumer acknowledged one of this host's own messages: the fences that ack ends go. Whether none is left.</summary>
+    internal bool Acknowledged() { Decode(); return fences.Count == 0; }
+    internal int Fences => fences.Count;
+    internal bool Callable => !released && target is not null && Decode() is { Names: not null };
+    internal ChordError Refusal => Decode()?.Error ?? refusal ?? HostErrors.NotReady("hold " + Id);
     internal bool Unbound => !released && target is null;
     private void Published()
     {
@@ -121,7 +145,7 @@ internal sealed class IncomingHold : IIncomingHold, IHolder, IReloadAwareHolder
     }
     private void Refuse(FailureKind kind, ChordError error)
     {
-        toldFailed = true; refusal = error;
+        toldFailed = true; refusal = error; latest = new(null, null, error);
         provider.Send(new FailedMessage(Id, new WireFailure(kind.ToString().ToLowerInvariant(), WireError.FromException(error))));
     }
     public void Retarget()
@@ -132,6 +156,10 @@ internal sealed class IncomingHold : IIncomingHold, IHolder, IReloadAwareHolder
     public void Moved()
     {
         if (released || target is null) return;
+        // Its version is no longer bound and no open old attempt serves it any more (a version-dropping reload's drain ended): it leaves
+        // its object and waits unbound, as at the publication that removes a type (upstream hold.ts `removed`).
+        if (target is ChordObject held && !DataInternal.Binds(held.Served.Provider, request.Version, request.Fingerprint) && !held.OldServes(request.Version, request.Fingerprint))
+        { Removed(new ChordError("contract_mismatch", $"{request.Type} v{request.Version}: not served")); return; }
         var state = target.StateFor(request.Version, request.Fingerprint);
         if (state.Kind == "ended") { End(state.Error ?? HostErrors.Released()); return; }
         if (state.Kind == "live")
@@ -144,13 +172,14 @@ internal sealed class IncomingHold : IIncomingHold, IHolder, IReloadAwareHolder
         }
         // Admitted commits keep their exact old source until H2 detaches it. This also covers a
         // replacement parked on an async attach, with no opportunity to publish a new binding yet.
-        if (names is not null && FollowsBoundInstance) return;
+        // Its events stop now, as a reference's do: a binding not shown live gets no event.
+        if (names is not null && FollowsBoundInstance) { Untap(); return; }
         if (names is not null || binding)
         {
             Unfollow(); instance = null; binding = false;
             if (state.Cause is { } failure)
             {
-                names = null; variant = null; previousBinding = null;
+                names = null; variant = null;
                 provider.Unbound(this, failure.Error);
             }
             else provider.Unbind(this);
@@ -161,21 +190,25 @@ internal sealed class IncomingHold : IIncomingHold, IHolder, IReloadAwareHolder
             var now = provider.Link.Host.Options.TimeProvider.GetUtcNow().ToUnixTimeMilliseconds();
             provider.Send(new FailedMessage(Id, new(cause.Kind.ToString().ToLowerInvariant(), WireError.FromException(cause.Error)),
                 state.RetryAt is { } retry ? (long)Math.Max(0, retry - now) : null));
-            names = null; variant = null; previousBinding = null; refusal = cause.Error; toldFailed = true;
+            // Told a failure, its consumer rejects what it still waits on: calls by the old names are not taken any more. One that still
+            // arrives was sent before its consumer learnt of the failure.
+            names = null; variant = null; refusal = cause.Error; toldFailed = true; latest = new(null, null, cause.Error);
         }
         else if (toldFailed) { toldFailed = false; refusal = null; provider.Send(new LoadingMessage(Id)); }
     }
     internal BoundEntry BoundEntry()
     {
         if (target is null || served is null || target.StateFor(request.Version, request.Fingerprint).Kind != "live") throw new InvalidOperationException("bind a live hold");
-        var previous = CallBinding;
+        var previous = latest;
         Unfollow(); binding = false; instance = target.Instance;
         var boundContract = instance is Attempt attempt ? attempt.Served.Contract : served.Contract;
         var variants = ContractsInternal.VariantsAt(boundContract, request.Version);
         var name = target.Variant ?? ContractsInternal.Local;
         if (!variants.TryGetValue(name, out variant)) throw new ArgumentException("variant is not in consumer version");
         names = ContractsInternal.VariantNamesOf(variant);
-        previousBinding = previous is { } old ? (old.Names, old.Variant, provider.NextOwn) : null;
+        // What its consumer's calls were decoded by so far is fenced until it acknowledged this bound, the next of this host's own messages.
+        if (previous is not null) { fences.Add((provider.NextOwn, previous)); provider.Fenced(this); }
+        latest = new(names, variant, null);
         toldFailed = false; refusal = null;
         var members = new List<BoundMember>(); var failed = new List<FailedMember>();
         for (var i = 0; i < names.State.Count; i++)
@@ -189,6 +222,9 @@ internal sealed class IncomingHold : IIncomingHold, IHolder, IReloadAwareHolder
             catch (Exception error) { followedMember.Failure = error; failed.Add(new(i, WireError.FromException(error))); }
             if (source is Source changing) changing.Subscribe(followedMember);
         }
+        // A variant without event members taps nothing (no cost per binding for contracts without events); the others from the counter
+        // value now: it gets only what is emitted after its bound.
+        if (names.Events.Count > 0 && instance is IEventInstance emitting) TapEvents(emitting);
         provider.Link.Context.Count("chord.link.encodes");
         return new(Id, variants.Keys.Order(StringComparer.Ordinal).ToList().IndexOf(name), members, failed);
     }
@@ -212,11 +248,10 @@ internal sealed class IncomingHold : IIncomingHold, IHolder, IReloadAwareHolder
     }
     internal (string Name, bool Bytes) Method(long index)
     {
-        var current = CallBinding;
-        if (current is null || index < 0 || index >= current.Value.Names.Methods.Count) throw new ArgumentException($"hold {Id}: no method {index}");
-        var name = current.Value.Names.Methods[(int)index]; return (name, current.Value.Variant.Methods[name].Result.Bytes);
+        if (Decode() is not { Names: { } bound, Variant: { } data } || index < 0 || index >= bound.Methods.Count) throw new ArgumentException($"hold {Id}: no method {index}");
+        var name = bound.Methods[(int)index]; return (name, data.Methods[name].Result.Bytes);
     }
-    internal Task<object?> CallAsync(string method, object? args, ChordContext context) => target!.CallAsync(method, args, context, Caller, request.Version);
+    internal Task<object?> CallAsync(string method, object? args, ChordContext context) => ((ChordObject)target!).CallAs(method, args, context, Caller, request.Version);
     public void Retry(long hops)
     {
         if (released) return;
@@ -227,7 +262,7 @@ internal sealed class IncomingHold : IIncomingHold, IHolder, IReloadAwareHolder
     {
         if (released) return;
         var previous = target; target = null; previous?.Unhold(this);
-        Unfollow(); names = null; variant = null; previousBinding = null; instance = null; served = null; binding = false;
+        Unfollow(); names = null; variant = null; instance = null; served = null; binding = false;
         provider.Unbound(this, error); provider.Send(new LoadingMessage(Id)); Refuse(FailureKind.Waiting, error);
     }
     public void End(ChordError error)
@@ -240,7 +275,7 @@ internal sealed class IncomingHold : IIncomingHold, IHolder, IReloadAwareHolder
         if (released) return; released = true;
         provider.Link.Host.PublishedChanged -= Published; Unfollow(); provider.Unbind(this);
         var held = target; target = null; held?.Unhold(this);
-        served = null; names = null; variant = null; previousBinding = null; instance = null;
+        served = null; names = null; variant = null; latest = null; fences.Clear(); instance = null;
         if (counted)
         {
             counted = false; provider.Link.Host.CountReference(-1);
@@ -250,6 +285,25 @@ internal sealed class IncomingHold : IIncomingHold, IHolder, IReloadAwareHolder
     private void Unfollow()
     {
         foreach (var member in followed) if (member.Source is Source changing) changing.Unsubscribe(member);
-        followed.Clear();
+        followed.Clear(); Untap();
+    }
+    // Stops its event members (its state may still follow its instance).
+    private void Untap()
+    {
+        if (taps is null) return;
+        foreach (var (node, tap) in taps) node.Untap(tap);
+        taps = null;
+    }
+    // Taps the event members of its variant (it has some) on its instance at its version, from the counter now.
+    private void TapEvents(IEventInstance emitting)
+    {
+        var boundAt = provider.Link.Host.Events.Counter; taps = [];
+        for (var index = 0; index < names!.Events.Count; index++)
+        {
+            if (emitting.EventNode(names.Events[index], request.Version) is not { } node) continue;
+            var member = index;
+            var tap = new Tap(boundAt, (entry, flush) => provider.QueueEvent(Id, member, entry, flush));
+            node.Tap(tap); taps.Add((node, tap));
+        }
     }
 }

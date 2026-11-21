@@ -162,3 +162,117 @@ internal static partial class Program
         }),
     ];
 }
+
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/chord/test/host/adapted.test.ts, "events of an older consumer" (decision
+// "Events: fire-and-forget members"). Ported by reading; the upstream turn and flush are S6Turn and S6Flushed (Sync160RemoteSupport.cs).
+internal static partial class Program
+{
+    private static readonly JsonObject A6Sample = Obj(("y", Int()));
+    /// <summary>v1: one event member; v2 adds a sample time to its values and a second member.</summary>
+    private static readonly Contract A6TickerV1 = Contract.Local("app.ticker", new() { Version = 1, Params = new(), Members = new() { ["ticks"] = Event(A6Sample) } });
+    private static readonly Contract A6TickerV2 = Contract.Evolve(A6TickerV1, e => e.Event("ticks", Obj(("y", Int()), ("t", Int()))).AddEvent("extra", A6Sample));
+
+    /// <summary>Serves v2 accepting v1 with <c>ticks</c> mapped by <paramref name="mapping"/>, or refused (null); its sources in the list.</summary>
+    private static async Task<(ChordHost Host, List<HostError> Errors, Action<int> Emit, List<IEventSource> Sources)> A6Ticker(Func<JsonNode, JsonNode?>? mapping)
+    {
+        var sources = new List<IEventSource>(); var errors = new List<HostError>();
+        var host = Hosts.Create(new() { OnError = error => { lock (errors) errors.Add(error); }, ReadyTimeout = TimeSpan.FromSeconds(3), CloseTimeout = TimeSpan.FromMilliseconds(200) });
+        StateEntry entry = mapping is null ? StateMapping.Refuse : new StateMapping(value => mapping((JsonNode)value!));
+        await host.LoadAsync([new("@test/app", Facet.Define((h, _) => h.Serve(A6TickerV2, (_, _, self) =>
+        {
+            var ticks = self.Events(); lock (sources) sources.Add(ticks);
+            return new(new Dictionary<string, object?> { ["ticks"] = ticks, ["extra"] = self.Events() });
+        }, new(new AcceptsTable { [1] = new() { Events = { ["ticks"] = entry } } }))))], ChordContext.Background);
+        return (host, errors, y => { IEventSource last; lock (sources) last = sources[^1]; last.Emit(new JsonObject { ["y"] = y, ["t"] = y * 10 }); }, sources);
+    }
+
+    private static IEnumerable<(string, Func<Task>)> HostAdapted160EventsCases() =>
+    [
+        Case("host.adapted.events-of-an-older-consumer-get-each-value-mapped-by-their-versions-mapping-once-per-emit-for-all-of-them", async () =>
+        {
+            var calls = 0;
+            var (host, _, emit, _) = await A6Ticker(value => { calls++; return new JsonObject { ["y"] = value["y"]!.DeepClone() }; });
+            await using var closing = host; var seen = new List<string>();
+            for (var reference = 0; reference < 3; reference++)
+            {
+                var old = await host.GetAsync(A6TickerV1, new(), ChordContext.Background);
+                await old.Event("ticks").OnAsync(e => { lock (seen) seen.Add(e.Value!.ToJsonString()); }, ChordContext.Background);
+            }
+            var current = await host.GetAsync(A6TickerV2, new(), ChordContext.Background);
+            await current.Event("ticks").OnAsync(e => { lock (seen) seen.Add(e.Value!.ToJsonString()); }, ChordContext.Background);
+            emit(1);
+            await S6Flushed(host);
+            Sequence(["{\"y\":1}", "{\"y\":1}", "{\"y\":1}", "{\"y\":1,\"t\":10}"], S6Seen(seen), "three mapped, one current");
+            Equal(1, calls, "mapped once for all of the version's bindings");
+        }),
+        Case("host.adapted.events-of-an-older-consumer-drop-an-emit-only-for-their-version-when-the-mapping-throws-reported-once-per-episode", async () =>
+        {
+            var (host, errors, emit, _) = await A6Ticker(value =>
+            {
+                var y = value["y"]!.GetValue<int>();
+                if (y < 0) throw new InvalidOperationException("no " + y);
+                return new JsonObject { ["y"] = y };
+            });
+            await using var closing = host; var old = new List<string>(); var current = new List<string>();
+            await (await host.GetAsync(A6TickerV1, new(), ChordContext.Background)).Event("ticks").OnAsync(S6Recorder(old), ChordContext.Background);
+            await (await host.GetAsync(A6TickerV2, new(), ChordContext.Background)).Event("ticks").OnAsync(S6Recorder(current), ChordContext.Background);
+            foreach (var y in new[] { -1, -2, 3, -4 }) { emit(y); await S6Flushed(host); }
+            Sequence(["3"], S6Seen(old), "the older version gets only what its mapping took");
+            Sequence(["-1", "-2", "3", "-4"], S6Seen(current), "the current version gets every emit");
+            HostError[] reported; lock (errors) reported = [.. errors];
+            Sequence(["event_mapping_failed", "event_mapping_failed"], reported.Select(error => error.Kind), "once per failure episode");
+            Equal("app.ticker", reported[0].Object, "the object"); Equal("ticks", reported[0].Member, "the member"); Equal(1L, reported[0].Version, "the version");
+            Equal("no -1", reported[0].Error!.Message, "the first episode's error"); Equal("no -4", reported[1].Error!.Message, "the next episode's error");
+        }),
+        Case("host.adapted.events-of-an-older-consumer-are-refused-their-binding-when-the-provider-refuses-a-changed-event-member", async () =>
+        {
+            var (host, _, _, _) = await A6Ticker(null); await using var closing = host;
+            var error = await S6Rejection(host.GetAsync(A6TickerV1, new(), ChordContext.Background, new(TimeSpan.FromMilliseconds(20))));
+            Equal("contract_mismatch", ((ChordError)error).Code, "the older version's binding is refused");
+            using var current = await host.GetAsync(A6TickerV2, new(), ChordContext.Background);
+            Check(current.Event("ticks") is not null, "the current version binds");
+        }),
+        Case("host.adapted.events-of-an-older-consumer-bind-with-a-removed-event-member-and-receive-none-of-it-the-unchanged-ones-as-they-are", async () =>
+        {
+            var pulseV1 = Contract.Local("app.pulse", new() { Version = 1, Params = new(), Members = new() { ["beat"] = Event(A6Sample), ["old"] = Event(A6Sample) } });
+            var pulseV2 = Contract.Evolve(pulseV1, e => e.RemoveEvent("old"));
+            var beats = new List<IEventSource>();
+            await using var host = Hosts.Create(new() { OnError = _ => { }, ReadyTimeout = TimeSpan.FromSeconds(3), CloseTimeout = TimeSpan.FromMilliseconds(200) });
+            await host.LoadAsync([new("@test/app", Facet.Define((h, _) => h.Serve(pulseV2, (_, _, self) =>
+            {
+                var beat = self.Events(); lock (beats) beats.Add(beat);
+                return new(new Dictionary<string, object?> { ["beat"] = beat });
+            }, new(new AcceptsTable { [1] = new() }))))], ChordContext.Background);
+            using var older = await host.GetAsync(pulseV1, new(), ChordContext.Background);
+            var seen = new List<string>();
+            await older.Event("beat").OnAsync(S6Recorder(seen, "beat "), ChordContext.Background);
+            await older.Event("old").OnAsync(S6Recorder(seen, "old "), ChordContext.Background);
+            IEventSource last; lock (beats) last = beats[^1];
+            last.Emit(new JsonObject { ["y"] = 1 });
+            await S6Flushed(host);
+            Sequence(["beat 1"], S6Seen(seen), "the unchanged member as it is, none of the removed one");
+            Equal("live", older.State.Value.Kind, "bound all the same");
+        }),
+        Case("host.adapted.events-of-an-older-consumer-keep-no-mapping-once-their-versions-last-reference-left", async () =>
+        {
+            // Upstream asserts the dropped mapping nodes are collected. Here the same thing is read directly: once the version's last
+            // reference left, nothing taps the instance's source any more and the mapping is not run for the next emit.
+            var calls = 0;
+            var (host, _, emit, sources) = await A6Ticker(value => { calls++; return new JsonObject { ["y"] = value["y"]!.DeepClone() }; });
+            await using var closing = host;
+            var old = await host.GetAsync(A6TickerV1, new(), ChordContext.Background);
+            await old.Event("ticks").OnAsync(_ => { }, ChordContext.Background);
+            emit(1);
+            await S6Flushed(host);
+            Equal(1, calls, "mapped while the older reference listened");
+            var source = (OwnEventSource)sources[^1];
+            Check(host.Dispatcher.Invoke(() => source.Tapped), "the mapping taps the instance's source");
+            old.Release();
+            await S6Flushed(host);
+            Check(!host.Dispatcher.Invoke(() => source.Tapped), "the mapping is gone with the version's last reference");
+            emit(2);
+            await S6Flushed(host);
+            Equal(1, calls, "nothing is mapped for nobody");
+        }),
+    ];
+}

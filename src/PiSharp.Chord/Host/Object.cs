@@ -160,7 +160,10 @@ internal sealed partial class ChordObject : ITarget, IDocumentsOwner, ITableOwne
     internal IEnumerable<ChordObject> WaitEdges() => gateWaits
         .Concat(Current?.Self.Dependencies.Select(binding => binding.Target).OfType<ChordObject>() ?? [])
         .Concat(readiness?.Targets ?? []);
-    public async Task<object?> CallAsync(string method, object? args, ChordContext context, Caller caller, long version)
+    /// <summary>Calls a method of the live object for a reference's holder: as its caller, at its version (<see cref="CallAs"/>).</summary>
+    public Task<object?> CallAsync(string method, object? args, IHolder holder, ChordContext context) =>
+        CallAs(method, args, context, holder.Caller, holder.Contract.Version);
+    internal async Task<object?> CallAs(string method, object? args, ChordContext context, Caller caller, long version)
     {
         if (Host.OldWork.Of(context) && OpenOldAttempt is { } old)
             return await old.CallAsync(method, args, context, caller, version);
@@ -234,11 +237,11 @@ internal sealed partial class ChordObject : ITarget, IDocumentsOwner, ITableOwne
         }
         throw HostErrors.InvalidMember(member);
     }
-    public void Retry(RetryWalk walk)
+    public void Retry(RetryWalk walk, IHolder? holder = null)
     {
         if (!walk.Visited.Add(this) || ending) return;
         if (Current is { Live: false } attempt && attempt.Self.Dependencies.Count > 0)
-            foreach (var dependency in attempt.Self.Dependencies) dependency.Target?.Retry(walk);
+            foreach (var dependency in attempt.Self.Dependencies) dependency.Target?.Retry(walk, dependency);
         if (state.Kind == "failed" && state.Cause?.Kind != FailureKind.Waiting) BeginAttempt();
         else Current?.Wake();
     }
