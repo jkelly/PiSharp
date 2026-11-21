@@ -728,8 +728,10 @@ internal static partial class Program
             // Another fingerprint: the plugin applies, and the refused job fails the restarted object.
             var rehearsed = new A6DocCode { Declare = job };
             Equal(0, (await w.Reload(doc: A6DocFacet(rehearsed, A6DocV2))).Failed.Count, "applied across another fingerprint");
-            Equal(0, rehearsed.BuiltNow.Length, "not rehearsed");
             await A6Delivered(w.Host);
+            // Upstream reads no run straight after the reload; the native restarted object's activation is posted and may already
+            // have run when the reload's await continues, so this counts the runs once it settled: one, the activation's.
+            Equal(1, rehearsed.BuiltNow.Length, "not rehearsed: built once, by the restarted object");
             Equal("failed Broken", $"{doc.State.Value.Kind} {doc.State.Value.Cause?.Kind}", "broken by the refused job");
             Equal(1, JobReports(), "reported once");
             // No value (the object is denied): not rehearsed either, reported when it is allowed.
