@@ -488,6 +488,14 @@ internal static class PiCommand
             return 1;
         }
 
+        // Pi faac585884ae2c013a6b1400f3e9e77f10b34bac main.ts createRuntime: "Could not restore model x/y. Using a/b" is a diagnostic,
+        // so every mode reports it at startup (and the session host after each replacement). Without any model the message is login
+        // guidance instead: interactive mode shows it at startup, and each prompt is refused until a model is selected.
+        if (!selection.IsUnselected && selection.FallbackMessage is { } restoreFallback)
+        {
+            runtimeDiagnostics.Add(new("warning", restoreFallback));
+            selection.FallbackMessage = null; // Already in the startup diagnostics.
+        }
         host.Timings.Time("createAgentSessionRuntime");
         // Piped stdin joins the first message; it also turns interactive mode into print mode.
         string? stdinContent = null;
@@ -506,7 +514,11 @@ internal static class PiCommand
         var (initialMessage, initialImages) = PiInitialMessage.Build(parsed.Messages, fileText, fileImages, stdinContent);
         host.Timings.Time("prepareInitialMessage");
 
-        var allDiagnostics = Deduplicate([.. startupDiagnostics, .. runtimeDiagnostics]);
+        // main.ts: taking the runtime's diagnostics marks them reported, so the modes do not report them again after a session
+        // replacement (AgentSessionRuntime.takeUnreportedDiagnostics).
+        var runtimeView = new PiSharp.CodingAgent.AgentSessionRuntimeDiagnostics();
+        runtimeView.Replace(runtimeDiagnostics.Select(diagnostic => new PiSharp.CodingAgent.AgentSessionRuntimeDiagnostic(diagnostic.Type, diagnostic.Message)));
+        var allDiagnostics = Deduplicate([.. startupDiagnostics, .. runtimeView.TakeUnreported().Select(diagnostic => new PiDiagnostic(diagnostic.Type, diagnostic.Message))]);
         if (appMode != PiAppMode.Interactive) await Report(allDiagnostics).ConfigureAwait(false);
         // main.ts: runtime errors (an extension that failed to load, an unknown extension flag) stop the run in every mode.
         if (extensionRun?.Diagnostics.Any(diagnostic => diagnostic.Type == "error") == true || !builtinResolution.Errors.IsEmpty)
@@ -551,6 +563,10 @@ internal static class PiCommand
             ShowStartupHeader = parsed.Verbose || settings.QuietStartup is not true, ShowStartupDetails = parsed.Verbose || settings.QuietStartup is false,
             MigratedAuthProviders = migrations.MigratedAuthProviders, DeprecationWarnings = migrations.DeprecationWarnings,
             ProjectTrusted = PiProjectTrust.Seam(trustedDirectories), StartupDiagnostics = allDiagnostics,
+            RuntimeDiagnostics = runtimeView, DiagnosticsColor = color,
+            // main.ts createRuntime runs again on /new, /resume and /fork: the settings files are read again, and their errors are
+            // diagnostics of the replacement's runtime.
+            CollectReplacementDiagnostics = _ => Task.FromResult(PiSettings.Load(sessionCwd, agentDir, projectTrusted).DrainDiagnostics()),
             ExtensionPaths = [.. (parsed.Extensions ?? []).Select(path => PiPaths.IsLocalPath(path) ? PiPaths.ResolvePath(path, cwd, home) : path)],
             NoExtensions = parsed.NoExtensions, ExtensionFlagValues = parsed.UnknownFlags.ToImmutableDictionary(StringComparer.Ordinal),
             Extensions = extensionRun?.Host, ExtensionMode = extensionMode, BuiltinExtensions = builtins,
@@ -641,14 +657,8 @@ internal static class PiCommand
         });
 
         async Task Error(string message) => await Line(err, Paint(Red, $"Error: {message}")).ConfigureAwait(false);
-        async Task Report(IEnumerable<PiDiagnostic> diagnostics)
-        {
-            foreach (var diagnostic in diagnostics)
-            {
-                var prefix = diagnostic.Type == "error" ? "Error: " : diagnostic.Type == "warning" ? "Warning: " : "";
-                await Line(err, Paint(diagnostic.Type == "error" ? Red : diagnostic.Type == "warning" ? Yellow : Dim, prefix + diagnostic.Message)).ConfigureAwait(false);
-            }
-        }
+        // modes/diagnostics-stderr.ts writeDiagnosticsToStderr.
+        Task Report(IEnumerable<PiDiagnostic> diagnostics) => PiDiagnosticsStderr.WriteAsync(err, diagnostics, color);
         string Paint(string code, string text) => color ? code + text + "\u001b[39m" : text;
     }
 

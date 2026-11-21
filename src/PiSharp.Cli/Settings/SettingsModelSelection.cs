@@ -117,7 +117,7 @@ internal sealed record SettingsModelSelection(string? Provider, string? Model, s
     }
 
     /// <summary>settings-manager getEnabledModels: an array of pattern strings.</summary>
-    private static ImmutableArray<string> ReadPatterns(StartupSettingsSnapshot? settings)
+    internal static ImmutableArray<string> ReadPatterns(StartupSettingsSnapshot? settings)
     {
         if (settings is null || !settings.Values.Value.TryGetProperty("enabledModels", out var value) || value.ValueKind == JsonValueKind.Null) return [];
         if (value.ValueKind != JsonValueKind.Array) throw new SessionCommandException(SessionCommandFailure.InvalidArguments);
