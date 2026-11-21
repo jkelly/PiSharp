@@ -5,6 +5,10 @@
 // Pi v1.5.0 sync (area run-failure): why the newest run ended without an answer (pi-durable 1.5.0 pi.live.runFailure), from the
 // snapshot's runFailure and a run_end's failure; a run_start of a later batch clears it, one in the batch that recorded it (a continue
 // after a failure, or the run a reset's queued input starts) keeps it, as pi.live does. A batch is one commit's events.
+// Pi v1.6.0 sync: a tool call that parks. A slot's status may be `sleeping` or `waiting` (in a snapshot, on a tool_execution_start of a call
+// parked at its gates, and on the tool_execution_update of a park), and `running` again on the update of its wake, which may carry the
+// arguments the call runs with. An update without `status` keeps the tool's status (before, it set `running`, which a parked call's
+// update would undo). The answer a run waits to have reviewed (snapshot run.yield, run_yield) is AgentModel.YieldAnswer.
 using System.Text.Json.Nodes;
 
 namespace PiSharp.Durable.Client;
@@ -27,6 +31,10 @@ public sealed class AgentModel
 
     /// <summary>Between <c>run_start</c> and <c>run_end</c>.</summary>
     public bool Running { get; private set; }
+
+    /// <summary>The entry of the answer a running run waits to have reviewed by its <c>onYield</c> tasks (<c>pi.live.run.yield</c>, Pi
+    /// v1.6.0): the answer is in the transcript, and the run's inputs are still open. Null otherwise.</summary>
+    public long? YieldAnswer { get; private set; }
 
     /// <summary>While an assistant message streams.</summary>
     public bool Generating => live is not null;
@@ -144,6 +152,8 @@ public sealed class AgentModel
                     Order = ++order,
                 };
         Running = snapshot["run"] is JsonObject;
+        YieldAnswer = snapshot["run"] is JsonObject run && run["yield"] is JsonObject yielded && yielded["answer"] is not null
+            ? Transcript.Id(yielded, "answer") : null;
         Agent = snapshot["agent"] as JsonObject is { } agent ? (JsonObject)agent.DeepClone() : [];
         Usage = snapshot["usage"] as JsonObject is { } usage ? (JsonObject)usage.DeepClone() : [];
         Retry = snapshot["generation"] is JsonObject attempt && attempt["retry"] is JsonObject retry
@@ -179,11 +189,16 @@ public sealed class AgentModel
                 return;
             case "run_start":
                 Running = true;
+                YieldAnswer = null;
                 // A run started in the commit that recorded the failure keeps it.
                 if (!failedInBatch) RunFailure = null;
                 return;
+            case "run_yield":
+                YieldAnswer = item["answer"] is null ? null : Transcript.Id(item, "answer");
+                return;
             case "run_end":
                 Running = false;
+                YieldAnswer = null;
                 live = null;
                 if (RunFailureInfo.Read(item["failure"]) is { } failed)
                 {
@@ -213,7 +228,8 @@ public sealed class AgentModel
                 var tool = new LiveTool
                 {
                     Name = Transcript.Str(item, "toolName") ?? "tool",
-                    Status = "running",
+                    // A call parked at its gates before it ran starts `sleeping`.
+                    Status = Transcript.Str(item, "status") ?? "running",
                     Args = item["args"]?.DeepClone(),
                     ParentCallId = Transcript.Str(item, "parentToolCallId"),
                     Order = ++order,
@@ -243,7 +259,9 @@ public sealed class AgentModel
                 map[callId] = tool with
                 {
                     Output = output,
-                    Status = "running",
+                    // A park (`sleeping`, `waiting`) and its wake (`running`) say so; any other update leaves the status as it is.
+                    Status = Transcript.Str(item, "status") ?? (known is null ? "running" : tool.Status),
+                    Args = item["args"] is JsonObject args ? args.DeepClone() : tool.Args,
                     Details = item.ContainsKey("details") ? item["details"]?.DeepClone() : tool.Details,
                     TaskId = tool.TaskId ?? (item["taskId"] is null ? null : Transcript.Id(item, "taskId")),
                 };

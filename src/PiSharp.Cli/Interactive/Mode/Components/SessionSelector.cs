@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): coding-agent/src/modes/interactive/components/session-selector.ts.
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): coding-agent/src/modes/interactive/components/session-selector.ts.
 // Also formatResumeCommand/quoteIfNeeded from coding-agent/src/modes/interactive/interactive-mode.ts (ResumeCommand below).
 // Sessions are PiSharp's PiSessionInfo (the source SessionInfo). The loaders, rename and delete are delegates; delete defaults to
 // the source deleteSessionFile (the `trash` command, then unlink).
@@ -118,6 +118,8 @@ internal sealed class SessionList : IComponent, IFocusable, IInputHandler
     private List<FlatSessionNode> filteredSessions = [];
     private int selectedIndex;
     private bool selectionTouched;
+    // Session to select once it appears, while a progressive reload has not yet delivered it
+    private string? pendingSelectedPath;
     private readonly Input searchInput;
     private bool showCwd;
     private SortMode sortMode;
@@ -181,9 +183,12 @@ internal sealed class SessionList : IComponent, IFocusable, IInputHandler
         FilterSessions(searchInput.GetValue());
     }
 
-    public void SetSessions(IReadOnlyList<PiSessionInfo> sessions, bool showCwd)
+    /// <param name="partial">True when more sessions are still loading; a selected session missing from a partial list stays the
+    /// selection target until it arrives.</param>
+    public void SetSessions(IReadOnlyList<PiSessionInfo> sessions, bool showCwd, bool partial = false)
     {
-        var selectedPath = selectionTouched ? GetSelectedSessionPath() : null;
+        var pendingPath = selectionTouched ? pendingSelectedPath : null;
+        var selectedPath = selectionTouched ? pendingPath ?? GetSelectedSessionPath() : null;
         allSessions = sessions;
         this.showCwd = showCwd;
         FilterSessions(searchInput.GetValue());
@@ -191,7 +196,15 @@ internal sealed class SessionList : IComponent, IFocusable, IInputHandler
         else if (!string.IsNullOrEmpty(selectedPath))
         {
             var index = filteredSessions.FindIndex(node => node.Session.Path == selectedPath);
-            if (index >= 0) selectedIndex = index;
+            if (index >= 0)
+            {
+                selectedIndex = index;
+                pendingSelectedPath = null;
+            }
+            // The selected session may not have loaded yet: keep it as the target instead of adopting whichever session the
+            // index now points to.
+            else if (partial) pendingSelectedPath = selectedPath;
+            else pendingSelectedPath = null;
         }
     }
 
@@ -503,8 +516,7 @@ internal sealed class SessionList : IComponent, IFocusable, IInputHandler
         {
             if (searchInput.GetValue().Length > 0)
             {
-                searchInput.HandleInput(keyData);
-                FilterSessions(searchInput.GetValue());
+                HandleSearchInput(keyData);
                 return;
             }
 
@@ -513,6 +525,7 @@ internal sealed class SessionList : IComponent, IFocusable, IInputHandler
         }
 
         selectionTouched = true;
+        pendingSelectedPath = null;
         if (kb.Matches(keyData, "tui.select.up")) selectedIndex = Math.Max(0, selectedIndex - 1);
         else if (kb.Matches(keyData, "tui.select.down")) selectedIndex = Math.Min(filteredSessions.Count - 1, selectedIndex + 1);
         // Page up - jump up by maxVisible items
@@ -525,11 +538,23 @@ internal sealed class SessionList : IComponent, IFocusable, IInputHandler
         }
         else if (kb.Matches(keyData, "tui.select.cancel")) OnCancel?.Invoke();
         // Pass everything else to search input
-        else
-        {
-            searchInput.HandleInput(keyData);
-            FilterSessions(searchInput.GetValue());
-        }
+        else HandleSearchInput(keyData);
+    }
+
+    /// <summary>Applies a key to the search query; a changed, non-empty query selects the top row, the best match.</summary>
+    private void HandleSearchInput(string keyData)
+    {
+        var previousQuery = searchInput.GetValue();
+        searchInput.HandleInput(keyData);
+        var query = searchInput.GetValue();
+        // Cursor keys leave the query as it is and must not move the selection.
+        if (query == previousQuery) return;
+        FilterSessions(query);
+        if (TextUtils.JsTrim(query).Length == 0) return;
+        selectedIndex = 0;
+        // Untouched, sessions that are still loading keep the selection on the top row instead of on this session.
+        selectionTouched = false;
+        pendingSelectedPath = null;
     }
 }
 
@@ -992,7 +1017,7 @@ internal sealed class SessionSelectorComponent : Container, IComponent, IFocusab
                 IReadOnlyList<PiSessionInfo> sessions = [.. partialSessions];
                 if (loadScope == SessionScope.Current) currentSessions = sessions;
                 else allSessions = sessions;
-                if (loadScope == scope) sessionList.SetSessions(sessions, showCwd);
+                if (loadScope == scope) sessionList.SetSessions(sessions, showCwd, true);
             }
             if (loadScope != scope) return;
             header.SetProgress(loaded, total);
@@ -1076,7 +1101,7 @@ internal sealed class SessionSelectorComponent : Container, IComponent, IFocusab
         var loading = (scope == SessionScope.Current ? currentLoad : allLoad) is not null;
         header.SetScope(scope);
         header.SetLoading(loading);
-        sessionList.SetSessions(sessions ?? [], scope == SessionScope.All);
+        sessionList.SetSessions(sessions ?? [], scope == SessionScope.All, loading || sessions is null);
         requestRender();
         if (sessions is null && !loading) _ = LoadScope(scope);
     }

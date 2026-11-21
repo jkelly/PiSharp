@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): coding-agent/src/modes/interactive/components/tool-execution.ts.
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): coding-agent/src/modes/interactive/components/tool-execution.ts.
 // ensurePngTranscoder (coding-agent/src/utils/image-convert.ts) registers PiSharp's Skia PNG conversion as the Image transcoder.
 using System.Text.Json.Nodes;
 using PiSharp.Extensions;
@@ -222,6 +222,8 @@ internal sealed class ToolExecutionComponent : Container, IDisposableComponent
             if (contentLines.Count > 0)
             {
                 lines.Add("");
+                // Upstream appends in a loop because spreading hundreds of thousands of wrapped lines exceeds V8's argument
+                // limit (#8036); AddRange copies a list of any length.
                 lines.AddRange(contentLines);
             }
             for (var i = 0; i < imageComponents.Count; i++)

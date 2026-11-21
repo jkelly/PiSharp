@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): coding-agent/src/modes/interactive/components/settings-submenu.ts.
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): coding-agent/src/modes/interactive/components/settings-submenu.ts.
 using PiSharp.Tui.Pi;
 using static PiSharp.Cli.Interactive.Mode.ThemeGlobals;
 
@@ -104,8 +104,11 @@ internal sealed class SelectSubmenu : Container, IInputHandler
             if (isNav) selectList.HandleInput(data);
             else
             {
+                // Cursor keys leave the query as it is and must not move the selection.
+                var previousQuery = searchInput.GetValue();
                 searchInput.HandleInput(data);
-                ApplyFilter(searchInput.GetValue());
+                var query = searchInput.GetValue();
+                if (query != previousQuery) ApplyFilter(query);
             }
         }
         else selectList.HandleInput(data);

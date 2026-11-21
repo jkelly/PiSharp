@@ -84,6 +84,9 @@ internal sealed class AttachView(TextWriter output)
     private void Call(ToolCallView call)
     {
         Print("call:" + call.CallId, $"• {call.Name} {Line(Transcript.Describe(call.Args), 120)}".TrimEnd());
+        // Pi Durable 1.6.0: a parked call, said once however often it parks.
+        if (call.Status is ToolStatus.Sleeping or ToolStatus.Waiting)
+            Print("parked:" + call.CallId, $"  ⏸ {(call.Status == ToolStatus.Sleeping ? "sleeping" : "waiting")}: {call.Name} holds no process until it is woken");
         if (call.Status is ToolStatus.Done or ToolStatus.Error && call.Result is { } result)
             Print("done:" + call.CallId, $"  {(call.Status == ToolStatus.Error ? "✗" : "⎿")} {Line(result, 200)}" + Images(call.Images.Count));
         foreach (var nested in call.Nested) Call(nested);

@@ -1,9 +1,13 @@
-// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/test/codemode-describe.test.ts ("code mode description and section"),
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/durable/test/codemode-describe.test.ts ("code mode description and section"),
 // as codemode.describe.<case>. Verbatim apart from the adaptations in HarnessSupport.cs and ChatSupport.cs, and these:
 // - codemodeDescription and codemodeSection are CodemodeDescribe.Description and Section (internal, as upstream's tests import them from the
 //   source file); an undefined section is null.
 // - The tools' Parameters are the JSON pi-schema builds for `obj({ path: str({ description: "File path" }) })`.
 // - CODEMODE_SOURCE_GRAMMAR is PiSharp.Codemode's CodemodeSource.Grammar.
+// - Pi v1.6.0 moved namespaces from name prefixes to extensions. The cases upstream rewrote are rewritten here under their new names
+//   ("lists ungrouped tools first ...", "lists what fits the budget ... with no counts in headings", "renders the section from the
+//   conversation's extensions and callable tools ..."); "uses the longest matching namespace prefix" is gone with the prefix API, as
+//   upstream deleted it. The cases upstream added are in Sync160CodemodeCases.cs.
 using PiSharp.Codemode;
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
@@ -25,7 +29,7 @@ internal static class CodemodeDescribeTests
     private static readonly JsonObjectValue PathParameters =
         O("""{"type":"object","properties":{"path":{"type":"string","description":"File path"}},"required":["path"],"additionalProperties":false}""");
 
-    private static ToolRegistration Tool(string name, string description, Func<ToolRegistration, ToolRegistration>? extra = null)
+    internal static ToolRegistration Tool(string name, string description, Func<ToolRegistration, ToolRegistration>? extra = null)
     {
         var tool = Define.Tool(new ToolRegistration
         {
@@ -37,10 +41,14 @@ internal static class CodemodeDescribeTests
         return extra is null ? tool : extra(tool);
     }
 
-    private static readonly CodemodeNamespace GitHub = new("github", "mcp__github__") { Description = "GitHub MCP server" };
+    internal static readonly ToolNamespace GitHub = new("mcp__github", "GitHub MCP server", "Pass repositories as owner/name.");
 
-    private static void Contains(string text, string part, string what) => Check(text.Contains(part, StringComparison.Ordinal), $"{what}: lacks <{part}>");
-    private static void Lacks(string text, string part, string what) => Check(!text.Contains(part, StringComparison.Ordinal), $"{what}: has <{part}>");
+    /// <summary>An extension bringing <paramref name="tools"/>, in <paramref name="toolNamespace"/> when given (upstream <c>extension</c>).</summary>
+    internal static Extension Ext(string name, IReadOnlyList<ToolRegistration> tools, ToolNamespace? toolNamespace = null) =>
+        Define.Extension(new Extension { Name = name, Tools = tools, Namespace = toolNamespace });
+
+    internal static void Contains(string text, string part, string what) => Check(text.Contains(part, StringComparison.Ordinal), $"{what}: lacks <{part}>");
+    internal static void Lacks(string text, string part, string what) => Check(!text.Contains(part, StringComparison.Ordinal), $"{what}: has <{part}>");
 
     internal static IEnumerable<(string, Func<Task>)> Cases()
     {
@@ -56,49 +64,47 @@ internal static class CodemodeDescribeTests
             Contains(CodemodeDescribe.Description(true), "`models`", "description with models");
         });
 
-        yield return Case(prefix + "lists-callable-tools-as-declarations-grouped-by-namespace-with-namespace-descriptions", () =>
+        yield return Case(prefix + "lists-ungrouped-tools-first-then-each-namespace-s-heading-and-description-then-its-declarations", () =>
         {
-            var section = CodemodeDescribe.Section([Tool("read", "Read a file."), Tool("mcp__github__list_issues", "List issues.")], [GitHub], 3000)!;
+            var read = Tool("read", "Read a file.");
+            var issues = Tool("list_issues", "List issues.");
+            var section = CodemodeDescribe.Section([read, issues], [Ext("coding", [read]), Ext("github", [issues], GitHub)], 3000)!;
             Contains(section, "### `read`\nRead a file.", "section");
             Contains(section, "read(args: {", "section");
-            Contains(section, "## github\nGitHub MCP server", "section");
-            // Tools before namespaces; a namespace's tools after its heading.
-            Check(section.IndexOf("### `read`", StringComparison.Ordinal) < section.IndexOf("## github", StringComparison.Ordinal), "tools first");
-            Check(section.IndexOf("## github", StringComparison.Ordinal) < section.IndexOf("### `mcp__github__list_issues`", StringComparison.Ordinal),
+            Contains(section, "## mcp__github\nGitHub MCP server", "section");
+            // Instructions only through describeNamespace().
+            Lacks(section, "owner/name", "section");
+            Check(section.IndexOf("### `read`", StringComparison.Ordinal) < section.IndexOf("## mcp__github", StringComparison.Ordinal), "tools first");
+            Check(section.IndexOf("## mcp__github", StringComparison.Ordinal) < section.IndexOf("### `list_issues`", StringComparison.Ordinal),
                 "a namespace's tools after its heading");
             Contains(section, "Promise<string>", "section");
         });
 
-        yield return Case(prefix + "lists-what-fits-the-budget-every-namespace-before-any-is-complete-and-says-what-is-left-out", () =>
+        yield return Case(prefix + "lists-what-fits-the-budget-every-namespace-before-any-is-complete-with-no-counts-in-headings", () =>
         {
-            var github = Enumerable.Range(0, 30).Select(index => Tool($"mcp__github__tool{index}", new string('x', 200))).ToList();
-            var section = CodemodeDescribe.Section([Tool("read", "Read a file."), .. github], [GitHub], 400)!;
+            var github = Enumerable.Range(0, 30).Select(index => Tool($"tool{index}", new string('x', 200))).ToList();
+            var read = Tool("read", "Read a file.");
+            var section = CodemodeDescribe.Section([read, .. github], [Ext("coding", [read]), Ext("github", github, GitHub)], 400)!;
             Contains(section, "### `read`", "section");
-            Contains(section, "## github (some tools not listed)", "section");
+            Contains(section, "Some tools are not listed: find them with `searchTools()`.", "section");
+            Contains(section, "## mcp__github\nGitHub MCP server", "section");
             Lacks(section, "tool29", "section");
-            Contains(CodemodeDescribe.Section([.. github], [GitHub], 10)!, "## github (tools not listed)", "tiny budget");
-            Equal<string?>(null, CodemodeDescribe.Section([], [GitHub], 3000), "no tools");
+            Lacks(section, "not listed)", "section");
         });
 
-        yield return Case(prefix + "uses-the-longest-matching-namespace-prefix", () =>
-        {
-            var section = CodemodeDescribe.Section([Tool("mcp__github__x", "x")], [new CodemodeNamespace("git", "mcp__git"), GitHub], 3000)!;
-            Contains(section, "## github", "section");
-            Lacks(section, "## git\n", "section");
-        });
-
-        yield return Case(prefix + "renders-the-section-from-the-conversation-s-callable-tools-into-the-system-prompt", async () =>
+        yield return Case(prefix + "renders-the-section-from-the-conversation-s-extensions-and-callable-tools-into-the-system-prompt", async () =>
         {
             var setup = Setup();
-            setup.Registry.Install(DurableCodemode.CreateExtension(new CodemodeToolOptions { Sandbox = new CodemodeSandbox(), Namespaces = [GitHub] }));
+            setup.Registry.Install(DurableCodemode.CreateExtension(new CodemodeToolOptions { Sandbox = new CodemodeSandbox() }));
+            setup.Registry.Install(Define.Extension(new Extension { Name = "tools", Tools = [Tool("read", "Read a file.")] }));
             setup.Registry.Install(Define.Extension(new Extension
             {
-                Name = "tools",
+                Name = "mcp:github",
+                Namespace = GitHub,
                 Tools =
                 [
-                    Tool("read", "Read a file."),
-                    Tool("mcp__github__list_issues", "List issues.", tool => tool with { Callers = [ToolCaller.Tools] }),
-                    Tool("mcp__github__get_issue", "Get an issue.", tool => tool with { Deferred = true }),
+                    Tool("list_issues", "List issues.", tool => tool with { Callers = [ToolCaller.Tools] }),
+                    Tool("get_issue", "Get an issue.", tool => tool with { Deferred = true }),
                 ],
             }));
             setup.Faux.SetResponses(FauxAssistantMessage("hi"));
@@ -107,9 +113,10 @@ internal static class CodemodeDescribeTests
             var system = (JsonObjectValue)(await AllEntries(root)).First(entry => entry.Kind == "pi.system").Model![0];
             var codemode = S(((JsonObjectValue)system["sections"])["codemode"]);
             Contains(codemode, "### `read`", "section");
-            Contains(codemode, "### `mcp__github__list_issues`", "section");
+            Contains(codemode, "## mcp__github\nGitHub MCP server", "section");
+            Contains(codemode, "### `list_issues`", "section");
             // Deferred tools are found with searchTools(), not listed.
-            Lacks(codemode, "mcp__github__get_issue", "section");
+            Lacks(codemode, "get_issue", "section");
             // The code mode tool itself is not callable from scripts.
             Lacks(codemode, "### `codemode`", "section");
             // The tool declaration carries the script grammar; pi-ai applies it only for models that support it.

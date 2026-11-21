@@ -1,7 +1,12 @@
-// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/src/tools/image-processor.ts
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/durable/src/tools/image-processor.ts
 // toBase64 is btoa over a binary string built 8 KiB at a time (v1.3.0: so a 3 MiB image no longer takes about 140 MB of V8 heap); .NET's
 // Convert.ToBase64String is the same standard base64, sized once, with no intermediate string.
+// Pi v1.6.0: imageLimits(model) is ImageLimits.Of (and CodingTools.ImageLimitsOf, the `/tools` export); preparedNotes is
+// ImageFormats.PreparedNotes; fromBase64 is ImageFormats.FromBase64, which decodes as `atob` does (the forgiving-base64 decode of the
+// HTML standard: ASCII whitespace is skipped and padding is optional) and throws a FormatException with atob's message for anything else,
+// where Convert.FromBase64String alone would refuse unpadded data that atob takes.
 using System.Collections.Frozen;
+using System.Globalization;
 
 namespace PiSharp.Durable.Tools;
 
@@ -13,6 +18,14 @@ public sealed record ImageLimits(int MaxWidth, int MaxHeight, int MaxBytes)
 {
     /// <summary>Upstream <c>DEFAULT_IMAGE_LIMITS</c>: 2000x2000 pixels and 4.5 MiB of base64.</summary>
     public static ImageLimits Default { get; } = new(2000, 2000, 4_718_592); // 4.5 * 1024 * 1024
+
+    /// <summary>The limits of images sent to <paramref name="model"/>: its <c>inputLimits.images.resize</c>, each absent one
+    /// <see cref="Default"/>'s (upstream <c>imageLimits</c>). Without a model, the defaults.</summary>
+    public static ImageLimits Of(DurableModel? model)
+    {
+        var resize = model?.InputLimits?.Images?.Resize;
+        return new ImageLimits(resize?.MaxWidth ?? Default.MaxWidth, resize?.MaxHeight ?? Default.MaxHeight, resize?.MaxBytes ?? Default.MaxBytes);
+    }
 }
 
 /// <summary>An image the model can take: a supported format, within the limits, as base64 (upstream <c>PreparedImage</c>).</summary>
@@ -54,6 +67,52 @@ internal static class ImageFormats
 
     /// <summary>Upstream <c>toBase64</c>: standard base64.</summary>
     public static string ToBase64(ReadOnlySpan<byte> bytes) => Convert.ToBase64String(bytes);
+
+    /// <summary>What preparing changed, for the model: the format, and the size with the factor that maps coordinates back (upstream
+    /// <c>preparedNotes</c>).</summary>
+    public static List<string> PreparedNotes(PreparedImage image)
+    {
+        var notes = new List<string>();
+        if (image.ConvertedFrom is { } convertedFrom) notes.Add($"Converted from {convertedFrom} to {image.MimeType}.");
+        if (image.Resized is { } resized)
+        {
+            var (from, to) = (resized.From, resized.To);
+            // toFixed(2).
+            var scale = ((double)from.Width / to.Width).ToString("F2", CultureInfo.InvariantCulture);
+            notes.Add($"Resized from {from.Width}x{from.Height} to {to.Width}x{to.Height}. Multiply coordinates by {scale} to map them to the original.");
+        }
+        return notes;
+    }
+
+    /// <summary>
+    /// Upstream <c>fromBase64</c>: the bytes of standard base64 <paramref name="data"/>, decoded as <c>atob</c> decodes. ASCII whitespace is
+    /// skipped, one or two trailing <c>=</c> are optional, and anything else that is not base64 (another character, padding in the middle, a
+    /// length of 1 modulo 4) throws a <see cref="FormatException"/> with atob's message.
+    /// </summary>
+    public static byte[] FromBase64(string data)
+    {
+        const string malformed = "The string to be decoded is not correctly encoded.";
+        var text = new System.Text.StringBuilder(data.Length);
+        foreach (var character in data)
+            if (character is not ('\t' or '\n' or '\f' or '\r' or ' ')) text.Append(character);
+        if (text.Length % 4 == 0)
+        {
+            if (text.Length > 0 && text[^1] == '=') text.Length--;
+            if (text.Length > 0 && text[^1] == '=') text.Length--;
+        }
+        if (text.Length % 4 == 1) throw new FormatException(malformed);
+        for (var index = 0; index < text.Length; index++)
+            if (!(char.IsAsciiLetterOrDigit(text[index]) || text[index] is '+' or '/')) throw new FormatException(malformed);
+        text.Append('=', (4 - text.Length % 4) % 4);
+        try
+        {
+            return Convert.FromBase64String(text.ToString());
+        }
+        catch (FormatException)
+        {
+            throw new FormatException(malformed);
+        }
+    }
 
     /// <summary>Upstream <c>base64Length</c>: the length of the base64 of <paramref name="byteLength"/> bytes.</summary>
     public static long Base64Length(long byteLength) => (byteLength + 2) / 3 * 4;

@@ -23,16 +23,17 @@ internal static class HighlightCases
     }
 
     // theme.ts highlightCode/buildCliHighlightTheme: keywords, strings and titles take their theme colors; an unknown language is
-    // not highlighted (mdCodeBlock), and a scope the theme does not map (hljs-section) keeps its text uncolored.
+    // not highlighted (mdCodeBlock). Pi 1.6.0 (#11092): text outside every scope, and a scope the theme does not map (hljs-section),
+    // take the theme's text color through the `default` formatter; before 1.6.0 they were left uncolored.
     private static void CliTheme()
     {
         var theme = Themes.Current;
         var lines = Themes.HighlightCode("const x = \"s\";", "typescript");
-        Equal(theme.Fg("syntaxKeyword", "const") + " x = " + theme.Fg("syntaxString", "\"s\"") + ";", lines.Single(), "typescript line");
+        Equal(theme.Fg("syntaxKeyword", "const") + theme.Fg("text", " x = ") + theme.Fg("syntaxString", "\"s\"") + theme.Fg("text", ";"), lines.Single(), "typescript line");
         Equal(theme.Fg("mdCodeBlock", "plain text"), Themes.HighlightCode("plain text", "not-a-language").Single(), "unknown language");
         Check(SyntaxHighlight.SupportsLanguage("ts") && SyntaxHighlight.SupportsLanguage("python"), "eager languages and aliases");
         SyntaxHighlight.LoadAllLanguages();
         Check(SyntaxHighlight.SupportsLanguage("yaml") && SyntaxHighlight.SupportsLanguage("dockerfile"), "all languages after loading");
-        Equal("# Title", SyntaxHighlight.Highlight("# Title", "markdown", theme), "unmapped section scope");
+        Equal(theme.Fg("text", "# Title"), SyntaxHighlight.Highlight("# Title", "markdown", theme), "unmapped section scope");
     }
 }

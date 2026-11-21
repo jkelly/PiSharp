@@ -6,6 +6,9 @@
         ToolStatus.Error => ("is-error", "<i class=\"bi bi-exclamation-circle\"></i>", "Error"),
         ToolStatus.Done => ("", "<i class=\"bi bi-check2\"></i>", "Done"),
         ToolStatus.Running => ("is-running", "<span class=\"spinner-border spinner-border-sm\" style=\"width:.8rem;height:.8rem;border-width:.12em\" aria-hidden=\"true\"></span>", "running"),
+        // Pi v1.6.0: a parked call holds no process; it runs again at its deadline, a signal, or the end of the tasks it waits for.
+        ToolStatus.Sleeping => ("", "<i class=\"bi bi-pause-fill\"></i>", "sleeping"),
+        ToolStatus.Waiting => ("", "<i class=\"bi bi-pause-fill\"></i>", "waiting"),
         _ => ("is-running", "<span class=\"status-dot waiting\"></span>", "pending"),
     };
     var args = call.Args as JsonObject;

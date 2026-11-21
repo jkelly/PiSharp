@@ -165,6 +165,9 @@ internal sealed class DeviceService(DurableDeviceHost host, DurableDeviceServerO
                     Phase = state["phase"] is JsonNode phase ? Transcript.Describe(phase) : null,
                     On = state["on"] is JsonArray on ? [.. on.Select(item => (long)item!.GetValue<double>())] : null,
                     Policy = state["policy"] is JsonNode policy ? Transcript.Describe(policy) : null,
+                    // Pi v1.6.0: a sleep may wait for signals, with or without a deadline.
+                    Until = node.State.Until,
+                    Signals = node.State.Signals is { } signals ? [.. signals.Select(key => new TaskSignalKey(key.Signal, key.Key))] : null,
                 },
                 Conversations = [.. node.Conversations.Select(id => id.Value)],
                 Label = label,

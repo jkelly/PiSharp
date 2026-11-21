@@ -5,7 +5,7 @@ using PiSharp.Durable.Examples;
 Console.OutputEncoding = Encoding.UTF8;
 
 // Usage: Durable.Examples [--storage memory|jsonl|sqlite] [--dir <directory>] [example ...]
-// Examples are named by number (00-34, Pi v1.5.0's names) or file name (00-conversation). File storage goes under --dir, or a fresh temporary directory.
+// Examples are named by number (00-34 and 38-47, Pi v1.6.0's names) or file name (00-conversation). File storage goes under --dir, or a fresh temporary directory.
 var storage = ExampleStorage.Memory;
 string? root = null;
 var only = new List<string>();

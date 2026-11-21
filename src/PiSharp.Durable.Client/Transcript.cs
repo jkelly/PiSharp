@@ -20,6 +20,10 @@ public enum ToolStatus
     Done,
     /// <summary>Finished with an error result.</summary>
     Error,
+    /// <summary>Parked until a time or a signal (Pi v1.6.0): at its gates before it ran, or by the tool itself. It holds no process.</summary>
+    Sleeping,
+    /// <summary>Parked until tasks it started end (Pi v1.6.0). It holds no process.</summary>
+    Waiting,
 }
 
 /// <summary>An image as a data URL's parts.</summary>
@@ -113,7 +117,7 @@ public sealed record EventItem(long Id, string EntryKind, string Text, string? N
 public sealed record LiveTool
 {
     public required string Name { get; init; }
-    /// <summary><c>pending</c>, <c>running</c> or <c>done</c>.</summary>
+    /// <summary><c>pending</c>, <c>running</c>, <c>sleeping</c> or <c>waiting</c> (a parked call, Pi v1.6.0), or <c>done</c>.</summary>
     public string Status { get; init; } = "running";
     public string Output { get; init; } = "";
     public JsonNode? Args { get; init; }
@@ -170,7 +174,7 @@ public static class Transcript
                     CallId = id,
                     Name = tool.Name,
                     Args = tool.Args,
-                    Status = tool.Status == "done" ? tool.IsError ? ToolStatus.Error : ToolStatus.Done : tool.Status == "running" ? ToolStatus.Running : ToolStatus.Pending,
+                    Status = tool.Status == "done" ? tool.IsError ? ToolStatus.Error : ToolStatus.Done : LiveStatus(tool.Status),
                     Output = tool.Output.Length > 0 ? tool.Output : null,
                     Result = tool.Result,
                     Nested = NestedOf(id, depth + 1),
@@ -197,7 +201,7 @@ public static class Transcript
                 CallId = id,
                 Name = name,
                 Args = args ?? running?.Args,
-                Status = running?.Status == "running" ? ToolStatus.Running : ToolStatus.Pending,
+                Status = LiveStatus(running?.Status),
                 Output = running is { Output.Length: > 0 } ? running.Output : null,
                 Nested = NestedOf(id, 0),
             };
@@ -414,13 +418,24 @@ public static class Transcript
         return json;
     }
 
-    /// <summary><c>pending</c>, <c>running</c>, <c>done</c> or <c>error</c>.</summary>
+    /// <summary><c>pending</c>, <c>running</c>, <c>sleeping</c>, <c>waiting</c>, <c>done</c> or <c>error</c>.</summary>
     public static string StatusText(ToolStatus status) => status switch
     {
         ToolStatus.Running => "running",
+        ToolStatus.Sleeping => "sleeping",
+        ToolStatus.Waiting => "waiting",
         ToolStatus.Done => "done",
         ToolStatus.Error => "error",
         _ => "pending",
+    };
+
+    /// <summary>The status of a call that has not ended, from its slot's: running, parked (<c>sleeping</c>, <c>waiting</c>), or pending.</summary>
+    public static ToolStatus LiveStatus(string? slotStatus) => slotStatus switch
+    {
+        "running" => ToolStatus.Running,
+        "sleeping" => ToolStatus.Sleeping,
+        "waiting" => ToolStatus.Waiting,
+        _ => ToolStatus.Pending,
     };
 
     /// <summary>Totals over a usage state's models.</summary>

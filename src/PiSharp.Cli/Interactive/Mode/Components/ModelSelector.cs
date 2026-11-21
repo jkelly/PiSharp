@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): coding-agent/src/modes/interactive/components/model-selector.ts.
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): coding-agent/src/modes/interactive/components/model-selector.ts.
 // Also coding-agent/src/modes/interactive/model-catalog-refresh.ts (refreshModelCatalogs) and modelsAreEqual from ai/src/models.ts.
 using System.Globalization;
 using System.Runtime.CompilerServices;
@@ -535,11 +535,13 @@ internal sealed class ModelSelectorComponent : Container, IComponent, IFocusable
                 onSelectAsDefaultCallback(selectedModel.Model);
             }
         }
-        // Pass everything else to search input
+        // Pass everything else to search input. Cursor keys leave the query as it is and must not move the selection.
         else
         {
+            var previousQuery = searchInput.GetValue();
             searchInput.HandleInput(keyData);
-            FilterModels(searchInput.GetValue());
+            var query = searchInput.GetValue();
+            if (query != previousQuery) FilterModels(query);
         }
     }
 

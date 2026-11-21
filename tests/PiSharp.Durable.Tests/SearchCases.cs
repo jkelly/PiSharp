@@ -179,15 +179,25 @@ internal static class SearchTests
 
         yield return Case("search.code-mode.search-tools-searches-namespace-instructions-and-ranks-a-named-tool-first", async () =>
         {
-            var chat = new CodemodeTests.Chat([],
-            [
-                new CodemodeNamespace("github", "mcp__github__") { Description = "GitHub repositories", Instructions = "Use owner/repo for repositories." },
-                new CodemodeNamespace("app", "mcp__app__") { Description = "Thread and queue state of the app" },
-            ]);
-            AddTool(chat.Setup.Registry, Described("mcp__github__list_issues", "List issues in a repository."));
-            AddTool(chat.Setup.Registry, Described("mcp__app__queue_read", "Read a queued message of this thread."));
-            AddTool(chat.Setup.Registry, Described("mcp__app__thread_read", "Read durable state and a paginated timeline from any thread. The default " +
-                "view returns user messages, assistant messages and plans. Continue with afterPosition until hasMore is false."));
+            // Pi v1.6.0: a namespace is its extension's (Extension.Namespace), whatever its tools are named.
+            var chat = new CodemodeTests.Chat();
+            chat.Setup.Registry.Install(Define.Extension(new Extension
+            {
+                Name = "mcp:github",
+                Namespace = new ToolNamespace("github", "GitHub repositories", "Use owner/repo for repositories."),
+                Tools = [Described("mcp__github__list_issues", "List issues in a repository.")],
+            }));
+            chat.Setup.Registry.Install(Define.Extension(new Extension
+            {
+                Name = "mcp:app",
+                Namespace = new ToolNamespace("app", "Thread and queue state of the app"),
+                Tools =
+                [
+                    Described("mcp__app__queue_read", "Read a queued message of this thread."),
+                    Described("mcp__app__thread_read", "Read durable state and a paginated timeline from any thread. The default " +
+                        "view returns user messages, assistant messages and plans. Continue with afterPosition until hasMore is false."),
+                ],
+            }));
             var ran = await CodemodeTests.RunScript("""
                 const names = async (query, options) => (await searchTools(query, options)).map((tool) => tool.name);
                 				return {

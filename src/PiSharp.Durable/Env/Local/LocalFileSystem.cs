@@ -1,4 +1,4 @@
-// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/src/env/node.ts (the FileSystem half of NodeExecutionEnv: path
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/durable/src/env/node.ts (the FileSystem half of NodeExecutionEnv: path
 // resolution, error mapping, the text-line, binary and directory readers, line scans, watches, temporary files and every file operation;
 // the watcher itself is LocalFileWatcher, node-watch.ts). The Shell half is LocalExecutionEnv in the durable tools project, which builds on
 // this class. NodeExecutionEnv has no `listFiles`; this class implements the optional method as pi-env's LocalExecutionEnv does, with its
@@ -11,6 +11,10 @@
 // MOVEFILE_REPLACE_EXISTING on Windows, rename(2) on Unix); transient sharing violations on Windows are retried briefly. Upstream opens a
 // binary reader with O_NONBLOCK (and O_NOFOLLOW) so a FIFO is refused without waiting for a writer; .NET has no non-blocking open, so the
 // file's type (NativeFiles) is checked before opening, which is not race-free, as upstream's own Windows check is not.
+//
+// Pi v1.6.0 (#11994): ListDirAsync leaves out an entry removed between enumeration and its stat instead of failing the listing, as the
+// directory reader already did. A name that is not valid UTF-8 is left out the same way: the enumeration decodes it with replacement
+// characters, so its stat reports it missing, as upstream's lstat does. StatListed is the seam upstream's test mocks `lstat` through.
 using System.Collections.Immutable;
 using System.Text;
 using System.IO.Enumeration;
@@ -216,12 +220,17 @@ public class LocalFileSystem : IFileSystem
             foreach (var entry in Directory.EnumerateFileSystemEntries(resolved))
             {
                 if (context.IsCancellationRequested) return Aborted(resolved);
-                var info = Stat(entry);
+                var info = StatListed(entry);
+                // Removed between enumeration and stat: not part of the listing any more.
                 if (info.IsOk) infos.Add(info.Value);
-                else if (info.Error.Code != FileErrorCode.Invalid) return info.Error;
+                else if (info.Error.Code is not (FileErrorCode.NotFound or FileErrorCode.Invalid)) return info.Error;
             }
             return infos.ToImmutable();
         });
+
+    /// <summary>The stat of one entry <see cref="ListDirAsync"/> enumerated (upstream's <c>lstat</c> in <c>listDir</c>); a test overrides it to
+    /// change the directory between the enumeration and the stat, as another process would.</summary>
+    internal virtual Result<FileMetadata, FileError> StatListed(string entry) => Stat(entry);
 
     /// <inheritdoc/>
     /// <remarks>Lists in process with the semantics of pi-env's daemon, which upstream's local environment lists through (LocalFileListing);

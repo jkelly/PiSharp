@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): coding-agent/src/modes/interactive/interactive-mode.ts (subscribeToAgent,
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): coding-agent/src/modes/interactive/interactive-mode.ts (subscribeToAgent,
 // handleEvent, addMessageToChat, renderSessionItems, renderSessionEntries, renderInitialMessages, cache and compaction notices,
 // showStatusIndicator/clearStatusIndicator, pending messages and the compaction queue).
 using System.Globalization;
@@ -433,6 +433,9 @@ internal sealed partial class InteractiveMode
         UpdateAvailableProviderCount();
         UpdateEditorBorderColor();
         UpdateTerminalTitle();
+        // setRebindSession: what the replacement's runtime found (settings errors, model scope warnings, a model that could not be
+        // restored) goes in the chat once the mode is bound to the new session (#11264).
+        ShowRuntimeDiagnostics(context.TakeUnreportedRuntimeDiagnostics());
         footer.Invalidate();
         ui.RequestRender();
         renderedGeneration = Math.Max(renderedGeneration, state.Generation);
@@ -683,39 +686,70 @@ internal sealed partial class InteractiveMode
         chatContainer.AddChild(new ThemedText(() => theme.Fg("warning", $"{label}: {FooterComponent.FormatTokens(tokens)} tokens billed{cost}"), 1, 0));
     }
 
-    private static int CountDroppedThinkingBlocks(JsonObject message)
+    /// <summary>Source ReasoningDropDiagnostic: the transformation <c>type</c> of a withheld block and its singular and plural name.</summary>
+    internal sealed record ReasoningDropDiagnostic(string Provider, string DroppedType, string Singular, string Plural);
+
+    /// <summary>Source REASONING_DROP_DIAGNOSTICS: assistant diagnostics that list reasoning a provider withheld from the model, by
+    /// diagnostic type.</summary>
+    private static readonly Dictionary<string, ReasoningDropDiagnostic> ReasoningDropDiagnostics = new(StringComparer.Ordinal)
     {
-        var count = 0;
-        if (message["diagnostics"] is not JsonArray diagnostics) return 0;
+        ["anthropic_input_transformations"] = new("Anthropic", "thinking_dropped", "thinking block", "thinking blocks"),
+        ["openai_input_transformations"] = new("OpenAI", "reasoning", "reasoning item", "reasoning items"),
+    };
+
+    /// <summary>Source DroppedReasoning.</summary>
+    internal sealed record DroppedReasoning(ReasoningDropDiagnostic Diagnostic, int Count, IReadOnlyList<string> Reasons);
+
+    /// <summary>Source getDroppedReasoning: counts the reasoning blocks a provider reported as withheld from the request that
+    /// produced <paramref name="message"/>.</summary>
+    internal static DroppedReasoning? GetDroppedReasoning(JsonObject message)
+    {
+        if (message["diagnostics"] is not JsonArray diagnostics) return null;
         foreach (var diagnostic in diagnostics.OfType<JsonObject>())
         {
-            if (S(diagnostic["type"]) != "anthropic_input_transformations") continue;
-            if (diagnostic["details"]?["transformations"] is not JsonArray transformations) continue;
-            count += transformations.OfType<JsonObject>().Count(transformation => S(transformation["type"]) == "thinking_dropped");
+            if (S(diagnostic["type"]) is not { } type || !ReasoningDropDiagnostics.TryGetValue(type, out var kind)) continue;
+            // Session data: diagnostics details are untyped JSON.
+            if (diagnostic["details"] is not JsonObject details || details["transformations"] is not JsonArray transformations) continue;
+            var dropped = transformations.OfType<JsonObject>().Where(transformation => S(transformation["type"]) == kind.DroppedType).ToList();
+            if (dropped.Count == 0) continue;
+            // A JavaScript Set keeps insertion order.
+            var reasons = new List<string>();
+            foreach (var transformation in dropped)
+                if (S(transformation["reason"]) is { } reason && !reasons.Contains(reason)) reasons.Add(reason);
+            return new(kind, dropped.Count, reasons);
         }
-        return count;
+        return null;
+    }
+
+    /// <summary>The notice for <paramref name="message"/>, or null when it reports no new losses compared with the branch's last
+    /// assistant message.</summary>
+    internal static string? ReasoningDropNotice(JsonObject message, IReadOnlyList<JsonObject> branch)
+    {
+        if (GetDroppedReasoning(message) is not { } dropped) return null;
+        // Providers report a withheld block again on every later request that replays it, so only a count above the previous
+        // response's means new losses. message_end reaches the UI before the current message is persisted, so the branch's last
+        // assistant message is the previous response.
+        for (var i = branch.Count - 1; i >= 0; i--)
+        {
+            var entry = branch[i];
+            if (SessionEntries.Type(entry) == "message" && entry["message"] is JsonObject previousMessage && S(previousMessage["role"]) == "assistant")
+            {
+                if (GetDroppedReasoning(previousMessage) is { } previous && ReferenceEquals(previous.Diagnostic, dropped.Diagnostic) &&
+                    dropped.Count <= previous.Count) return null;
+                break;
+            }
+        }
+        var noun = dropped.Count == 1 ? dropped.Diagnostic.Singular : dropped.Diagnostic.Plural;
+        var reasons = dropped.Reasons.Count > 0 ? $": {string.Join(", ", dropped.Reasons)}" : "";
+        return $"{dropped.Diagnostic.Provider} dropped {dropped.Count.ToString(CultureInfo.InvariantCulture)} {noun}{reasons} (details in session)";
     }
 
     private void MaybeShowThinkingDropNotice(JsonObject message)
     {
         if (!settings.ShowCacheMissNotices) return;
-        var droppedCount = CountDroppedThinkingBlocks(message);
-        if (droppedCount == 0) return;
-        var previousDroppedCount = 0;
-        var branch = SessionEntries.BuildSessionPath(state.Entries, state.LeafId);
-        for (var i = branch.Count - 1; i >= 0; i--)
-        {
-            var entry = branch[i];
-            if (SessionEntries.Type(entry) == "message" && entry["message"] is JsonObject previous && S(previous["role"]) == "assistant")
-            {
-                previousDroppedCount = CountDroppedThinkingBlocks(previous);
-                break;
-            }
-        }
-        if (droppedCount <= previousDroppedCount) return;
-        var noun = droppedCount == 1 ? "thinking block" : "thinking blocks";
+        if (ReasoningDropNotice(message, SessionEntries.BuildSessionPath(state.Entries, state.LeafId)) is not { } notice) return;
         chatContainer.AddChild(new Spacer(1));
-        chatContainer.AddChild(new ThemedText(() => theme.Fg("warning", $"Anthropic dropped {droppedCount} {noun} (details in session)"), 1, 0));
+        chatContainer.AddChild(new ThemedText(() => theme.Fg("warning", notice), 1, 0));
     }
 
     private void MaybeShowCacheMissNotice(JsonObject message)

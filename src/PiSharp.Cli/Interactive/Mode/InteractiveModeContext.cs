@@ -64,6 +64,9 @@ internal sealed record InteractiveModeContext
     public Func<Task<IReadOnlyList<string>>> CheckForPackageUpdates { get; init; } = () => Task.FromResult<IReadOnlyList<string>>([]);
     public Func<string, IReadOnlyList<string>, TimeSpan, Task<ProcessResult>> RunProcess { get; init; } = DefaultRunProcess;
     public Func<CrashNoticeInfo?> TakeUnnotifiedCrash { get; init; } = () => null;
+    /// <summary>Pi faac585884ae2c013a6b1400f3e9e77f10b34bac agent-session-runtime.ts takeUnreportedDiagnostics: the current session
+    /// runtime's diagnostics (type "error", "warning" or "info") that no mode reported yet, each returned once.</summary>
+    public Func<IReadOnlyList<(string Type, string Message)>> TakeUnreportedRuntimeDiagnostics { get; init; } = () => [];
     public Func<string, object?, string?, string, bool> RecordCrashImpl { get; init; } = (_, _, _, _) => false;
     public Func<InstallChange?> DetectInstallChange { get; init; } = () => null;
     public Func<string, bool> HasTrustRequiringProjectResources { get; init; } = _ => false;

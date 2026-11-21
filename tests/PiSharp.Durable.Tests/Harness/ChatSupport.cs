@@ -325,7 +325,11 @@ internal sealed record FauxOptions
 }
 
 /// <summary>One faux model (upstream <c>FauxModelDefinition</c>): context window default 128000, output limit default 16384.</summary>
-internal sealed record FauxModelOptions(string Id, double? ContextWindow = null, double? MaxTokens = null);
+internal sealed record FauxModelOptions(string Id, double? ContextWindow = null, double? MaxTokens = null)
+{
+    /// <summary>The model's <c>inputLimits</c> (Pi v1.6.0's images-fit.test.ts gives its faux model image limits).</summary>
+    public DurableModelInputLimits? InputLimits { get; init; }
+}
 
 /// <summary>What a response factory sees: the request (upstream's factory arguments).</summary>
 internal sealed record FauxRequest(ImmutableArray<JsonValue> Messages, DurableStreamOptions? Options, CancellationToken Signal, FauxState State,
@@ -384,7 +388,7 @@ internal sealed class FauxModels : IDurableModels
         {
             Id = definition.Id, Name = definition.Id == "faux-1" && this.options.Models is null ? "Faux Model" : definition.Id, Api = Api,
             Provider = Provider, BaseUrl = "http://localhost:0", Reasoning = false, Input = ["text", "image"],
-            ContextWindow = definition.ContextWindow ?? 128000, MaxTokens = definition.MaxTokens ?? 16384,
+            ContextWindow = definition.ContextWindow ?? 128000, MaxTokens = definition.MaxTokens ?? 16384, InputLimits = definition.InputLimits,
         })];
         Model = Models[0];
     }

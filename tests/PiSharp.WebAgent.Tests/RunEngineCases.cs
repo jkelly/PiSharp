@@ -295,15 +295,29 @@ internal static partial class Program
                 Equal(free, plan.Patch?["tool_choice"]?["type"]?.GetValue<string>(), $"{free} while thinking is sent");
             }
 
-            // Codex takes no output cap: max tokens is refused (never reported as applied), and the guard is told it cannot cap it.
+            // Pi 1.6.0: Codex takes the output cap (PiSharp.AI's Codex transport sends max_output_tokens), so max tokens is sent and the guard
+            // may cap its output. Before, the transport sent none and max tokens was refused here. Two limits remain, the transport's own: a
+            // cap below 16 would be raised to 16, and a model whose compat turns max_output_tokens off gets none.
             var codex = Model("openai-codex", "gpt-codex-test", "openai-codex-responses");
             var codexPlan = Plan(codex, new RunSpec { MaxTokens = 1000 });
-            Check(Refused(codexPlan, RunModelOptions.MaxTokens).Reason!.Contains("Codex", StringComparison.Ordinal) && !codexPlan.Applied.Contains(RunModelOptions.MaxTokens),
-                "max tokens on Codex is refused: " + codexPlan.RefusalMessage);
+            Check(codexPlan.Allowed && codexPlan.Applied.Contains(RunModelOptions.MaxTokens), "max tokens on Codex is sent: " + codexPlan.RefusalMessage);
             var codexCaps = RunModelOptions.Capabilities(codex, null).Find(RunModelOptions.MaxTokens)!;
-            Check(!codexCaps.Supported && codexCaps.WithThinking == false, "the Playground shows it unsupported");
-            Check(RunModelOptions.OutputCapRefusal(codex, null, 500) is not null, "the Spend Guard's cap the output would not hold either");
+            Check(codexCaps.Supported && codexCaps.WithThinking != false, "the Playground shows it supported");
+            Check(RunModelOptions.OutputCapRefusal(codex, null, 500) is null, "the Spend Guard's cap the output holds");
+            Check(RunModelOptions.OutputCapRefusal(codex, "high", 500) is null, "with thinking too: the cap is the whole output on the Responses shape");
             Check(Plan(codex, new RunSpec()).Allowed, "a Codex run without max tokens is sent");
+            var low = Plan(codex, new RunSpec { MaxTokens = 15 });
+            Check(Refused(low, RunModelOptions.MaxTokens).Reason!.Contains("at least 16", StringComparison.Ordinal) && !low.Applied.Contains(RunModelOptions.MaxTokens),
+                "a cap the transport would raise to 16 is refused: " + low.RefusalMessage);
+            Check(Plan(codex, new RunSpec { MaxTokens = 16 }).Allowed, "16 is the least cap sent as it is");
+            Check(RunModelOptions.OutputCapRefusal(codex, null, 15) is not null, "the guard is told a cap below 16 would not hold");
+            var uncapped = codex with { Wire = (ChordObject)ChordJson.Parse("""{"compat":{"supportsMaxOutputTokens":false}}""") };
+            var uncappedPlan = Plan(uncapped, new RunSpec { MaxTokens = 1000 });
+            Check(Refused(uncappedPlan, RunModelOptions.MaxTokens).Reason!.Contains("supportsMaxOutputTokens", StringComparison.Ordinal) &&
+                !uncappedPlan.Applied.Contains(RunModelOptions.MaxTokens), "a model whose compat takes no output cap still refuses it: " + uncappedPlan.RefusalMessage);
+            var uncappedCaps = RunModelOptions.Capabilities(uncapped, null).Find(RunModelOptions.MaxTokens)!;
+            Check(!uncappedCaps.Supported && uncappedCaps.WithThinking == false, "and the Playground shows it unsupported");
+            Check(RunModelOptions.OutputCapRefusal(uncapped, null, 500) is not null, "nor can the guard cap it");
 
             // Anthropic budget thinking: max tokens is the whole output; adaptive models keep the cap as it is.
             var budget = Plan(claude, new RunSpec { Thinking = "medium", MaxTokens = 20_000 });
@@ -608,6 +622,20 @@ internal static partial class Program
             var refused = await ThrowsAsync<RunOptionException>(() => host.Engine.StartAsync(spec with { ServiceTier = "scale" }), "scale on Codex");
             Check(refused.Message.Contains("Codex backend takes auto, default, flex, priority", StringComparison.Ordinal), "named: " + refused.Message);
             Equal(count, host.Provider.Requests.Count, "nothing was sent for it");
+
+            // Pi 1.6.0: Codex takes the output cap. The run's max tokens goes on the wire as max_output_tokens (PiSharp.AI's Codex transport,
+            // through the router's capped route), with the rest of the request as before.
+            var capped = await host.Engine.StartAsync(spec with { MaxTokens = 1000, Messages = [new RunMessage { Text = "codex capped run" }] });
+            Check(capped.Posted, "a capped Codex run is posted: " + capped.Refusal?.Message);
+            var cappedRun = await RunsFinishedAsync(host.Store, capped.Id!);
+            Equal(RunStatus.Completed, cappedRun.Status, "completed: " + cappedRun.Error + " " + cappedRun.Notes);
+            var cappedBody = JsonNode.Parse(host.Provider.Requests.Single(request => request.Body?.Contains("codex capped run", StringComparison.Ordinal) == true).Body!)!;
+            Equal(1000, cappedBody["max_output_tokens"]?.GetValue<int>(), "the cap is the body's max_output_tokens");
+            Equal(("priority", "run-session-1"), (cappedBody["service_tier"]?.GetValue<string>(), cappedBody["prompt_cache_key"]?.GetValue<string>()),
+                "the capped request keeps its tier and its prompt cache key");
+            Check(cappedRun.Options?["applied"]?.AsArray().Select(item => item!.GetValue<string>()).Contains(RunModelOptions.MaxTokens) == true,
+                "History records max tokens as applied");
+            Check(body["max_output_tokens"]?.GetValue<int>() != 1000, "the uncapped run was sent with the model's own limit");
         }),
     ];
 
