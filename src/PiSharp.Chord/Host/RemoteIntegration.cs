@@ -43,7 +43,7 @@ public sealed partial class ChordHost
             if (contract.Kind != ContractKind.Remote) return false;
             var address = ContractsInternal.DataOf(contract).HostAddress!(binding.Parameters.Value);
             if (address.Equals(Address)) return false;
-            var path = PathOf(new WireAddress(address.Kind, address.Params), binding.Caller, null);
+            var path = PathOf(new WireAddress(address.Kind, address.Params), binding.Caller, null, binding.AcquisitionContext);
             if (path is null) return false;
             BindOver(binding, path, address);
             return true;
@@ -149,9 +149,9 @@ public sealed partial class ChordHost
         if (nextRelay == MessageCheck.MaxSafeInteger) throw new InvalidOperationException("Relay origins exhausted");
         var id = ++nextRelay; Relays.Add(id, provider); return id;
     }
-    internal RemotePath? PathOf(WireAddress address, Caller caller, HostLink? arriving)
+    internal RemotePath? PathOf(WireAddress address, Caller caller, HostLink? arriving, ChordContext? holding = null)
     {
-        if (remoteRoutes.TryGetValue(address.Kind, out var route)) return route.Path(address.Params, caller.Principal);
+        if (remoteRoutes.TryGetValue(address.Kind, out var route)) return route.Path(address.Params, caller.Principal, holding);
         // A hold arriving from the parent never returns to it; route links can forward to a different parent.
         if (arriving is null) return parentPath;
         return arriving.Role != LinkRole.Parent && parentPath.Linked ? parentPath : null;

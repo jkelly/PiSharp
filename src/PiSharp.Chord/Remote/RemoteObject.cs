@@ -4,7 +4,9 @@
 // last bound variant (kept while its link is down), the nodes its events arrive at (decision "Events: fire-and-forget members"), its
 // bindings (each reference's own release, calls and seen members), its hold on the path's current link and calls through it: its hold in
 // a chord.hold span until bound (shared work: a root on the host's adapter), each call in a chord.call span, their carriers on the wire.
-// The admission paths of 1.6.0 (withheld, admitted, a denial dropping its replicas) are chord-admission's; QueryMember is chord-queries'.
+// Admission (slice 14 §2.2, §2.3): `failed` with a denied cause drops its replicas (no value of it stays readable here) and its members
+// are followed as `denied`; a route's admission may hold it back (Withheld: released at its provider, failed with the cause) and admit it
+// again (Admitted: loading until its next binding). QueryMember is chord-queries'.
 using System.Text.Json.Nodes;
 using PiSharp.Chord.Contracts;
 using PiSharp.Chord.Data;
@@ -13,6 +15,7 @@ using PiSharp.Chord.Host;
 using PiSharp.Chord.Link;
 using PiSharp.Telemetry;
 using StateEntry = PiSharp.Chord.Link.StateEntry;
+using DataFailure = PiSharp.Chord.Data.FailureCause;
 
 namespace PiSharp.Chord.Remote;
 
@@ -46,7 +49,7 @@ internal sealed class RemoteObject : ITarget, IUpstream
     private IReadOnlyDictionary<string, string>? firstHold;
     private int holds;
     public ITelemetrySpan? Span => holding?.Span;
-    internal Caller Caller { get; }
+    public Caller Caller { get; }
     internal HoldMessage Request { get; }
     internal IReadOnlyList<string>? ActivationChain => dependent?.ActivationChain();
     public string Label { get; }
@@ -126,6 +129,19 @@ internal sealed class RemoteObject : ITarget, IUpstream
     public void Attach(HostLink link) { if (State.Kind != "ended") hold = (link.Consumer, link.Consumer.Attach(this, HoldTrace())); }
     public void Dropped(ChordError error) { hold = null; Loading(); }
     public void Unreachable(ChordError error) { Held("failed", error); LastFailure = error; Move(RefState.Failed(new(FailureKind.Waiting, error))); }
+    /// <summary>Its route's admission holds it back with <paramref name="cause"/> (slice 14 §2.3): released at its provider when it is held
+    /// there (its calls reject, <c>forbidden/revoked</c> for a denial), and <c>failed</c> with the cause; a denial drops its replicas. It
+    /// stays on its path: an allow holds it again.</summary>
+    public void Withheld(DataFailure cause)
+    {
+        var current = hold; hold = null;
+        current?.Side.Release(current.Value.Id, AdmissionInternal.Cut(Label, cause));
+        LastFailure = cause.Error; Held("failed", cause.Error);
+        if (cause.Kind == FailureKind.Denied) bound = null;
+        Move(RefState.Failed(cause));
+    }
+    /// <summary>Its route's admission allows it: loading (again, after what held it back) until its next binding.</summary>
+    public void Admitted() => Loading();
     public Task<object?> CallAsync(string method, object? args, IHolder holder, ChordContext context)
     {
         if (State.Kind != "live" || bound is null || hold is null) return Task.FromException<object?>(HostErrors.NotReady(Label));
@@ -153,6 +169,8 @@ internal sealed class RemoteObject : ITarget, IUpstream
         bound?.Replicas.TryGetValue(member, out replica);
         if (State.Kind == "live") return replica is null || !bound!.Data.State.ContainsKey(member)
             ? new("lacking", Error: HostErrors.InvalidMember(member)) : new("live", replica, bound);
+        // A denial keeps no value (slice 14 §2.2).
+        if (State.Cause is { Kind: FailureKind.Denied } denied) return new("denied", Error: denied.Error);
         return State.Kind == "failed" ? new("failed", Instance: bound, Error: State.Cause!.Error, Last: replica)
             : new("loading", Instance: bound, Last: replica);
     }
@@ -280,6 +298,8 @@ internal sealed class RemoteObject : ITarget, IUpstream
         var error = DataInternal.AsChordError(message.Cause.Error.ToException(), Label); LastFailure = error;
         Held("failed", error);
         var kind = Enum.Parse<FailureKind>(message.Cause.Kind, true);
+        // An admission refused this hold's caller (slice 14 §2.2): its replicas are dropped, no value of it stays readable here.
+        if (kind == FailureKind.Denied) bound = null;
         Move(RefState.Failed(new(kind, error), message.RetryIn is { } retry ? host.Options.TimeProvider.GetUtcNow().ToUnixTimeMilliseconds() + retry : null));
     }
     internal void Loading() { if (State.Kind is not ("ended" or "loading")) Move(RefState.Loading); }

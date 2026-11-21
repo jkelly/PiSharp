@@ -1,10 +1,13 @@
 // Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/chord/src/remote/relay.ts.
 // 1.6.0: a relayed call waits in its upstream link's call window for its origin (decision "Call windows only for untrusted links": a relay
-// honours each upstream window) and is forwarded as a slot frees.
+// honours each upstream window) and is forwarded as a slot frees. A route's admission may hold a relayed hold back (slice 14 §2.3):
+// released upstream, its calls rejected (forbidden/revoked for a denial), told failed with the cause, and held again, under its id, by
+// the next allow.
 using PiSharp.Chord.Data;
 using PiSharp.Chord.Host;
 using PiSharp.Chord.Link;
 using PiSharp.Telemetry;
+using DataFailure = PiSharp.Chord.Data.FailureCause;
 
 namespace PiSharp.Chord.Remote;
 
@@ -58,6 +61,8 @@ internal sealed class RelayedHold(ProviderSide downstream, HoldMessage request, 
     private OpenSpan? relaying;
     private IReadOnlyDictionary<string, string>? firstTrace;
     private int holds;
+    // What its downstream was told holds it back (Withheld), until it is told that it is admitted again.
+    private DataFailure? heldBack;
     public ITelemetrySpan? Span => relaying?.Span;
     public long Id => request.Hold;
     public Caller Caller => caller;
@@ -85,15 +90,38 @@ internal sealed class RelayedHold(ProviderSide downstream, HoldMessage request, 
     public void Dropped(ChordError error) { var previous = upstream; upstream = null; if (previous is not null) downstream.UpstreamDropped(this, error); }
     public void Unreachable(ChordError error)
     { Relayed("error", error); downstream.Send(new FailedMessage(Id, new("waiting", WireError.FromException(error)))); }
+    /// <summary>Its route's admission holds it back with <paramref name="cause"/> (slice 14 §2.3): released upstream when it is held there
+    /// (what still arrives for it from that link is dropped: a link answers only for what is relayed over it); downstream its calls, in
+    /// flight and waiting, are rejected and it is told <c>failed</c> with the cause. It stays on its path: an allow holds it again, under
+    /// its id.</summary>
+    public void Withheld(DataFailure cause)
+    {
+        var link = upstream; upstream = null;
+        link?.Send(new ReleaseMessage(Id) { Origin = origin });
+        Relayed("error", cause.Error);
+        heldBack = cause;
+        downstream.Withheld(this, cause);
+    }
+    /// <summary>Its route's admission allows it: a hold that was told what held it back is <c>loading</c> downstream from here on, through
+    /// the fence and its host's start, until its next <c>bound</c>. A hold never told anything is loading already.</summary>
+    public void Admitted()
+    {
+        if (heldBack is null) return;
+        heldBack = null;
+        downstream.Send(new LoadingMessage(Id));
+    }
     /// <summary>A call from downstream (registered there under its id): it waits in its upstream link's window for this origin and is
     /// forwarded (<see cref="Call"/>) as a slot frees, at once when one is free and nothing waits; its reply comes back by the origin.
-    /// Without an upstream link it is answered <c>unavailable</c> at once (it crossed the <c>loading</c> notice).</summary>
+    /// Without an upstream link it is answered at once: <c>unavailable</c> (it crossed the <c>loading</c> notice), or, held back by its
+    /// route's admission, what held it back (it crossed that <c>failed</c>: <c>forbidden/revoked</c> for a denial, access withdrawn under
+    /// a call already made).</summary>
     internal void Submit(RelayedCall call)
     {
         if (upstream is not { } link)
         {
             var id = call.Message.Call;
-            downstream.Reply(id, new ErrorMessage(id, WireError.FromException(new ChordError("unavailable", "the upstream link is down"))));
+            var unreached = heldBack is { } cause ? AdmissionInternal.Cut($"hold {Id}", cause) : new ChordError("unavailable", "the upstream link is down");
+            downstream.Reply(id, new ErrorMessage(id, WireError.FromException(unreached)));
             return;
         }
         call.Queue(link.Consumer.RelayWindow(origin));

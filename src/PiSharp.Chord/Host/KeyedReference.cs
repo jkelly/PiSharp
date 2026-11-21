@@ -109,7 +109,9 @@ internal sealed class ReferenceKeySource(Binding binding, string member, string 
         if (binding.Target is not ChordObject { FollowingAttempt.HasSources: true } target)
         {
             var targetState = binding.Target?.State ?? binding.RefState;
-            if (targetState.Kind == "failed" && targetState.Cause is { } cause) Fail(cause.Error, holding: true);
+            // A denial keeps no value (Pi 1.6.0, slice 14 §2.2): the pinned key's reads throw it until the next allow.
+            if (targetState.Cause is { Kind: FailureKind.Denied } denied) Deny(denied.Error);
+            else if (targetState.Kind == "failed" && targetState.Cause is { } cause) Fail(cause.Error, holding: true);
             else if (targetState.Kind == "loading" && heldFailure) { error = null; heldFailure = false; }
             return;
         }
@@ -146,6 +148,12 @@ internal sealed class ReferenceKeySource(Binding binding, string member, string 
     {
         if (holding && error is not null) return;
         Frame(); error = failure; heldFailure = holding && hasValue; toldFailure = true; Changed();
+    }, ChordContext.Background);
+    private void Deny(ChordError denial) => Batch.Within(() =>
+    {
+        if (!hasValue && ReferenceEquals(error, denial)) return;
+        framed = true; before = null; hadBefore = false;
+        value = null; hasValue = false; error = denial; heldFailure = false; toldFailure = true; Changed();
     }, ChordContext.Background);
     private void FinishPending() { if (pending) { pending = false; binding.PendingKeys--; } }
     public void Advance(WatchCall<JsonNode?> call, ChordContext context)

@@ -1,4 +1,7 @@
-// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/chord/src/next/host/host.ts
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/chord/src/host/host.ts
+// 1.6.0 here: events and call windows, the sharing table's use in Place (chord-remote), and for admission (slice 14 §2): presence lists
+// an admitted object's holders from its first allow until a denial (ChordObject.ListsHolders), and PrincipalKeyOf for a route's
+// admission, which keeps one decision per principal key.
 using System.Text.Json.Nodes;
 using PiSharp.Chord.Contracts;
 using PiSharp.Chord.Data;
@@ -259,7 +262,7 @@ public sealed partial class ChordHost : IAsyncDisposable
         return (INativeWatchable<IReadOnlyList<Presence>>)source;
     });
     private IReadOnlyList<Presence> CurrentPresence(string name) =>
-        Objects.Values.Where(obj => obj.State.Kind == "live" && obj.Served.Contract.Name == name)
+        Objects.Values.Where(obj => obj.ListsHolders && obj.Served.Contract.Name == name)
             .SelectMany(obj => obj.Holders.Where(holder => holder.Listed).Select(holder => new Presence(obj.Parameters.Value, holder.Caller.Principal, holder.Caller.Incarnation))).ToArray();
     internal void ChangedPresence()
     {
@@ -272,6 +275,9 @@ public sealed partial class ChordHost : IAsyncDisposable
         }, Context);
     }
     internal void Forget(Binding binding) { bindings.Remove(binding); ChangedPresence(); }
+    /// <summary>The principal key of <paramref name="principal"/> (<c>HostOptions.PrincipalKey</c>): a route's admission keeps one
+    /// decision per key.</summary>
+    internal string PrincipalKeyOf(JsonObject principal, ChordContext context) => DataInternal.PrincipalKey(principal, context, Options.PrincipalKey);
     internal void CountCall(int by) { runningCalls += by; ChordTelemetry.Metrics(Telemetry.Metrics).UpDownCounter("chord.calls.in_flight").Add(by); ChangedPresence(); }
     internal void CountJob(int by) { runningJobs += by; ChangedPresence(); }
     internal void CountReference(int by) { incomingReferences += by; ChangedPresence(); }

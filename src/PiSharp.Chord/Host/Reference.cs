@@ -2,7 +2,9 @@
 // 1.6.0 here: a binding's event members (decision "Events: fire-and-forget members"), and what references sharing one wire hold need
 // (decision "References share one wire hold"): calls and retries name their binding, a binding joining a bound remote object records
 // the members it has not seen (Joined, Seen), and a retry alone moves it to a private object (Transfer). Named queries (QueryMember,
-// FollowInstance) are a partial of Binding in Host/NamedQuery.cs; the denied state is chord-admission's.
+// FollowInstance) are a partial of Binding in Host/NamedQuery.cs. A denied reference (slice 14 §2.2: an admission refused its caller)
+// rejects its getters at once and keeps no value: its members' reads throw the denial, a watch gets one failed call, and the next allow
+// brings a whole value.
 // A reference's member passes its source's frame on as it is when that frame is the batch's only change of it (upstream's reference
 // source forwards its source's call): a list's or a live query's narrow frame stays narrow for a holder of the object that re-exposes or
 // watches it. Before 1.6.0 the member diffed the two values again, and its first frame replaced the value whole.
@@ -206,7 +208,8 @@ internal sealed partial class Binding : IReference, IHolder
         {
             if (state.Kind == "live" && Target?.Hydrated == true) return;
             if (state.Kind == "ended") throw state.Error!;
-            if (state.Cause?.Kind == FailureKind.Broken) throw state.Cause.Error;
+            // Neither a broken nor a denied failure heals by waiting.
+            if (state.Cause is { Kind: FailureKind.Broken or FailureKind.Denied } final) throw final.Error;
             var remaining = deadline - Host.Options.TimeProvider.GetUtcNow();
             if (remaining <= TimeSpan.Zero) throw state.Cause?.Error ?? new ChordError("unavailable", $"{Label}: did not become live within {timeout.TotalMilliseconds} ms");
             context.AbortSignal?.ThrowIfCancellationRequested();
@@ -348,12 +351,23 @@ internal sealed class ReferenceMember(Binding binding, string name) : Source(bin
             }
             source?.Subscribe(this);
         }
+        else if (followed?.Kind == "denied") Deny(followed.Error!);
         else if (followed?.Error is { } error)
         {
             var holding = binding.Target?.State.Kind == "failed";
             if (!holding || !heldFailure) Record(value, error, holding);
         }
         else if (followed?.Kind == "loading" && heldFailure) { failure = null; heldFailure = false; }
+    }
+    // An admission refused its reference's caller (slice 14 §2.2): it keeps no value (reads throw the denial, a watch opened now has
+    // nothing to start at); watches get one failure call per denial and stay open, and derives over it fail until the next allow brings a
+    // value (a whole replacement). What application code already took from it stays with that code.
+    private void Deny(ChordError denial)
+    {
+        if (!hasValue && ReferenceEquals(failure, denial)) return;
+        if (!framed) framed = Watched;
+        before = null; hasBefore = false; passed = null;
+        value = null; hasValue = false; failure = denial; heldFailure = false; toldFailure = true; Changed();
     }
     private void Record(JsonNode? next, Exception? error, bool holding = false)
     {

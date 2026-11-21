@@ -1,6 +1,7 @@
 // Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/chord/src/host/{host,facet,attempt,reference,ctx}.ts
 // 1.6.0 here: events and call windows (chord-remote), query_failed's Query and HostDeleteOptions (chord-store), named queries, their
-// readers and lists on ISelf, IStoreSelf and IReference (chord-queries). Admission is chord-admission's.
+// readers and lists on ISelf, IStoreSelf and IReference (chord-queries), a served type's admission (ServeOptions.Admit and the factory
+// that takes the admitted value; the admission's own types are in Host/Admission.cs).
 using System.Text.Json.Nodes;
 using PiSharp.Chord.Contracts;
 using PiSharp.Chord.Data;
@@ -55,7 +56,11 @@ public sealed class RootOptions
     public JsonObject? Principal { get => principal; init { principal = value; HasPrincipal = true; } }
     internal bool HasPrincipal { get; private init; }
 }
-public sealed record ServeOptions(AcceptsTable? Accepts = null, TimeSpan? Linger = null, bool Untraced = false);
+/// <summary>What <c>host.Serve</c> takes besides the type and the factory. <paramref name="Admit"/> (Pi 1.6.0, slice 14 §2.1) is the
+/// type's admission, for remote types whose contract declares an <c>Admission</c>, and only those (either without the other, or on a
+/// local type, is a declaration error): run first in every attempt, it reads data about the caller and returns a watchable of
+/// <c>Admission.Allow(value)</c> or <c>Admission.Deny(reason)</c>; the factory is handed the value.</summary>
+public sealed record ServeOptions(AcceptsTable? Accepts = null, TimeSpan? Linger = null, bool Untraced = false, Admit? Admit = null);
 public sealed record PluginFailure(string Plugin, Exception Error);
 public sealed record LoadReport(IReadOnlyList<PluginFailure> Failed);
 public sealed record CommittedReload(IReadOnlyList<string> Added, IReadOnlyList<string> Changed,
@@ -86,6 +91,10 @@ public sealed class Facet
 public interface IFacetHost
 {
     void Serve(Contract type, HostFactory factory, ServeOptions? options = null);
+    /// <summary>Serves a remote type whose contract declares an <c>Admission</c> (Pi 1.6.0, slice 14 §2.1): <c>options.Admit</c> is
+    /// required, and <paramref name="factory"/> gets what it allowed after the principal. (A factory that does not need the value may be
+    /// served through the other overload, with <c>options.Admit</c>.)</summary>
+    void Serve(Contract type, AdmittedHostFactory factory, ServeOptions options) => throw new NotSupportedException("Admission is not available on this facet host.");
     void Serve<C, V>(Registry<C, V> registry, RegistryProvider<C, V> provider);
     INativeWatchable<IReadOnlyList<Presence>> References(Contract type);
 }

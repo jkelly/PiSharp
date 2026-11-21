@@ -1,8 +1,9 @@
 // Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/chord/src/host/{attempt,dependencies}.ts
 // 1.6.0 here: the reusable park step (ParkAsync, upstream #park) that the dependency check, the readers of named queries and an
-// admission's decision drive; the readers awaited after the tables are prepared and before the natives (slice 14 §3.2). Admission (the
-// phase before the factory) is chord-admission's. The declarations of named queries, readers and lists are partials of Self in
-// Host/ReadDeclarations.cs.
+// admission's decision drive; the readers awaited after the tables are prepared and before the natives (slice 14 §3.2); and the admission
+// phase of an admitted type's attempt, before the wait for the previous instance's teardown and before the factory (slice 14 §2.2; the
+// phase itself is a partial of Attempt in Host/Admission.cs). The declarations of named queries, readers and lists are partials of Self
+// in Host/ReadDeclarations.cs.
 using System.Text.Json.Nodes;
 using PiSharp.Chord.Contracts;
 using PiSharp.Chord.Data;
@@ -83,18 +84,40 @@ internal sealed partial class Attempt : IOldWorkSource
     internal Task<FailureCause?> Check => Checked.Task;
     private TaskCompletionSource changed = NewSignal();
     private Task? closing;
-    internal Attempt(ChordObject owner, ServedType served) { Owner = owner; Served = served; Self = new(this); }
+    // Its seal's token, taken once: its source is disposed at its close, and a step of a parked attempt may end after that.
+    private readonly CancellationToken sealing;
+    internal Attempt(ChordObject owner, ServedType served) { Owner = owner; Served = served; Self = new(this); sealing = Cancellation.Token; }
     private static TaskCompletionSource NewSignal() => new(TaskCreationOptions.RunContinuationsAsynchronously);
     internal void Wake() { var before = changed; changed = NewSignal(); before.TrySetResult(); }
-    internal async Task ActivateAsync()
+    /// <summary>Activates it. <paramref name="ending"/> is the previous instance's teardown, for an admitted type only (slice 14 §2.2):
+    /// its admission runs before that wait, only its factory waits for it; an attempt of any other type is started once the teardown
+    /// finished, as before.</summary>
+    internal async Task ActivateAsync(Func<Task>? ending = null)
     {
         StartActivation();
         try
         {
+            if (Served.Admission is { } admission)
+            {
+                await RunAdmissionAsync(admission);
+                if (activation is { Ended: false } allowing) ChordTelemetry.Admitted(allowing.Span, true);
+                Owner.AdmissionAllowed(this);
+                if (ending is not null) await ending().WaitAsync(sealing);
+                sealing.ThrowIfCancellationRequested();
+            }
             try
             {
-                using var factoryLease = Owner.Host.RetainCallback(Served.Factory, Served.DeclaringFacet);
-                Implementation = Served.Factory(Owner.Parameters.Value, Served.Contract.Kind == ContractKind.Local ? null : Owner.Caller.Principal, Self);
+                if (Served.Admission is { } admittedType)
+                {
+                    using var admittedLease = Owner.Host.RetainCallback(admittedType.Factory, Served.DeclaringFacet);
+                    // A remote object's identity has its principal; an admitted one's factory gets what its admission allowed.
+                    Implementation = admittedType.Factory(Owner.Parameters.Value, Owner.Caller.Principal!, admitted!.Value?.DeepClone(), Self);
+                }
+                else
+                {
+                    using var factoryLease = Owner.Host.RetainCallback(Served.Factory, Served.DeclaringFacet);
+                    Implementation = Served.Factory(Owner.Parameters.Value, Served.Contract.Kind == ContractKind.Local ? null : Owner.Caller.Principal, Self);
+                }
                 PluginStaging.ValidateImplementation(Served.Contract, Implementation, this);
             }
             catch (Exception error) { throw new ActivationException(new(FailureKind.Broken, DataInternal.AsChordError(error, Owner.Label))); }
@@ -153,11 +176,11 @@ internal sealed partial class Attempt : IOldWorkSource
         var episode = new ParkedLong(this);
         for (;;)
         {
-            Cancellation.Token.ThrowIfCancellationRequested();
+            sealing.ThrowIfCancellationRequested();
             // Taken before the check: a change while it runs (a key loaded, a run adopted) checks again.
             var wake = changed.Task;
             var parking = await step(episode);
-            Cancellation.Token.ThrowIfCancellationRequested();
+            sealing.ThrowIfCancellationRequested();
             if (parking is Parking.Broken broken) throw new ActivationException(new(FailureKind.Broken, broken.Error));
             if (parking is Parking.Ready && !wake.IsCompleted) { Unparked(); return; }
             if (parking is Parking.Parked parked) ParkedOn(parked);
@@ -191,7 +214,7 @@ internal sealed partial class Attempt : IOldWorkSource
     /// authority or an ended dependency.</summary>
     private Task<Parking> CheckDependencies(IBlocked episode)
     {
-        FailureCause? wait = null; bool pending = false, blocks = false;
+        FailureCause? wait = null; bool pending = false, blocks = false, named = false;
         var blocker = "a dependency"; var blockerState = "loading";
         foreach (var dependency in Self.Dependencies)
         {
@@ -204,21 +227,25 @@ internal sealed partial class Attempt : IOldWorkSource
             if (state.Kind == "live") continue;
             if (state.Cause is { } cause)
             {
+                // Before the authority check: a dependency an admission denied is no failure that never heals (its error is forbidden);
+                // the attempt shows the denial and goes on when the dependency is admitted (slice 14 §2.2). It names no blocker: a denial
+                // is no parked_long report.
+                if (cause.Kind == FailureKind.Denied) { wait ??= cause; pending = true; continue; }
                 if (cause.Error.Code == "forbidden" || cause.Error.Reason == "cycle") return Task.FromResult<Parking>(new Parking.Broken(cause.Error));
                 wait ??= DataInternal.WaitingFor(dependency.Label, cause.Error);
             }
-            if (!pending) { blocker = dependency.Label; blockerState = state.Kind == "failed" ? "failed" : "loading"; }
+            if (!named) { blocker = dependency.Label; blockerState = state.Kind == "failed" ? "failed" : "loading"; named = true; }
             pending = true; blocks |= target?.BlocksFirstPass == true;
         }
         foreach (var registry in Self.RegistryDependencies)
         {
             var error = registry.Error();
             if (error is null) continue;
-            if (!pending) { blocker = $"registry {registry.Name}"; blockerState = "failed"; }
+            if (!named) { blocker = $"registry {registry.Name}"; blockerState = "failed"; named = true; }
             wait ??= DataInternal.WaitingFor(registry.Name, DataInternal.AsChordError(error, registry.Name)); pending = true;
         }
         if (!pending) return Parking.GoNow;
-        episode.BlockedBy(new(blocker, blockerState));
+        episode.BlockedBy(named ? new(blocker, blockerState) : null);
         return Task.FromResult<Parking>(new Parking.Parked(wait is null ? RefState.Loading : RefState.Failed(wait), !blocks, wait));
     }
     /// <summary>
@@ -301,7 +328,15 @@ internal sealed partial class Attempt : IOldWorkSource
         // Account for the call before plugin code executes (it may synchronously end this object).
         Admit(completion.Task, () => Owner.Host.CountCall(-1));
         _ = Invoke();
-        return completion.Task.WaitAsync(waitingToken);
+        var aborted = context.AbortSignal;
+        return Served.Admission is null ? completion.Task.WaitAsync(waitingToken) : Cuttable();
+        // A change of its admission seals an admitted type's attempt under its running calls: their callers get what the cut rejects them
+        // with (unavailable, or forbidden/revoked for a denial), not the cancellation of their wait.
+        async Task<object?> Cuttable()
+        {
+            try { return await completion.Task.WaitAsync(waitingToken); }
+            catch (OperationCanceledException) when (cut is not null && aborted?.IsCancellationRequested != true) { throw cut; }
+        }
         async Task Invoke()
         {
             try
@@ -346,10 +381,12 @@ internal sealed partial class Attempt : IOldWorkSource
         {
             // Cleanup continuations may still be queued on the dispatcher after the originals settled.
             var work = Work.Keys.Where(work => !work.IsCompleted).ToArray();
-            if (work.Length == 0) return;
+            // A change of its admission sealed it (ChordObject.SealDraining): no drain on a seal, its calls were rejected.
+            if (work.Length == 0 || WasCut) return;
             var remaining = due - Owner.Host.Options.TimeProvider.GetUtcNow();
             if (remaining <= TimeSpan.Zero) { Owner.Host.Report(new("drain_timeout", Object: Owner.Label)); return; }
-            try { await Task.WhenAll(work).WaitAsync(remaining, Owner.Host.Options.TimeProvider); }
+            var settled = Served.Admission is null ? Task.WhenAll(work) : Task.WhenAny(Task.WhenAll(work), CutTask);
+            try { await settled.WaitAsync(remaining, Owner.Host.Options.TimeProvider); }
             catch (TimeoutException) { Owner.Host.Report(new("drain_timeout", Object: Owner.Label)); return; }
             catch { }
         }
@@ -429,8 +466,9 @@ internal sealed partial class Attempt : IOldWorkSource
     {
         private DateTimeOffset? since;
         private bool reported;
-        private Blocker blocker = new("a dependency", "loading");
-        public void BlockedBy(Blocker? next) { if (next is not null) blocker = next; }
+        // The blocker the latest check found; null when it is parked on a denial alone (no report for one).
+        private Blocker? blocker = new("a dependency", "loading");
+        public void BlockedBy(Blocker? next) => blocker = next;
         /// <summary>Waits for <paramref name="wake"/> (at once when the change came during the check); the attempt's seal ends the wait.</summary>
         internal async Task NextChangeAsync(Task wake)
         {
@@ -450,8 +488,9 @@ internal sealed partial class Attempt : IOldWorkSource
                     if (ReferenceEquals(signaled, wake)) return;
                 }
                 reported = true;
-                host.Report(new("parked_long", Object: attempt.Owner.Label, WaitingFor: blocker.Label, State: blocker.State,
-                    Since: since.Value.ToUnixTimeMilliseconds()));
+                if (blocker is { } blocking)
+                    host.Report(new("parked_long", Object: attempt.Owner.Label, WaitingFor: blocking.Label, State: blocking.State,
+                        Since: since.Value.ToUnixTimeMilliseconds()));
             }
             await wake.WaitAsync(token);
         }
@@ -595,7 +634,8 @@ internal sealed partial class Self : IStoreSelf, IKeyDeclarer, IJobOwner, IWrita
     }
     internal IHostedJob DeclareJob(string name, Func<IJobOwner, IHostedJob> create)
     {
-        Declare("job"); if (!jobNames.Add(name)) throw new ArgumentException($"job {name} declared twice");
+        Declare("job"); AdmissionInternal.RefuseAdmittedJob(Attempt.Served, Attempt.Owner.Label);
+        if (!jobNames.Add(name)) throw new ArgumentException($"job {name} declared twice");
         var job = create(this); Jobs.Add(job); return job;
     }
     internal void Detach(Exception error)

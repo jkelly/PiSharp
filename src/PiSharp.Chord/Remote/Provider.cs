@@ -10,6 +10,7 @@ using PiSharp.Chord.Data;
 using PiSharp.Chord.Host;
 using PiSharp.Chord.Link;
 using WireFailure = PiSharp.Chord.Link.FailureCause;
+using DataFailure = PiSharp.Chord.Data.FailureCause;
 
 namespace PiSharp.Chord.Remote;
 
@@ -359,8 +360,14 @@ internal sealed class ProviderSide(HostLink link, long origin, long? limit) : IE
                 RejectRelayed(hold, new ChordError("unavailable", $"hold {hold.Id}: rebinding"), all: false);
                 Send(loading); break;
             case FailedMessage failed when entries.GetValueOrDefault(failed.Hold) is RelayedHold hold && hold.HeldOn(from):
-                RejectRelayed(hold, DataInternal.AsChordError(failed.Cause.Error.ToException(), $"hold {hold.Id}"), all: false);
+            {
+                // What its calls still waiting for the upstream window are answered: the cause's error, forbidden/revoked for a denial
+                // (access withdrawn under a call that waits, as under one in flight: slice 14 §2.3).
+                var label = $"hold {hold.Id}";
+                var error = DataInternal.AsChordError(failed.Cause.Error.ToException(), label);
+                RejectRelayed(hold, failed.Cause.Kind == "denied" ? AdmissionInternal.Revoked(label, error) : error, all: false);
                 Send(failed); break;
+            }
         }
     }
     /// <summary>The upstream link of relayed hold <paramref name="hold"/> dropped with <paramref name="error"/>: its calls fail, in flight
@@ -369,6 +376,14 @@ internal sealed class ProviderSide(HostLink link, long origin, long? limit) : IE
     {
         RejectRelayed(hold, error, all: true);
         Send(new LoadingMessage(hold.Id));
+    }
+    /// <summary>A route's admission holds relayed hold <paramref name="hold"/> back with <paramref name="cause"/> (slice 14 §2.3): its
+    /// calls, in flight or waiting, are answered with the cause's error (<c>forbidden/revoked</c> for a denial: access withdrawn under a
+    /// running call), and the hold is told <c>failed</c> with the cause.</summary>
+    internal void Withheld(RelayedHold hold, DataFailure cause)
+    {
+        RejectRelayed(hold, AdmissionInternal.Cut($"hold {hold.Id}", cause), all: true);
+        Send(new FailedMessage(hold.Id, new WireFailure(cause.Kind.ToString().ToLowerInvariant(), WireError.FromException(cause.Error))));
     }
     // Answers error to the calls of relayed hold `hold`: those still waiting for the upstream window, or all of them. The waiting ones
     // leave their window before any slot is counted free, so a freed slot never forwards a call being rejected.

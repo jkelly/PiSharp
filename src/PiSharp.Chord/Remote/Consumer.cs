@@ -202,7 +202,13 @@ internal sealed class ConsumerSide(HostLink link)
             loadingHolder.Loading();
         }
         else if (message is FailedMessage failed && entries.TryGetValue(failed.Hold, out var failedHolder))
-        { FailCalls(failed.Hold, DataInternal.AsChordError(failed.Cause.Error.ToException(), "remote hold")); failedHolder.Failed(failed); }
+        {
+            // A denial is access withdrawn under its calls, waiting or in flight (slice 14 §2.3): forbidden/revoked for them; a call made
+            // after it meets the denied reference and gets its plain forbidden.
+            var error = DataInternal.AsChordError(failed.Cause.Error.ToException(), "remote hold");
+            FailCalls(failed.Hold, failed.Cause.Kind == "denied" ? PiSharp.Chord.Host.AdmissionInternal.Revoked(failedHolder.Label, error) : error);
+            failedHolder.Failed(failed);
+        }
         else if (message is GoneMessage gone && entries.TryGetValue(gone.Hold, out var goneHolder)) goneHolder.Lost(DataInternal.AsChordError(gone.Error.ToException(), "remote hold"));
         else if (message is ResultMessage result) await Reply(result.Call, result, null);
         else if (message is ErrorMessage error) await Reply(error.Call, null, error);

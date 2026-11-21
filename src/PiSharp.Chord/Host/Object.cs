@@ -1,6 +1,9 @@
 // Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/chord/src/host/object.ts
 // 1.6.0 here: UnbindSets (chord-store), calls for a holder (chord-remote), and in Host/NamedQuery.cs a partial with what its lists keep
-// across its attempts and its queries members (chord-queries). Admission (readmit, rebuild, cut) is chord-admission's.
+// across its attempts and its queries members (chord-queries). What a change of an admitted type's admission does to it (Readmit, Rebuild,
+// SealDraining, FollowFailed, the cut and presence, slice 14 §2.2) is a partial in Host/Admission.cs; here: an attempt of an admitted
+// type is handed the previous teardown instead of started behind it, closes accumulate, a denied state is no failure a retry restarts,
+// and a denied object's members are followed as `denied`.
 using System.Text.Json.Nodes;
 using PiSharp.Chord.Contracts;
 using PiSharp.Chord.Data;
@@ -74,19 +77,38 @@ internal sealed partial class ChordObject : ITarget, IDocumentsOwner, ITableOwne
         retryPending = false;
         Current = attempt;
         SetState(RefState.Loading);
-        _ = Host.Dispatcher.RunAsync(async () =>
-        {
-            try { await previousClose; } catch { }
-            foreach (var predecessor in Host.EndingObjects.Where(obj => obj.Identity == Identity && !ReferenceEquals(obj, this)).ToArray())
-                try { await predecessor.EndCompletion; } catch { }
-            if (!ending && ReferenceEquals(Current, attempt)) await attempt.ActivateAsync();
-        });
+        Activate(attempt);
+    }
+    // Starts attempt in a later turn (posted, never inline: a seal's flush has ended by then). An admitted type's attempt runs its
+    // admission before it waits for the previous teardown (slice 14 §2.2: only its factory waits for that); any other is started once the
+    // teardown finished.
+    private void Activate(Attempt attempt) => _ = Host.Dispatcher.RunAsync(async () =>
+    {
+        if (attempt.Served.Admission is null) await Ended();
+        if (ending || !ReferenceEquals(Current, attempt)) return;
+        if (attempt.Served.Admission is null) await attempt.ActivateAsync(); else await attempt.ActivateAsync(Ended);
+    });
+    // The teardown a factory waits for: the closes of the attempts before it, and an ending object of the same identity.
+    private async Task Ended()
+    {
+        try { await previousClose; } catch { }
+        foreach (var predecessor in Host.EndingObjects.Where(obj => obj.Identity == Identity && !ReferenceEquals(obj, this)).ToArray())
+            try { await predecessor.EndCompletion; } catch { }
     }
     internal void SetState(RefState next)
     {
         if (state == next) return;
+        // The same denial again (a new attempt's own admission reads the denial its predecessor's cut showed): nothing new to tell.
+        if (next.Cause is { Kind: FailureKind.Denied } denial && state.Cause is { Kind: FailureKind.Denied } shown && DataInternal.SameCause(shown, denial)) return;
         state = next;
-        if (next.Kind == "failed" && OpenOldAttempt is null)
+        // Shown denied (a parked attempt's own check found the denial): presence lists its holders no more, until its next allow.
+        if (next.Cause?.Kind == FailureKind.Denied) allowed = false;
+        Notify();
+    }
+    // Tells every holder what the object shows now (also when the state is the one it had: a cut changes what its holders follow).
+    private void Notify()
+    {
+        if (state.Kind == "failed" && OpenOldAttempt is null)
             foreach (var previous in OldAttempts) previous.WithdrawContributions();
         var before = stateChanged; stateChanged = new(TaskCreationOptions.RunContinuationsAsynchronously); before.TrySetResult();
         Host.Batch.Within(() => { foreach (var holder in Holders.ToArray()) holder.Retarget(); }, Context);
@@ -98,6 +120,7 @@ internal sealed partial class ChordObject : ITarget, IDocumentsOwner, ITableOwne
     {
         if (ending || !ReferenceEquals(Current, attempt)) return;
         LiveOrder = Host.NextLiveOrder();
+        Allow();
         failures = 0; SetState(RefState.Live); firstOutcome.TrySetResult();
         if (!Served.HostLifetime && Holders.Count == 0 && runs == 0) ScheduleEnd();
     }
@@ -106,7 +129,9 @@ internal sealed partial class ChordObject : ITarget, IDocumentsOwner, ITableOwne
         if (ending || !ReferenceEquals(Current, attempt)) return;
         if (attempt.Live) swappingSource = attempt;
         attempt.Seal(cause.Error, keepSources: true);
-        previousClose = attempt.CloseAsync(NativeCloseReason.End);
+        // An admitted type's attempt can fail (a throwing admit) while its predecessor still closes: the next factory waits for both.
+        var closing = attempt.CloseAsync(NativeCloseReason.End);
+        previousClose = previousClose.IsCompleted ? closing : Task.WhenAll(Settled(previousClose), Settled(closing));
         var delay = TimeSpan.FromMilliseconds(Math.Min(60000, 1000 * Math.Pow(2, Math.Min(failures++, 6))));
         SetState(RefState.Failed(cause, cause.Kind == FailureKind.Transient ? Host.Options.TimeProvider.GetUtcNow().ToUnixTimeMilliseconds() + delay.TotalMilliseconds : null));
         firstOutcome.TrySetResult();
@@ -122,6 +147,7 @@ internal sealed partial class ChordObject : ITarget, IDocumentsOwner, ITableOwne
         retry = new CancellationTokenSource();
         _ = RetryLater(delay, retry.Token);
     }
+    private static async Task Settled(Task work) { try { await work; } catch { } }
     private async Task RetryLater(TimeSpan delay, CancellationToken token)
     {
         try { await Task.Delay(delay, Host.Options.TimeProvider, token); if (!ending) BeginAttempt(); }
@@ -160,7 +186,7 @@ internal sealed partial class ChordObject : ITarget, IDocumentsOwner, ITableOwne
     private TaskCompletionSource stateChanged = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly HashSet<ChordObject> gateWaits = new(ReferenceEqualityComparer.Instance);
     internal IEnumerable<ChordObject> WaitEdges() => gateWaits
-        .Concat(Current?.Self.Dependencies.Select(binding => binding.Target).OfType<ChordObject>() ?? [])
+        .Concat(Current?.Self.Dependencies.Concat(Current.AdmissionBindings).Select(binding => binding.Target).OfType<ChordObject>() ?? [])
         .Concat(readiness?.Targets ?? []);
     /// <summary>Calls a method of the live object for a reference's holder: as its caller, at its version (<see cref="CallAs"/>).</summary>
     public Task<object?> CallAsync(string method, object? args, IHolder holder, ChordContext context) =>
@@ -206,6 +232,8 @@ internal sealed partial class ChordObject : ITarget, IDocumentsOwner, ITableOwne
             }
             catch (ChordError error) { return new("failed", Error: error); }
         }
+        // A denial keeps no value (slice 14 §2.2): what the caller may read is withdrawn with its access.
+        if (state.Cause is { Kind: FailureKind.Denied } denied) return new("denied", Error: denied.Error);
         return new(state.Kind == "failed" ? "failed" : "loading", Error: state.Cause?.Error, Instance: current);
     }
     public IKeyedHandle KeyedMember(string member, long version)
@@ -242,13 +270,15 @@ internal sealed partial class ChordObject : ITarget, IDocumentsOwner, ITableOwne
     public void Retry(RetryWalk walk, IHolder? holder = null)
     {
         if (!walk.Visited.Add(this) || ending) return;
-        if (Current is { Live: false } attempt && attempt.Self.Dependencies.Count > 0)
-            foreach (var dependency in attempt.Self.Dependencies) dependency.Target?.Retry(walk, dependency);
-        if (state.Kind == "failed" && state.Cause?.Kind != FailureKind.Waiting) BeginAttempt();
+        if (Current is { Live: false } attempt)
+            foreach (var dependency in attempt.Self.Dependencies.Concat(attempt.AdmissionBindings).ToArray()) dependency.Target?.Retry(walk, dependency);
+        // An attempt parked on its admission's denial is still activating: a retry starts nothing, it only passes on and checks again.
+        var parkedDenied = state.Cause?.Kind == FailureKind.Denied && Current is { Sealed: false, Live: false };
+        if (state.Kind == "failed" && state.Cause?.Kind != FailureKind.Waiting && !parkedDenied) BeginAttempt();
         else Current?.Wake();
     }
     public bool Reaches(ITarget target, HashSet<ITarget> visited) => ReferenceEquals(this, target) ||
-        (visited.Add(this) && Current is { } attempt && attempt.Self.Dependencies.Any(d => d.Target?.Reaches(target, visited) == true));
+        (visited.Add(this) && Current is { } attempt && attempt.Self.Dependencies.Concat(attempt.AdmissionBindings).Any(d => d.Target?.Reaches(target, visited) == true));
     public void AssertLive() => Documents.AssertLive();
     public void Fail(ChordError error) { if (Current is { Live: true } attempt) Failed(attempt, new(FailureKind.Broken, error)); }
     public void ReportTransactionCancelled(Exception error) => Host.Report(new("transaction_cancelled", error, Object: Label));
@@ -320,6 +350,7 @@ internal sealed partial class ChordObject : ITarget, IDocumentsOwner, ITableOwne
         var failures = new List<Exception>();
         foreach (var attempt in OldAttempts.Append(Current).Where(a => a is not null).Cast<Attempt>().Distinct().ToArray())
             try { await attempt.CloseAsync(reason); } catch (Exception error) { failures.Add(error); }
+        ReleaseAdmissions();
         await Documents.SettledAsync(); Documents.End(); Host.Store?.Claims.Release(this);
         if (Host.Objects.TryGetValue(Identity, out var current) && ReferenceEquals(current, this)) Host.Objects.Remove(Identity);
         Current = null; OldAttempts.Clear();

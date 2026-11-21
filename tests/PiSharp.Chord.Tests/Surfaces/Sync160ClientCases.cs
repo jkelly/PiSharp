@@ -4,6 +4,7 @@
 // variant.test.ts; not an upstream execution capture. Helpers: Sync160EdgeSupport.cs.
 using System.Text.Json.Nodes;
 using PiSharp.Chord;
+using PiSharp.Chord.Data;
 using PiSharp.Chord.Host;
 using PiSharp.Chord.Link;
 using PiSharp.Chord.Surfaces;
@@ -251,34 +252,49 @@ internal static partial class Program
             using var held = desk.Client.Hold(Sync160Desk, new(), ChordContext.Background);
             Equal<IReference?>(null, Variants.LiveIn(held, "reader"), "a reference that is not bound yet");
             Equal<IReference?>(null, Variants.LiveIn<IReference>(null, "reader"), "no reference");
-            desk.Link("guest");
             await Sync160Until(() => held.State.Value.Kind == "live", "the reference is live");
             Check(ReferenceEquals(held, Variants.LiveIn(held, "reader")), "the reference is read in the variant it is live in");
             Equal<IReference?>(null, Variants.LiveIn(held, "editor"), "another variant");
             Throws<ArgumentNullException>(() => Variants.LiveIn(held, null!), "a variant is required");
         }),
         // variant.test.ts "follows the variant an admission rebinds: nothing while it loads between two, denied or released". Upstream
-        // rebinds through an admission and denies through it; admission is the chord-admission package's, so here another principal's
-        // link rebinds the hold, and a lost link is what leaves it not live. The denied state and the per-state sequence upstream
-        // records from the state's watch (a native watch is delivered on another thread, so what is read there is not the state it
-        // was called for) are not covered here; "loading still says the last variant" is terminal.160.scope-variant-one-watch-per-state
-        // in the Hosting suite.
-        Case("surfaces.variant.160.live-in-follows-a-rebind-to-another-variant", async () =>
+        // records each state as its watch gets it, with what the reference is read as then; a native watch is delivered on a pool
+        // thread and may deliver two quick states as one call, so what is read there need not be the state it was called for. Here the
+        // states the watch got are recorded alone (a quick loading may fold into the live after it), and the reference is read at each
+        // settled point instead; "loading still says the last variant" is terminal.160.scope-variant-one-watch-per-state in the
+        // Hosting suite.
+        Case("surfaces.variant.160.live-in-follows-the-variant-an-admission-rebinds-denied-or-released", async () =>
         {
             await using var desk = await Sync160DeskWorld.StartAsync();
             var held = desk.Client.Hold(Sync160Desk, new(), ChordContext.Background);
-            desk.Link("guest");
             await Sync160Until(() => ReferenceEquals(held, Variants.LiveIn(held, "reader")), "the reference is live in the reader variant");
-            desk.Link("owner");
+            var seen = new List<string>();
+            var watch = await held.State.WatchAsync(ChordContext.Background);
+            watch.Start((call, _) =>
+            {
+                if (call is NativeWatchValueCall<RefState> value) lock (seen) seen.Add(value.Value.Kind);
+                return Task.CompletedTask;
+            });
+            await desk.Admit("editor");
             await Sync160Until(() => ReferenceEquals(held, Variants.LiveIn(held, "editor")), "the reference is live in the editor variant");
             Equal<IReference?>(null, Variants.LiveIn(held, "reader"), "an editor is not read as a reader");
             await Variants.LiveIn(held, "editor")!.CallAsync("write", JsonValue.Create("edited"), ChordContext.Background);
-            desk.Unlink();
-            await Sync160Until(() => held.State.Value.Kind != "live", "the reference lost its link");
-            Equal<IReference?>(null, Variants.LiveIn(held, "editor"), "a reference that is not live");
-            desk.Link("guest");
+            await desk.Admit("none");
+            await Sync160Until(() => held.State.Value is { Kind: "failed", Cause.Kind: FailureKind.Denied }, "the reference is denied");
+            Equal<IReference?>(null, Variants.LiveIn(held, "editor"), "a denied reference");
+            Equal<IReference?>(null, Variants.LiveIn(held, "reader"), "a denied reference as a reader");
+            Equal<string?>(null, held.Variant, "a denied reference has no variant");
+            await desk.Admit("reader");
             await Sync160Until(() => ReferenceEquals(held, Variants.LiveIn(held, "reader")), "the reference is live in the reader variant again");
             Equal<IReference?>(null, Variants.LiveIn(held, "editor"), "a reader is not read as an editor");
+            await Sync160Until(() => { lock (seen) return seen.Count > 0 && seen[^1] == "live"; }, "the watch got the last live");
+            string[] kinds; lock (seen) kinds = [.. seen.Where((kind, at) => at == 0 || seen[at - 1] != kind)];
+            // Upstream: loading, live, failed, loading, live. A quick loading may be folded into the live after it.
+            Check(kinds.Length >= 3 && kinds.Count(kind => kind == "failed") == 1 && kinds[^1] == "live"
+                && kinds.All(kind => kind is "loading" or "live" or "failed")
+                && kinds.Contains("live") && Array.IndexOf(kinds, "live") < Array.IndexOf(kinds, "failed"),
+                $"the states the watch got: {string.Join(",", kinds)}");
+            await watch.StopAsync();
             held.Release();
             Equal<IReference?>(null, Variants.LiveIn(held, "reader"), "a released reference");
         }),
