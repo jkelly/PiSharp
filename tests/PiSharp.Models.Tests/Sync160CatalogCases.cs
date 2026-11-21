@@ -209,6 +209,40 @@ internal static partial class Program
                 driven.Order(StringComparer.Ordinal), "providers whose rows dropped the flag and have a key-authenticated live route");
             Check(wrong.Count == 0, "the system prompt left as developer where 1.5.2 sent system (needs the 1.6.0 openai-completions developer-role default): " + string.Join("; ", wrong));
         });
+        yield return ("sync160.catalog.every-default-model-streams-as-the-cli-asks", async () =>
+        {
+            // Every provider default of the 1.6.0 catalog has to work the way the CLI uses it: the request asks for the model's own
+            // maxTokens (simple-options.ts buildBaseOptions) at the default thinking level, clamped to the levels the route offers.
+            // live.one-model-per-provider-against-fake-http drives the same models with a bounded cap and no thinking level.
+            var failed = new List<string>(); var driven = 0;
+            foreach (var provider in BuiltinProviders.All)
+            {
+                if (ProviderApiRoutes.Contains(provider.Id) || provider.Id == "anthropic" || LiveModelFor(provider.Id) is not { } id) continue;
+                var endpoint = new LiveEndpoint(seen => Respond(seen, id));
+                var runtime = new LiveSessionRuntime(Env((ProviderEnvironmentKeys.GetApiKeyVariables(provider.Id)![0], "fixture-key"),
+                    ("AZURE_OPENAI_BASE_URL", "https://pisharp-res.openai.azure.com/openai/v1")), () => endpoint);
+                var selection = await new SettingsModelSelection(null, provider.Id + "/" + id, null) { UseModelMaximumTokens = true }
+                    .ResolveAsync(null, runtime, null, false, CancellationToken.None);
+                Equal(ModelResolver.DefaultModelFor(provider.Id) ?? id, selection.Model.Id, provider.Id + " default model");
+                var what = $"{provider.Id}/{id} (maxTokens {selection.Definition.Raw.Value.GetProperty("maxTokens").GetDouble()})";
+                driven++;
+                try
+                {
+                    using var connection = selection.Connect(runtime);
+                    var transport = connection.CreateTransport();
+                    var level = transport is IThinkingLevelTransport levels ? ThinkingLevels.Clamp(levels.GetSupportedThinkingLevels(selection.Model), ModelResolver.DefaultThinkingLevel) : null;
+                    StreamEvent? last = null;
+                    await foreach (var frame in transport.StreamAsync(Request(selection.Model) with { ThinkingLevel = level })) last = frame;
+                    var api = selection.Model.Api;
+                    if (endpoint.Snapshot().Length == 0) failed.Add($"{what} at {level} sent no request ({last?.GetType().Name})");
+                    else if (api is "openai-completions" or "openai-responses" or "anthropic-messages" && provider.Id != "azure" && last is not StreamDone)
+                        failed.Add($"{what} at {level} ended with {last?.GetType().Name}");
+                }
+                catch (Exception error) when (error is not OperationCanceledException) { failed.Add($"{what} threw {error.GetType().Name}: {error.Message}"); }
+            }
+            Equal(35, driven, "providers with a key-authenticated live route besides anthropic");
+            Check(failed.Count == 0, "default models the CLI cannot use: " + string.Join("; ", failed));
+        });
         yield return ("sync160.gpt-6.2.official-metadata-openai-and-codex", Sync(() =>
         {
             // supports-xhigh.test.ts "includes official metadata for OpenAI and Codex %s" (the two rows 1.6.0 added).
