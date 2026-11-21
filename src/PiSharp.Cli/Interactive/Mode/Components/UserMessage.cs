@@ -1,4 +1,4 @@
-// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): coding-agent/src/modes/interactive/components/user-message.ts.
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): coding-agent/src/modes/interactive/components/user-message.ts.
 using PiSharp.Tui.Pi;
 using static PiSharp.Cli.Interactive.Mode.ThemeGlobals;
 

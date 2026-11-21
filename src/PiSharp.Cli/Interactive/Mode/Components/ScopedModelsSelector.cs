@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): coding-agent/src/modes/interactive/components/scoped-models-selector.ts.
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): coding-agent/src/modes/interactive/components/scoped-models-selector.ts.
 using System.Text.Json.Nodes;
 using PiSharp.Tui.Pi;
 using static PiSharp.Cli.Interactive.Mode.ThemeGlobals;
@@ -390,8 +390,14 @@ internal sealed class ScopedModelsSelectorComponent : Container, IComponent, IFo
             return;
         }
 
-        // Pass everything else to search input
+        // Pass everything else to search input. A new query moves the selection to the top row, so the best match is
+        // highlighted; toggles and reorders call Refresh() too, so the reset lives here and not there. Cursor keys
+        // leave the query as it is and must not move the selection.
+        var previousQuery = searchInput.GetValue();
         searchInput.HandleInput(data);
+        var query = searchInput.GetValue();
+        if (query == previousQuery) return;
+        if (query.Length > 0) selectedIndex = 0;
         Refresh();
     }
 

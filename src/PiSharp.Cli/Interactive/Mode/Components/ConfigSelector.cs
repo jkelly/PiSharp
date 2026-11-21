@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): coding-agent/src/modes/interactive/components/config-selector.ts.
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): coding-agent/src/modes/interactive/components/config-selector.ts.
 // TUI component for managing package resources (enable/disable), shown by `pi config`. The package manager's resolved paths
 // (core/package-manager.ts PathMetadata, ResolvedResource, ResolvedPaths) arrive as records; the settings it edits go through
 // IConfigSelectorSettings, the SettingsManager members the component calls (settings and package sources as Pi JSON).
@@ -526,9 +526,11 @@ internal sealed partial class ConfigSelectorComponent
                 return;
             }
 
-            // Pass to search input
+            // Pass to search input. Cursor keys leave the query as it is and must not move the selection.
+            var previousQuery = searchInput.GetValue();
             searchInput.HandleInput(data);
-            FilterItems(searchInput.GetValue());
+            var query = searchInput.GetValue();
+            if (query != previousQuery) FilterItems(query);
         }
 
         private bool? ToggleResource(ResourceItem item)
