@@ -5,7 +5,7 @@ using System.Text.Json.Nodes;
 using PiSharp.Env;
 using PiSharp.Env.Daemon;
 
-internal static class Program
+internal static partial class Program
 {
     private static int passed;
     private static readonly byte[] Binary = Enumerable.Range(0, 3 * 1024 * 1024 + 257).Select(index => (byte)(index * 31)).ToArray();
@@ -190,6 +190,9 @@ internal static class Program
             { Cwd = Environment.CurrentDirectory, Argv = Command("--child", "linger"), OnStdout = _ => { } }));
             Check(unsupported.Code == "not_supported", "old feature gate");
         });
+        await Case("sync160.process-output-left-in-pipe-survives-exit-while-link-is-backed-up (upstream scenario)", Sync160UpstreamBackedUpLink);
+        await Case("sync160.process-reads-on-after-exit-while-link-holds-output-back", () => Sync160HeldLink(exec: false));
+        await Case("sync160.exec-without-window-reads-on-after-exit-while-link-holds-output-back", () => Sync160HeldLink(exec: true));
         Console.WriteLine($"PASS {passed} native Env process cases"); return 0;
     }
 
@@ -218,7 +221,7 @@ internal static class Program
                 using (var descendant = Process.Start(start)!) { await stdout.WriteAsync(Encoding.ASCII.GetBytes(descendant.Id + "\n")); await stdout.FlushAsync(); }
                 return 0;
             case "silent": await Task.Delay(TimeSpan.FromMinutes(5)); return 0;
-            default: return 99;
+            default: return await Sync160Child(args, stdout);
         }
     }
     private static string[] Command(params string[] args) => Path.GetFileNameWithoutExtension(Environment.ProcessPath!).Equals("dotnet", StringComparison.OrdinalIgnoreCase)
