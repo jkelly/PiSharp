@@ -16,8 +16,6 @@ Open at the time of writing, from the reports:
 - Native `pi.exec` reads 137 on Linux and macOS where Pi reads 143. The explicit-policy find profile is not updated.
 - The native Chord store has no group commit.
 
-<!-- sync-1.6.0: confirm against the chord-admission / chord-workers report -->
-- Chord admission, route admission, the `denied` paths and the workers component's `Store`, `Admit`, `Incarnation`, exit ordering and `TerminalScope.On` were still being implemented.
 
 # Previous source candidate: Pi 1.5.2 (released as PiSharp 1.5.2)
 

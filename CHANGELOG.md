@@ -13,7 +13,7 @@
 - **Terminal UI:** read-only render output that containers reuse across frames, fullscreen scrolling that reuses earlier frames, a suspend handler for `SIGTSTP`, image fixes for overlays, Kitty redraws and Markdown, search fixes in the selectors, and a transcript notice when OpenAI drops reasoning items.
 - **Durable:** signals, sleeps that wait for signals, tools that park, gates in `beforeTool`, hooks that start tasks, code-mode namespaces declared by extensions, image fitting, and examples 38 to 47.
 - **Chord:** event members, call windows by trust, shared holds, column sets, named queries, lists, a commit that re-runs a live query only when it can change it, the app kit's sign-ins, client and sync fixes, and delete host data by plugin.
-- **Chord admission and workers:** admission for remote contracts and routes with the `denied` failure cause, and the workers component's `Store`, `Admit`, `Incarnation`, exit ordering and `TerminalScope.On`. <!-- sync-1.6.0: confirm against the chord-admission / chord-workers report -->
+- **Chord admission and workers:** admission for remote contracts and routes with the `denied` failure cause, and the workers component's `Store`, `Admit`, `Incarnation`, exit ordering and `TerminalScope.On`.
 - **Env, MCP and agent:** remote directory listings leave out vanished entries, the daemon keeps reading a program's output after exit while the link is backed up, and `McpCatalogPlanner.ServerSummary` gives a server's one-line summary.
 - **Node extensions:** exact Pi 1.6.0 runtime packages in a version-isolated cache with `undici` 8.12.4, and fallback modules regenerated from the pinned source. Earlier caches, locks and release evidence are preserved.
 
@@ -27,7 +27,7 @@
 - **Chord app kit:** `Sessions` is renamed `SignIns`, with `EphemeralSignIns`, `SignInKind`, `SignInInfo` and `IssuedSignIn`. The cookie, contract and stored document names changed with it and there is no migration: everyone signs in again and paired devices pair again.
 - **Chord options:** `TelemetryIngestOptions.Admit` is required. `ChordHttpOptions.LinksOpened` takes a third argument that closes the link. `HostError.Table` is `HostError.Query`. `IStore` gains `OnCommitted`. `Client.StartAsync` completes before the server's first script set is applied. `UploadOptions.Store` is an `ISessionSyncUploader`.
 - **Chord wire:** the protocol version stays 1, but 1.5.x and 1.6.0 hosts do not interoperate over trusted links (workers and host-to-host routes), and a 1.5.x sync client refuses a remote that holds an archive slot written by 1.6.0. Update hosts and devices that share a link or a remote together.
-- **Chord workers:** the workers component requires the server host's store (`ProcessWorkerOptions.Store`). <!-- sync-1.6.0: confirm against the chord-admission / chord-workers report -->
+- **Chord workers:** `ProcessWorkerOptions.Store` is required (null only for a host without a store; a store not opened by `Tables.OpenStoreAsync` is refused). `ProcessWorkerState` gains the trailing parameter `Incarnation`, which is binary-breaking. A worker's fatal error, a link lost before it was ready and a closed control pipe now show in `State` with the worker's exit, not at once, and a worker whose control pipe closes while its process lives on is killed after `CloseTimeout`.
 - **`PiSharp.Tools`:** `read` no longer adds a note for a model without image input. It names the model in `details.imageUnsupportedByModel`; `ReadWriteTools.NonVisionImageNote` is obsolete.
 
 ### Behavior changes

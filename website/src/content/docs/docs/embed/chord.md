@@ -34,7 +34,7 @@ The entry implements `IChordPlugin.CreateFacet(PluginContext)`; `PluginContext.K
 | `ChordHttp` | Load its facet under `chord.http` with route/authenticator contributions. `Port = 0` selects an ephemeral loopback listener; omit the port to mount `HandleAsync` in ASP.NET. `ListeningAsync` reports the actual URI. |
 | Request lifetime | Routes, streams and sockets hold a Chord root through response settlement. Contributions include wrappers, allowed hosts, relay validation, origins and CSP. Cross-site webhooks receive an anonymous root. |
 | Shutdown | Close HTTP before the host, then dispose the plugin runtime. Requests drain to `CloseTimeout`, after which their scopes are cancelled. |
-| `ProcessWorkers` | Create before host load and include its stable facet. Supply executable/arguments, build provider, principal factory, authorization and lock directory. Authorized references start addressed workers. |
+| `ProcessWorkers` | Create before host load and include its stable facet. Supply executable/arguments, build provider, principal factory, authorization, lock directory and the server host's `Store` (required). An optional `Admit` decides per principal and address before a worker starts. Authorized, admitted references start addressed workers; `ProcessWorkerState.Incarnation` names the running one. |
 | `WorkerMain.RunAsync` | Child entry point; the callback creates the host and loads plugins through `WorkerContext.LoadPluginsAsync`. Separate current-user named pipes carry private control and framed Chord v2 traffic. |
 
 Worker crash/retry, reload and retained process-tree cleanup are tested with real child processes in [hosting tests](https://github.com/jkelly/PiSharp/tree/main/tests/PiSharp.Chord.Hosting.Tests). The framing is distinct from Node IPC. The package does not provide JavaScript module evaluation, npm installation, browser asset compilation or arbitrary Node child compatibility.
@@ -107,12 +107,10 @@ A commit runs a live query again only when its writes can change it. The store i
 
 ### Admission and workers
 
-<!-- sync-1.6.0: confirm against the chord-admission / chord-workers report -->
-These parts were still being implemented when this page was written. They are described here from the Pi 1.6.0 changelog, and the native names may differ.
-
-- **Admission.** A remote contract may declare an admission schema: the value its factory is handed about a caller. Its type is served with an `admit` function that reads data about the caller and returns a watchable of allow or deny. A denial shows the reference as `failed` with the cause kind `denied`: getters reject at once, no value is kept, and running calls reject `forbidden` with reason `revoked`. Another value rebuilds the object.
-- **Route admission.** A route and the workers component ask one decision per principal and address before anything is resolved or forwarded, so no worker starts for a caller who is denied.
-- **Workers.** The workers component requires the server host's store, so that a worker's exit is published only once the commits queued before the exit settled. It closes a worker's link when the worker exits, before it publishes the exit. The worker state carries the running worker's incarnation.
+- **Admission.** A remote contract may declare an admission schema: the value its factory is handed about a caller. Serve its type with `IFacetHost.Serve(Contract, AdmittedHostFactory, ServeOptions)` and `ServeOptions.Admit`: the `Admit` function reads data about the caller through `IAdmitSelf` and returns a watchable of `Admission.Allow(value)` or `Admission.Deny(reason)`. A denial shows the reference as `failed` with the cause kind `FailureKind.Denied`: getters reject at once, no value is kept, and running calls reject `forbidden` with reason `revoked`. Another value rebuilds the object.
+- **Route admission.** `RouteOptions.Admit` asks one decision per principal and address before anything is resolved or forwarded. `ProcessWorkerOptions.Admit` passes it to the workers' route, so no worker starts for a caller who is denied.
+- **Workers.** `ProcessWorkerOptions.Store` is required, so that a worker's exit is published only once the commits queued before the exit settled. The workers close a worker's link when it exits, before they publish the exit. `ProcessWorkerState.Incarnation` carries the running worker's incarnation.
+- **Terminal scopes.** `TerminalScope.On(member, listener)` subscribes to an event member.
 - **Terminal scope.** `TerminalScope.Variant` narrows a held reference to one variant while it is live in it; this part is implemented. `TerminalScope.On` subscribes to an event member.
 
 ## Legacy Chord is separate
