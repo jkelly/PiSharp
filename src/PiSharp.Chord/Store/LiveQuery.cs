@@ -138,6 +138,8 @@ internal sealed class LiveQuery : FramedSource
     // The read its value is of, and the one that replaces it once its first run is adopted.
     private Reading? current;
     private Reading? next;
+    // Counts the reads its value has been of: the rows of two reads share no decoded row.
+    private long reads;
 
     /// <summary>One of a live query's reads, open, with the query it is of and what it reads (upstream <c>Reading</c>).</summary>
     private sealed class Reading(OpenQuery query, LiveTarget target)
@@ -149,8 +151,8 @@ internal sealed class LiveQuery : FramedSource
         internal OpenRead Read { get; set; } = null!;
     }
 
-    /// <summary>What a value shows: its rows as they were decoded, and whether more followed.</summary>
-    private sealed record Shown(IReadOnlyList<DecodedRow> Rows, bool More);
+    /// <summary>What a value shows: its rows as they were decoded, whether more followed, and which of its reads it is of.</summary>
+    private sealed record Shown(IReadOnlyList<DecodedRow> Rows, bool More, long Read);
 
     internal LiveQuery(ReadSite site, IFramedOwner owner, LiveShape shape)
         : base(site.Batch, owner)
@@ -223,6 +225,7 @@ internal sealed class LiveQuery : FramedSource
             current = reading;
             next = null;
             rows.Reset();
+            reads++;
         }
         else if (!ReferenceEquals(reading, current)) return;
         switch (run)
@@ -249,7 +252,7 @@ internal sealed class LiveQuery : FramedSource
             var decoded = rows.Decode(result.Rows, reading.Target, reading.Query.Context);
             var items = new JsonArray([.. decoded.Select(row => row.Copy())]);
             JsonNode value = window.WithMore ? new JsonObject { ["rows"] = items, ["more"] = result.More } : items;
-            shown.Add(value, new Shown(decoded, result.More));
+            shown.Add(value, new Shown(decoded, result.More, reads));
             Set(value);
         }
         catch (Exception error)
@@ -258,10 +261,13 @@ internal sealed class LiveQuery : FramedSource
         }
     }
 
-    /// <summary>The frame from the value its watches have to the one the batch left: by the rows' tokens when both are rows it showed.</summary>
+    /// <summary>The frame from the value its watches have to the one the batch left: by the rows' tokens when both are rows of one of its
+    /// reads. Across two reads (another target decodes its own way) no row is shared, and the values are compared as upstream compares
+    /// them then, structurally.</summary>
     protected override ImmutableArray<Op> Diff(JsonNode? before, JsonNode? after)
     {
-        if (shape is not LiveShape.Rows window || before is null || after is null || !shown.TryGetValue(before, out var was) || !shown.TryGetValue(after, out var now))
+        if (shape is not LiveShape.Rows window || before is null || after is null || !shown.TryGetValue(before, out var was) ||
+            !shown.TryGetValue(after, out var now) || was.Read != now.Read)
             return base.Diff(before, after);
         if (StoreInternal.DiffRows(was.Rows, now.Rows, window.WithMore ? RowsPath : []) is not { } ops) return [new ReplaceOp(after)];
         return window.WithMore && was.More != now.More ? ops.Add(new SetOp(["more"], JsonValue.Create(now.More))) : ops;

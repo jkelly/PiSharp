@@ -1,4 +1,4 @@
-// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/chord/src/next/store/index.ts and README.md. index.ts only re-exports: the
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/chord/src/store/index.ts and README.md. index.ts only re-exports: the
 // store for apps, the public types of PiSharp.Chord.Store. openStore, Store and StoreOptions are Tables.OpenStoreAsync, IStore and
 // StoreOptions (Store.cs); Backend and sqliteBackend are Backend and Tables.SqliteBackend (Backend.cs); Outbox and OutboxCommit are Outbox
 // and OutboxCommit (Outbox.cs); StoreWrite is StoreWrite (Writes.cs); defineTable, evolveTable, query, json, the expression helpers and
@@ -11,4 +11,10 @@
 // ChordStore.CommitSeriesAsync, MintId and Ids (Store.cs) and Tables.ApplyBatchAsync (ApplyBatch.cs); refusalOf (Refusal.cs) and
 // ChordStore's members that take Chord's internal types (the commit, the batch, the claims) are internal, for Chord's own layers.
 // Everything is under the assembly's experimental attribute.
+//
+// 1.6.0 added to the exports: defineColumns, ColumnSet and ColumnSetOptions (Tables.DefineColumns, ColumnSet, ColumnSetOptions;
+// ColumnSet.cs); exists, existsNode and Match (Expressions.Exists, ExistsNode and Match, a map from a set's column to a reference;
+// Expression.cs); compile and WhereNode (Tables.Compile in Query.cs; WhereNode was public already); EvolveOptions (TableEvolve.cs).
+// The store's reads (Reads.cs, Read.cs, ReadPlan.cs, Skip.cs, OpenQuery.cs, LiveQuery.cs, Page.cs) are not exported upstream and are
+// internal here.
 namespace PiSharp.Chord.Store;

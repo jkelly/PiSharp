@@ -383,17 +383,19 @@ internal static partial class Program
     }
 
     /// <summary>What self.Query makes of a table handle: the owner's window of <paramref name="limit"/> rows in key order, and what it reads.</summary>
-    private static (LiveQuery Live, LiveTarget Target) LiveQueryOver(TableHandle handle, IChordStore store, LiveQueryTestOwner owner, StateHost state, long limit = 100)
+    private static (LiveQuery Live, LiveTarget Target) LiveQueryOver(TableHandle handle, IChordStore store, LiveQueryTestOwner owner, StateHost state, long limit = 100) =>
+        (new LiveQuery(new ReadSite(store, state.Batch), owner, new LiveShape.Rows(new ReadRange(limit))), LiveQueryTarget(handle, Tables.Query(handle.Definition)));
+
+    /// <summary>What a live source reads of <paramref name="handle"/>'s table: <paramref name="query"/>, each row as its columns' object.</summary>
+    private static LiveTarget LiveQueryTarget(TableHandle handle, Query query)
     {
-        var live = new LiveQuery(new ReadSite(store, state.Batch), owner, new LiveShape.Rows(new ReadRange(limit)));
         var rows = handle.Definition.Rows;
-        var target = new LiveTarget(new QuerySpec(Tables.Query(handle.Definition), handle.Sql.Table, Projection.All, handle), (stored, context) =>
+        return new LiveTarget(new QuerySpec(query, handle.Sql.Table, Projection.All, handle), (stored, context) =>
         {
             var row = new JsonObject();
             foreach (var (column, cell) in rows.Decode(stored, context)) row[column] = cell;
             return row;
         });
-        return (live, target);
     }
 
     private static async Task LiveQueryCommit(ChordStore store, TableHandle handle, StateHost state, Action<TableChanges>? fill = null, ChordContext? context = null)
@@ -562,6 +564,82 @@ internal static partial class Program
             Json("""[{"id":1,"value":{"n":1}},{"id":2,"value":{"n":2}},{"id":3,"value":{"n":3}}]""", query.Value, "the rows");
             query.Unsubscribe(deliveries);
             query.Detach(new InvalidOperationException("done"));
+        }),
+        Case("store.live-query.160-a-later-read-switches-in-one-frame-and-a-failure-closes-its-reads-until-the-next-read", async () =>
+        {
+            await using var store = await MemoryStore();
+            var owner = new LiveQueryTestOwner();
+            var handle = await LiveQueryHandle(store, owner);
+            await StoreCommitWith(store, handle, changes => { for (var id = 1; id <= 3; id++) changes.Put(LiveQueryRow(id)); });
+            var state = new StateHost();
+            // The store's reads can be held: the new read's first run is caught between its statement and its adoption.
+            var controlled = new LiveQueryControlledStore(store);
+            var (query, all) = LiveQueryOver(handle, controlled, owner, state);
+            await query.LoadAsync(all, ChordContext.Background);
+            var calls = ChordSupport.ChangesOf(await query.WatchAsync(ChordContext.Background));
+            string Ids() => string.Join(",", ((JsonArray)query.Value!).Select(row => row!["id"]!.GetValue<double>()));
+            // Another read (arguments that follow a value): the previous value shows until the new read's first run is adopted.
+            var above = LiveQueryTarget(handle, Tables.Query(handle.Definition).Where(row => Gte(row["id"], 2)));
+            var captured = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            controlled.AfterRead = async () => { captured.TrySetResult(); await release.Task; };
+            var reading = query.ReadAsync(above, ChordContext.Background);
+            await captured.Task;
+            controlled.AfterRead = null;
+            Equal("1,2,3", Ids(), "the previous value while the new read runs");
+            Equal(2, store.ReadIndex.On(handle.Sql.Table)?.Count, "both reads are registered meanwhile");
+            release.TrySetResult();
+            Check(await reading is ReadRun.Rows, "the new read's first run");
+            state.Delivered();
+            Equal("2,3", Ids(), "the new read's rows");
+            Equal(1, calls.Count, "one frame for the switch");
+            Json("""[["p",[],0,1,[]]]""", ChordSupport.OpsJson(((WatchValueCall<JsonNode?>)calls[0]).Ops), "the diff of the two values");
+            Equal(1, store.ReadIndex.On(handle.Sql.Table)?.Count, "the read of the previous arguments left the index");
+            await LiveQueryCommit(store, handle, state, changes => changes.Put(LiveQueryRow(4)));
+            Json("""[["p",[],2,0,[{"id":4,"value":{"n":4}}]]]""", ChordSupport.OpsJson(((WatchValueCall<JsonNode?>)calls[^1]).Ops), "the new read follows commits");
+            // What it should read cannot be read: a failed member, and no read may heal it.
+            var refused = new InvalidOperationException("its arguments threw");
+            query.Fail(refused, ChordContext.Background);
+            state.Delivered();
+            Check(calls[^1] is WatchFailedCall<JsonNode?>, "the watch failed");
+            Equal("its arguments threw", owner.Reports.Single().Message, "reported once");
+            Check(store.ReadIndex.On(handle.Sql.Table) is null, "its reads are closed");
+            await LiveQueryCommit(store, handle, state, changes => changes.Put(LiveQueryRow(5)));
+            Check(ReferenceEquals(refused, StoreThrows(() => _ = query.Value, "its arguments threw")), "a commit does not heal it");
+            await query.ReadAsync(all, ChordContext.Background);
+            state.Delivered();
+            Equal("1,2,3,4,5", Ids(), "the next read heals it");
+            Check(((WatchValueCall<JsonNode?>)calls[^1]).Ops is [ReplaceOp], "the value replaces the failure whole");
+            query.Detach(new InvalidOperationException("done"));
+        }),
+        Case("store.live-query.160-rows-with-more-and-a-count-are-the-shapes-a-named-query-is-read-in", async () =>
+        {
+            await using var store = await MemoryStore();
+            var owner = new LiveQueryTestOwner();
+            var handle = await LiveQueryHandle(store, owner);
+            await StoreCommitWith(store, handle, changes => { for (var id = 1; id <= 3; id++) changes.Put(LiveQueryRow(id)); });
+            var state = new StateHost();
+            var target = LiveQueryTarget(handle, Tables.Query(handle.Definition));
+            var page = new LiveQuery(new ReadSite(store, state.Batch), owner, new LiveShape.Rows(new ReadRange(2), WithMore: true));
+            var count = new LiveQuery(new ReadSite(store, state.Batch), owner, new LiveShape.Count());
+            await page.LoadAsync(target, ChordContext.Background);
+            await count.LoadAsync(target, ChordContext.Background);
+            Json("""{"rows":[{"id":1,"value":{"n":1}},{"id":2,"value":{"n":2}}],"more":true}""", page.Value, "the first two rows, and more follow");
+            Json("3", count.Value, "the count");
+            var pageCalls = ChordSupport.ChangesOf(await page.WatchAsync(ChordContext.Background));
+            var countCalls = ChordSupport.ChangesOf(await count.WatchAsync(ChordContext.Background));
+            await LiveQueryCommit(store, handle, state, changes => changes.Delete(new JsonObject { ["id"] = 1 }));
+            Json("""[["p",["rows"],0,1,[]],["p",["rows"],1,0,[{"id":3,"value":{"n":3}}]],["s",["more"],false]]""",
+                ChordSupport.OpsJson(((WatchValueCall<JsonNode?>)pageCalls.Single()).Ops), "the rows' ops under rows, then more");
+            Json("""{"rows":[{"id":2,"value":{"n":2}},{"id":3,"value":{"n":3}}],"more":false}""", page.Value, "the page after the delete");
+            Json("""[["r",2]]""", ChordSupport.OpsJson(((WatchValueCall<JsonNode?>)countCalls.Single()).Ops), "a count is replaced");
+            // A count keeps no keys: an update of a column its condition does not use is skipped, a put runs it.
+            await LiveQueryCommit(store, handle, state, changes => changes.Update(new JsonObject { ["id"] = 2 }, new JsonObject { ["value"] = new JsonObject { ["n"] = 20 } }));
+            Equal(1, countCalls.Count, "the count was skipped");
+            Equal(2, pageCalls.Count, "the page's row changed");
+            var ended = new InvalidOperationException("done");
+            page.Detach(ended);
+            count.Detach(ended);
         }),
         Case("store.live-query.160-refused-step-adopts-nothing", async () =>
         {
