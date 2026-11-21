@@ -37,6 +37,22 @@
 //   run, and the answer's commit is the run's run_end, as in v1.2.0; the commit that ends it after the tasks shows no run change, only
 //   the run_start of a run it starts. A handoff continues the run in the new context (38ff99177), which the events show as the reset's
 //   entries within the run.
+// Pi v1.6.0 sync (faac585884ae2c013a6b1400f3e9e77f10b34bac; PiSharp-only fields and one event, all additive), what the projection shows of
+// the new Harness states:
+// - Tools that park (spec suspendable §4, §5): a slot is live while it is `running`, `sleeping` or `waiting`. A call has one
+//   tool_execution_start, when its slot first becomes live: at its first `running`, or `sleeping` for a call parked at its gates before it
+//   ran (a beforeTool sleep), whose start then carries `status: "sleeping"` and, having no intent yet, no arguments. A park and its wake
+//   are tool_execution_update events with `status`: `sleeping` or `waiting` at the park (with `output: {set: ""}` when the park cleared a
+//   window that held text, as the slot shows no output while parked), `running` at the wake, with `args` when the stream saw the intent
+//   the woken call recorded (the arguments a gated call runs with, which its start could not carry). A parked slot that turns `running`
+//   again is never a second start, whenever the stream attached: its snapshot lists the slot with its status. Events between a park and
+//   its wake are none: a parked call holds no invocation.
+// - Hooks that start tasks: a run whose answer waits for its onYield tasks keeps its inputs (pi.live.run.yield), so it stays the run on
+//   the wire: no run_end until the tasks let the answer stand. The snapshot's run carries `yield: {answer}` meanwhile, and run_yield says
+//   when that begins (`{inputs, answer}`) and when the tasks continued the run instead (`{inputs}`, no answer). An afterTools task changes
+//   no event: the run ends, or goes on with the steer its task queued.
+// - Sleeps without `until`, signals and wake reasons are task state, which no agent event carries; the task graph and the task records the
+//   hosts serialize carry them (PiSharp.Durable.Server's TaskNodeState).
 //
 // Mappings: each AgentEvent variant is a sealed record whose ToJson() is upstream's object with upstream's key order, so a JSON-mode host
 // prints what upstream prints. pi-ai messages, usage, tool slots, compaction statuses and the pi.agent / pi.usage states are wire JSON, as
@@ -78,7 +94,8 @@ public sealed record QueuedItem(SubmissionId Id, string Mode)
 
 /// <summary>
 /// The current state at attachment, or after an overflow (upstream <c>SnapshotEvent</c>): <c>{type, entries, run?, generation?, tools,
-/// nestedTools, compactions, compactionFailure?, runFailure?, inbox, agent, usage}</c>. Every other event applies on top of it.
+/// nestedTools, compactions, compactionFailure?, runFailure?, inbox, agent, usage}</c>. Every other event applies on top of it. A tool slot's
+/// <c>status</c> is <c>pending</c>, <c>running</c>, <c>sleeping</c>, <c>waiting</c> (a parked call, Pi v1.6.0) or <c>done</c>.
 /// </summary>
 public sealed record SnapshotEvent : AgentEvent
 {
@@ -88,6 +105,9 @@ public sealed record SnapshotEvent : AgentEvent
     public required ImmutableArray<EntryRecord> Entries { get; init; }
     /// <summary>The inputs of the current run, <c>run.inputs</c>; null without a run.</summary>
     public ImmutableArray<SubmissionId>? RunInputs { get; init; }
+    /// <summary>The answer of a run that waits for its onYield tasks, <c>run.yield.answer</c> (PiSharp-only, Pi v1.6.0); null while the run
+    /// has not answered, and without a run.</summary>
+    public EntryId? RunYield { get; init; }
     /// <summary>Current generation attempt <c>{attempt, message?, retry?: {at, error}, deferred?: {pollAt}}</c>: its in-flight partial, retry
     /// backoff, or deferred poll.</summary>
     public JsonObjectValue? Generation { get; init; }
@@ -114,7 +134,10 @@ public sealed record SnapshotEvent : AgentEvent
     /// <inheritdoc/>
     public override JsonObjectValue ToJson() => Writer()
         .Add("entries", JsonValue.Array(Entries.Select(entry => (JsonValue)entry.ToJson())))
-        .Add("run", RunInputs is { } inputs ? JsonValue.Object([KeyValuePair.Create("inputs", (JsonValue)Ids(inputs))]) : null)
+        .Add("run", RunInputs is { } inputs
+            ? new RecordJson.Writer().Add("inputs", Ids(inputs))
+                .Add("yield", RunYield is { } answer ? JsonValue.Object([KeyValuePair.Create("answer", (JsonValue)answer.ToJson())]) : null).Build()
+            : null)
         .Add("generation", Generation).Add("tools", Tools).Add("nestedTools", NestedTools).Add("compactions", Compactions)
         .Add("compactionFailure", CompactionFailure).Add("runFailure", RunFailure)
         .Add("inbox", JsonValue.Array(Inbox.Select(item => (JsonValue)item.ToJson()))).Add("agent", Agent).Add("usage", Usage).Build();
@@ -140,6 +163,19 @@ public sealed record RunEndEvent(ImmutableArray<SubmissionId> Inputs) : AgentEve
     public JsonObjectValue? Failure { get; init; }
     /// <inheritdoc/>
     public override JsonObjectValue ToJson() => Writer().Add("inputs", Ids(Inputs)).Add("failure", Failure).Build();
+}
+
+/// <summary>
+/// <c>{type: "run_yield", inputs, answer?}</c> (PiSharp-only, Pi v1.6.0): the run answered and waits for the tasks its <c>onYield</c> hooks
+/// started, with its inputs still open (<c>pi.live.run.yield</c>); <see cref="Answer"/> is the answer's entry. Without an answer: the tasks
+/// continued the run, which goes on. A run whose answer stands ends with <c>run_end</c> instead.
+/// </summary>
+public sealed record RunYieldEvent(ImmutableArray<SubmissionId> Inputs, EntryId? Answer = null) : AgentEvent
+{
+    /// <inheritdoc/>
+    public override string Type => "run_yield";
+    /// <inheritdoc/>
+    public override JsonObjectValue ToJson() => Writer().Add("inputs", Ids(Inputs)).Add("answer", Answer?.ToJson()).Build();
 }
 
 /// <summary><c>{type: "turn_start"}</c>: a <c>pi.generation</c> task is created and takes the run.</summary>
@@ -223,23 +259,30 @@ public abstract record ToolEvent(ToolEventCall Call) : AgentEvent
     private protected RecordJson.Writer CallWriter() => Call.Write(Writer());
 }
 
-/// <summary><c>{type: "tool_execution_start", ...call, args}</c>: a slot becomes <c>running</c>; <c>args</c> come from the tool task's
-/// intent checkpoint, or for a nested call from its slot, which carries the arguments it runs with.</summary>
+/// <summary><c>{type: "tool_execution_start", ...call, args, status?}</c>: a slot becomes live, once per call: <c>running</c>, or parked at
+/// its gates before it ran (<see cref="Status"/> <c>sleeping</c>, Pi v1.6.0). <c>args</c> come from the tool task's intent checkpoint, or
+/// for a nested call from its slot, which carries the arguments it runs with; a call parked at its gates has no intent yet, so its
+/// arguments follow with the <c>tool_execution_update</c> of its wake.</summary>
 public sealed record ToolExecutionStartEvent(ToolEventCall Call, JsonObjectValue Args) : ToolEvent(Call)
 {
+    /// <summary>The slot's status when the call starts parked (<c>sleeping</c> or <c>waiting</c>); null for a call that starts running
+    /// (PiSharp-only, Pi v1.6.0).</summary>
+    public string? Status { get; init; }
+
     /// <summary>A model-issued call's start without a task ID.</summary>
     public ToolExecutionStartEvent(string toolCallId, string toolName, JsonObjectValue args) : this(new ToolEventCall(toolCallId, toolName), args) { }
 
     /// <inheritdoc/>
     public override string Type => "tool_execution_start";
     /// <inheritdoc/>
-    public override JsonObjectValue ToJson() => CallWriter().Add("args", Args).Build();
+    public override JsonObjectValue ToJson() => CallWriter().Add("args", Args).Add("status", Status).Build();
 }
 
 /// <summary>
-/// <c>{type: "tool_execution_update", ...call, output?, details?, diagnostics?}</c>: the running slot's output window, details or
-/// diagnostics changed. <see cref="Details"/> is <see cref="JsonValue.Null"/> and <see cref="Diagnostics"/> empty when a safe replay removed
-/// them; a null property is absent.
+/// <c>{type: "tool_execution_update", ...call, output?, details?, diagnostics?, status?, args?}</c>: the live slot's output window, details,
+/// diagnostics or status changed. <see cref="Details"/> is <see cref="JsonValue.Null"/> and <see cref="Diagnostics"/> empty when a safe replay
+/// removed them; a null property is absent. <see cref="Status"/> (PiSharp-only, Pi v1.6.0) is set when the call parks (<c>sleeping</c>,
+/// <c>waiting</c>) and when it wakes (<c>running</c>, with <see cref="Args"/> when the stream saw the intent the woken call recorded).
 /// </summary>
 public sealed record ToolExecutionUpdateEvent(ToolEventCall Call, ToolOutputChange? Output = null, JsonValue? Details = null,
     JsonArrayValue? Diagnostics = null) : ToolEvent(Call)
@@ -250,8 +293,13 @@ public sealed record ToolExecutionUpdateEvent(ToolEventCall Call, ToolOutputChan
 
     /// <inheritdoc/>
     public override string Type => "tool_execution_update";
+    /// <summary>The slot's new status, when it changed between <c>running</c>, <c>sleeping</c> and <c>waiting</c>; null otherwise.</summary>
+    public string? Status { get; init; }
+    /// <summary>The arguments a woken call runs with, when <see cref="Status"/> turned <c>running</c> and its intent was seen.</summary>
+    public JsonObjectValue? Args { get; init; }
     /// <inheritdoc/>
-    public override JsonObjectValue ToJson() => CallWriter().Add("output", Output?.ToJson()).Add("details", Details).Add("diagnostics", Diagnostics).Build();
+    public override JsonObjectValue ToJson() => CallWriter().Add("output", Output?.ToJson()).Add("details", Details).Add("diagnostics", Diagnostics)
+        .Add("status", Status).Add("args", Args).Build();
 }
 
 /// <summary>A change of a running tool's retained output window: a front trim and then an append (<see cref="ToolOutputDelta"/>), or its
@@ -597,6 +645,7 @@ public static class AgentEvents
         {
             Entries = active,
             RunInputs = parts.Run is { } run ? Inputs(run) : null,
+            RunYield = YieldOf(parts.Run),
             Generation = parts.Generation,
             Tools = parts.Tools ?? JsonArrayValue.Empty,
             NestedTools = parts.NestedTools ?? JsonArrayValue.Empty,
@@ -626,6 +675,13 @@ public static class AgentEvents
 
     private static ImmutableArray<SubmissionId> Inputs(JsonObjectValue run) =>
         [.. ((JsonArrayValue)run["inputs"]).Select(id => new SubmissionId(Integer(id)))];
+
+    /// <summary>The answer a run waits to have reviewed by its onYield tasks (<c>run.yield.answer</c>); null otherwise.</summary>
+    private static EntryId? YieldOf(JsonObjectValue? run) =>
+        Field(Field(run, "yield"), "answer") is JsonNumberValue answer ? new EntryId((long)answer.Value) : null;
+
+    /// <summary>Whether a slot is live: its call runs, or is parked (Pi v1.6.0).</summary>
+    private static bool IsLive(JsonObjectValue slot) => Status(slot) is "running" or "sleeping" or "waiting";
 
     // ─── translate ──────────────────────────────────────────────────────────
 
@@ -710,13 +766,14 @@ public static class AgentEvents
         {
             var isNested = slot.ContainsKey("parentCallId");
             var previous = isNested ? nestedBefore.GetValueOrDefault(Integer(slot["taskId"])) : slotsBefore.GetValueOrDefault(Text(slot["callId"]));
-            if (Status(slot) != "running" || (previous is not null && Status(previous) == "running")) continue;
+            // One start per call: when its slot first is live. A parked slot that turns running again was live before (Pi v1.6.0).
+            if (!IsLive(slot) || (previous is not null && IsLive(previous))) continue;
             // A nested slot carries the arguments the call runs with; a model-issued call's are in its intent checkpoint, committed in this
-            // commit or before it.
+            // commit or before it. A call parked at its gates has no intent yet.
             JsonObjectValue args;
-            if (isNested) args = (JsonObjectValue)slot["arguments"];
+            if (isNested) args = Field(slot, "arguments") as JsonObjectValue ?? JsonObjectValue.Empty;
             else args = Field(slot, "taskId") is { } taskId && intents.Remove(new TaskId(Integer(taskId)), out var given) ? given : JsonObjectValue.Empty;
-            events.Add(new ToolExecutionStartEvent(CallOf(slot), args));
+            events.Add(new ToolExecutionStartEvent(CallOf(slot), args) { Status = Status(slot) == "running" ? null : Status(slot) });
         }
         var partialBefore = Field(was.Generation, "message") as JsonObjectValue;
         var partial = Field(now.Generation, "message") as JsonObjectValue;
@@ -726,14 +783,21 @@ public static class AgentEvents
         for (var index = 0; index < slots.Count; index++)
         {
             var slot = slots[index];
-            if (Status(slot) != "running" || !slotsBefore.TryGetValue(Text(slot["callId"]), out var previous) || Status(previous) != "running") continue;
-            if (ToolUpdate(viewOps, "tools", index, slot, previous) is { } update) events.Add(update);
+            if (!IsLive(slot) || !slotsBefore.TryGetValue(Text(slot["callId"]), out var previous) || !IsLive(previous)) continue;
+            // A woken call recorded its intent again (Tool.cs, the `parked` phase): its arguments go with the update that shows it running.
+            var woke = Status(slot) == "running" && Status(previous) != "running";
+            var args = woke && Field(slot, "taskId") is { } taskId && intents.Remove(new TaskId(Integer(taskId)), out var given) ? given : null;
+            if (ToolUpdate(viewOps, "tools", index, slot, previous, args) is { } update) events.Add(update);
         }
         for (var index = 0; index < nested.Count; index++)
         {
             var slot = nested[index];
-            if (Status(slot) != "running" || !nestedBefore.TryGetValue(Integer(slot["taskId"]), out var previous) || Status(previous) != "running") continue;
-            if (ToolUpdate(viewOps, "nestedTools", index, slot, previous) is { } update) events.Add(update);
+            if (!IsLive(slot) || !nestedBefore.TryGetValue(Integer(slot["taskId"]), out var previous) || !IsLive(previous)) continue;
+            // A nested slot carries its arguments; its own intent is not kept for the wake.
+            if (Field(slot, "taskId") is { } taskId) intents.Remove(new TaskId(Integer(taskId)));
+            var woke = Status(slot) == "running" && Status(previous) != "running";
+            if (ToolUpdate(viewOps, "nestedTools", index, slot, previous, woke ? Field(slot, "arguments") as JsonObjectValue : null) is { } update)
+                events.Add(update);
         }
         var generation = now.Generation;
         var generationBefore = was.Generation;
@@ -843,6 +907,9 @@ public static class AgentEvents
             events.Add(new RunEndEvent(Inputs(runBefore)) { Failure = recorded is null ? null : V1RunFailure(recorded) });
         }
 
+        // The run answered and waits for its onYield tasks, or they continued it (Pi v1.6.0). A run that ended says so with its run_end.
+        if (run is not null && !runChanged && YieldOf(run) != YieldOf(runBefore)) events.Add(new RunYieldEvent(Inputs(run), YieldOf(run)));
+
         // Submissions, document state, then what began.
         foreach (var record in sortedSubmissions) events.Add(new SubmissionEvent(record));
         if (!ReferenceEquals(now.Inbox, was.Inbox)) events.Add(new InboxUpdateEvent(Queued(now.Inbox)));
@@ -858,6 +925,8 @@ public static class AgentEvents
             }
         }
         if (run is not null && runChanged) events.Add(new RunStartEvent(Inputs(run)));
+        // A run that starts already answered (its first commit on the wire holds the yield) says so after its start.
+        if (run is not null && runChanged && YieldOf(run) is { } yielded) events.Add(new RunYieldEvent(Inputs(run), yielded));
         if (run is not null && !Same(run["taskId"], Field(runBefore, "taskId")) && TaskOf(new TaskId(Integer(run["taskId"])))?.Kind == GenerationKind)
             events.Add(new TurnStartEvent());
         return events;
@@ -927,8 +996,10 @@ public static class AgentEvents
     /// <summary>Output, details, and diagnostics changes of a running slot at <paramref name="list"/>[<paramref name="index"/>] in
     /// <c>pi.live</c>, from the view operations on it (upstream <c>toolUpdate</c>).</summary>
     private static ToolExecutionUpdateEvent? ToolUpdate(ImmutableArray<Op> viewOps, string list, int index, JsonObjectValue slot,
-        JsonObjectValue previous)
+        JsonObjectValue previous, JsonObjectValue? wokenArgs = null)
     {
+        // A park or a wake: the live slot's status changed (Pi v1.6.0).
+        var status = Status(slot) != Status(previous) ? Status(slot) : null;
         var outputPath = Path("docs", "pi.live", list, index, "output");
         long trimStart = 0;
         var append = "";
@@ -950,10 +1021,14 @@ public static class AgentEvents
         var diagnostics = Field(slot, "diagnostics");
         var detailsChanged = !Same(details, Field(previous, "details"));
         var diagnosticsChanged = !Same(diagnostics, Field(previous, "diagnostics"));
-        if (output is null && !detailsChanged && !diagnosticsChanged) return null;
+        if (output is null && !detailsChanged && !diagnosticsChanged && status is null) return null;
         return new ToolExecutionUpdateEvent(CallOf(slot), output,
             detailsChanged ? details ?? JsonValue.Null : null,
-            diagnosticsChanged ? diagnostics as JsonArrayValue ?? JsonArrayValue.Empty : null);
+            diagnosticsChanged ? diagnostics as JsonArrayValue ?? JsonArrayValue.Empty : null)
+        {
+            Status = status,
+            Args = status == "running" ? wokenArgs : null,
+        };
     }
 
     // ─── JSON helpers ───────────────────────────────────────────────────────

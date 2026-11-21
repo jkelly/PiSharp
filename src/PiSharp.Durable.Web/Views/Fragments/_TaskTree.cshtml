@@ -12,7 +12,7 @@ else
     <div class="task-row" style="--depth:@depth" data-task="@task.Id">
       <i class="bi @Display.TaskIcon(task)"></i>
       <div class="min-w-0 flex-grow-1">
-        <div><span class="t-name">@Display.TaskName(task)</span> <span class="ps-chip" data-tone="@tone">@text</span>@if (task.State.Phase is { } phase)
+        <div><span class="t-name">@Display.TaskName(task)</span> <span class="ps-chip" data-tone="@tone" title="@Display.TaskWaitsFor(task)">@text</span>@if (task.State.Phase is { } phase)
           { <span class="fs-8 text-ps-faint ms-1">@phase</span> }</div>
         <div class="t-meta">#@task.Id @task.Kind · @agent@(task.Background ? " · background" : "")</div>
       </div>

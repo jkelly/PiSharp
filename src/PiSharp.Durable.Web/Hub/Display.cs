@@ -170,11 +170,25 @@ public static class Display
         {
             "running" => ("Running", "ok"),
             "waiting" => ("Waiting", "warn"),
+            // Pi v1.6.0: a sleep waits for a time, for signals, or for whichever comes first. It holds no process meanwhile.
+            "sleeping" => (task.State.Signals is { Count: > 0 } ? "Waiting for a signal" : "Sleeping", ""),
             "completing" => ("Finishing", "ok"),
             "pending" or "ready" => ("Queued", ""),
             var status => (status, ""),
         },
     };
+
+    /// <summary>What a sleeping task waits for, for a tooltip: its signal keys and its deadline, when it has them (Pi v1.6.0); null for any
+    /// other task.</summary>
+    public static string? TaskWaitsFor(TaskNode task)
+    {
+        if (task.State.Status != "sleeping") return null;
+        var parts = new List<string>();
+        if (task.State.Signals is { Count: > 0 } signals) parts.Add("Signals: " + string.Join(", ", signals.Select(key => $"{key.Signal} / {key.Key}")));
+        if (task.State.Until is { } until)
+            parts.Add("Until " + DateTimeOffset.FromUnixTimeMilliseconds((long)until).ToString("yyyy-MM-dd HH:mm:ss 'UTC'", System.Globalization.CultureInfo.InvariantCulture));
+        return parts.Count == 0 ? null : string.Join(". ", parts);
+    }
 
     /// <summary>A task's name: its label, or its kind.</summary>
     public static string TaskName(TaskNode task) => task.Label ?? task.Kind switch
