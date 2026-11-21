@@ -1,4 +1,4 @@
-// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): coding-agent/src/modes/interactive/components/assistant-message.ts.
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): coding-agent/src/modes/interactive/components/assistant-message.ts.
 // The AssistantMessage is a JsonObject in pi-ai's shape: { role: "assistant", content: [{ type: "text", text } | { type: "thinking",
 // thinking } | { type: "toolCall", ... } | ...], stopReason, errorMessage, ... }. QueueStreamingContent is PiSharp's: it keeps only
 // the latest streamed update until the next render.
