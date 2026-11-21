@@ -106,6 +106,8 @@ public sealed partial class ChordHost
         return arriving.Role != LinkRole.Parent && parentPath.Linked ? parentPath : null;
     }
     internal RemotePath UnplacedPath => unplacedPath;
+    /// <summary>The host's open links (its accepted children, its parent, its routes' links).</summary>
+    internal IReadOnlyCollection<HostLink> Links => remoteLinks;
     internal RemotePath? Repath(Contract contract, JsonObject parameters, Caller caller)
     {
         var address = ContractsInternal.DataOf(contract).HostAddress!(parameters);

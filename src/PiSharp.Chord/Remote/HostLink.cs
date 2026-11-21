@@ -35,6 +35,9 @@ internal sealed class HostLink : IChannelHandler
         ChordTelemetry.Metrics(host.Telemetry.Metrics).UpDownCounter("chord.links.open").Add(1);
     }
     internal void Start() => channel.Start();
+    /// <summary>How many origins have a provider side on this link now: a side is dropped once it holds nothing (no holds, no calls, no
+    /// state and no event messages in flight).</summary>
+    internal int Providers => providers.Count;
     internal bool Open => !channel.Closed;
     internal bool Greeted => channel.Opened;
     internal string Peer => channel.Peer;
