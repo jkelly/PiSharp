@@ -1,4 +1,4 @@
-// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/tui/src/components/markdown.ts.
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/tui/src/components/markdown.ts.
 using System.Text.RegularExpressions;
 
 namespace PiSharp.Tui.Pi;
@@ -157,7 +157,8 @@ public sealed partial class Markdown : IComponent
         var margin = new string(' ', paddingX);
         var bg = defaultStyle?.BgColor;
         var lines = new List<string>();
-        foreach (var line in RenderToken(token, contentWidth, nextTokenType))
+        // Image lines skip wrapping, so split them here: hard breaks after an image must stay separate rows.
+        foreach (var line in RenderToken(token, contentWidth, nextTokenType).SelectMany(line => TerminalImage.IsImageLine(line) ? line.Split('\n') : [line]))
         {
             if (TerminalImage.IsImageLine(line)) { lines.Add(line); continue; }
             foreach (var wrapped in TextUtils.WrapTextWithAnsi(line, contentWidth))

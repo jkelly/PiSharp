@@ -130,8 +130,7 @@ public static partial class MarkdownLexer
             if ((match = Newline().Match(src)).Success && match.Length > 0)
             {
                 src = src[match.Length..];
-                // A paragraph here keeps its own line break, so any blank line is a space token in marked: no clipped-paragraph join.
-                lastParagraphClipped = false;
+                // A single "\n" as a spacer terminates the last line, so it moves there; anything longer is a blank line.
                 if (match.Value.Length == 1 && tokens.Count > 0) tokens[^1].Raw += "\n";
                 else tokens.Add(new() { Type = "space", Raw = match.Value });
                 continue;
@@ -226,6 +225,10 @@ public static partial class MarkdownLexer
                 var clip = top ? ParagraphClip(src) : src.Length;
                 if (clip < src.Length && clip < collected.Consumed) collected = Collect(src[..clip]);
                 var (lines, consumed, _) = collected;
+                // marked's paragraph and text rules stop before the line break that ends them. The newline rule above then moves a
+                // single "\n" into this token's raw and turns a blank line into a space token, which is what puts the empty row
+                // between a paragraph and a list and lets an indented line after a blank line start a code block.
+                if (consumed > 1 && src[consumed - 1] == '\n') consumed--;
                 var rawText = src[..consumed];
                 var clipped = clip != src.Length;
                 src = src[consumed..];
