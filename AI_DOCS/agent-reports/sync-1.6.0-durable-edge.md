@@ -212,4 +212,39 @@ Item 6's cases are in the commits of the items they test.
 
 ## Suites
 
-SUITES-PLACEHOLDER
+Pinned SDK (`artifacts/sample-tools/dotnet`), Release, on Windows, at `48fbc5c4` (the last source commit; the commits after it change
+this report only). No live provider, no SQL Server. Each suite ran alone, after every build had finished.
+
+| Suite | Cases | Passed | Failed | Skipped | Notes |
+| --- | --- | --- | --- | --- | --- |
+| PiSharp.Durable.Tests (full) | 4851 | 4847 | 0 | 4 | 4722 authored, 125 upstream capture. Base: 4821. +31 new (`sync160.codemode` 6, `sync160.images-fit` 14, `sync160.env-list-race` 4, `sync160.agent-events` 6, `setup.sync160-native-map-...` 1), -1 (`codemode.describe.uses-the-longest-matching-namespace-prefix`). The 4 skips are the base's: `compat.reverse.upstream-reads-pisharp-sessions` (PISHARP_DURABLE_UPSTREAM unset) and three `plan.symlink-escape.*` (no symlink privilege). |
+| PiSharp.Durable.Hosting.Tests | 129 | 129 | 0 | 0 | |
+| PiSharp.Durable.Server.Tests | 36 | 36 | 0 | 0 | 31 on the base, +5 `sync160.park-model.*` |
+| PiSharp.Durable.Web.Tests | 17 | 17 | 0 | 0 | |
+| PiSharp.DurableCli.Tests | 122 | 122 | 0 | 0 | 119 on the base, +3 `sync160.tui.*` |
+| PiSharp.CustomAgents.Tests | 104 | 104 | 0 | 0 | |
+| PiSharp.WebAgent.Tests | 544 | 544 | 0 | 0 | 543 on the base, +1 `bench.strict.lists-a-schema-node-without-a-type`; `runs.options.refuses-...` and `runs.engine.codex-takes-...` changed |
+| PiSharp.Codemode.Tests | 149 | 149 | 0 | 0 | |
+| PiSharp.Chord.Durable.Integration.Tests | 7 | 7 | 0 | 0 | |
+| PiSharp.Durable150.Capture.Tests | 35 | 35 | 0 | 0 | not in the brief's list; run because the read tool and code mode changed |
+| `node --test tools/CompatibilityReport/sync-1.6.0-applicability.test.mjs` | 5 | 5 | 0 | 0 | includes "the pending 1.6.0 snapshot reproduces from its generator" |
+| `node --test tools/CompatibilityReport/sync-1.6.0-source.test.mjs` | 3 | 2 | 0 | 1 | |
+| `node --test tools/CompatibilityReport/sync-applicability.test.mjs` | 5 | 3 | 1 | 1 | the base's failure: see "What root must do" |
+
+The `sync160.*` cases of PiSharp.Durable.Tests (100 with durable-core's) ran six more times in a row with no failure, and the ten new
+examples seven times on memory storage with identical output after the three placeholders.
+
+Builds, 0 errors and 0 warnings each: `src/PiSharp.Cli`, `src/PiSharp.Durable.Web`, `src/PiSharp.WebAgent`, `src/PiSharp.CustomAgents`,
+`samples/Durable.Examples`, `samples/Durable.Chat`, `samples/Durable.Chord.Examples`, `samples/Durable.ReleaseWatcher`, and the ten test
+projects above.
+
+Not run:
+
+- The SQL Server-backed groups (`storage.mssql.conformance.*`, `session.mssql.*`, `harness.*.mssql.*`, `agent-events.mssql.*`): not
+  enumerated without `PISHARP_DURABLE_MSSQL_CONNECTION_STRING`.
+- `PiSharp.Durable.Web.BrowserTests` and `PiSharp.WebAgent.BrowserTests`: not built or run. The three Razor views changed here
+  (`_ToolCall.cshtml`, `_TaskTree.cshtml`, `_ChatToolCall.cshtml`) compile, and no case renders a parked call in a browser.
+- `PiSharp.McpParity.Tests`, `PiSharp.ToolSearch.Tests`, `PiSharp.CodingAgent.Tests`: the coding agent's MCP and code-mode integration
+  did not change. It uses `PiSharp.Codemode`, not Durable's code mode, and no file of it named the removed API. `src/PiSharp.Cli`
+  changed only under `Durable/` (attach and the durable TUI), which `PiSharp.DurableCli.Tests` covers.
+- No failure needed a comparison with the base commit: the only failing check is the node test above.
