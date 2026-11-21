@@ -681,7 +681,7 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
                     connection = DeferredConnection(liveSelection, liveRuntime ?? LiveSessionRuntime.Default);
                 }
             var profile = new OfflineSessionProfile(canonicalWorkspace, new BuiltinToolCatalog(canonicalWorkspace, toolHome, files,
-                readWriteOptions: ReadOptions(toolSettings, modelDefinition.DeclaresImageInput),
+                readWriteOptions: ReadOptions(toolSettings, modelDefinition.DeclaresImageInput, modelDefinition.Id),
                 // Pi edits files of any size; only the edit arguments and the display diff keep the profile bounds.
                 editOptions: new(MaximumInputBytes: 64 * 1024 * 1024, MaximumOutputBytes: 64 * 1024 * 1024, MaximumArgumentCharacters: 65_536,
                     DiffOptions: new(MaximumOutputCharacters: 4096)), bash: bashTool,
@@ -897,11 +897,11 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
     /// <summary>Pi's read and write limits behind the profile bounds: reads and writes of files of up to 64 MiB (a write's content
     /// within <see cref="WriteArgumentCharacters"/>), and images through the SkiaSharp codec (Photon upstream) with Pi's 2000x2000 /
     /// 4.5MB resize profile.</summary>
-    private static ReadWriteToolOptions ReadOptions(BuiltinToolSettings settings, bool modelSupportsImages) =>
+    private static ReadWriteToolOptions ReadOptions(BuiltinToolSettings settings, bool modelSupportsImages, string modelId) =>
         new(MaximumReadBytes: 64 * 1024 * 1024, MaximumWriteBytes: 64 * 1024 * 1024, MaximumArgumentCharacters: WriteArgumentCharacters)
         {
             AutoResizeImages = settings.AutoResizeImages, ImageCodec = PiSharp.Tools.Skia.SkiaImageCodec.Instance,
-            CurrentModelSupportsImages = () => modelSupportsImages
+            CurrentModelSupportsImages = () => modelSupportsImages, CurrentModelId = () => modelId
         };
 
     /// <summary>The PI_* values of the profile's current session (source resolveSpawnContext), or none before attachment.</summary>

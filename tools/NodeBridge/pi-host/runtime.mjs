@@ -12,6 +12,7 @@
 import { constants as bufferConstants } from 'node:buffer';
 import { spawn } from 'node:child_process';
 import { EventEmitter } from 'node:events';
+import { constants as osConstants } from 'node:os';
 import path from 'node:path';
 import { StringDecoder } from 'node:string_decoder';
 import { pathToFileURL } from 'node:url';
@@ -42,7 +43,8 @@ const FORCE_KILL_DELAY_MS = 5000;
 
 /** Source execCommand: argv without a shell, `timeout`/`signal` stop the child with SIGTERM and then SIGKILL after five seconds,
  * stdout and stderr together are capped at `maxBuffer` bytes (the command is stopped and the result is `truncated`), and output is
- * decoded across chunk boundaries. A child that could not start resolves with its error in stderr and code 1. */
+ * decoded across chunk boundaries. A child that could not start resolves with its error in stderr and code 1; a child ended by a
+ * signal resolves with code 128 + the signal number. */
 export async function execCommand(command, args, cwd, options) {
   const maxBuffer = options?.maxBuffer ?? DEFAULT_EXEC_MAX_BUFFER;
   if (!Number.isInteger(maxBuffer) || maxBuffer < 0 || maxBuffer > bufferConstants.MAX_STRING_LENGTH) {
@@ -80,7 +82,9 @@ export async function execCommand(command, args, cwd, options) {
   finally { clearTimeout(timeoutId); clearTimeout(forceKillId); options?.signal?.removeEventListener('abort', killProcess); }
   // On truncation an incomplete UTF-8 suffix is dropped rather than flushed as a replacement character.
   if (!truncated) { stdout += stdoutDecoder.end(); stderr += stderrDecoder.end(); }
-  const exitCode = code ?? 0;
+  // exec.ts at Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (#12088): a signal-killed command has no exit code. Use the shell
+  // convention, as the bash tool does, so a timeout, an abort or a crash does not read as success (143 for SIGTERM, 137 for SIGKILL).
+  const exitCode = code ?? (proc.signalCode ? 128 + (osConstants.signals[proc.signalCode] ?? 0) : 1);
   return { stdout, stderr, code: truncated && exitCode === 0 ? 1 : exitCode, killed, truncated };
 }
 

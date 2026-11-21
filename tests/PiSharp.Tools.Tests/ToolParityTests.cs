@@ -119,8 +119,9 @@ internal static class ToolParityTests
         await File.WriteAllBytesAsync(temp.File("pixel.png"), Convert.FromBase64String(Png1x1));
         var blind = new ReadWriteTools(temp.Root, temp.Root, options: new() { CurrentModelSupportsImages = () => false });
         var result = await Read(blind, "pixel.png");
-        Equal("Read image file [image/png]\n[Current model does not support images. The image will be omitted from this request.]",
-            result.ContentValue.Value[0].GetProperty("text").GetString());
+        // Pi 1.6.0 (#12131): the stored text no longer says the model cannot see images; details name the model for renderers instead.
+        Equal("Read image file [image/png]", result.ContentValue.Value[0].GetProperty("text").GetString());
+        Equal(ReadWriteTools.UnnamedModel, result.Details.Value.GetProperty("imageUnsupportedByModel").GetString());
         var noModel = new ReadWriteTools(temp.Root, temp.Root, options: new() { CurrentModelSupportsImages = () => null });
         Equal("Read image file [image/png]", (await Read(noModel, "pixel.png")).ContentValue.Value[0].GetProperty("text").GetString());
     }

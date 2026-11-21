@@ -213,16 +213,22 @@ internal static partial class Program
         Check(missing["stderr"]!.GetValue<string>().Contains("ENOENT", StringComparison.Ordinal), "spawn error in stderr: " + missing.ToJsonString());
         Equal("""{"stdout":"","code":1,"killed":false,"truncated":false}""", Without(missing, "stderr"), "spawn error result");
         Equal("""{"stdout":"","stderr":"","code":1,"killed":false,"truncated":false}""", records["silent"]!.ToJsonString(), "a silent failure keeps stderr empty");
-        Equal("""{"stdout":"","stderr":"","code":1,"killed":true,"truncated":true}""", records["zero"]!.ToJsonString(), "maxBuffer 0 truncates everything");
+        // Pi 1.6.0 (#12088): a command the cap stopped with SIGTERM reads 143 where it read 1 (a truncated 0); one that had already
+        // exited by itself still reads 1. Upstream asserts only that the code is not 0.
+        Equal("""{"stdout":"","stderr":"","killed":true,"truncated":true}""", Without(records["zero"]!, "code"), "maxBuffer 0 truncates everything");
+        Check(StoppedCode(records["zero"]!), "zero code " + records["zero"]!.ToJsonString());
         Equal("{\"stdout\":\"" + new string('a', 1000) + "\",\"stderr\":\"\",\"code\":0,\"killed\":false,\"truncated\":false}",
             records["exact"]!.ToJsonString(), "output up to maxBuffer is unchanged");
         Equal("a€", records["cut"]!["stdout"]!.GetValue<string>(), "a cut keeps whole characters only");
-        Equal("""{"code":1,"killed":true,"truncated":true}""", Without(records["cut"]!, "stdout", "stderr"), "cut result");
-        Equal("""{"stdout":"","stderr":"","code":1,"killed":true,"truncated":true}""", records["cutStderr"]!.ToJsonString(), "a stderr cut inside a character");
+        Equal("""{"killed":true,"truncated":true}""", Without(records["cut"]!, "stdout", "stderr", "code"), "cut result");
+        Check(StoppedCode(records["cut"]!), "cut code " + records["cut"]!.ToJsonString());
+        Equal("""{"stdout":"","stderr":"","killed":true,"truncated":true}""", Without(records["cutStderr"]!, "code"), "a stderr cut inside a character");
+        Check(StoppedCode(records["cutStderr"]!), "cutStderr code " + records["cutStderr"]!.ToJsonString());
         Equal("€", records["split"]!["stdout"]!.GetValue<string>(), "a character split across chunks");
         Equal(false, records["split"]!["truncated"]!.GetValue<bool>(), "split is not truncated");
         Equal("�", records["partialAtEof"]!["stdout"]!.GetValue<string>(), "a partial character at a normal EOF");
-        Equal("""{"bytes":1000,"code":1,"killed":true,"truncated":true}""", records["flood"]!.ToJsonString(), "the combined cap stops a writing command");
+        // The flooding command never exits by itself: SIGTERM ends it (128 + 15; Node reports the same signal on Windows).
+        Equal("""{"bytes":1000,"code":143,"killed":true,"truncated":true}""", records["flood"]!.ToJsonString(), "the combined cap stops a writing command");
         if (!OperatingSystem.IsWindows())
         {
             var stubborn = records["stubborn"]!;
@@ -299,6 +305,9 @@ internal static partial class Program
         public ValueTask<ProcessRunResult> RunAsync(ProcessRequest request, ProcessOutputCallback? onUpdate = null, CancellationToken cancellationToken = default)
             => inner.RunAsync(request, onUpdate, cancellationToken);
     }
+
+    /// <summary>The code of a command the output cap stopped: 143 when SIGTERM ended it, 1 when it had already exited with 0.</summary>
+    private static bool StoppedCode(JsonNode record) => record["code"]!.GetValue<int>() is 1 or 143;
 
     private static string Without(JsonNode node, params string[] names)
     {

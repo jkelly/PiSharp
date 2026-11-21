@@ -1,7 +1,6 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/core/export-html/tool-renderer.ts and the ToolHtmlRenderer
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/coding-agent/src/core/export-html/tool-renderer.ts and the ToolHtmlRenderer
 // interface of core/export-html/index.ts.
 using System.Diagnostics.CodeAnalysis;
-using System.Text.RegularExpressions;
 
 namespace PiSharp.CodingAgent.Export;
 
@@ -58,7 +57,6 @@ public sealed record ToolHtmlRendererDependencies(Func<string?, ToolRenderers?> 
 /// <summary>createToolHtmlRenderer: runs a tool's TUI renderers and converts their ANSI lines to HTML.</summary>
 public sealed class TuiToolHtmlRenderer : IToolHtmlRenderer
 {
-    private static readonly Regex AnsiEscape = new(@"\x1b\[[0-9;]*m", RegexOptions.CultureInvariant);
     private readonly ToolHtmlRendererDependencies deps;
     private readonly Dictionary<string, IToolRenderComponent> callComponents = new(StringComparer.Ordinal), resultComponents = new(StringComparer.Ordinal);
     private readonly Dictionary<string, Dictionary<string, object?>> states = new(StringComparer.Ordinal);
@@ -67,7 +65,7 @@ public sealed class TuiToolHtmlRenderer : IToolHtmlRenderer
     public TuiToolHtmlRenderer(ToolHtmlRendererDependencies dependencies)
     { ArgumentNullException.ThrowIfNull(dependencies); deps = dependencies; }
 
-    private static bool IsBlank(string line) => Js.Trim(AnsiEscape.Replace(line, "")).Length == 0;
+    private static bool IsBlank(string line) => Js.Trim(AnsiToHtml.StripAnsiEscapes(line)).Length == 0;
 
     private static IReadOnlyList<string> TrimRenderedResultLines(IReadOnlyList<string> lines)
     {
