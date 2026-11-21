@@ -123,7 +123,12 @@ internal static partial class Program
             await world.PublishAsync(Sync160SetOf("B1", [two]));
             await Sync160Until(() => world.Fetched.Count == 1, "the published set was fetched");
             using var greeting = await world.Client.Host.GetAsync(Sync160Greeting, new(), ChordContext.Background);
-            await Sync160Until(() => greeting.Member("text").Value?.GetValue<string>() == "two", "the published set was applied");
+            // The reference is held across the reload that applies the set: its member has no value while the new code loads.
+            await Sync160Until(() =>
+            {
+                try { return greeting.Member("text").Value?.GetValue<string>() == "two"; }
+                catch (PiSharp.Chord.Data.ChordError) { return false; }
+            }, "the published set was applied");
             Equal(0, world.Errors.Count, "nothing failed");
         }),
     ];
