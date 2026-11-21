@@ -221,6 +221,8 @@ internal sealed class GivenQuery(NamedQueryHandle handle, GivenArguments args, B
             catch { now = null; }
             if (now is null || now != read) moved?.Invoke();
         });
+        // A change made outside any commit (a reference binding late) has no flush of its own: one commit soon runs it.
+        if (!batch.Running) batch.Soon(static () => { }, ChordContext.Background);
     }
 
     public void SourceRetired(ReferenceSet<IDependent> visited)
