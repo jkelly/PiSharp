@@ -128,8 +128,59 @@ internal static partial class Program
     }, "v"));
     private static string[] H6Tags(List<string> seen) { lock (seen) return [.. seen]; }
 
+    // A reference of the waits type made, called, watched and released in a frame of its own: what is left of it, weakly.
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static WeakReference[] H6ReleasedReference(ChordHost client, ChordHost server, W6WaitProbe probe)
+    {
+        var a = client.GetAsync(W6Waits, new(), S6Ctx).GetAwaiter().GetResult();
+        var waits = probe.Waits;
+        var call = H6Rejects(a.CallAsync("wait", null, S6Ctx));
+        S6Until(() => probe.Waits == waits + 1, "the call running").GetAwaiter().GetResult();
+        a.Release();
+        Equal("released", H6Code(call.GetAwaiter().GetResult()), "its call rejects released");
+        S6Settled(server, client).GetAwaiter().GetResult();
+        return [new(a)];
+    }
+
+    // A second reference retried alone after too_large/part, then released: the moved binding and its private object's replica, weakly.
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static WeakReference[] H6RetriedAlone(ChordHost client, S6Peer peer)
+    {
+        var moved = client.Hold(Notes, H6Session(), S6Ctx);
+        var hold = H6BindNext(peer).GetAwaiter().GetResult(); S6Live(moved).GetAwaiter().GetResult();
+        peer.Send(new StateMessage([new StateEntry(hold, [new StateMember(WireNames(Notes, "editor").State["notes"],
+            new Part.Text("[[\"r\",[{\"text\":\"" + new string('x', 100) + "\"}]]]"))], [], [])]));
+        peer.Next<ReleaseMessage>().GetAwaiter().GetResult();
+        S6Until(() => moved.State.Value.Kind == "failed", "the too_large failure").GetAwaiter().GetResult();
+        moved.Retry();
+        H6BindHold(peer, peer.Next<HoldMessage>().GetAwaiter().GetResult().Hold);
+        S6Live(moved).GetAwaiter().GetResult();
+        var own = client.Dispatcher.Invoke(() => ((Binding)moved).Target!);
+        var replica = client.Dispatcher.Invoke(() => own.Followed("count", Notes.Version).Source!);
+        moved.Release();
+        S6Settled(client).GetAwaiter().GetResult();
+        return [new(moved), new(own), new(replica)];
+    }
+
     private static IEnumerable<(string, Func<Task>)> RemoteSync160SharedHoldCases() =>
     [
+        Case("remote.shared-hold.gc-a-released-reference-its-calls-cancelled-is-not-kept-by-a-live-sibling-its-object-or-its-link", async () =>
+        {
+            var probe = new W6WaitProbe();
+            var (server, client) = await S6Linked(h => W6ServeWaits(h, probe)); await using var closeServer = server; await using var closeClient = client;
+            using var b = await client.GetAsync(W6Waits, new(), S6Ctx);
+            var refs = H6ReleasedReference(client, server, probe);
+            await ChordSupport.ExpectCollected(refs);
+            Equal("live", b.State.Value.Kind, "the sibling stays live");
+        }),
+        Case("remote.shared-hold.gc-after-a-retry-alone-the-old-object-keeps-neither-the-moved-binding-nor-the-private-objects-forked-replicas", async () =>
+        {
+            var (client, peer) = await H6RawProvider(new(64)); await using var closing = client;
+            using var kept = client.Hold(Notes, H6Session(), S6Ctx);
+            var refs = H6RetriedAlone(client, peer);
+            await ChordSupport.ExpectCollected(refs);
+            Check(kept.State.Value is { Kind: "failed", Cause.Kind: FailureKind.Broken }, "the reference it left stays failed broken");
+        }),
         // --- sharing ---
         Case("remote.shared-hold.two-references-from-one-host-with-one-key-share-one-hold-another-key-is-another-hold", async () =>
         {

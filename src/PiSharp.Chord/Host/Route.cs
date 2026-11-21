@@ -1,4 +1,6 @@
-// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): next/host/route.ts.
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/chord/src/host/route.ts.
+// 1.6.0 here: a resolve's result may carry `opened` (the peer's incarnation at the handshake), and a route's path tells whether it is
+// suspended (references sharing one wire hold). A route's admission (`admit`, the path gate, the cycle refusal) is chord-admission's.
 using System.Text.Json.Nodes;
 using PiSharp.Chord.Contracts;
 using PiSharp.Chord.Data;
