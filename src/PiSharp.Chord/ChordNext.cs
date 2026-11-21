@@ -9,16 +9,16 @@
 // Local package admission is prepared; final runtime/package validation and external publication remain separate gates.
 namespace PiSharp.Chord;
 
-/// <summary>The upstream source target of the Chord v2 port: Pi v1.5.2's <c>packages/chord/src</c>, now exported from the package root.
+/// <summary>The upstream source target of the Chord v2 port: Pi v1.6.0's <c>packages/chord/src</c>, now exported from the package root.
 /// The CLR name is retained for compatibility; separate Legacy APIs retain their original source identity.
-/// Every public type remains experimental (<c>PISHARP_CHORD001</c>). See the v1.5.2 applicability and validation records.</summary>
+/// Every public type remains experimental (<c>PISHARP_CHORD001</c>). See the v1.6.0 applicability and validation records.</summary>
 public static class ChordNext
 {
     /// <summary>The pinned Pi commit.</summary>
-    public const string Commit = "b4afdddf44e059c67ccf5097e5317d913521b470";
+    public const string Commit = "faac585884ae2c013a6b1400f3e9e77f10b34bac";
 
     /// <summary>The upstream package and version.</summary>
-    public const string Package = "@earendil-works/chord@1.5.2";
+    public const string Package = "@earendil-works/chord@1.6.0";
 
     /// <summary>The upstream module this assembly targets: the package root.</summary>
     public const string Module = "@earendil-works/chord";
