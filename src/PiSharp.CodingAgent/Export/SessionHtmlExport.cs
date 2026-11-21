@@ -31,13 +31,13 @@ public static class SessionHtmlExport
     /// <summary>config.ts APP_NAME (package.json piConfig has no name).</summary>
     public const string AppName = "pi";
 
-    /// <summary>Asset blobs (git blob SHA-1), embedded byte-for-byte under Export/Assets: the upstream v1.5.0 blobs (highlight.js and the
-    /// themes are unchanged since v1.2.0).</summary>
+    /// <summary>Asset blobs (git blob SHA-1), embedded byte-for-byte under Export/Assets: the upstream v1.6.0 blobs (only template.js
+    /// changed since v1.5.0; highlight.js and the themes are unchanged since v1.2.0).</summary>
     public static readonly IReadOnlyDictionary<string, string> AssetBlobs = new Dictionary<string, string>(StringComparer.Ordinal)
     {
         ["template.html"] = "eea85b9350f9af51e813d21ba6e695fa478de791", // v1.5.0 packages/coding-agent/src/core/export-html/template.html
         ["template.css"] = "2e2489994e3553c36ba70a5ac591643b4b3872fa", // v1.5.0 packages/coding-agent/src/core/export-html/template.css
-        ["template.js"] = "37022818d551a2ca080db141b4b8215ce576a85e", // v1.5.0 packages/coding-agent/src/core/export-html/template.js
+        ["template.js"] = "f7961ffb1ac9fc4dc6659ac6df97dc2bc777c494", // v1.6.0 packages/coding-agent/src/core/export-html/template.js (#12003: link clicks)
         ["vendor/marked.min.js"] = "9b8644b8c2f708da81365ff387d805dedeafd77d", // v1.5.0 export-html/vendor/marked.min.js (marked v18.0.11, MIT)
         ["vendor/marked-cjk-friendly.min.js"] = "1931333ed83a86bde59356f4328afe7a450ab096", // v1.5.0 export-html/vendor/marked-cjk-friendly.min.js (v0.1.2, MIT)
         ["vendor/highlight.min.js"] = "5d699ae6a4cfc9544a22a9ac394b01db2e5abd4f", // export-html/vendor/highlight.min.js (highlight.js v11.9.0, BSD-3-Clause)

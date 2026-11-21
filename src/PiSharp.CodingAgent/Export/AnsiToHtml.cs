@@ -1,11 +1,12 @@
-// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/coding-agent/src/core/export-html/ansi-to-html.ts.
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/coding-agent/src/core/export-html/ansi-to-html.ts.
 using System.Globalization;
 using System.Text;
 using System.Text.RegularExpressions;
 
 namespace PiSharp.CodingAgent.Export;
 
-/// <summary>ANSI SGR escapes to HTML with inline styles (16/256/RGB colors, bold, dim, italic, underline, reset).</summary>
+/// <summary>ANSI SGR escapes to HTML with inline styles (16/256/RGB colors, bold, dim, italic, underline, reset) and OSC 8 hyperlinks
+/// with http, https or mailto URLs to anchors. Other CSI, OSC and APC sequences and stray ESC characters are dropped.</summary>
 public static class AnsiToHtml
 {
     private static readonly string[] AnsiColors =
@@ -84,7 +85,47 @@ public static class AnsiToHtml
         }
     }
 
-    private static readonly Regex AnsiPattern = new(@"\x1b\[([0-9;]*)m", RegexOptions.CultureInvariant);
+    // Escape sequences: SGR (ESC[...m), other CSI sequences, OSC sequences, and APC sequences (terminated by BEL or ST).
+    private static readonly Regex AnsiPattern = new(
+        @"\x1b\[([0-9;]*)m|\x1b\[[0-?]*[ -/]*[@-~]|\x1b\]([^\x07\x1b]*)(?:\x07|\x1b\\)|\x1b_[^\x07\x1b]*(?:\x07|\x1b\\)", RegexOptions.CultureInvariant);
+
+    // OSC 8 hyperlink payload: "8;params;url".
+    private static readonly Regex Osc8Pattern = new(@"^8;[^;]*;(.*)\z", RegexOptions.CultureInvariant | RegexOptions.Singleline);
+
+    /// <summary>SAFE_LINK_REGEX /^(?:https?:|mailto:)/i: the scheme in ASCII letters of either case (JavaScript's non-Unicode
+    /// case-insensitive match maps no other character onto an ASCII letter).</summary>
+    private static bool IsSafeLink(string url) => StartsWithAsciiIgnoreCase(url, "http:") || StartsWithAsciiIgnoreCase(url, "https:") ||
+        StartsWithAsciiIgnoreCase(url, "mailto:");
+
+    private static bool StartsWithAsciiIgnoreCase(string text, string lowerPrefix)
+    {
+        if (text.Length < lowerPrefix.Length) return false;
+        for (var index = 0; index < lowerPrefix.Length; index++)
+        {
+            var c = text[index];
+            if (c is >= 'A' and <= 'Z') c = (char)(c + 32);
+            if (c != lowerPrefix[index]) return false;
+        }
+        return true;
+    }
+
+    /// <summary>url.replace(/[\x00-\x1f\x7f]/g, ""): browsers strip C0 controls from URLs, so they go before the scheme check.</summary>
+    private static string StripControls(string url)
+    {
+        if (!url.AsSpan().ContainsAnyInRange('\0', '\u001f') && !url.Contains('\u007f')) return url;
+        var builder = new StringBuilder(url.Length);
+        foreach (var c in url) if (c > '\u001f' && c != '\u007f') builder.Append(c);
+        return builder.ToString();
+    }
+
+    private static string StripEscapeCharacters(string text) => text.Contains('\u001b') ? text.Replace("\u001b", "", StringComparison.Ordinal) : text;
+
+    /// <summary>stripAnsiEscapes: removes all escape sequences matched by the converter, plus stray ESC characters.</summary>
+    public static string StripAnsiEscapes(string text)
+    {
+        ArgumentNullException.ThrowIfNull(text);
+        return StripEscapeCharacters(AnsiPattern.Replace(text, ""));
+    }
 
     /// <summary>parseInt(p, 10) || 0 over the digits of one SGR parameter.</summary>
     private static double ParseParameter(string value) => value.Length == 0 ? 0 : double.Parse(value, NumberStyles.None, CultureInfo.InvariantCulture);
@@ -93,21 +134,37 @@ public static class AnsiToHtml
     public static string Convert(string text)
     {
         ArgumentNullException.ThrowIfNull(text);
-        var style = new Style(); var result = new StringBuilder(); var lastIndex = 0; var inSpan = false;
+        var style = new Style(); var result = new StringBuilder(); var lastIndex = 0; var inSpan = false; var inLink = false;
+        void CloseSpan() { if (inSpan) { result.Append("</span>"); inSpan = false; } }
+        void OpenSpan() { if (HasStyle(style)) { result.Append("<span style=\"").Append(StyleToInlineCss(style)).Append("\">"); inSpan = true; } }
         foreach (Match match in AnsiPattern.Matches(text))
         {
             var before = text[lastIndex..match.Index];
-            if (before.Length > 0) result.Append(EscapeHtml(before));
-            var parameterText = match.Groups[1].Value;
-            var parameters = parameterText.Length > 0 ? parameterText.Split(';').Select(ParseParameter).ToArray() : [0d];
-            if (inSpan) { result.Append("</span>"); inSpan = false; }
-            ApplySgrCode(parameters, style);
-            if (HasStyle(style)) { result.Append("<span style=\"").Append(StyleToInlineCss(style)).Append("\">"); inSpan = true; }
+            if (before.Length > 0) result.Append(EscapeHtml(StripEscapeCharacters(before)));
+            if (match.Groups[1].Success)
+            {
+                var parameterText = match.Groups[1].Value;
+                var parameters = parameterText.Length > 0 ? parameterText.Split(';').Select(ParseParameter).ToArray() : [0d];
+                CloseSpan();
+                ApplySgrCode(parameters, style);
+                OpenSpan();
+            }
+            else if (match.Groups[2].Success && Osc8Pattern.Match(match.Groups[2].Value) is { Success: true } hyperlink)
+            {
+                // Keep spans nested inside the link: close and reopen the current style around link changes.
+                var url = StripControls(Js.Trim(hyperlink.Groups[1].Value));
+                CloseSpan();
+                if (inLink) { result.Append("</a>"); inLink = false; }
+                if (url.Length > 0 && IsSafeLink(url)) { result.Append("<a href=\"").Append(EscapeHtml(url)).Append("\">"); inLink = true; }
+                OpenSpan();
+            }
+            // Other OSC, CSI and APC sequences are dropped.
             lastIndex = match.Index + match.Length;
         }
         var remaining = text[lastIndex..];
-        if (remaining.Length > 0) result.Append(EscapeHtml(remaining));
-        if (inSpan) result.Append("</span>");
+        if (remaining.Length > 0) result.Append(EscapeHtml(StripEscapeCharacters(remaining)));
+        CloseSpan();
+        if (inLink) result.Append("</a>");
         return result.ToString();
     }
 
