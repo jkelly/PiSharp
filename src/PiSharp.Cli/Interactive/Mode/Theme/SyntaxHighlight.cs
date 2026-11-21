@@ -1,4 +1,4 @@
-// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/coding-agent/src/utils/syntax-highlight.ts (highlight, supportsLanguage,
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/coding-agent/src/utils/syntax-highlight.ts (highlight, supportsLanguage,
 // loadAllHighlightLanguages, getHighlightLanguageCount) and theme.ts buildCliHighlightTheme (scope to theme token mapping), over the highlight.js 10.7.3 port
 // (Theme/Highlight: the engine and every lib/languages grammar, verified against the original's output).
 namespace PiSharp.Cli.Interactive.Mode;
@@ -39,6 +39,8 @@ internal static class SyntaxHighlight
             cachedFor = t;
             return cached = new Dictionary<string, Func<string, string>>(StringComparer.Ordinal)
             {
+                // Unscoped text takes the theme foreground, not the terminal's, so it stays readable on tool cards (#11092).
+                ["default"] = s => t.Fg("text", s),
                 ["keyword"] = s => t.Fg("syntaxKeyword", s),
                 ["built_in"] = s => t.Fg("syntaxType", s),
                 ["literal"] = s => t.Fg("syntaxNumber", s),
