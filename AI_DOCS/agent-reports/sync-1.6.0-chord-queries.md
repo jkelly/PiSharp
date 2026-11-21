@@ -45,7 +45,7 @@ All 64 upstream cases have a native case. 85 new cases in all: 82 port upstream 
 
 ## 2. Suites
 
-Pinned SDK, `-c Release`, commands as in the plan file. See the end of this file for the final counts (section 8).
+Pinned SDK, `-c Release`, commands as in the plan file. The counts are in section 8.
 
 ## 3. Where a ported case differs from upstream
 
@@ -131,6 +131,7 @@ How admission should drive it:
 - **An attempt leaving parking shows `loading`** (upstream `object.unparked`). Natively a parked object kept showing `failed { waiting }` through its own steps until it went live. The existing suite did not depend on it.
 - **Staging checks a `queries` member** as an attempt does (a recording's `self.Queries` knows its builders): a missing builder for a listed query, a second schema and a private query without one fail the reload's staging, where upstream would fail the successor's activation.
 - **`PageAsync` runs on the host's dispatcher** (it may be called from any thread); the builder is called under the facet's callback lease.
+- **A reader's argument check when its source changed outside a commit.** `GivenQuery.Invalidate` compares the arguments in the batch's flush, as upstream. A native reference's member can change outside any commit (a binding that binds late), which has no flush of its own: the reader then asks for one commit soon (`Batch.Soon`).
 - **Arguments** are a `JsonNode` (null is JSON null) or a JSON watchable made by Chord (a derive, a state member, a reference's member, a constant); anything else is refused at the declaration.
 - **A mapping's item** that already has a parent is copied (a value's row is a node of its own).
 
@@ -195,4 +196,23 @@ IReadOnlyDictionary<string, INamedQuery> IReference.QueriesMember(string name);
 
 ## 8. Suites: final counts
 
-(Filled in at the end of the work; see the last commit of this file.)
+Builds, 0 errors and 0 warnings each: `src/PiSharp.Chord.Hosting`, `src/PiSharp.Durable.Store`, `tests/PiSharp.Chord.Tests`, `tests/PiSharp.Chord.Hosting.Tests`, `tests/PiSharp.Chord.Durable.Integration.Tests`, `tests/PiSharp.Durable.Tests`.
+
+| Suite | Base `2dabe61a` | This branch (`eb7c3e7b`, the last source commit) |
+|---|---|---|
+| `PiSharp.Chord.Tests` (no arguments) | 1,344 cases, 0 failed (the brief's baseline; see below) | 1,429 cases, 1,429 passed, 0 failed, run twice |
+| `PiSharp.Chord.Hosting.Tests` (no arguments) | 55 / 0 (the brief's baseline) | 55 cases, 55 passed, 0 failed |
+| `PiSharp.Chord.Durable.Integration.Tests` | passes (the brief's baseline) | 7 of 7 passed |
+| `PiSharp.Durable.Tests` (no arguments) | 4,821 cases, 0 failed, 4 skipped (the brief's baseline) | 4,821 cases, 4,817 passed, 0 failed, 4 skipped |
+
+The base's own build of the Chord suite was run once here from a copy outside the repository: 1,323 passed, and the 21 failures were the cases that look for the repository's fixtures above the binary's folder (goldens, the schema corpus), not a base defect. The first run in the tree, with the park refactor and no new case, was 1,344 / 0.
+
+The same four suites were also run in full on `5758fa16` (the source before the last one-line commit) with the same counts, so the Chord suite ran four times in full on the finished work, and three more times while it was built (after the park refactor alone: 1,344 / 0; with the first 82 cases: 1,426 / 0, twice). The 85 new cases were run five more times in a row on their own: no failure.
+
+Neither Chord suite has a skip status. `PiSharp.Durable.Tests` skips four cases on this machine, reported `SKIPPED_NO_UPSTREAM`: `compat.reverse.upstream-reads-pisharp-sessions` and the three `plan.symlink-escape.*` cases (the same four as on the base; none is this package's).
+
+The 1,429 Chord cases are the base's 1,344 and 85 new (section 1). No existing case was changed, weakened or deleted, and no case failed in any full run, so there was no failure to compare against the base.
+
+Timing. While the cases were written, three things failed and none was a flake: a stack overflow in the list invariant (a real defect, 4.3: a page loaded inside the adoption that made it), the two-owner invariant failing at an adoption (the test's pairing of calls with commits, 3.4), and expectations that assumed a commit group (3.3). Each was fixed at its cause.
+
+Not run: every suite outside the four above. Nothing outside `src/PiSharp.Chord` and `tests/PiSharp.Chord.Tests` was changed.
