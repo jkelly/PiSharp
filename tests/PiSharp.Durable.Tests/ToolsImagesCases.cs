@@ -1,4 +1,4 @@
-// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/test/tools-images.test.ts, as tools.images.<case>, on LocalExecutionEnv
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/durable/test/tools-images.test.ts, as tools.images.<case>, on LocalExecutionEnv
 // (upstream NodeExecutionEnv). Verbatim apart from these adaptations:
 // - Photon is PiSharp.Tools.Skia's SkiaImageCodec (Images.cs in PiSharp.Durable.Tools/Images maps the two): the fixtures are built, and the
 //   prepared images decoded, with SkiaSharp where upstream builds and decodes them with Photon; the processor is
@@ -15,6 +15,11 @@
 //   per-call heap limit to run under, so the case measures what the encoding allocates on its thread instead
 //   (GC.GetAllocatedBytesForCurrentThread) and expects less than 128 MiB, with the same 3,147,295 bytes and the same comparison with
 //   standard base64.
+// - Pi v1.6.0 moved the fixtures (blocks, pixels, encode, noisyPng, bmp, gif, tiff, withOrientation, webpWithOrientation, decodedImage) to
+//   test/image-fixtures.ts, shared with images-fit.test.ts. Here they stay in this file as private members of the partial Program class,
+//   which Sync160ImagesFitCases.cs shares. Upstream's stand-in model gained `id: "test"`; ImageTestModel already had it.
+// - Pi v1.6.0 (#12131): "says when the model sees a placeholder instead of the image" became "names a text-only model in details for UIs,
+//   not in what the model gets" (case id renamed with it): the diagnostic is gone and details carry imageUnsupportedByModel.
 using System.Collections.Immutable;
 using System.Reflection;
 using System.Runtime.InteropServices;
@@ -350,12 +355,16 @@ internal static partial class Program
             Equal("a.bmp is an image (image/bmp) that needs converting, and no image processor is configured", string.Join("|", Messages(result)), "message");
         });
 
-        yield return ImagesCase("without-processor.says-when-the-model-sees-a-placeholder-instead-of-the-image", async directory =>
+        yield return ImagesCase("without-processor.names-a-text-only-model-in-details-for-uis-not-in-what-the-model-gets", async directory =>
         {
             var result = await ReadImageFile(directory, "a.png", EncodeImage(4, 4, "png"), input: ["text"]);
-            Equal(1, result.Output?.Count, "one block");
-            Equal("Read image file [image/png]. The current model does not support images; it sees a placeholder instead.", string.Join("|", Messages(result)),
-                "messages");
+            // The result is replayed after a switch to a vision model, so it keeps the image and no note that the model cannot see it; pi-ai
+            // replaces the image per request instead (#12131).
+            Equal("image/png", OnlyImage(result).MimeType, "mimeType");
+            Equal("Read image file [image/png].", string.Join("|", Messages(result)), "messages");
+            Equal("""{"imageUnsupportedByModel":"test"}""", result.Details?.ToJson(), "details");
+            var vision = await ReadImageFile(directory, "a.png", EncodeImage(4, 4, "png"));
+            Check(vision.Details is null, "a vision model's read has no details");
         });
 
         yield return ImagesCase("without-processor.applies-the-models-image-limits-instead-of-the-defaults", async directory =>
