@@ -77,6 +77,9 @@ internal sealed class RouteAdmission
     /// <summary>How many decisions it holds now (one per principal key and address with holds).</summary>
     internal int Decisions => asked.Count;
 
+    /// <summary>The decisions it holds now (for the tests' weak references).</summary>
+    internal Decision[] DecisionsNow => [.. asked.Values.Select(entry => entry.Decision).OfType<Decision>()];
+
     /// <summary>Whether <paramref name="holding"/> binds a reference of this route's own admission (which may hold nothing behind the
     /// route).</summary>
     internal bool Admitting(ChordContext holding) => ReferenceEquals(holding.Value(AdmittingKey), route);
