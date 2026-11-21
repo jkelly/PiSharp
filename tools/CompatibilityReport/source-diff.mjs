@@ -6,7 +6,9 @@ import { writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-export function sourceDiff(upstream, from = 'v1.5.0', to = 'v1.5.2') {
+// from/to are explicit: each sync's inventory names its own endpoints (v1.5.0..v1.5.2, v1.5.2..v1.6.0, ...).
+export function sourceDiff(upstream, from, to) {
+  if (!from || !to) throw new Error('sourceDiff requires the from and to tags');
   const git = (...args) => execFileSync('git', ['-C', resolve(upstream), ...args], { maxBuffer: 1 << 30 });
   const ref = tag => ({ tag, commit: git('rev-parse', `${tag}^{commit}`).toString().trim(), tree: git('rev-parse', `${tag}^{tree}`).toString().trim() });
   const before = ref(from), after = ref(to);
@@ -46,7 +48,7 @@ export function sourceDiff(upstream, from = 'v1.5.0', to = 'v1.5.2') {
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
   const args = Object.fromEntries(process.argv.slice(2).reduce((out, arg, i, all) => arg.startsWith('--') ? [...out, [arg.slice(2), all[i + 1]]] : out, []));
-  if (!args.upstream || !args.out) throw new Error('--upstream and --out are required');
+  if (!args.upstream || !args.out || !args.from || !args.to) throw new Error('--upstream, --from, --to and --out are required');
   const inventory = sourceDiff(args.upstream, args.from, args.to);
   writeFileSync(resolve(args.out), JSON.stringify(inventory, null, 2) + '\n');
   console.log(JSON.stringify(inventory.summary, null, 2));
