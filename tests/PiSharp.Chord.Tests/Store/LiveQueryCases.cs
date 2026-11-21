@@ -530,6 +530,39 @@ internal static partial class Program
             Equal(0, owner.Failures.Count, "a query failure remains isolated from its table owner");
             query.Detach(new InvalidOperationException("done"));
         }),
+        Case("store.live-query.160-one-frame-per-commit-when-its-value-is-set-several-times-in-that-commit", async () =>
+        {
+            await using var store = await MemoryStore();
+            var owner = new LiveQueryTestOwner();
+            var handle = await LiveQueryHandle(store, owner);
+            await StoreCommitWith(store, handle, changes => changes.Put(LiveQueryRow(1)));
+            var state = new StateHost();
+            var (query, target) = LiveQueryOver(handle, store, owner, state);
+            await query.LoadAsync(target, ChordContext.Background);
+            var calls = ChordSupport.ChangesOf(await query.WatchAsync(ChordContext.Background));
+            var deliveries = new Sync160Recorder();
+            query.Subscribe(deliveries);
+            // Two refreshes in one commit (a host data change beside a transaction's own, a list touching several pages): the read runs in
+            // the step twice, both runs are adopted in the commit's batch, and the value is set twice.
+            List<IStagedWrite> staged = [];
+            new TableChanges(handle, staged).Put(LiveQueryRow(2));
+            TableChange[] bulk = [new TableChange(handle.Sql.Table, TableChangeKind.Bulk, null, null)];
+            var first = new ReadRefresh(store.ReadIndex, [handle.Sql.Table], () => bulk, ChordContext.Background);
+            var second = new ReadRefresh(store.ReadIndex, [handle.Sql.Table], () => bulk, ChordContext.Background);
+            staged.Add(first.Write);
+            new TableChanges(handle, staged).Put(LiveQueryRow(3));
+            staged.Add(second.Write);
+            await store.CommitAsync(staged, new CommitFence(() => true, (_, _) => state.Batch.Commit(() => { first.Adopt(); second.Adopt(); }, ChordContext.Background)),
+                ChordContext.Background);
+            state.Delivered();
+            Equal(1, deliveries.Calls.Count, "one frame for the commit, as a link takes it");
+            Equal(1, calls.Count, "one call for a watch");
+            Json("""[["p",[],1,0,[{"id":2,"value":{"n":2}},{"id":3,"value":{"n":3}}]]]""", ChordSupport.OpsJson(((WatchValueCall<JsonNode?>)calls[0]).Ops),
+                "the diff from the value before the commit to the last one set");
+            Json("""[{"id":1,"value":{"n":1}},{"id":2,"value":{"n":2}},{"id":3,"value":{"n":3}}]""", query.Value, "the rows");
+            query.Unsubscribe(deliveries);
+            query.Detach(new InvalidOperationException("done"));
+        }),
         Case("store.live-query.160-refused-step-adopts-nothing", async () =>
         {
             await using var store = await MemoryStore();

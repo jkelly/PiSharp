@@ -650,4 +650,51 @@ internal static partial class Program
             await store.DisposeAsync();
         }),
     ];
+
+    // Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/chord/src/documents/transaction.ts (#refreshQueries). Authored: upstream's
+    // transaction.test.ts did not change at 1.6.0; what changed in transaction.ts is asserted through a host in store/live-query.test.ts
+    // (Store/LiveQueryCases.cs). These cases pin it at the transaction: a commit stages the refresh of the store's reads over the tables it
+    // wrote whether or not a read exists when it stages, and the reads are chosen in its step.
+    private static IEnumerable<(string, Func<Task>)> DocumentsTransactionSync160Cases() =>
+    [
+        Case("documents.transaction.160-a-commit-refreshes-the-stores-reads-over-the-tables-it-wrote-also-one-opened-while-it-waited", async () =>
+        {
+            var (made, store, handles) = await TxStored();
+            var edits = handles[0].Edits;
+            // Another commit holds the queue: the transaction's commit waits behind it.
+            var held = HoldNextCommit(store);
+            var blocking = store.CommitAsync([], CommitFence.Open, DocumentsBg);
+            await held.Entered;
+            var writing = made.Attempts[0].TxAsync(tx =>
+            {
+                tx.Put(edits, TxRow("e1", 1));
+                return Task.CompletedTask;
+            }, DocumentsBg);
+            await Task.Delay(30);
+            // No read existed when the transaction staged its writes. This one is registered while its commit waits, and not loaded.
+            var runs = new List<ReadRun>();
+            var query = new OpenQuery(new ReadSite(store, Sync160Batch()), new QuerySpec(Tables.Query(TxEdits), edits.Sql.Table, Projection.All, edits), ReadShape.Rows,
+                () => { }, DocumentsBg);
+            query.Read(new ReadKind.Rows(new ReadRange(5)), new ReadSink(run => { lock (runs) runs.Add(run); }));
+            held.Release();
+            await blocking;
+            await writing;
+            Equal(1, runs.Count, "the commit ran the read it found in its step");
+            Sequence(["[\"e1\"]"], ((ReadRun.Rows)runs[0]).Result.Rows.Select(row => Sync160Stored(row, "id")), "with the rows it wrote");
+            // A transaction that writes no table stages no refresh: the read is not run.
+            await made.Attempts[0].TxAsync(async tx => { (await tx.DraftAsync(handles[0].N))["n"] = 1; }, DocumentsBg);
+            Equal(1, runs.Count, "a commit without table writes runs no read");
+            // A write that cannot change the result is skipped: an update, of a row that was not fetched, of a column that decides neither
+            // membership nor position.
+            await made.Attempts[0].TxAsync(tx =>
+            {
+                tx.Update(edits, TxKey("nope"), new JsonObject { ["at"] = 9 });
+                return Task.CompletedTask;
+            }, DocumentsBg);
+            Equal(1, runs.Count, "an update that can bring no row in is skipped");
+            query.Close();
+            await made.Host.CloseAsync();
+            await store.DisposeAsync();
+        }),
+    ];
 }
