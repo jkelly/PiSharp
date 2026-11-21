@@ -63,3 +63,4 @@ tools/PerformanceReview/memory-pass-2/restore-previous-pass.patch -text whitespa
 
 # Exact current release catalog bytes, independently verified against the npm archive.
 /src/PiSharp.AI/Catalogs/Releases/1.5.2/*.json -text
+/src/PiSharp.AI/Catalogs/Releases/1.6.0/*.json -text
