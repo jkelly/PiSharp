@@ -1,3 +1,4 @@
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/ai/src/api/openai-completions.ts (the chunk stream processing and parseChunkUsage).
 using System.Collections.Immutable;
 using System.Globalization;
 using System.Runtime.CompilerServices;
@@ -688,6 +689,9 @@ public sealed class OpenAICompletionsWireSource : IChatTransport
             var cacheRead = read ?? OptionalCount(usage, "prompt_cache_hit_tokens") ?? OptionalCount(usage, "cached_tokens") ?? 0;
             if (usage.TryGetProperty("completion_tokens_details", out var outputDetails) && outputDetails.ValueKind != JsonValueKind.Null)
                 reasoning = Count(Object(outputDetails), "reasoning_tokens");
+            // Pi 1.6.0 parseChunkUsage (#12110): completion_tokens_details?.reasoning_tokens || usage.reasoning_tokens || 0. GitHub Copilot's
+            // Gemini and Kimi models report the count at the top level of usage.
+            if (reasoning == 0) reasoning = Count(usage, "reasoning_tokens");
             if (reasoning > output) throw Protocol();
             var input = Math.Max(0, prompt - cacheRead - write);
             var extras = JsonFields.Empty.Set("reasoning", JsonData.Parse(JsonNumber.Text(reasoning)));

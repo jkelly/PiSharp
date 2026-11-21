@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/ai/src/api/openai-completions.ts (buildParams sampling merge).
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/ai/src/api/openai-completions.ts (buildParams sampling merge, detectCompat).
 using System.Collections.Immutable;
 using System.Net.Http.Headers;
 using System.Text;
@@ -409,6 +409,10 @@ public sealed class CompletionsKeyAuthRequestFactory
             var isCerebras = provider == "cerebras" || baseUrl.Contains("cerebras.ai", StringComparison.Ordinal);
             var isDeepSeek = provider == "deepseek" || baseUrl.Contains("deepseek.com", StringComparison.OrdinalIgnoreCase);
             var isGrok = provider == "xai" || baseUrl.Contains("api.x.ai", StringComparison.Ordinal);
+            // Pi 1.6.0 detectCompat (#10741): the developer role is OpenAI's. Other hosts' chat templates often reject it (Groq's Qwen
+            // answers 400 "Unexpected message role") and every host accepts system, so only OpenAI's own API gets developer by default;
+            // Azure, OpenRouter (its anthropic/ and openai/ models included) and custom hosts get system. compat.supportsDeveloperRole overrides.
+            var isOpenAI = provider == "openai" || baseUrl.Contains("api.openai.com", StringComparison.Ordinal);
             var nonStandard = isNvidia || isCerebras || isGrok || isTogether || baseUrl.Contains("chutes.ai", StringComparison.Ordinal) || isDeepSeek || isZai || isMoonshot ||
                 provider == "opencode" || baseUrl.Contains("opencode.ai", StringComparison.Ordinal) || isWorkers || isGateway || isAntLing;
             var useMaxTokens = baseUrl.Contains("chutes.ai", StringComparison.Ordinal) || isDeepSeek || isMoonshot || isGateway || isTogether || isNvidia || isAntLing || isZai;
@@ -454,7 +458,7 @@ public sealed class CompletionsKeyAuthRequestFactory
             {
                 RequiresNonNullAssistantContent = _projectionOptions.RequiresNonNullAssistantContent ?? requiresContent,
                 Reasoning = reasoning.GetBoolean(), ModelSupportsImages = input.EnumerateArray().Any(item => item.GetString() == "image"),
-                SupportsDeveloperRole = Flag("supportsDeveloperRole", isOpenRouter && (id.StartsWith("anthropic/", StringComparison.Ordinal) || id.StartsWith("openai/", StringComparison.Ordinal)) || !nonStandard && !isOpenRouter),
+                SupportsDeveloperRole = Flag("supportsDeveloperRole", isOpenAI),
               SupportsMidConversationSystemMessages = Flag("supportsMidConvoSystemMessages", false), RequiresToolResultName = Flag("requiresToolResultName", false),
               SupportsMidConversationToolAdditions = Flag("supportsMidConvoToolAdditions", false),
                 RequiresAssistantAfterToolResult = Flag("requiresAssistantAfterToolResult", false), RequiresThinkingAsText = Flag("requiresThinkingAsText", false),
