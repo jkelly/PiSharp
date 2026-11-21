@@ -1,4 +1,4 @@
-// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/tui/src/tui.ts.
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/tui/src/tui.ts.
 using System.Diagnostics;
 using System.Globalization;
 using System.Runtime.InteropServices;
@@ -824,6 +824,25 @@ public abstract partial class TuiBase : Container, ITui
         _ => marginLeft + (int)Math.Floor((availWidth - width) / 2.0)
     };
 
+    /// <summary>Drops image placements that intersect an overlay rectangle (<paramref name="overlay"/>'s row is viewport-relative).
+    /// Terminals draw images above text, so an overlay cannot paint over them. The renderers delete a placement once its line
+    /// changes and draw it again when the overlay no longer covers it. Images beside the overlay stay; on the row holding such an
+    /// image's sequence the overlay is not drawn, because <see cref="CompositeLine"/> passes image lines through.</summary>
+    private static void HideImagesUnderOverlay(List<string> lines, OverlayBounds overlay, int viewportStart)
+    {
+        if (overlay.Height == 0) return;
+        // Kitty images extend downward, so an image line above the viewport can still reach into it.
+        for (var index = Math.Max(0, viewportStart - TerminalImage.GetMaxKittyImageRows()); index < lines.Count; index++)
+        {
+            var line = lines[index];
+            if (TerminalImage.GetImageLineExtent(line) is not { } extent) continue;
+            var firstRow = index + extent.FirstRow - viewportStart;
+            var lastRow = index + extent.LastRow - viewportStart;
+            if (firstRow < overlay.Row + overlay.Height && lastRow >= overlay.Row && extent.StartCol < overlay.Col + overlay.Width && extent.EndCol > overlay.Col)
+                lines[index] = TerminalImage.StripImageSequences(line);
+        }
+    }
+
     /// <summary>Composites visible overlays (by focus order) onto the rendered lines.</summary>
     protected List<string> CompositeOverlays(List<string> lines, int termWidth, int termHeight)
     {
@@ -846,7 +865,10 @@ public abstract partial class TuiBase : Container, ITui
         var workingHeight = Math.Max(Math.Max(result.Count, termHeight), minLines);
         while (result.Count < workingHeight) result.Add("");
         var viewportStart = Math.Max(0, workingHeight - termHeight);
+        // Composite each overlay, back to front. Hiding images per overlay also hides images drawn by overlays below it.
         foreach (var (_, overlayLines, row, col, w) in rendered)
+        {
+            HideImagesUnderOverlay(result, new(row, col, w, overlayLines.Count), viewportStart);
             for (var i = 0; i < overlayLines.Count; i++)
             {
                 var index = viewportStart + row + i;
@@ -854,6 +876,7 @@ public abstract partial class TuiBase : Container, ITui
                 var line = TextUtils.VisibleWidth(overlayLines[i]) > w ? TextUtils.SliceByColumn(overlayLines[i], 0, w, true) : overlayLines[i];
                 result[index] = CompositeLine(result[index], line, col, w, termWidth);
             }
+        }
         // Remote snapshot reads can arrive while a component render/visibility callback is in flight. Keep the previous
         // completed layout stable until this composition commits, rather than exposing the temporary Bounds=null above.
         foreach (var entry in overlayStack) entry.LastRenderedBounds = entry.Bounds;
