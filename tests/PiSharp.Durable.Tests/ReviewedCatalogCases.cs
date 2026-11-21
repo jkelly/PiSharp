@@ -18,14 +18,16 @@ internal static partial class Program
                 Equal(expected.ProviderJsonSha256, current.ProviderJsonSha256, provider + " exact released snapshot");
                 count += current.Models.Length;
             }
-            Equal(1773, count, "released entries of all model types");
+            Equal(1853, count, "released entries of all model types (Pi 1.6.0)");
             var fable = DurableBuiltinCatalog.Get("anthropic")!.Models.Single(m => m.Id == "claude-fable-5-2");
             Equal(1_000_000, fable.Raw.Value.GetProperty("contextWindow").GetInt32(), "Fable 5.2 context");
             Equal(40m, fable.Cost.Value.GetProperty("output").GetDecimal(), "Fable 5.2 output rate");
             Check(fable.Raw.Value.GetProperty("compat").GetProperty("supportsMidConvoEffort").GetBoolean(), "Fable 5.2 finalization");
             using var models = new NativeDurableModels();
             Check(models.GetModel("anthropic", "claude-fable-5-2") is not null, "Fable 5.2 available to durable callers");
-            Equal(10, models.GetModels("qwen-token-plan-individual-cn").Count, "CN individual allowlist");
+            Equal(13, models.GetModels("qwen-token-plan-individual-cn").Count, "CN individual allowlist (Pi 1.6.0 added three)");
+            Check(models.GetModel("openai", "gpt-6.2-sol") is not null && models.GetModel("openai-codex", "gpt-6.2-astra") is not null, "GPT-6.2 available to durable callers");
+            Check(models.GetModel("qwen-token-plan", "deepseek-v3.2") is null, "retired Team model absent");
             Check(models.GetModel("qwen-token-plan-individual", "glm-5.3") is not null, "international individual GLM 5.3");
             Equal(1, models.GetModelsOfType("classifier", "github-copilot").Length, "Copilot classifier advertised separately");
             Check(models.GetModel("github-copilot", "microsoft-decision-1") is null, "classifier not exposed as chat");
@@ -37,9 +39,16 @@ internal static partial class Program
             var model = models.GetModel("qwen-token-plan-individual-cn", "qwen3.8-max")!;
             await models.CompleteSimpleAsync(model, UserTurn("hello"), new DurableStreamOptions { MaxTokens = 128 }, CancellationToken.None);
             var request = handler.Requests.Single();
-            Equal("https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1/chat/completions", request.Uri, "China endpoint");
+            // Pi 1.6.0 (#11773): the China gateway moved; the shared region key still authenticates the Individual plan.
+            Equal("https://token-plan.maas.qianwenaiapi.com/compatible-mode/v1/chat/completions", request.Uri, "China endpoint");
             Equal("Bearer fixture-china-key", request.Header("Authorization"), "China key");
             Equal("qwen3.8-max", request.Json.GetProperty("model").GetString(), "default model payload");
+            // The Individual CN plan's own variable is read before the shared region variable.
+            var preferred = new RecordingHandler(_ => Sse(CompletionsText));
+            using var both = Models(new() { ["QWEN_TOKEN_PLAN_CN_API_KEY"] = "fixture-china-key", ["QWEN_TOKEN_PLAN_INDIVIDUAL_CN_API_KEY"] = "fixture-plan-key" }, preferred);
+            await both.CompleteSimpleAsync(both.GetModel("qwen-token-plan-individual-cn", "qwen4-max-preview")!, UserTurn("hello"), new DurableStreamOptions { MaxTokens = 128 }, CancellationToken.None);
+            Equal("Bearer fixture-plan-key", preferred.Requests.Single().Header("Authorization"), "the per-plan key is preferred");
+            Equal("qwen4-max-preview", preferred.Requests.Single().Json.GetProperty("model").GetString(), "a model Pi 1.6.0 added");
         })
     ];
 }

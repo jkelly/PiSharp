@@ -195,14 +195,16 @@ internal static partial class Program
 
     private static void DefaultsExist()
     {
-        Equal("gpt-6.1-sol", ModelResolver.DefaultModelFor("openai"), "openai"); Equal("gpt-6.1-sol", ModelResolver.DefaultModelFor("openai-codex"), "codex");
+        // Pi 1.6.0 model-resolver.ts: the OpenAI defaults moved from gpt-6.1-sol to gpt-6.2-sol.
+        Equal("gpt-6.2-sol", ModelResolver.DefaultModelFor("openai"), "openai"); Equal("gpt-6.2-sol", ModelResolver.DefaultModelFor("openai-codex"), "codex");
         Equal("glm-5.3", ModelResolver.DefaultModelFor("zai"), "zai"); Equal("MiniMax-M3", ModelResolver.DefaultModelFor("minimax-cn"), "minimax-cn");
         Equal("gpt-oss-120b", ModelResolver.DefaultModelFor("cerebras"), "cerebras"); Equal("Ring-2.6-1T", ModelResolver.DefaultModelFor("ant-ling"), "ant-ling");
         Equal("zai/glm-5.3", ModelResolver.DefaultModelFor("vercel-ai-gateway"), "gateway"); Equal("grok-4.7", ModelResolver.DefaultModelFor("xai"), "xai");
         Equal("qwen3.8-max", ModelResolver.DefaultModelFor("qwen-token-plan-individual"), "qwen individual");
-        foreach (var provider in BuiltinModelCatalog.ShardHashes.Keys)
+        // The generated catalogs are the current release (Pi 1.6.0); the frozen 1.5.0 shards predate gpt-6.2-sol.
+        foreach (var provider in CurrentModelCatalog.Providers)
         {
-            var chat = BuiltinModelCatalog.Get(provider).Models.Where(model => model.Type == CatalogModelType.Chat).ToList();
+            var chat = CurrentModelCatalog.Get(provider)!.Models.Where(model => model.Type == CatalogModelType.Chat).ToList();
             var id = ModelResolver.DefaultModelFor(provider);
             if (chat.Count == 0) { Check(id is null, provider + " has no chat models and should have no chat default"); continue; }
             Check(chat.Any(model => model.Id == id), $"{provider} default {id} should exist in its generated catalog");
