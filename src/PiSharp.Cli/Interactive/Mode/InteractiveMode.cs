@@ -294,6 +294,7 @@ internal sealed partial class InteractiveMode
         var nextUi = CreateRenderer(mode, showHardwareCursor, terminal);
         nextUi.ClearOnShrink = clearOnShrink;
         nextUi.OnDebug = onDebug;
+        nextUi.SetSuspendSignalHandler(HandleCtrlZ);
         if (nextUi is TuiMainScreen nextMain && mainScreenRenderState is not null) nextMain.RestoreRenderState(mainScreenRenderState);
         renderer = nextUi;
         MountInteractiveTui(nextUi, components);
@@ -329,6 +330,8 @@ internal sealed partial class InteractiveMode
         defaultEditor.OnSubmit = HandleStartupSubmit;
         ui.SetFocus(editor);
 
+        // An external SIGTSTP (kill -TSTP) restores the terminal like Ctrl+Z (#12272).
+        ui.SetSuspendSignalHandler(HandleCtrlZ);
         ui.Start();
         isInitialized = true;
         programStatus.Report();
