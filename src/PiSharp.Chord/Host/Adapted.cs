@@ -50,9 +50,10 @@ internal sealed class AdaptedMembers(ServedType served, string? variant, string 
     {
         if (!Accepts(served, Version) || EventOf?.Invoke(name) is not { } node) return null;
         var mapping = SectionMapping(served, Mappings(served, Version)?.Events, variant, name);
-        if (mapping is null) return node;
         // A refused member refused the binding (Refusal): no binding of this version taps it.
-        if (mapping.Value.Map is not { } map) return null;
+        if (mapping is { Refuses: true }) return null;
+        // Unchanged since (an entry without a function is no mapping, as for a state member).
+        if (mapping?.Map is not { } map) return node;
         events ??= new(StringComparer.Ordinal);
         if (!events.TryGetValue(name, out var mapped))
             events.Add(name, mapped = new MappedEvents(node, value =>
