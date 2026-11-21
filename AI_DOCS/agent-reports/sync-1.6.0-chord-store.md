@@ -69,13 +69,26 @@ Authored cases (no upstream counterpart), all with `160` in their id: ten `store
 7. **"a refresh applied again"** stubs a `Read` upstream; here a real `Read` over a counting executor is applied twice (`Read` is sealed).
 8. **The delete-by-plugin fixture** serves the board and the ledger from two facets instead of one facet with a filtering `serve`; the view, which none of the three cases uses, is left out.
 
-No existing case was weakened. Seven were replaced: the 1.5.2 `store.live-query.*` cases were authored against `LiveQueries`, `QueryRefresh` and `StoreInternal.RefreshOf`, which 1.6.0 removes; each is rewritten against the new API with the same assertions where the behaviour still exists (see the header of `Store/LiveQueryCases.cs`). One expectation changed because upstream changed it: a commit that touches a live query's table costs one query and **two** statements more than one that does not (the probe; upstream's own cost guard changed from one).
+No existing case was weakened. Seven were replaced: the 1.5.2 `store.live-query.*` cases were authored against `LiveQueries`, `QueryRefresh` and `StoreInternal.RefreshOf`, which 1.6.0 removes; each is rewritten against the new API with the same assertions where the behaviour still exists (see the header of `Store/LiveQueryCases.cs`). No other expectation of an existing case changed. Upstream's own changed expectation is in a case that is new here: a commit that touches a live query's table costs one query and **two** statements more than one that does not (the probe; upstream's cost guard said one at 1.5.2).
 
 ## 2. Suites
 
-Pinned SDK, `-c Release`, commands as in the plan file.
+Pinned SDK, `-c Release`, commands as in the plan file. The runs below are of the source at `77d59eee` (the last source commit; the commits after it change one test assertion and this report), with the test project as of `e1348e58`.
 
-The final runs are recorded here when the last commit is made; the runs made while the work was in progress had no failure.
+Builds, 0 errors and 0 warnings each: `src/PiSharp.Chord.Hosting`, `src/PiSharp.Durable.Store`, `tests/PiSharp.Chord.Tests`, `tests/PiSharp.Chord.Hosting.Tests`, `tests/PiSharp.Chord.Durable.Integration.Tests`, `tests/PiSharp.Durable.Tests`, `tests/PiSharp.Chord.Legacy.Cluster.Tests`, `benchmarks/PiSharp.Durable.Benchmarks`, `samples/Durable.Chord.Examples`, `samples/chord/NativePlugins/Host` (with its `Shared` and `Counter` projects): every project that references `PiSharp.Chord` or `PiSharp.Chord.Hosting`.
+
+| Suite | Base `9aa79a22` (the brief's baseline) | This branch |
+|---|---|---|
+| `PiSharp.Chord.Tests` (no arguments) | 1,083 cases, 1,083 passed, 0 failed | 1,171 cases, 1,171 passed, 0 failed |
+| `PiSharp.Chord.Hosting.Tests` (no arguments) | 46 passed, 0 failed | 46 cases, 46 passed, 0 failed |
+| `PiSharp.Chord.Durable.Integration.Tests` | 7 passed, 0 failed | 7 passed, 0 failed |
+| `PiSharp.Durable.Tests` (no arguments) | not run on the base | 4,699 cases, 4,695 passed, 0 failed, 4 skipped (run twice: on `55a79dd3` and again on the final source, the same result) |
+
+Neither Chord suite has a skip status, and the integration suite skipped nothing. `PiSharp.Durable.Tests` skips four cases on this machine, reported as `SKIPPED_NO_UPSTREAM`: `compat.reverse.upstream-reads-pisharp-sessions` (`PISHARP_DURABLE_UPSTREAM` unset) and the three `plan.symlink-escape.*` cases (this process cannot create symbolic links). They are the skips the discovery report's 5.2 names; none is this package's. No case failed in any run, so there was no failure to compare against the base commit, and the base was not run again here.
+
+The 1,171 Chord cases are the 1,083 of the base without the seven replaced `store.live-query.*` ones, and 95 new: 77 port upstream cases (column-set 7, read-plan 21, reads 12, skip 15, live-query 14, store 5, host-data 3) and 18 are authored (section 1).
+
+Not run: every other suite of the repository. The public surface of `PiSharp.Chord` changed (section 5.3); nothing outside the projects listed above references it.
 
 ## 3. What `chord-queries` builds on
 
