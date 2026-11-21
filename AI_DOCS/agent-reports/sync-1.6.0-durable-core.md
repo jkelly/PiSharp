@@ -156,6 +156,8 @@ Pinned SDK (artifacts/sample-tools/dotnet), Release, on Windows, at the branch h
 | PiSharp.Chord.Durable.Integration.Tests | 7 | 7 | 0 | 0 | |
 | PiSharp.Durable150.Capture.Tests | 35 | 35 | 0 | 0 | The v1.5.0 captures still read unchanged. |
 | PiSharp.Durable.Web.Tests | 17 | 17 | 0 | 0 | |
+| PiSharp.WebAgent.Tests | 543 | 543 | 0 | 0 | |
+| PiSharp.Chord.Hosting.Tests | 46 | 46 | 0 | 0 | |
 
 The first full run of PiSharp.Durable.Tests after the source port, before any test was changed, had 4699 cases and 114 failures, all of
 them expectations upstream changed (task versions, durations, the example's printed state) or their authored forms over the v1.2.0
@@ -169,5 +171,4 @@ projects PiSharp.Durable.Tests, .Durable.Hosting.Tests, .Durable.Server.Tests, .
 Not run: the SQL Server-backed groups (storage.mssql.conformance.*, session.mssql.*, harness.*.mssql.*, the mssql upgrade cases), which
 are not enumerated without PISHARP_DURABLE_MSSQL_CONNECTION_STRING, so the new conformance case did not run against SQL Server; the 20
 storage.mssql.offline.* cases ran and passed. PiSharp.Durable.Web.BrowserTests and PiSharp.WebAgent.BrowserTests were not built or run.
-PiSharp.WebAgent.Tests, PiSharp.DurableMessages.Tests and PiSharp.Chord.Hosting.Tests were built; their runs were not finished when
-this report was written.
+PiSharp.DurableMessages.Tests was built but not run (its output is not at bin/Release/net10.0, and it is not in this package's list).
