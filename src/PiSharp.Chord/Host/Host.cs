@@ -31,7 +31,9 @@ public sealed partial class ChordHost : IAsyncDisposable
     internal bool Closed;
     internal event Action? PublishedChanged;
     internal event Action? Closing;
-    internal Func<Contract, CheckedParams, Caller, ChordContext, ITarget?>? RemoteTarget;
+    // Binds a reference to a remote object over the path its address places it on (the one this host holds for its sharing key, or a new
+    // one); false when nothing places it.
+    internal Func<Binding, bool>? BindRemote;
     private readonly List<Binding> bindings = [];
     private readonly List<CallContext> roots = [];
     private readonly List<RegistryContribution> facetContributions = [];
@@ -212,8 +214,7 @@ public sealed partial class ChordHost : IAsyncDisposable
                 binding.Bind(LocalObject(served, binding.Parameters, binding.Caller, binding.AcquisitionContext));
                 return;
             }
-            var remote = RemoteTarget?.Invoke(type, binding.Parameters, binding.Caller, binding.AcquisitionContext);
-            if (remote is not null) { binding.Bind(remote); return; }
+            if (BindRemote?.Invoke(binding) == true) return;
             binding.Waiting(new ChordError("unavailable", $"{type.Name}: no provider"));
         }
         catch (Exception error) { binding.Failed(new FailureCause(FailureKind.Broken, DataInternal.AsChordError(error, binding.Contract.Name))); }

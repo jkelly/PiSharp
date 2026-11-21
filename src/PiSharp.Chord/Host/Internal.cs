@@ -47,10 +47,17 @@ internal interface ITarget
     object? Instance { get; }
     void Hold(IHolder holder);
     void Unhold(IHolder holder);
-    Task<object?> CallAsync(string method, object? args, ChordContext context, Caller caller, long version);
+    /// <summary>Calls a method of the live object for <paramref name="holder"/> (its caller, at its contract's version: an older one is
+    /// mapped); over a link the call is the holder's own, cancelled with its release.</summary>
+    Task<object?> CallAsync(string method, object? args, IHolder holder, ChordContext context);
     Followed Followed(string member, long version);
     IKeyedHandle KeyedMember(string member, long version);
-    void Retry(RetryWalk walk);
+    /// <summary><c>Retry()</c> from <paramref name="holder"/>, as one step of <paramref name="walk"/>: an attempt now if failed; an object
+    /// parked on failed dependencies passes it on; ignored otherwise.</summary>
+    void Retry(RetryWalk walk, IHolder? holder = null);
+    /// <summary>How many values the shared replica of state member <paramref name="member"/> took (a remote object's; decision "References
+    /// share one wire hold"); null without one (and on this host, where members are no replicas).</summary>
+    long? GenerationOf(string member) => null;
     bool Reaches(ITarget target, HashSet<ITarget> visited);
 }
 internal interface IJobOwner

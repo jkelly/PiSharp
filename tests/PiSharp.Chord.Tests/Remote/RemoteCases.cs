@@ -173,7 +173,8 @@ internal static partial class Program
         {
             var type = R1Type(); var errors = new List<HostError>(); await using var host = R1Host(errors: errors); await host.LoadAsync([], ChordContext.Background);
             var pair = MemoryLinkPair.Create(); using var raw = new R1Peer(pair.Second); host.Connect(pair.First, new() { Principal = R1User }, ChordContext.Background);
-            using var a = host.Hold(type, new(), ChordContext.Background); using var b = host.Hold(type, new(), ChordContext.Background);
+            // Two types: since Pi 1.6.0 two references of one host with one key share one hold.
+            using var a = host.Hold(type, new(), ChordContext.Background); using var b = host.Hold(R1Type("remote.counter-b"), new(), ChordContext.Background);
             var ah = await raw.Next<HoldMessage>(); var bh = await raw.Next<HoldMessage>();
             raw.Send(new BoundMessage([R1Bound(ah.Hold, 1), R1Bound(bh.Hold, 2)])); await R1Until(() => a.State.Value.Kind == "live" && b.State.Value.Kind == "live");
             var av = a.Member("value"); var bv = b.Member("value");
@@ -187,7 +188,8 @@ internal static partial class Program
         {
             var type = R1Type(); await using var host = R1Host(); await host.LoadAsync([], ChordContext.Background);
             var pair = MemoryLinkPair.Create(); using var raw = new R1Peer(pair.Second); host.Connect(pair.First, new() { Principal = R1User, Limits = new(100, 100) }, ChordContext.Background);
-            using var a = host.Hold(type, new(), ChordContext.Background); using var b = host.Hold(type, new(), ChordContext.Background);
+            // Two types: since Pi 1.6.0 two references of one host with one key share one hold.
+            using var a = host.Hold(type, new(), ChordContext.Background); using var b = host.Hold(R1Type("remote.counter-b"), new(), ChordContext.Background);
             var ah = await raw.Next<HoldMessage>(); var bh = await raw.Next<HoldMessage>();
             raw.Send(new BoundMessage([new(ah.Hold, 0, [new(0, new Part.Text("\"" + new string('x', 110) + "\""))], []), R1Bound(bh.Hold, 2)]));
             await R1Until(() => a.State.Value.Kind == "failed" && b.State.Value.Kind == "live");

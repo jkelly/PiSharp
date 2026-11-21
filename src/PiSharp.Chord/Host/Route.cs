@@ -66,7 +66,7 @@ internal sealed class HostRoute
         if (!addresses.TryGetValue(address.Key, out var routed))
         {
             routed = new(address); var captured = routed;
-            routed.Path = new RemotePath((change, holder) => Changed(captured, change, holder)); addresses.Add(address.Key, routed);
+            routed.Path = new RemotePath((change, holder) => Changed(captured, change, holder), () => captured.Suspended); addresses.Add(address.Key, routed);
         }
         return routed.Path;
     }

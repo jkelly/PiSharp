@@ -247,7 +247,7 @@ internal sealed class IncomingHold : IIncomingHold, IHolder, IReloadAwareHolder
         if (Decode() is not { Names: { } bound, Variant: { } data } || index < 0 || index >= bound.Methods.Count) throw new ArgumentException($"hold {Id}: no method {index}");
         var name = bound.Methods[(int)index]; return (name, data.Methods[name].Result.Bytes);
     }
-    internal Task<object?> CallAsync(string method, object? args, ChordContext context) => target!.CallAsync(method, args, context, Caller, request.Version);
+    internal Task<object?> CallAsync(string method, object? args, ChordContext context) => ((ChordObject)target!).CallAs(method, args, context, Caller, request.Version);
     public void Retry(long hops)
     {
         if (released) return;

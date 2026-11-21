@@ -1,4 +1,8 @@
-// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/chord/src/next/host/{reference,reference-source,ref-state}.ts
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/chord/src/host/{reference,reference-source,ref-state}.ts
+// 1.6.0 here: a binding's event members (decision "Events: fire-and-forget members"), and what references sharing one wire hold need
+// (decision "References share one wire hold"): calls and retries name their binding, a binding joining a bound remote object records
+// the members it has not seen (Joined, Seen), and a retry alone moves it to a private object (Transfer). Named queries (QueryMember,
+// FollowInstance) and the denied state are chord-queries' and chord-admission's.
 using System.Collections.Immutable;
 using System.Text.Json.Nodes;
 using PiSharp.Chord.Contracts;
@@ -39,6 +43,9 @@ internal sealed partial class Binding : IReference, IHolder
     private (IEventInstance Instance, long BoundAt)? eventsAt;
     private ReferenceEventTaps? eventTaps;
     private Dictionary<string, ReferenceEvents>? eventMembers;
+    // The state members it has not seen since it joined a shared remote object, each with its replica's count of values then; one is seen
+    // once that count passes. Made at the join.
+    private Dictionary<string, long>? unseen;
     internal Binding(ChordHost host, Contract contract, CheckedParams parameters, Caller caller, TimeSpan timeout, ChordObject? dependent)
     {
         this.host = host; Contract = contract; Parameters = parameters; Caller = caller; this.timeout = timeout; Dependent = dependent;
@@ -56,6 +63,35 @@ internal sealed partial class Binding : IReference, IHolder
     {
         if (Ended || ReferenceEquals(Target, target)) return;
         Host.UnboundClock.Stop(this); Target?.Unhold(this); Target = target; target.Hold(this); Retarget(); Moved();
+    }
+    /// <summary>It joined a shared remote object that was bound already: <paramref name="members"/> are the members it has not seen, with
+    /// their replicas' counts of values now. Until a value arrives for one, it shows no last value of it from before the join (as on a
+    /// fresh failed snapshot). A member it holds a value of its own for (a binding that followed another object before) keeps its history.</summary>
+    internal void Joined(IReadOnlyDictionary<string, long> members)
+    {
+        foreach (var (member, count) in members)
+        {
+            if (this.members.TryGetValue(member, out var source) && source.HasOwnValue) continue;
+            (unseen ??= new(StringComparer.Ordinal))[member] = count;
+        }
+    }
+    /// <summary>Whether member <paramref name="member"/>, unseen at its join, took a value since (its replica's count of values passed the
+    /// one recorded then, also across rebinds and a private retry's copies): from then on it is seen for good.</summary>
+    internal bool Seen(string member)
+    {
+        if (unseen is null || !unseen.TryGetValue(member, out var count)) return true;
+        if (Target?.GenerationOf(member) is not { } generation || generation <= count) return false;
+        unseen.Remove(member); return true;
+    }
+    /// <summary>Moves to <paramref name="target"/> keeping everything of its own (its reference, watches, subscriptions, waiters, last
+    /// values, unseen members): a reference retrying alone after <c>too_large/part</c>. Its previous target let it go already; its members
+    /// and keys follow <paramref name="target"/>, and it is told.</summary>
+    internal void Transfer(ITarget target)
+    {
+        if (Ended) return;
+        Target = target; target.Hold(this);
+        if (Following) Host.Batch.Within(Retarget, Host.Context); else Retarget();
+        Moved();
     }
     internal void Waiting(ChordError error) => Failed(new(FailureKind.Waiting, error));
     internal void UnbindForReload()
@@ -184,13 +220,13 @@ internal sealed partial class Binding : IReference, IHolder
             AssertUsable(); Host.Batch.AssertOutside("call");
             await ReadyAsOldWorkAsync(context);
             AssertUsable();
-            return await Target!.CallAsync(name, arguments, context, Caller, Contract.Version);
+            return await Target!.CallAsync(name, arguments, this, context);
         });
     }
     public void Retry() => Host.Dispatcher.Invoke(() =>
     {
         AssertUsable(); Host.Batch.AssertOutside("retry");
-        if (Target is null) Host.Place(this); else Target.Retry(new(new(ReferenceEqualityComparer.Instance)));
+        if (Target is null) Host.Place(this); else Target.Retry(new(new(ReferenceEqualityComparer.Instance)), this);
     });
     public void Release() { if (!Ended) Host.Dispatcher.Invoke(() => End(HostErrors.Released())); }
     public void Dispose() => Release();
@@ -198,7 +234,7 @@ internal sealed partial class Binding : IReference, IHolder
     {
         if (Ended) return;
         Host.UnboundClock.Stop(this);
-        Ended = true; var target = Target; Target = null;
+        Ended = true; var target = Target; Target = null; unseen = null;
         state = RefState.Ended(error);
         // Its subscriptions end and its event members untap (taken out first: a stopping subscription finds none).
         var taps = eventTaps; eventTaps = null; eventsAt = null; eventMembers = null; taps?.End();
@@ -255,6 +291,8 @@ internal sealed class ReferenceMember(Binding binding, string name) : Source(bin
     public override JsonNode? Value => binding.Host.Dispatcher.Invoke(() =>
     { if (failure is not null && !heldFailure) throw failure; if (!hasValue) throw failure ?? HostErrors.NotReady(name); return value; });
     public override WatchStart Start() => failure is { } error ? WatchStart.Failure(error, hasValue, value) : WatchStart.Of(Value);
+    /// <summary>Whether it holds a value of its own: one it recorded while it followed an object.</summary>
+    internal bool HasOwnValue => hasValue;
     internal void Retarget()
     {
         if (ended) return;
@@ -269,7 +307,14 @@ internal sealed class ReferenceMember(Binding binding, string name) : Source(bin
                 var next = resolved switch { Source s => s.Value, Constant c => c.Value, _ => throw HostErrors.InvalidMember(name) };
                 Record(next, null);
             }
-            catch (Exception error) { Record(value, error); }
+            catch (Exception error)
+            {
+                // A shared remote object's member it finds failed: it starts with the replica's last good value as its own once its
+                // reference has seen the member (never one from before its join; decision "References share one wire hold").
+                if (!hasValue && source is PiSharp.Chord.Remote.Replica replica && replica.Start() is { Failed: true, HasLast: true } start && binding.Seen(name))
+                { value = start.Value; hasValue = true; }
+                Record(value, error);
+            }
             source?.Subscribe(this);
         }
         else if (followed?.Error is { } error)
