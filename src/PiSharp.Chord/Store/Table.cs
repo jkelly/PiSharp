@@ -1,4 +1,4 @@
-// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/chord/src/next/store/table.ts
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/chord/src/store/table.ts
 //
 // Table definitions (slice 6a §5, §9; decisions "Flat columns", "Restricted names", "Index definitions are recorded"):
 // Tables.DefineTable(name, { Version, Columns, Key, Indexes }), checked and materialized once at declaration: its columns, its key, its
@@ -6,7 +6,8 @@
 // before it and to the migration between them (Evolution; TableEvolve.cs, TableHistory.cs). Area cv2-store-sql added this file without the
 // evolution, because the query layer compiles over a table definition; area cv2-store-tables, which owns table.ts, added the evolution and
 // ports table.test.ts (TableCases.cs). Upstream's TableDefinition<C, K, V> and KeyOf<C, K> carry TypeScript types of the columns, key and
-// version; the C# class is untyped, and a key is an object of the key columns (Rows.cs).
+// version; the C# class is untyped, and a key is an object of the key columns (Rows.cs). 1.6.0 added Exposes (slice 14 §5): the column set
+// other plugins read the table through, checked here against the table and no part of its fingerprint.
 using System.Globalization;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
@@ -29,6 +30,9 @@ public sealed class TableOptions
 
     /// <summary>Secondary indexes by name (<c>[a-z0-9_]+</c>); each ends with the primary key.</summary>
     public OrderedDictionary<string, IReadOnlyList<string>> Indexes { get; init; } = new(StringComparer.Ordinal);
+
+    /// <summary>The column set other plugins read this table through (slice 14 §5): its columns are among <see cref="Columns"/>.</summary>
+    public ColumnSet? Exposes { get; init; }
 }
 
 /// <summary>How a version came about: the version before it and the migration from there, for one <c>EvolveTable</c> (upstream
@@ -46,7 +50,7 @@ public static partial class Tables
 
 /// <summary>A declared table at one version: its columns in declaration order, key, indexes (declared columns; the key is appended when
 /// they are rendered), the fingerprint of all of it and the row codec (upstream <c>TableDefinition</c>).</summary>
-public sealed class TableDefinition
+public sealed class TableDefinition : IMatchedSet
 {
     internal TableDefinition(string name, TableOptions options, Evolution? evolution = null)
     {
@@ -78,6 +82,8 @@ public sealed class TableDefinition
         Rows = new RowCodec(Columns, Key, name);
         Refs = StoreInternal.ColumnRefs(Columns);
         Evolution = evolution;
+        if (options.Exposes is { } exposes) StoreInternal.CheckExposes(name, ByName, Key, Indexes, exposes);
+        Exposes = options.Exposes;
     }
 
     /// <summary>The table's name.</summary>
@@ -118,6 +124,11 @@ public sealed class TableDefinition
 
     /// <summary>The version before this one and the migration from it; null for a base.</summary>
     internal Evolution? Evolution { get; }
+
+    /// <summary>The column set this version exposes to other plugins, if any (not part of the fingerprint).</summary>
+    public ColumnSet? Exposes { get; }
+
+    IReadOnlyDictionary<string, Column> ISide.ByName => ByName;
 
     /// <summary>The column <paramref name="name"/>; an unknown one throws (<paramref name="what"/> names the use).</summary>
     internal Column Column(string name, string what) =>
