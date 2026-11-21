@@ -184,6 +184,32 @@ internal static class Program
             Check(durable == (expected && !stopped), "Durable exact retry phrase and exclusions");
             Check(AgentRetryPolicy.IsRetryableError(stopped ? StopReason.Stop : StopReason.Error, text) == durable, "retry classifier parity");
         }
+        // Pi 1.6.0 (faac585884ae2c013a6b1400f3e9e77f10b34bac) packages/ai/test/retry.test.ts: bare Node socket error codes (#12128), a
+        // gateway's "Connection closed." (#12064) and the Codex WebSocket lifetime limit (#12124), then what System.Net reports for the
+        // same failures (PiSharp-only). The two ports of utils/retry.ts hold the same patterns.
+        foreach (var (text, expected) in new[]
+        {
+            ("read ECONNRESET", true), ("connect ETIMEDOUT 140.82.113.3:443", true), ("write EPIPE", true), ("connect ECONNREFUSED 127.0.0.1:443", true),
+            ("ECONNABORTED", true), ("Connection reset by peer", true), ("{\"type\":\"error\",\"error\":{\"type\":\"api_error\",\"message\":\"Connection closed.\"}}", true),
+            ("Codex error: Responses websocket connection limit reached (60 minutes). Create a new websocket connection to continue.", true),
+            ("Codex error: websocket_connection_limit_reached", true), ("connection limit reached", false),
+            ("Invalid value EXECONNRESET", false), ("Unknown field ETIMEDOUTX", false), ("Invalid key ERR_EPIPE_ID", false),
+            ("read ECONNRESET insufficient_quota", false),
+            ("An existing connection was forcibly closed by the remote host.", true), ("An established connection was aborted by the software in your host machine.", true),
+            ("Software caused connection abort", true), ("No connection could be made because the target machine actively refused it.", true),
+            ("A connection attempt failed because the connected party did not properly respond after a period of time, or established connection failed because connected host has failed to respond.", true),
+            ("Broken pipe", true), ("A request to send or receive data was disallowed because the socket had already been shut down in that direction with a previous shutdown call.", true),
+            ("Unable to read data from the transport connection: Connection reset by peer.", true), ("An error occurred while sending the request.", true),
+            ("The response ended prematurely.", true), ("The remote party closed the WebSocket connection without completing the close handshake.", true),
+            ("The SSL connection could not be established, see inner exception.", false), ("An error occurred while sending the request. billing", false),
+        })
+        foreach (var stopped in new[] { false, true })
+        {
+            var message = DurableJson.Object([new("stopReason", stopped ? "stop" : "error"), new("errorMessage", text)]);
+            var durable = (bool)method.Invoke(null, [message])!;
+            Check(durable == (expected && !stopped), "Durable Pi 1.6.0 socket and connection retry classification: " + text);
+            Check(AgentRetryPolicy.IsRetryableError(stopped ? StopReason.Stop : StopReason.Error, text) == durable, "retry classifier parity: " + text);
+        }
     }
     private sealed class Capture(bool completions = false) : HttpMessageHandler
     {
