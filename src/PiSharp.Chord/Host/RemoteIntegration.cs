@@ -175,9 +175,11 @@ public sealed partial class ChordHost
                 .Select(item => DataInternal.CanonicalJson(item, context)).ToHashSet(StringComparer.Ordinal)).Contains(key);
         var error = new ChordError("forbidden", "principal revoked", "revoked");
         var count = Objects.Values.Count(obj => obj.Served.Contract.Kind == ContractKind.Remote && obj.Caller.Principal is { } principal && Revoked(principal));
-        RevokeLocal(Revoked, error);
-        foreach (var path in remoteRoutes.Values.SelectMany(route => route.Holders).Concat(parentPath.Holders).ToArray())
+        // The remote objects first: each ends every reference sharing it with the revocation (their running calls reject forbidden), before
+        // the references are ended one by one, which would release them as an ordinary release does.
+        foreach (var path in remoteRoutes.Values.SelectMany(route => route.Holders).Concat(parentPath.Holders).Concat(unplacedPath.Holders).ToArray())
             if (path is RemoteObject remote && remote.Caller.Principal is { } principal && Revoked(principal)) remote.Revoke(error);
+        RevokeLocal(Revoked, error);
         foreach (var link in remoteLinks.ToArray()) link.RevokeUnbound(Revoked, error);
         foreach (var link in remoteLinks.ToArray()) if (link.Role == LinkRole.Route) link.Send(new RevokeMessage(revocation?.DeepClone()));
         foreach (var link in remoteLinks.ToArray()) if (link.Role == LinkRole.Child && Revoked(link.Principal)) { count++; link.Close(); }
