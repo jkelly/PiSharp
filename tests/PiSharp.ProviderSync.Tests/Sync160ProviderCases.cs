@@ -44,6 +44,8 @@ internal static partial class Program
         ("sync160.responses-input-transformations-over-openai-and-azure-http", Sync160ResponsesInputTransformationsHttp),
         ("sync160.google-continuation-finish-ends-the-turn-as-length", Sync160GoogleContinuation),
         ("sync160.google-injected-http-handler-and-continuation-switch", Sync160GoogleInjectedHandler),
+        ("sync160.completions-developer-role-default-on-the-route-and-simple-paths", Sync160DeveloperRoleRoutes),
+        ("sync160.max-tokens-above-one-million-builds-on-every-request-path", Sync160LargeMaxTokens),
     ];
 
     // ---------------------------------------------------------------- retry.ts
@@ -367,9 +369,15 @@ internal static partial class Program
 
     // ---------------------------------------------------------------- openai-completions.ts
 
-    private static string Sync160CompletionsRow(string provider, string id, string baseUrl, string compat = "{}", bool reasoning = true) =>
+    private static string Sync160CompletionsRow(string provider, string id, string baseUrl, string compat = "{}", bool reasoning = true,
+        int contextWindow = 100000, int maxTokens = 1000) =>
         "{\"id\":\"" + id + "\",\"name\":\"N\",\"api\":\"openai-completions\",\"provider\":\"" + provider + "\",\"baseUrl\":\"" + baseUrl + "\",\"reasoning\":" +
-        (reasoning ? "true" : "false") + ",\"input\":[\"text\"],\"cost\":{\"input\":0,\"output\":0,\"cacheRead\":0,\"cacheWrite\":0},\"contextWindow\":100000,\"maxTokens\":1000,\"compat\":" + compat + "}";
+        (reasoning ? "true" : "false") + ",\"input\":[\"text\"],\"cost\":{\"input\":0,\"output\":0,\"cacheRead\":0,\"cacheWrite\":0},\"contextWindow\":" + contextWindow +
+        ",\"maxTokens\":" + maxTokens + ",\"compat\":" + compat + "}";
+
+    private const string Sync160CompletionChunk = """{"id":"chatcmpl-sync160","object":"chat.completion.chunk","created":1,"model":"m","choices":""";
+    private static HttpResponseMessage Sync160Completion() => Sse(null, Frames(Sync160CompletionChunk + """[{"index":0,"delta":{"role":"assistant","content":"OK"},"finish_reason":null}]}""",
+        Sync160CompletionChunk + """[{"index":0,"delta":{},"finish_reason":"stop"}],"usage":{"prompt_tokens":1,"completion_tokens":1}}"""));
 
     private static async Task Sync160CompletionsDeveloperRole()
     {
@@ -400,6 +408,22 @@ internal static partial class Program
             ("github-copilot", "gemini-4-argon", "https://api.individual.githubcopilot.com"), ("fireworks", "accounts/fireworks/routers/kimi-k3-fast", "https://api.fireworks.ai/inference/v1"),
         })
             Equal("system", (await Roles(provider, id, baseUrl))[0]);
+        // Pi 1.6.0's catalog no longer says supportsDeveloperRole: false on any row (428 rows lost it), so the default alone keeps these
+        // providers' reasoning models on system: rows without the flag, as the 1.6.0 catalog has them.
+        foreach (var (provider, baseUrl) in new[]
+        {
+            ("baseten", "https://inference.baseten.co/v1"), ("fireworks", "https://api.fireworks.ai/inference/v1"),
+            ("github-copilot", "https://api.individual.githubcopilot.com"), ("huggingface", "https://router.huggingface.co/v1"),
+            ("kimi-coding", "https://api.kimi.com/coding/v1"), ("qwen-token-plan", "https://token-plan.maas.qwencloudapi.com/compatible-mode/v1"),
+            ("qwen-token-plan-cn", "https://token-plan.maas.qianwenaiapi.com/compatible-mode/v1"),
+            ("qwen-token-plan-individual", "https://token-plan.maas.qwencloudapi.com/compatible-mode/v1"),
+            ("qwen-token-plan-individual-cn", "https://token-plan.maas.qianwenaiapi.com/compatible-mode/v1"),
+            ("deepseek", "https://api.deepseek.com"), ("cerebras", "https://api.cerebras.ai/v1"), ("moonshotai", "https://api.moonshot.ai/v1"),
+            ("nvidia", "https://integrate.api.nvidia.com/v1"), ("together", "https://api.together.xyz/v1"), ("zai", "https://api.z.ai/api/coding/paas/v4"),
+            ("opencode", "https://opencode.ai/zen/v1"), ("ant-ling", "https://api.ant-ling.com/v1"), ("cloudflare-workers-ai", "https://api.cloudflare.com/client/v4/accounts/a/ai/v1"),
+            ("cloudflare-ai-gateway", "https://gateway.ai.cloudflare.com/v1/a/g/compat"), ("xai", "https://api.x.ai/v1"), ("mistral-compat", "https://api.mistral.ai/v1"),
+        })
+            Equal("system", (await Roles(provider, "reasoning-model", baseUrl))[0]);
         // compat.supportsDeveloperRole overrides in both directions.
         Equal("developer", (await Roles("groq", "qwen/qwen3.8-27b", "https://api.groq.com/openai/v1", """{"supportsDeveloperRole":true}"""))[0]);
         Equal("system", (await Roles("openai", "gpt-5.5", "https://api.openai.com/v1", """{"supportsDeveloperRole":false}"""))[0]);
@@ -407,6 +431,135 @@ internal static partial class Program
         Equal("system", (await Roles("openai", "gpt-4.1", "https://api.openai.com/v1", reasoning: false))[0]);
         BodyEqual("developer,user,developer,user", string.Join(",", await Roles("openai", "gpt-5.5", "https://api.openai.com/v1", """{"supportsMidConvoSystemMessages":true}""", midSystem: true)));
         BodyEqual("system,user,system,user", string.Join(",", await Roles("groq", "qwen/qwen3.8-27b", "https://api.groq.com/openai/v1", """{"supportsMidConvoSystemMessages":true}""", midSystem: true)));
+    }
+
+    private static async Task Sync160DeveloperRoleRoutes()
+    {
+        // The same default through the paths a session uses: the catalog route at each thinking level (the model row is bound on every
+        // one, the summary binding included) and the Simple factory. Nothing else decides the role: the fixed OpenAI/OpenRouter factory
+        // and the Azure one bind the row too.
+        ImmutableArray<TranscriptEntry> messages = [Entry("""{"role":"system","content":"Follow instructions.","timestamp":0}"""), Ask];
+        async Task<string?> RouteRole(string provider, string baseUrl, string? level, bool thinkingProfile = true)
+        {
+            var model = new ModelDescriptor("reasoning-model", "openai-completions", provider);
+            string? body = null;
+            using var handler = new Handler(async request => { body = await request.Content!.ReadAsStringAsync(); return Sync160Completion(); });
+            using var provider0 = NativeProviderFactory.CreateCatalogCompletions(model, baseUrl, Key, new(Reasoning: true), new(),
+                JsonData.Parse(Sync160CompletionsRow(provider, "reasoning-model", baseUrl)), handler, thinkingProfile);
+            var result = await new ChatClient(provider0).CompleteAsync(new ChatRequest(model, messages, 1) { ThinkingLevel = level }).WaitAsync(Deadline);
+            Check(result.Message.StopReason == StopReason.Stop, provider + " route failed: " + PiWireJson.WriteMessage(result.Message));
+            return (string?)JsonNode.Parse(body!)!["messages"]![0]!["role"];
+        }
+        async Task<string?> SimpleRole(string provider, string baseUrl, string? reasoning)
+        {
+            var model = new ModelDescriptor("reasoning-model", "openai-completions", provider);
+            string? body = null;
+            using var handler = new Handler(async request => { body = await request.Content!.ReadAsStringAsync(); return Sync160Completion(); });
+            using var client = new HttpClient(handler);
+            var factory = new CompletionsSimpleRequestFactory(client, new(baseUrl + "/chat/completions"), model,
+                new CompletionsSimpleOptions(JsonData.Parse(Sync160CompletionsRow(provider, "reasoning-model", baseUrl)), reasoning) { ApiKey = Key });
+            StreamTerminalEvent? terminal = null;
+            await foreach (var frame in factory.StreamAsync(new(model, messages, 1))) if (frame is StreamTerminalEvent done) terminal = done;
+            Check(terminal is StreamDone, provider + " Simple request failed: " + PiWireJson.WriteMessage(terminal!.Message));
+            return (string?)JsonNode.Parse(body!)!["messages"]![0]!["role"];
+        }
+        foreach (var (provider, baseUrl) in new[]
+        {
+            ("kimi-coding", "https://api.kimi.com/coding/v1"), ("fireworks", "https://api.fireworks.ai/inference/v1"),
+            ("huggingface", "https://router.huggingface.co/v1"), ("baseten", "https://inference.baseten.co/v1"),
+        })
+        {
+            foreach (var level in new[] { null, "off", "high" }) Equal("system", await RouteRole(provider, baseUrl, level));
+            Equal("system", await RouteRole(provider, baseUrl, null, thinkingProfile: false));
+            foreach (var reasoning in new[] { null, "high" }) Equal("system", await SimpleRole(provider, baseUrl, reasoning));
+        }
+        foreach (var level in new[] { null, "off", "high" }) Equal("developer", await RouteRole("openai", "https://api.openai.com/v1", level));
+        Equal("developer", await SimpleRole("openai", "https://api.openai.com/v1", "high"));
+    }
+
+    // PiSharp-only: the request factories bound the output token limit. Pi has no ceiling and sends the catalog value as it is; the
+    // bound was 1,000,000 and refused the models whose maxTokens is 1,048,576 before any request was sent (62 rows of the Pi 1.6.0
+    // catalog, the Fireworks, OpenCode Go and Together default models among them). Its default is now the 32-bit token range.
+    private static async Task Sync160LargeMaxTokens()
+    {
+        const int large = 1_048_576;
+        // 1. The Completions key factory, alone and with the model row bound.
+        foreach (var (provider, baseUrl, field) in new[]
+        {
+            ("fireworks", "https://api.fireworks.ai/inference/v1", "max_completion_tokens"), ("together", "https://api.together.xyz/v1", "max_tokens"),
+            ("opencode-go", "https://opencode.ai/zen/go/v1", "max_completion_tokens"),
+        })
+        {
+            var model = new ModelDescriptor("large-output", "openai-completions", provider);
+            var row = JsonData.Parse(Sync160CompletionsRow(provider, "large-output", baseUrl, contextWindow: large, maxTokens: large));
+            foreach (var metadata in new JsonData?[] { null, row })
+            {
+                var factory = new CompletionsKeyAuthRequestFactory(new(baseUrl + "/chat/completions"), model, null, new CompletionsKeyAuthRequestOptions(MaxTokens: large) { ModelMetadata = metadata });
+                using var http = factory.Create(new(model, [Ask], 1), Key);
+                using var body = JsonDocument.Parse(await http.Content!.ReadAsStringAsync());
+                Equal(large, body.RootElement.GetProperty(metadata is null ? "max_completion_tokens" : field).GetInt32());
+            }
+            // The route a session uses, with the model's limit as its output cap, at a thinking level and without.
+            foreach (var level in new[] { null, "high" })
+            {
+                string? sent = null;
+                using var handler = new Handler(async request => { sent = await request.Content!.ReadAsStringAsync(); return Sync160Completion(); });
+                using var route = NativeProviderFactory.CreateCatalogCompletions(model, baseUrl, Key, new(Reasoning: true), new(MaxTokens: large), row, handler);
+                var result = await new ChatClient(route).CompleteAsync(new ChatRequest(model, [Ask], 1) { ThinkingLevel = level }).WaitAsync(Deadline);
+                Check(result.Message.StopReason == StopReason.Stop, provider + " route refused maxTokens " + large + ": " + PiWireJson.WriteMessage(result.Message));
+                Equal(large, JsonNode.Parse(sent!)![field]!.GetValue<int>());
+            }
+            // 2. The Completions Simple factory: the model's limit fitted into its context window (above the old ceiling), and whole
+            // when the window leaves room for it.
+            foreach (var window in new[] { large, 4 * large })
+            {
+                string? sent = null;
+                using var handler = new Handler(async request => { sent = await request.Content!.ReadAsStringAsync(); return Sync160Completion(); });
+                using var client = new HttpClient(handler);
+                var simple = new CompletionsSimpleRequestFactory(client, new(baseUrl + "/chat/completions"), model,
+                    new CompletionsSimpleOptions(JsonData.Parse(Sync160CompletionsRow(provider, "large-output", baseUrl, contextWindow: window, maxTokens: large))) { ApiKey = Key });
+                var resolved = simple.Resolve(new(model, [Ask], 1)).MaxTokens;
+                Check(window == large ? resolved is > 1_000_000 and < large : resolved == large, provider + " Simple resolved " + resolved + " for a window of " + window);
+                StreamTerminalEvent? terminal = null;
+                await foreach (var frame in simple.StreamAsync(new(model, [Ask], 1))) if (frame is StreamTerminalEvent done) terminal = done;
+                Check(terminal is StreamDone, provider + " Simple refused maxTokens " + large + ": " + PiWireJson.WriteMessage(terminal!.Message));
+                Equal(resolved, JsonNode.Parse(sent!)![field]!.GetValue<double>());
+            }
+        }
+        // 3. The Anthropic key factory: the projection's limit, an explicit one, and the catalog route.
+        var claude = new ModelDescriptor("large-output", "anthropic-messages", "opencode-go");
+        foreach (var options in new[] { new AnthropicMessagesKeyAuthRequestOptions(), new AnthropicMessagesKeyAuthRequestOptions(MaxTokens: large) })
+        {
+            var factory = new AnthropicMessagesKeyAuthRequestFactory(new("https://opencode.ai/zen/go"), claude, new(large, CacheRetention: AnthropicCacheRetention.None), options);
+            using var http = factory.Create(new(claude, [Ask], 1), Key);
+            using var body = JsonDocument.Parse(await http.Content!.ReadAsStringAsync());
+            Equal(large, body.RootElement.GetProperty("max_tokens").GetInt32());
+        }
+        string? anthropicBody = null;
+        using (var handler = new Handler(async request => { anthropicBody = await request.Content!.ReadAsStringAsync(); return Sync160AnthropicReply(1); }))
+        using (var route = NativeProviderFactory.CreateCatalogAnthropic(claude, "https://opencode.ai/zen/go", Key, new(large, CacheRetention: AnthropicCacheRetention.None), new(MaxTokens: large),
+            JsonData.Parse("""{"id":"large-output","name":"N","api":"anthropic-messages","provider":"opencode-go","baseUrl":"https://opencode.ai/zen/go","reasoning":false,"input":["text"],"cost":{"input":0,"output":0,"cacheRead":0,"cacheWrite":0},"contextWindow":1048576,"maxTokens":1048576}"""), handler))
+        {
+            var result = await new ChatClient(route).CompleteAsync(new ChatRequest(claude, [Ask], 1)).WaitAsync(Deadline);
+            Check(result.Message.StopReason == StopReason.Stop, "The Anthropic route refused maxTokens " + large + ": " + PiWireJson.WriteMessage(result.Message));
+            Equal(large, JsonNode.Parse(anthropicBody!)!["max_tokens"]!.GetValue<int>());
+        }
+        // The Responses factory had the same ceiling.
+        var responsesModel = new ModelDescriptor("large-output", "openai-responses", "fireworks");
+        using (var http = new ResponsesKeyAuthRequestFactory(new("https://api.fireworks.ai/inference/v1/responses"), responsesModel, new(false), new(MaxOutputTokens: large)).Create(new(responsesModel, [Ask], 1), Key))
+        using (var body = JsonDocument.Parse(await http.Content!.ReadAsStringAsync()))
+            Equal(large, body.RootElement.GetProperty("max_output_tokens").GetInt32());
+
+        // The bound is still there for a caller that configures one, and the default still stops a count outside the 32-bit range.
+        var bounded = new ModelDescriptor("bounded", "openai-completions", "fixture");
+        foreach (var options in new[] { new CompletionsKeyAuthRequestOptions(MaxTokens: large, MaximumTokenMagnitude: 1_000_000), new CompletionsKeyAuthRequestOptions(MaxTokens: 2_147_483_648d) })
+            try { _ = new CompletionsKeyAuthRequestFactory(new("https://bounded.invalid/v1/chat/completions"), bounded, null, options); throw new InvalidOperationException("A Completions limit above the bound was admitted."); }
+            catch (CompletionsRequestException error) when (error.Failure == CompletionsRequestFailure.ResourceLimit) { }
+        foreach (var options in new[] { new AnthropicMessagesKeyAuthRequestOptions(MaxTokens: large, MaximumTokenMagnitude: 1_000_000), new AnthropicMessagesKeyAuthRequestOptions(MaxTokens: 2_147_483_648d) })
+            try { _ = new AnthropicMessagesKeyAuthRequestFactory(new("https://bounded.invalid"), claude, new(128), options); throw new InvalidOperationException("An Anthropic limit above the bound was admitted."); }
+            catch (AnthropicMessagesKeyAuthRequestException error) when (error.Failure == AnthropicMessagesKeyAuthRequestFailure.ResourceLimit) { }
+        try { _ = new ResponsesKeyAuthRequestFactory(new("https://bounded.invalid/v1/responses"), responsesModel, new(false), new(MaxOutputTokens: large, MaximumOutputTokens: 1_000_000)); throw new InvalidOperationException("A Responses limit above the bound was admitted."); }
+        catch (ResponsesKeyAuthRequestException error) when (error.Failure == ResponsesKeyAuthRequestFailure.ResourceLimit) { }
     }
 
     private static async Task Sync160CompletionsReasoningTokens()
