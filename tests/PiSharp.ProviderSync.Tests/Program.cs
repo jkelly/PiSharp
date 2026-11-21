@@ -105,6 +105,7 @@ internal static partial class Program
         cases = [.. cases, .. Sync150Cases];
         cases = [.. cases, .. Sync150StreamCases()];
         cases = [.. cases, .. Sync150CatalogCases()];
+        cases = [.. cases, .. Sync160ProviderCases];
         var results = new List<object>(); var failures = 0;
         foreach (var test in cases)
         {

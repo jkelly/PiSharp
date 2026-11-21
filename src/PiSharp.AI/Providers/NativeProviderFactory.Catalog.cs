@@ -114,6 +114,10 @@ public static partial class NativeProviderFactory
         ArgumentNullException.ThrowIfNull(options);
         if (options.BaseUrl != endpoint) throw new ArgumentException("Mistral options must retain the selected endpoint.");
         options.Validate();
+        // The Simple transport reads compat.supportsStrictMode from the row itself; the direct one takes it from here (Pi 1.6.0, #12148).
+        if (!simple && modelMetadata.Value.TryGetProperty("compat", out var compat) && compat.ValueKind == System.Text.Json.JsonValueKind.Object &&
+            compat.TryGetProperty("supportsStrictMode", out var strictMode) && strictMode.ValueKind == System.Text.Json.JsonValueKind.True)
+            options = options with { SupportsStrictMode = true };
         return Bind(model, handler, client => simple
             ? new MistralSimpleHttpSseTransport(client, model, modelMetadata, options with { ApiKey = explicitApiKey })
             : new MistralTextHttpSseTransport(client, model, options with { ApiKey = explicitApiKey }));

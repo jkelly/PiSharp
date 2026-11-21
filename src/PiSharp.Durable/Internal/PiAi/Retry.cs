@@ -1,4 +1,4 @@
-// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/ai/src/utils/retry.ts (isRetryableAssistantError, retryDelayMs) over a pi-ai
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/ai/src/utils/retry.ts (isRetryableAssistantError, retryDelayMs) over a pi-ai
 // wire assistant message. PiSharp.CodingAgent's AgentRetryPolicy ports the same classifier over PiSharp.Contracts stop reasons, but
 // PiSharp.Durable does not reference PiSharp.CodingAgent; this port uses its regex translation, and the test project compares the two on
 // shared inputs. retryAssistantCall is not ported: generation drives its own durable retry loop.
@@ -42,12 +42,19 @@ internal static class PiAiRetry
         // Gateway failures relaying the upstream response stream, as `response.failed` events or error codes (#10920).
         "unable to forward upstream", "upstream.?request.?failed", "upstream_stream_read_error", "stream was interrupted", "http/?2 stream failed",
         // Network, proxy, and fetch transport failures; node-fetch system errors such as a Google ADC token refresh (#10996).
-        "network.?error", "connection.?error", "connection.?refused", "connection.?lost", "other side closed", "fetch failed",
+        "network.?error", "connection.?error", "connection.?refused", "connection.?lost",
+        // A gateway's mid-stream drop relayed as an Anthropic-style `api_error` event reading "Connection closed." (#12064).
+        "connection.?closed", "other side closed", "fetch failed",
         "request to \\S+ failed, reason:", "getaddrinfo",
+        // Bare Node socket error codes such as "read ECONNRESET", "write EPIPE" or "connect ETIMEDOUT 1.2.3.4:443" (#12128); a code
+        // inside a longer identifier does not count.
+        "(?<![a-z0-9_])(?:ECONNRESET|ECONNABORTED|ECONNREFUSED|ETIMEDOUT|EPIPE)(?![a-z0-9_])", "connection reset by peer",
         "ENOTFOUND", "EAI_AGAIN", "upstream.?connect", "reset before headers", "socket hang up", "socket connection was closed", "timed? out",
         "timeout", "terminated",
         // WebSocket close/error text.
         "websocket.?closed", "websocket.?error",
+        // Codex's 60-minute WebSocket lifetime limit, as its code or its text; a retry opens a fresh connection (#12124).
+        "websocket.?connection.?limit.?reached",
         // Premature stream endings from SDKs and transports, including Codex CLI proxies' mid-stream disconnect (#11057).
         "ended without", "stream ended before message_stop", "stream ended before a terminal response event",
         "http2 request did not get a response", "stream disconnected before completion", "cut short after the reply had begun", "pending stream has been canceled",
@@ -58,7 +65,13 @@ internal static class PiAiRetry
         // gRPC based providers.
         "ResourceExhausted",
         // Sign in with ChatGPT: usage or user data temporarily unavailable.
-        "subscription_sharing_usage_unavailable", "subscription_sharing_user_unavailable"));
+        "subscription_sharing_usage_unavailable", "subscription_sharing_user_unavailable",
+        // PiSharp-only: what System.Net reports where Node reports a bare socket error code or "Connection closed." (the SocketException
+        // texts on Windows and Unix, NetworkStream's IOException, HttpClient's failed send and premature response end, a WebSocket closed
+        // without its close handshake). The same list as PiSharp.CodingAgent's AgentRetryPolicy.
+        "forcibly closed by the remote host", "connection was aborted by the software", "software caused connection abort", "actively refused",
+        "did not properly respond after a period of time", "broken pipe", "socket had already been shut down", "transport connection",
+        "error occurred while sending the request", "response ended prematurely", "without completing the close handshake"));
 
     /// <summary>
     /// Whether a failed assistant message looks like a transient provider or transport error (upstream <c>isRetryableAssistantError</c>).

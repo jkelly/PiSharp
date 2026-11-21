@@ -50,12 +50,15 @@ internal static partial class Program
         var request = http.All.Single();
         Equal("https://chatgpt.com/backend-api/codex/responses", request.Url, "url");
         // R6: the reviewed gpt-5.6-sol catalog opts into mid-conversation additional tools. v1.5.0
-        // openai-responses-shared.ts declares even initial tools inline; Codex still keeps prompt text in instructions.
-        // Authored expected bodies below intentionally replace the former top-level-only projection; frozen captures are untouched.
+        // openai-responses-shared.ts declares even initial tools inline.
+        // Pi 1.6.0 (faac585884ae2c013a6b1400f3e9e77f10b34bac) changed three members of this body: the prompt text is the developer item after
+        // the tool declarations instead of a top-level instructions field (#12273), max_output_tokens carries streamSimple's maxTokens
+        // (the model's 128000 here), and (below) thinking off is effort none with the summary setting.
+        // Authored expected bodies below intentionally replace the former projections; frozen captures are untouched.
         JsonEqual("""
-            {"model":"gpt-5.6-sol","store":false,"stream":true,"instructions":"Be brief.",
-             "input":[{"type":"additional_tools","role":"developer","tools":[{"type":"function","name":"read","description":"Read a file","parameters":{"type":"object","properties":{"path":{"type":"string"}},"required":["path"]},"strict":null}]},{"role":"user","content":[{"type":"input_text","text":"Hi"}]}],
-             "text":{"verbosity":"low"},"include":["reasoning.encrypted_content"],"prompt_cache_key":"sess-1","tool_choice":"auto","parallel_tool_calls":true,
+            {"model":"gpt-5.6-sol","store":false,"stream":true,
+             "input":[{"type":"additional_tools","role":"developer","tools":[{"type":"function","name":"read","description":"Read a file","parameters":{"type":"object","properties":{"path":{"type":"string"}},"required":["path"]},"strict":null}]},{"role":"developer","content":"Be brief."},{"role":"user","content":[{"type":"input_text","text":"Hi"}]}],
+             "text":{"verbosity":"low"},"include":["reasoning.encrypted_content"],"prompt_cache_key":"sess-1","tool_choice":"auto","parallel_tool_calls":true,"max_output_tokens":128000,
              "reasoning":{"effort":"high","summary":"auto"}}
             """, request.Body, "codex body");
         Check(request.Header("authorization") == "Bearer " + CodexToken && request.Header("chatgpt-account-id") == "acct-123" &&
@@ -69,13 +72,14 @@ internal static partial class Program
         // Off: reasoning effort none; no session: no cache key; a "required" tool choice and service tier travel as given.
         var off = Codex(new() { ToolChoice = "required", ServiceTier = "flex", TextVerbosity = "high", Temperature = 0.2 });
         Check(off.Transport.BuildBody(new(off.Model, CodexTranscript(), 3) { ThinkingLevel = "off" }).ToJsonString() ==
-            JsonDocument.Parse("""{"model":"gpt-5.6-sol","store":false,"stream":true,"instructions":"Be brief.","input":[{"type":"additional_tools","role":"developer","tools":[{"type":"function","name":"read","description":"Read a file","parameters":{"type":"object","properties":{"path":{"type":"string"}},"required":["path"]},"strict":null}]},{"role":"user","content":[{"type":"input_text","text":"Hi"}]}],"text":{"verbosity":"high"},"include":["reasoning.encrypted_content"],"tool_choice":"required","parallel_tool_calls":true,"temperature":0.2,"service_tier":"flex","reasoning":{"effort":"none"}}""").RootElement.GetRawText(),
+            JsonDocument.Parse("""{"model":"gpt-5.6-sol","store":false,"stream":true,"input":[{"type":"additional_tools","role":"developer","tools":[{"type":"function","name":"read","description":"Read a file","parameters":{"type":"object","properties":{"path":{"type":"string"}},"required":["path"]},"strict":null}]},{"role":"developer","content":"Be brief."},{"role":"user","content":[{"type":"input_text","text":"Hi"}]}],"text":{"verbosity":"high"},"include":["reasoning.encrypted_content"],"tool_choice":"required","parallel_tool_calls":true,"max_output_tokens":128000,"temperature":0.2,"service_tier":"flex","reasoning":{"effort":"none","summary":"auto"}}""").RootElement.GetRawText(),
             "off body");
-        // minimal clamps through the thinkingLevelMap (minimal -> low); a missing system prompt uses the default instructions.
+        // minimal clamps through the thinkingLevelMap (minimal -> low); a missing system prompt sends no item (Pi 1.6.0: the default
+        // "You are a helpful assistant." instructions are gone with the instructions field).
         var spark = Codex(id: "gpt-5.6-luna");
         var minimal = spark.Transport.BuildBody(new(spark.Model, [Entry("""{"role":"user","content":"Hi","timestamp":2}""")], 3) { ThinkingLevel = "minimal" });
         Equal("""{"effort":"low","summary":"auto"}""", minimal["reasoning"]!.ToJsonString(), "minimal mapped");
-        Equal("You are a helpful assistant.", minimal["instructions"]!.GetValue<string>(), "default instructions");
+        Check(!minimal.ContainsKey("instructions") && minimal["input"]!.ToJsonString() == """[{"role":"user","content":[{"type":"input_text","text":"Hi"}]}]""", "no instructions and no prompt item: " + minimal.ToJsonString());
         Equal("https://example.com/codex/responses", OpenAICodexResponsesTransport.ResolveUrl("https://example.com/codex/"), "codex url suffix");
         Equal("https://example.com/x/codex/responses", OpenAICodexResponsesTransport.ResolveUrl("https://example.com/x"), "codex url");
         Equal("Failed to extract accountId from token", (await Throws<InvalidOperationException>(() => Task.FromResult(OpenAICodexResponsesTransport.ExtractAccountId("not-a-jwt")))).Message, "jwt");

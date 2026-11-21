@@ -1,4 +1,5 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/ai/src/api/simple-options.ts and packages/ai/src/utils/estimate.ts.
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/ai/src/api/simple-options.ts, packages/ai/src/utils/estimate.ts and
+// packages/ai/src/api/mistral-conversations.ts (the model compat read by buildChatPayload).
 using System.Collections.Immutable;
 using System.Text.Json;
 using System.Text;
@@ -55,8 +56,12 @@ public sealed class MistralSimpleHttpSseTransport : IChatTransport, IThinkingLev
                     pair => pair.Value.ValueKind == JsonValueKind.Null ? null : pair.Value.GetString(), StringComparer.Ordinal);
             var midSystem = row.TryGetProperty("compat", out var compat) && compat.ValueKind != JsonValueKind.Null &&
                 compat.TryGetProperty("supportsMidConvoSystemMessages", out var mid) && mid.ValueKind != JsonValueKind.Null && mid.GetBoolean();
+            // Pi 1.6.0 mistral-conversations.ts buildChatPayload: model.compat?.supportsStrictMode ?? false.
+            var strictMode = compat.ValueKind == JsonValueKind.Object && compat.TryGetProperty("supportsStrictMode", out var strict) &&
+                strict.ValueKind != JsonValueKind.Null && strict.GetBoolean();
             _options = options with { Reasoning = reasoning, ThinkingLevelMap = map, ModelHeaders = headers,
-                SupportsImages = images, SupportsMidConversationSystemMessages = midSystem, PromptMode = null, ReasoningEffort = null };
+                SupportsImages = images, SupportsMidConversationSystemMessages = midSystem, SupportsStrictMode = strictMode,
+                PromptMode = null, ReasoningEffort = null };
             _capabilities = new(client, model, _options); _client = client; _model = model; ModelMetadata = modelMetadata;
         }
         catch (Exception error) when (error is JsonException or InvalidOperationException or KeyNotFoundException or ArgumentException)

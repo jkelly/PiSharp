@@ -255,7 +255,8 @@ internal static partial class Program
         Check(idleDone is StreamDone && silent.Posts.Count == 1, "idle timeout falls back to SSE");
         Equal("WebSocket idle timeout after 300ms", Diagnostics(idleDone)!.Single()!["error"]!["message"]!.GetValue<string>(), "idle timeout");
         Check(await silent.WaitAsync(() => silent.Closes.Contains("1000 idle_timeout")), "closed with 1000 idle_timeout");
-        // A cached connection older than 55 minutes is closed ("connection_age_limit") and replaced.
+        // A cached connection older than 45 minutes is closed ("connection_age_limit") and replaced (Pi 1.6.0, #12124: 55 minutes before,
+        // which left a response started on a reused connection as little as 5 minutes before the server's 60-minute limit).
         await using var server = new CodexServer();
         server.OnFrame = (connection, _) => connection.SendAllAsync(CodexCompleted);
         const string session = "sess-ws-age";
@@ -263,10 +264,10 @@ internal static partial class Program
         try
         {
             Check((await Collect(aged, Hi(agedModel)))[^1] is StreamDone, "first");
-            Interlocked.Add(ref time.Now, 54 * 60_000);
-            Check((await Collect(aged, Hi(agedModel)))[^1] is StreamDone && server.Upgrades.Count == 1, "reused before 55 minutes");
+            Interlocked.Add(ref time.Now, 44 * 60_000);
+            Check((await Collect(aged, Hi(agedModel)))[^1] is StreamDone && server.Upgrades.Count == 1, "reused before 45 minutes");
             Interlocked.Add(ref time.Now, 60_000);
-            Check((await Collect(aged, Hi(agedModel)))[^1] is StreamDone && server.Upgrades.Count == 2, "replaced at 55 minutes");
+            Check((await Collect(aged, Hi(agedModel)))[^1] is StreamDone && server.Upgrades.Count == 2, "replaced at 45 minutes");
             Check(await server.WaitAsync(() => server.Closes.Contains("1000 connection_age_limit")), "closed with connection_age_limit");
             OpenAICodexWebSockets.CloseSessions(session);
             Check(await server.WaitAsync(() => server.Closes.Contains("1000 debug_close")), "session cleanup closes with debug_close");

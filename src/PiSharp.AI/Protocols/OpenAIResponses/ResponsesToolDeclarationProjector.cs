@@ -1,3 +1,5 @@
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/ai/src/api/openai-responses-shared.ts (convertResponsesTools) and
+// packages/ai/src/api/constrained-sampling.ts (makeStrictJsonSchema, resolveJsonSchemaStrictSampling).
 using System.Globalization;
 using System.Text;
 using System.Text.Encodings.Web;
@@ -183,6 +185,9 @@ public sealed class ResponsesToolDeclarationProjector
     {
         token.ThrowIfCancellationRequested();
         if (node is not JsonObject schema || UnsupportedStrictKeys.Any(schema.ContainsKey)) throw new StrictSchemaException();
+        // Pi 1.6.0 constrained-sampling.ts (#12049): OpenAI strict mode rejects a node without a type (items: {}, Type.Unknown());
+        // a bare enum counts as typed, a bare const does not.
+        if (!schema.ContainsKey("type") && !schema.ContainsKey("anyOf") && !schema.ContainsKey("enum")) throw new StrictSchemaException();
         if (schema.ContainsKey("anyOf"))
         {
             if (schema["anyOf"] is not JsonArray variants || variants.Count == 0) throw new StrictSchemaException();

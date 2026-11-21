@@ -1,3 +1,5 @@
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/ai/src/api/openai-responses-shared.ts (processResponsesStream,
+// appendReasoningRemovals) and packages/ai/src/utils/diagnostics.ts (appendAssistantMessageDiagnostic).
 using System.Collections.Immutable;
 using System.Runtime.CompilerServices;
 using System.Text;
@@ -56,6 +58,8 @@ public sealed record ResponsesTextToolOptions(
     public bool SupportsOpenAIGrammarTools { get; init; }
     /// <summary>Pi 1.5.0 openai-responses.ts: the configuration_update effort, recorded on the output as <c>providerThinkingLevel</c>.</summary>
     internal string? ProviderThinkingLevel { get; init; }
+    /// <summary>Read when a terminal response receives its openai_input_transformations diagnostic (upstream: Date.now()).</summary>
+    public TimeProvider Clock { get; init; } = TimeProvider.System;
 }
 
 /// <summary>A bounded parsed-DTO adapter. Owns the returned source enumerator, never performs HTTP or executes tools.</summary>
@@ -460,6 +464,7 @@ public sealed class ResponsesTextToolTransport : IChatTransport
                             else if (kind is not ("message" or "function_call" or "custom_tool_call")) throw Protocol();
                         }
                     }
+                    AppendReasoningRemovals(response);
                     if (OptionalString(response, "id") is { Length: > 0 } id) _properties = _properties.Set("responseId", StringData(id));
                     _properties = _properties.Set("rawStopReason", StringData(status + (string.IsNullOrEmpty(incompleteReason) ? "" : "." + incompleteReason)));
                     _stopReason = !_incomplete ? StopReason.Stop : incompleteReason == "max_output_tokens" ? StopReason.Length : StopReason.Error;
@@ -482,6 +487,35 @@ public sealed class ResponsesTextToolTransport : IChatTransport
                 default: break;
             }
             return events;
+        }
+
+        // Pi 1.6.0 openai-responses-shared.ts appendReasoningRemovals: the replayed reasoning items the API withheld from the model, with
+        // the reason for each, as one openai_input_transformations diagnostic. From GPT-6.2 on, OpenAI removes reasoning that follows an
+        // edit of earlier input (prefix_mismatch) and reasoning created under another organization, end user or model; a removal is
+        // reported again on every later request that replays the item. turn_boundary removals are left out: models that use only
+        // current-turn reasoning (all before GPT-5.6) report every earlier turn's reasoning item on every request, which would grow the
+        // session quadratically. Wire input: older servers and proxies omit the field, and malformed entries are tolerated.
+        private void AppendReasoningRemovals(JsonElement response)
+        {
+            if (!response.TryGetProperty("input_transformations", out var transformations) || transformations.ValueKind != JsonValueKind.Array) return;
+            static bool Is(JsonElement entry, string name, string expected) =>
+                entry.TryGetProperty(name, out var field) && field.ValueKind == JsonValueKind.String && JsonUtf16.GetString(field) == expected;
+            var removals = new JsonArray();
+            foreach (var entry in transformations.EnumerateArray())
+            {
+                if (entry.ValueKind != JsonValueKind.Object || !Is(entry, "type", "reasoning") || !Is(entry, "action", "removed") ||
+                    Is(entry, "reason", "turn_boundary")) continue;
+                // ({ type, id, action, reason }): those four members in that order; a missing one is left out, as JSON.stringify does.
+                var removal = new JsonObject();
+                foreach (var name in new[] { "type", "id", "action", "reason" })
+                    if (entry.TryGetProperty(name, out var field)) removal[name] = JsonUtf16.MutableNode(field.GetRawText());
+                removals.Add(removal);
+            }
+            if (removals.Count == 0) return;
+            var diagnostics = _properties.TryGet("diagnostics", out var earlier) && earlier is not null ? JsonUtf16.MutableNode(earlier)!.AsArray() : [];
+            diagnostics.Add(new JsonObject { ["type"] = "openai_input_transformations", ["timestamp"] = _options.Clock.GetUtcNow().ToUnixTimeMilliseconds(),
+                ["details"] = new JsonObject { ["transformations"] = removals } });
+            _properties = _properties.Set("diagnostics", JsonData.Parse(JsonUtf16.ToJsonString(diagnostics, JavaScriptEncoder.Default)));
         }
 
         private void ProviderFailure(string message)

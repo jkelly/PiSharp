@@ -118,6 +118,8 @@ internal sealed class LiveProviderRoute
             case "openai-codex":
                 return NativeProviderFactory.CreateCodexResponses(model, definition.Raw, new OpenAICodexResponsesOptions
                 {
+                    // Pi 1.6.0: the Codex provider no longer ignores maxTokens (max_output_tokens unless compat.supportsMaxOutputTokens is false).
+                    MaxTokens = maximum,
                     CacheRetention = summary ? "none" : cacheRetention,
                     ModelHeaders = Headers(definition),
                     Transport = runtime.Transport,
