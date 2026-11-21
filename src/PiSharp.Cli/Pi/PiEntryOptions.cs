@@ -81,6 +81,18 @@ internal sealed record PiEntryOptions
     /// <summary>The project trust of the session cwd and of other directories the run resolved (IMPL-H, IMPL-E).</summary>
     internal Func<string, bool> ProjectTrusted { get; init; } = _ => false;
     internal ImmutableArray<PiDiagnostic> StartupDiagnostics { get; init; } = [];
+    /// <summary>Pi faac585884ae2c013a6b1400f3e9e77f10b34bac agent-session-runtime.ts takeUnreportedDiagnostics: the diagnostics of
+    /// the run's current session runtime. The entry took the startup ones (they are in <see cref="StartupDiagnostics"/>). After each
+    /// session replacement (/new, /resume, /fork, import, RPC new_session, switch_session, fork and clone, or an extension's
+    /// newSession/switchSession/fork) the session host collects them again before it publishes the new session
+    /// (<c>session_switched</c>); print, JSON and RPC modes then write the unreported ones to stderr, and interactive mode takes them
+    /// with <see cref="PiSharp.CodingAgent.AgentSessionRuntimeDiagnostics.TakeUnreported"/> to show them in the chat.</summary>
+    internal PiSharp.CodingAgent.AgentSessionRuntimeDiagnostics RuntimeDiagnostics { get; init; } = new();
+    /// <summary>main.ts createRuntime on a session replacement: the diagnostics the entry collects again from the files it reads
+    /// (settings errors), without the model scope and model fallback ones the session host adds. Null collects none.</summary>
+    internal Func<CancellationToken, Task<ImmutableArray<PiDiagnostic>>>? CollectReplacementDiagnostics { get; init; }
+    /// <summary>Whether diagnostics written to stderr are colored (the entry's stderr color).</summary>
+    internal bool DiagnosticsColor { get; init; }
     /// <summary>Extension inputs parsed from the command line for IMPL-E (<c>-e</c>, <c>--no-extensions</c>, unknown flags).</summary>
     internal ImmutableArray<string> ExtensionPaths { get; init; } = [];
     internal bool NoExtensions { get; init; }

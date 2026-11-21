@@ -8,7 +8,7 @@ for (var index = 0; index < args.Length; index++)
     else throw new ArgumentException("Usage: PiSharp.Rpc.Tests [--report <path>] [--filter <name substring>]");
 }
 var tests = JsonlTransportTests.Cases().Concat(RecoverableJsonlReaderTests.Cases())
-    .Concat(RpcSessionDispatcherTests.Cases()).Concat(RpcSessionCreationTests.Cases()).Concat(SourceProgressRpcTests.Cases())
+    .Concat(RpcSessionDispatcherTests.Cases()).Concat(RpcSessionDispatcherTests.Sync160Cases()).Concat(RpcSessionCreationTests.Cases()).Concat(SourceProgressRpcTests.Cases())
     .Concat(RpcSessionCatalogTests.Cases())
     .Concat(RpcQueueRestorationTests.Cases())
     .Concat(RpcTerminalInterruptTests.Cases())

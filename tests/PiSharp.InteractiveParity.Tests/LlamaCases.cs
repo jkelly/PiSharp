@@ -225,7 +225,7 @@ internal static class LlamaCases
             await Task.Delay(300);
             pi.Type(Enter);
             await pi.WaitFor("llama.cpp server URL");
-            Contains(pi.Terminal.Text, "http://127.0.0.1:8080", "default URL placeholder");
+            Contains(pi.Terminal.Text, "http://127.0.0.1:9931", "default URL placeholder"); // Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (#12001)
             pi.Type(router.Server.Url);
             await Task.Delay(100);
             pi.Type(Enter);

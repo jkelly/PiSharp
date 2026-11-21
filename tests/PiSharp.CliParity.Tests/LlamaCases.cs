@@ -1,6 +1,8 @@
 // Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/coding-agent/test/llama-extension.test.ts, ported against
 // packages/coding-agent/src/extensions/llama/{client,provider,huggingface}.ts, plus the built-in provider's integration in the model
 // registry (auth check/resolve, the persisted catalog, the live chat route and the classifier registry).
+// The 9931 default-port expectations and the guide pin follow Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (#12001); the other v1.6.0 cases
+// are in Sync160LlamaCases.cs.
 using System.Collections.Immutable;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -66,7 +68,7 @@ internal static partial class Program
 
     private static void LlamaUrls()
     {
-        Equal("http://127.0.0.1:8080", LlamaClient.NormalizeServerUrl("http://127.0.0.1:8080/v1/"), "trailing /v1/");
+        Equal("http://127.0.0.1:9931", LlamaClient.NormalizeServerUrl("http://127.0.0.1:9931/v1/"), "trailing /v1/");
         Equal("https://example.com/prefix", LlamaClient.NormalizeServerUrl("https://example.com/prefix/v1"), "prefix");
         Equal("http://localhost:8080", LlamaClient.NormalizeServerUrl("  http://localhost:8080/?x=1#y  "), "query and fragment");
         Equal("Server URL must use http or https", Throws<InvalidOperationException>(() => LlamaClient.NormalizeServerUrl("file:///tmp/llama"), "file").Message, "file URL");
@@ -83,14 +85,14 @@ internal static partial class Program
             Info("""{"id":"loaded","status":{"value":"loaded","args":["llama-server","--n-gpu-layers","999"]},"architecture":{"input_modalities":["text","image"]},"meta":{"n_ctx":65536,"n_ctx_train":131072}}"""),
             Info("""{"id":"sleeping","status":{"value":"sleeping"}}"""),
             Info("""{"id":"unloaded","status":{"value":"unloaded"}}"""),
-            Info("""{"id":"loading","status":{"value":"loading"}}""")], "http://localhost:8080");
+            Info("""{"id":"loading","status":{"value":"loading"}}""")], "http://localhost:9931");
         var models = catalog.ChatModels;
         Names(["loaded", "sleeping"], models.Select(model => model.Id), "chat models");
-        Equal("""{"id":"loaded","name":"loaded","api":"openai-completions","provider":"llama.cpp","baseUrl":"http://localhost:8080/v1","reasoning":false,"input":["text","image"],"cost":""" + LlamaFree +
+        Equal("""{"id":"loaded","name":"loaded","api":"openai-completions","provider":"llama.cpp","baseUrl":"http://localhost:9931/v1","reasoning":false,"input":["text","image"],"cost":""" + LlamaFree +
             ""","contextWindow":65536,"maxTokens":65536,"compat":{"supportsStore":false,"supportsDeveloperRole":false,"supportsReasoningEffort":false,"supportsUsageInStreaming":true,"supportsStrictMode":false,"maxTokensField":"max_tokens"}}""",
             models[0].ToJsonString(), "loaded model");
         Equal(128000d, models[1].ContextWindow, "sleeping model without metadata");
-        Names(["loaded \"llama-cpp-classify\" \"http://localhost:8080\" 65536", "sleeping \"llama-cpp-classify\" \"http://localhost:8080\" 128000"],
+        Names(["loaded \"llama-cpp-classify\" \"http://localhost:9931\" 65536", "sleeping \"llama-cpp-classify\" \"http://localhost:9931\" 128000"],
             catalog.AllModels.Where(model => model.Type == PiSharp.AI.Catalogs.CatalogModelType.Classifier).Select(model => $"{model.Id} {Rows([model], "api", "baseUrl", "contextWindow")[0]}"), "classifier models");
     }
 
@@ -255,7 +257,7 @@ internal static partial class Program
         var catalog = LlamaCatalog.Detached();
         catalog.SetCatalog([
             Info("""{"id":"decide","status":{"value":"sleeping"},"architecture":{"output_modalities":["decisions"]}}"""),
-            Info("""{"id":"hybrid","status":{"value":"loaded"},"architecture":{"output_modalities":["text","decisions"]}}""")], "http://localhost:8080");
+            Info("""{"id":"hybrid","status":{"value":"loaded"},"architecture":{"output_modalities":["text","decisions"]}}""")], "http://localhost:9931");
         Names(["hybrid"], catalog.ChatModels.Select(model => model.Id), "chat models");
         Names(["\"decide\" \"typesafe-system-one\"", "\"hybrid\" \"typesafe-system-one\""], Rows(catalog.ClassifierJson, "id", "api"), "classifiers");
     }
@@ -278,7 +280,7 @@ internal static partial class Program
         var (key, environment) = await LlamaCatalog.LoginAsync(interaction, none, CancellationToken.None);
         Names(["GET /models"], server.Seen(), "login reads the catalog");
         Equal("Bearer secret", server.Requests.Single().Header("authorization"), "with the entered key");
-        Names(["Text llama.cpp server URL http://127.0.0.1:8080", "Secret API key (optional) "], interaction.Prompts.Select(prompt => $"{prompt.Kind} {prompt.Message} {prompt.Placeholder}"), "prompts");
+        Names(["Text llama.cpp server URL http://127.0.0.1:9931", "Secret API key (optional) "], interaction.Prompts.Select(prompt => $"{prompt.Kind} {prompt.Message} {prompt.Placeholder}"), "prompts");
         Equal("secret", key, "key");
         Equal(server.Url, environment["LLAMA_BASE_URL"], "env");
         var resolved = LlamaCatalog.Resolve(new("api_key", key, environment), none)!;
@@ -479,18 +481,19 @@ internal static partial class Program
     }
 
     // packages/coding-agent/docs/llama-cpp.md ships with the CLI as docs/llama-cpp.md (as docs/codemode.md does): the attribution comment,
-    // then upstream's file byte for byte (its git blob 6684bb4df996feabc0fb28a78bf9f9d2638bf7ef at v1.5.0: the llama.app setup).
+    // then upstream's file byte for byte (its git blob 2bb0cd49a52db9622eccd49f7368ae7447cd1500 at v1.6.0, unchanged since v1.5.2: the
+    // unified llama entry point and the 9931 default port).
     private static void LlamaGuide()
     {
         var path = Path.Combine(AppContext.BaseDirectory, "docs", "llama-cpp.md");
         Check(File.Exists(path), "docs/llama-cpp.md next to the CLI: " + path);
         var bytes = File.ReadAllBytes(path);
         var newline = Array.IndexOf(bytes, (byte)'\n');
-        Equal("<!-- Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT, Copyright (c) 2025 Mario Zechner): packages/coding-agent/docs/llama-cpp.md, unchanged except this comment. -->",
+        Equal("<!-- Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT, Copyright (c) 2025 Mario Zechner): packages/coding-agent/docs/llama-cpp.md, unchanged except this comment. -->",
             System.Text.Encoding.UTF8.GetString(bytes, 0, newline), "attribution line");
         var upstream = bytes[(newline + 1)..];
         var blob = Convert.ToHexStringLower(System.Security.Cryptography.SHA1.HashData([.. System.Text.Encoding.ASCII.GetBytes($"blob {upstream.Length}\0"), .. upstream]));
-        Equal("6684bb4df996feabc0fb28a78bf9f9d2638bf7ef", blob, "the rest is upstream's v1.5.0 blob");
+        Equal("2bb0cd49a52db9622eccd49f7368ae7447cd1500", blob, "the rest is upstream's v1.6.0 blob");
         Check(File.Exists(Path.Combine(AppContext.BaseDirectory, "docs", "codemode.md")), "next to docs/codemode.md");
     }
 

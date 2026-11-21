@@ -40,6 +40,11 @@ internal sealed partial class NativeExtensionActivation
         var registry = new ExtensionRegistry(PiExtensionHost.RegistryOptions, uiPrompts ?? (IExtensionUiProvider)new UnavailableExtensionUiProvider(),
             sessionViews, facadeCapabilities);
         if (mcpServers is not null) { registry.McpServerHost = mcpServers; mcpServers.OwnerPath = pi.PathOfOwner; }
+        // Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (#11264), runner.ts runtime.reportError: a native extension's failed pi.events
+        // listener is reported like other extension errors (the mode's ReportError: chat, extension_error, "Extension error (...)")
+        // under the extension's path, with event "events:<channel>". The Node extensions' listeners report through the Node host.
+        registry.EventBusErrorReporter = (diagnostic, _) => ObserveEventBusReport(
+            pi.ReportAsync(pi.PathOfOwner(diagnostic.OwnerId), diagnostic.EventName, diagnostic.ErrorText));
         // registerProvider with classifiers or images from native extensions; the run's model registry follows them.
         registry.ModelOperationProviderHost = pi.NativeModelProviders;
         if (pi.RunModelOperations is { } runModels) facadeHost.BindRunModelOperations(runModels);
@@ -62,6 +67,19 @@ internal sealed partial class NativeExtensionActivation
             await CollectNativeCleanupAsync(registry.DisposeAsync, failures).ConfigureAwait(false);
             if (failures.Count > 0) throw new NativeExtensionException(NativeExtensionFailure.CleanupFailed, new AggregateException(failures.Prepend(original)));
             throw;
+        }
+    }
+
+    /// <summary>Starts an event-bus error report and observes its failure: the bus's delivery never waits for the mode's output, and
+    /// a failed report (a closed output) has nowhere else to go.</summary>
+    private static void ObserveEventBusReport(ValueTask report)
+    {
+        if (report.IsCompletedSuccessfully) return;
+        _ = Observe(report);
+        static async Task Observe(ValueTask pending)
+        {
+            try { await pending.ConfigureAwait(false); }
+            catch (Exception error) when (error is not OutOfMemoryException) { }
         }
     }
 

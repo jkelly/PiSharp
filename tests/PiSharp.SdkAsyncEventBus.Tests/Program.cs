@@ -28,6 +28,7 @@ var cases = new (string Name, Func<Task> Run)[]
  ("scope and ancestor lifecycle reentry reject after await", OwnerReentry),
  ("async fault settlement cannot prevent owner cleanup", OwnerFaultCleanup)
 };var failures = 0;
+cases = [.. cases, .. Sync160EventBusCases.All]; // Pi 1.6.0 sync (#11264): owner listener failures are extension errors.
 var evidence = new List<object>();
 var callbackEvidence = new List<object>();
 var callbackOrdinal = 0;

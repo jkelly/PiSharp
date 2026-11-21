@@ -211,43 +211,56 @@ internal static partial class PiSessions
         return FindMostRecentSession(dir, FilterCwd(sessionDir, dir, cwd, agentDir) ? cwd : null);
     }
 
+    // Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (#11956), session-manager.ts list, listAll, listSessionsFromDir, mapWithConcurrency and
+    // buildSessionInfo: the listing's abort signal is the cancellation token. It is checked between files and between lines
+    // (signal.throwIfAborted()), never handed to the file read, so a cancelled listing ends with OperationCanceledException at the
+    // caller and nothing else; every file is closed when its read stops, also one skipped because it is not a session.
+
     /// <summary>Source SessionManager.list: the cwd's sessions, newest activity first.</summary>
-    internal static ImmutableArray<PiSessionInfo> List(string cwd, string? sessionDir, string agentDir)
+    internal static ImmutableArray<PiSessionInfo> List(string cwd, string? sessionDir, string agentDir, CancellationToken token = default)
     {
         var dir = Directory_(cwd, sessionDir, agentDir);
         var filter = FilterCwd(sessionDir, dir, cwd, agentDir); var resolvedCwd = Path.GetFullPath(cwd);
-        return Sort(ListDirectory(dir).Where(info => !filter || CwdMatches(info.Cwd, resolvedCwd)));
+        return Sort(ListDirectory(dir, token).Where(info => !filter || CwdMatches(info.Cwd, resolvedCwd)));
     }
 
     /// <summary>Source SessionManager.listAll: every project's sessions under the sessions directory, or one custom directory.</summary>
-    internal static ImmutableArray<PiSessionInfo> ListAll(string? sessionDir, string agentDir)
+    internal static ImmutableArray<PiSessionInfo> ListAll(string? sessionDir, string agentDir, CancellationToken token = default)
     {
-        if (sessionDir is not null) return Sort(ListDirectory(sessionDir));
+        token.ThrowIfCancellationRequested();
+        if (sessionDir is not null) return Sort(ListDirectory(sessionDir, token));
         var root = Path.Join(agentDir, "sessions");
         if (!Directory.Exists(root)) return [];
-        try { return Sort(Directory.EnumerateDirectories(root).SelectMany(ListDirectory)); }
-        catch (Exception error) when (error is IOException or UnauthorizedAccessException) { return []; }
+        try { return Sort(Directory.EnumerateDirectories(root).SelectMany(directory => ListDirectory(directory, token))); }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException) { token.ThrowIfCancellationRequested(); return []; }
     }
 
     private static ImmutableArray<PiSessionInfo> Sort(IEnumerable<PiSessionInfo> sessions) =>
         [.. sessions.OrderByDescending(info => info.Modified)];
 
-    private static IEnumerable<PiSessionInfo> ListDirectory(string directory)
+    private static IEnumerable<PiSessionInfo> ListDirectory(string directory, CancellationToken token = default)
     {
+        token.ThrowIfCancellationRequested();
         string[] files;
         try { files = Directory.Exists(directory) ? Directory.GetFiles(directory, "*.jsonl") : []; }
-        catch (Exception error) when (error is IOException or UnauthorizedAccessException) { files = []; }
-        foreach (var file in files) if (BuildSessionInfo(file) is { } info) yield return info;
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException) { token.ThrowIfCancellationRequested(); files = []; }
+        foreach (var file in files)
+        {
+            token.ThrowIfCancellationRequested();
+            if (BuildSessionInfo(file, token) is { } info) yield return info;
+        }
     }
 
-    /// <summary>Source buildSessionInfo.</summary>
-    internal static PiSessionInfo? BuildSessionInfo(string path)
+    /// <summary>Source buildSessionInfo. The enumeration's disposal closes the file wherever the read stops: at the end, at a first
+    /// entry that is not a session header, or at a cancellation (upstream destroys its stream in <c>finally</c>).</summary>
+    internal static PiSessionInfo? BuildSessionInfo(string path, CancellationToken token = default)
     {
         try
         {
             JsonObject? header = null; string? name = null; var count = 0; var first = ""; var all = new List<string>(); long? lastActivity = null;
             foreach (var line in File.ReadLines(path, new UTF8Encoding(false, false)))
             {
+                token.ThrowIfCancellationRequested();
                 if (string.IsNullOrWhiteSpace(line)) continue;
                 JsonObject? entry;
                 try { entry = JsonNode.Parse(line, documentOptions: PiSharp.Contracts.JsonData.DocumentOptions) as JsonObject; } catch (JsonException) { continue; }
@@ -271,13 +284,15 @@ internal static partial class PiSessions
                 all.Add(text);
                 if (first.Length == 0 && role == "user") first = text;
             }
+            // An abort after the last line (upstream: while readline waited for the end of the file).
+            token.ThrowIfCancellationRequested();
             if (header is null) return null;
             var headerTime = DateTimeOffset.TryParse(Text(header, "timestamp"), CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var created) ? created : (DateTimeOffset?)null;
             var modified = lastActivity is > 0 ? DateTimeOffset.FromUnixTimeMilliseconds(lastActivity.Value) : headerTime ?? File.GetLastWriteTimeUtc(path);
             return new(path, Text(header, "id")!, Text(header, "cwd") ?? "", name, Text(header, "parentSession"), headerTime ?? modified, modified, count,
                 first.Length == 0 ? "(no messages)" : first, string.Join(" ", all));
         }
-        catch (Exception error) when (error is IOException or UnauthorizedAccessException) { return null; }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException) { token.ThrowIfCancellationRequested(); return null; }
     }
 
     /// <summary>Source SessionManager.forkFrom: a new session in the target cwd's directory whose header names the source as parent,

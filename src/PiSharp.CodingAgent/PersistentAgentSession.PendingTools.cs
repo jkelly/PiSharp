@@ -15,10 +15,26 @@ public sealed partial class PersistentAgentSession
     /// catalog but are not registered in it, such as MCP tools whose server connects later, and names of the loadout restored
     /// from the transcript (session open without initial names, tree navigation) that were left out because they are not
     /// registered yet or are now hidden. A later catalog publication that registers (or unhides) one activates it. Running a
-    /// prompt drops them, as does a selection that deactivates an active tool; a tool the user disabled is never pending, so
-    /// it is not resurrected. In-memory only, like the source.
+    /// prompt drops them, as does a selection that deactivates an active tool of the restored or reloaded loadout
+    /// (<see cref="_restoredToolNames"/>); a tool the user disabled is never pending, so it is not resurrected. In-memory only,
+    /// like the source.
     /// </summary>
     public ImmutableArray<string> PendingToolNames { get { lock (_gate) return _pendingToolNames; } }
+
+    /// <summary>
+    /// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac agent-session.ts _restoredToolNames (#11996): the restored or reloaded loadout
+    /// that <see cref="_pendingToolNames"/> belongs to. At session open and tree navigation it is the loadout the branch records
+    /// (with the selection's modifiers at open), registered or not, without the extension tools the restore activates as newly
+    /// registered; at a reload it is the names active before the reload. A selection that deactivates only tools outside it, such
+    /// as an extension hiding its own loader tool at session_start, keeps the pending tools. The next restore or reload replaces
+    /// it, and a run keeps it, like the source's (it only matters while tools are pending). In-memory only.
+    /// </summary>
+    private ImmutableHashSet<string> _restoredToolNames = ImmutableHashSet.Create<string>(StringComparer.Ordinal);
+
+    /// <summary>The replacement reservation whose publications produced <see cref="_restoredToolNames"/>. A reload publishes more
+    /// than one catalog under its reservation (its owned resources, such as MCP servers, retire before the reloaded catalog is
+    /// published), and the names active before each of them are one reloaded loadout: the names active before the reload.</summary>
+    private object? _reloadedLoadoutOwner;
 
     /// <summary>
     /// Source _restoreToolsFromTranscript and the constructor's initial names (_buildRuntime) apply the loadout in memory only:
@@ -33,9 +49,18 @@ public sealed partial class PersistentAgentSession
 
     /// <summary>Source _restoreToolsFromTranscript at session open: the restored loadout replaces the pending set; it is recorded at
     /// the next request boundary when it differs from the recorded one.</summary>
-    private void RestoreUnrecordedTools(bool unrecorded, ImmutableArray<string> pending)
+    private void RestoreUnrecordedTools(bool unrecorded, ImmutableArray<string> pending, ImmutableArray<string> restored)
     {
-        lock (_gate) { _unrecordedLoadout = unrecorded; _pendingToolNames = pending; }
+        lock (_gate) { _unrecordedLoadout = unrecorded; RestorePendingToolsLocked(pending, restored); }
+    }
+
+    /// <summary>Source _restoreToolsFromTranscript (session open, tree navigation): the pending set and the restored loadout it
+    /// belongs to are replaced together; a branch that records no loadout leaves both empty.</summary>
+    private void RestorePendingToolsLocked(ImmutableArray<string> pending, ImmutableArray<string> restored)
+    {
+        _pendingToolNames = pending;
+        _restoredToolNames = restored.IsDefaultOrEmpty ? _restoredToolNames.Clear() : restored.ToImmutableHashSet(StringComparer.Ordinal);
+        _reloadedLoadoutOwner = null;
     }
 
     /// <summary>Source constructor with usesDefaultTools (Pi 1.5.0 _restoreToolsFromTranscript): the branch's loadout that a resumed
@@ -58,7 +83,8 @@ public sealed partial class PersistentAgentSession
     /// Source createAgentSession for an existing session (sdk.ts initialActiveToolNames: the selected or default tool names) and the
     /// constructor's _buildRuntime: the names become the agent's loadout in memory and the session file is not written; the next
     /// request records the loadout when it differs from the recorded one. Unknown, hidden and capped-out names are ignored, as
-    /// <see cref="SetActiveToolsAsync"/> ignores them; a loadout that deactivates a tool drops pending tools, as a selection does.
+    /// <see cref="SetActiveToolsAsync"/> ignores them; a loadout that deactivates a tool of the restored loadout drops pending tools,
+    /// as a selection does.
     /// Requires the idle session, like <see cref="ConfigureAsync"/>.
     /// </summary>
     public async Task ApplyInitialToolsAsync(ImmutableArray<string> names, CancellationToken cancellationToken = default)
@@ -145,9 +171,11 @@ public sealed partial class PersistentAgentSession
         return messages.Insert(index, registry.CreateActivationMessage(names, recorded, 0, token, replaceDeclarations: true)!);
     }
 
-    /// <summary>The names a catalog publication requests (its own, then pending ones) and the pending candidates it considers.</summary>
-    private (ImmutableArray<string> Requested, ImmutableArray<string> Candidates) PendingToolRequestLocked(SessionRuntimeRegistry replacement,
-        ImmutableArray<string> activeNames, bool restorePrevious)
+    /// <summary>The names a catalog publication requests (its own, then pending ones), the pending candidates it considers and,
+    /// for a publication that keeps the previously active names pending (a reload or another owned retirement), those names: the
+    /// reloaded loadout (default otherwise).</summary>
+    private (ImmutableArray<string> Requested, ImmutableArray<string> Candidates, ImmutableArray<string> Reloaded) PendingToolRequestLocked(
+        SessionRuntimeRegistry replacement, ImmutableArray<string> activeNames, bool restorePrevious)
     {
         var lifetime = replacement.LifetimeToolSelection;
         var previous = restorePrevious
@@ -156,19 +184,30 @@ public sealed partial class PersistentAgentSession
         // Source _isAllowedTool: --tools/--exclude-tools keep a name from ever becoming pending.
         var candidates = _pendingToolNames.Concat(previous).Where(name => lifetime?.IsAllowed(name) != false)
             .Distinct(StringComparer.Ordinal).ToImmutableArray();
-        return (activeNames.IsDefault ? activeNames : activeNames.Concat(candidates).Distinct(StringComparer.Ordinal).ToImmutableArray(), candidates);
+        return (activeNames.IsDefault ? activeNames : activeNames.Concat(candidates).Distinct(StringComparer.Ordinal).ToImmutableArray(), candidates,
+            restorePrevious ? previous : default);
     }
 
-    /// <summary>Source _setActiveTools: activated names leave the pending set.</summary>
-    private void RetirePendingToolsLocked(ImmutableArray<string> candidates, ImmutableArray<string> selected) =>
+    /// <summary>Source _setActiveTools: activated names leave the pending set. Source reload (Pi faac585884ae2c013a6b1400f3e9e77f10b34bac,
+    /// #11996): the names active before it (<paramref name="reloaded"/>; default for a publication that keeps no previous names
+    /// pending) become the restored loadout, joined with those of the earlier publications of the same <paramref name="owner"/>.</summary>
+    private void RetirePendingToolsLocked(ImmutableArray<string> candidates, ImmutableArray<string> selected, ImmutableArray<string> reloaded, object? owner)
+    {
         _pendingToolNames = candidates.Where(name => !selected.Contains(name, StringComparer.Ordinal)).ToImmutableArray();
+        if (reloaded.IsDefault) return;
+        _restoredToolNames = owner is not null && ReferenceEquals(owner, _reloadedLoadoutOwner)
+            ? _restoredToolNames.Union(reloaded) : reloaded.ToImmutableHashSet(StringComparer.Ordinal);
+        _reloadedLoadoutOwner = owner;
+    }
 
-    /// <summary>Source setActiveToolsByName: a selection that deactivates an active tool replaces the restored loadout and
-    /// drops pending tools; one that only adds tools keeps them.</summary>
+    /// <summary>Source setActiveToolsByName (Pi faac585884ae2c013a6b1400f3e9e77f10b34bac, #11996): a selection that deactivates an
+    /// active tool of the restored or reloaded loadout replaces that loadout and drops its pending tools. One that only adds
+    /// tools keeps them, and so does one that only deactivates tools outside the restored loadout, such as an extension's own
+    /// tool that the restore or reload activated as newly registered.</summary>
     private void SelectPendingToolsLocked(ImmutableArray<string> previous, ImmutableArray<string> selected)
     {
         if (_pendingToolNames.IsEmpty) return;
-        _pendingToolNames = previous.Any(name => !selected.Contains(name, StringComparer.Ordinal)) ? []
+        _pendingToolNames = previous.Any(name => _restoredToolNames.Contains(name) && !selected.Contains(name, StringComparer.Ordinal)) ? []
             : _pendingToolNames.Where(name => !selected.Contains(name, StringComparer.Ordinal)).ToImmutableArray();
     }
 }

@@ -29,7 +29,8 @@ internal sealed record LlamaAuth(string ApiKey, string ServerUrl, string Source)
 internal sealed class LlamaCatalog
 {
     internal const string ProviderId = "llama.cpp";
-    internal const string DefaultServerUrl = "http://127.0.0.1:8080";
+    // Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (#12001): llama-server's current default port (8080 before v1.6.0).
+    internal const string DefaultServerUrl = "http://127.0.0.1:9931";
     internal const string LlamaClassifyApi = "llama-cpp-classify", SystemOneApi = "typesafe-system-one";
 
     private sealed record Snapshot(IReadOnlyList<JsonObject> Chat, IReadOnlyList<JsonObject> Classifiers);
@@ -191,16 +192,22 @@ internal sealed class LlamaCatalog
     private static JsonObject FreeCost() => new() { ["input"] = 0, ["output"] = 0, ["cacheRead"] = 0, ["cacheWrite"] = 0 };
 
     /// <summary>provider.ts <c>toPiClassifierModel</c>: decision models answer through System One at the <c>/v1</c> URL; chat models
-    /// through <c>llama-cpp-classify</c> at the server URL.</summary>
+    /// through <c>llama-cpp-classify</c> at the server URL, which reads answers from next-token label probabilities and takes no
+    /// images. Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (#12282): a decision model that reports image input (Clef with its
+    /// <c>mmproj</c>) accepts images, and llama.cpp reads System One images from the <c>images</c> list of data URLs, not from
+    /// TypeSafe's <c>assets</c> behind the opt-in header.</summary>
     internal static JsonObject ToClassifierModel(LlamaModelInfo model, string serverUrl, double? cachedContextWindow = null)
     {
         var decision = IsDecisionModel(model);
-        return new()
+        var image = decision && model.InputModality("image");
+        var json = new JsonObject
         {
             ["type"] = "classifier", ["id"] = model.Id, ["name"] = model.Id, ["api"] = decision ? SystemOneApi : LlamaClassifyApi, ["provider"] = ProviderId,
-            ["baseUrl"] = decision ? LlamaClient.InferenceUrl(serverUrl) : serverUrl, ["input"] = new JsonArray("text"), ["cost"] = FreeCost(),
-            ["contextWindow"] = Number(ContextWindowOf(model, cachedContextWindow))
+            ["baseUrl"] = decision ? LlamaClient.InferenceUrl(serverUrl) : serverUrl, ["input"] = image ? new JsonArray("text", "image") : new JsonArray("text"),
+            ["cost"] = FreeCost(), ["contextWindow"] = Number(ContextWindowOf(model, cachedContextWindow))
         };
+        if (image) json["compat"] = new JsonObject { ["imageInput"] = "images", ["sendImageOptInHeader"] = false };
+        return json;
     }
 
     private static bool IsLlamaClassifierModel(JsonObject model) =>
@@ -223,6 +230,10 @@ internal sealed class LlamaCatalog
         json["cost"] = FreeCost();
         json["contextWindow"] = contextWindow.DeepClone();
         json["maxTokens"] = contextWindow;
+        // Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (#12134) drops supportsDeveloperRole here: pi-ai's openai-completions detectCompat
+        // now sends the developer role only to api.openai.com. The explicit false stays until that default is native
+        // (CompletionsKeyAuthRequestFactory still defaults a local server's reasoning models to the developer role); the wire role is
+        // the same either way (CliParity sync160.llama.reasoning-models-send-the-system-role).
         var compat = new JsonObject
         {
             ["supportsStore"] = false, ["supportsDeveloperRole"] = false, ["supportsReasoningEffort"] = false, ["supportsUsageInStreaming"] = true,

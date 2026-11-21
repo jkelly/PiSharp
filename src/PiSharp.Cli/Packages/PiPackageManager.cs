@@ -457,7 +457,10 @@ internal sealed class PiPackageManager
                 // Skip its resources, like offline mode does, and report the failure.
                 try
                 {
-                    await InstallParsedSource(parsed, resolvedScope, cancellationToken).ConfigureAwait(false);
+                    // Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (#11264): the install is announced through the progress callback, so a
+                    // host that captures git and npm output can still show "Installing <source>...".
+                    await WithProgress("install", resolvedSource, $"Installing {resolvedSource}...",
+                        () => InstallParsedSource(parsed, resolvedScope, cancellationToken)).ConfigureAwait(false);
                     return true;
                 }
                 catch (Exception error) when (error is not OperationCanceledException)

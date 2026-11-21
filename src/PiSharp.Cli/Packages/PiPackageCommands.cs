@@ -228,7 +228,8 @@ Options:
         settings.DrainDiagnostics();
     }
 
-    private static PiPackageProcesses Processes(PiHost host) => host.PackageProcesses?.Invoke(host.Stdout, host.Stderr) ?? new PiPackageProcesses { Output = host.Stdout, ErrorOutput = host.Stderr };
+    // Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (#11264): the package commands keep live git and npm output (commandOutput inherit).
+    private static PiPackageProcesses Processes(PiHost host) => PiPackageProcesses.For(host, host.Stdout, host.Stderr, PiPackageCommandOutput.Inherit);
 
     /// <summary>Source handleConfigCommand; null when the arguments are not a <c>config</c> command.</summary>
     internal static async Task<int?> RunConfigAsync(string[] args, PiHost host, CancellationToken token)

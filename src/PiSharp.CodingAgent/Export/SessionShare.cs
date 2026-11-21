@@ -250,7 +250,7 @@ public sealed class SessionShare
 }
 
 /// <summary>spawn/spawnSync of a program on PATH without a shell. A program that cannot start yields a null exit code, as spawnSync's
-/// status does for ENOENT; cancellation kills the process tree.</summary>
+/// status does for ENOENT, with the start error as its stderr; cancellation kills the process tree.</summary>
 public sealed class SystemShareProcessRunner : IShareProcessRunner
 {
     public async Task<ShareProcessResult> RunAsync(string fileName, IReadOnlyList<string> arguments, CancellationToken cancellationToken)
@@ -260,7 +260,9 @@ public sealed class SystemShareProcessRunner : IShareProcessRunner
         foreach (var argument in arguments) start.ArgumentList.Add(argument);
         Process process;
         try { process = Process.Start(start) ?? throw new Win32Exception(2); }
-        catch (Win32Exception) { return new(null, "", ""); }
+        // Pi faac585884ae2c013a6b1400f3e9e77f10b34bac session-share.ts shareViaGist: a failed spawn reports its error as the output
+        // (stderr || error.message) with a null exit code; it never escapes as an unhandled error.
+        catch (Win32Exception error) { return new(null, "", error.Message); }
         using (process)
         {
             process.StandardInput.Close();
