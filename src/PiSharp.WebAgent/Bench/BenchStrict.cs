@@ -5,6 +5,10 @@
 // the bench refuses it before anything is sent, naming the strict tools and the reason, and the tool list says so beforehand. OpenAI's
 // strict mode also asks more of the schema ("additionalProperties": false on every object, every property required); the editor shows
 // what a schema misses as a warning, not a refusal, since the provider has the last word.
+// Pi 1.6.0 (#12049, packages/ai/src/api/constrained-sampling.ts): strict mode also rejects a schema node without a type; a bare "enum"
+// counts as typed and so does an "anyOf", a bare "const" does not. The walk lists such nodes too. A "$ref" node is left alone here: the
+// bench sends the user's schema as it is and the provider resolves the reference (pi-ai's own strict projection, which the bench does not
+// use, refuses "$ref" altogether and falls back to a non-strict tool).
 using System.Text.Json.Nodes;
 using PiSharp.WebAgent.Runs;
 
@@ -70,7 +74,8 @@ public static class BenchStrict
     }
 
     /// <summary>What OpenAI's strict mode would refuse in <paramref name="parameters"/> (an object schema; null is the empty one): an
-    /// object without <c>"additionalProperties": false</c>, a property missing from <c>required</c>. Empty when it asks nothing more.</summary>
+    /// object without <c>"additionalProperties": false</c>, a property missing from <c>required</c>, a schema without a type (Pi 1.6.0).
+    /// Empty when it asks nothing more.</summary>
     public static IReadOnlyList<string> Problems(JsonObject? parameters)
     {
         var problems = new List<string>();
@@ -101,6 +106,8 @@ public static class BenchStrict
     private static void Walk(JsonNode? node, string path, List<string> problems, int depth)
     {
         if (problems.Count >= MaxProblems || depth > BenchSchema.MaxDepth || node is not JsonObject schema) return;
+        if (Untyped(schema))
+            problems.Add($"{Place(path)}: add a \"type\" (strict mode rejects a schema without one; an \"enum\" or an \"anyOf\" counts, a bare \"const\" does not)");
         if (path.Length == 0 || IsObject(schema))
         {
             if (!(schema["additionalProperties"] is JsonValue extra && extra.TryGetValue<bool>(out var allowed) && !allowed))
@@ -139,6 +146,11 @@ public static class BenchStrict
         JsonArray types => types.Any(item => item is JsonValue value && value.TryGetValue<string>(out var type) && type == "object"),
         _ => schema["properties"] is JsonObject,
     };
+
+    /// <summary>Pi 1.6.0's rule (constrained-sampling.ts): a node with no <c>type</c>, no <c>anyOf</c> and no <c>enum</c>. A <c>$ref</c>
+    /// node is not one here (see the file header).</summary>
+    private static bool Untyped(JsonObject schema) =>
+        !schema.ContainsKey("type") && !schema.ContainsKey("anyOf") && !schema.ContainsKey("enum") && !schema.ContainsKey("$ref");
 
     private static string Place(string path) => "parameters" + path;
 }
