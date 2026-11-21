@@ -171,6 +171,7 @@ internal static class Program
             ("workers.160.stop-resolves-after-the-exit-was-published", Sync160WorkerCases.StopResolvesAfterTheExitWasPublished),
             ("workers.160.incarnation-before-the-first-call", Sync160WorkerCases.IncarnationBeforeTheFirstCall),
             ("workers.160.link-ended-at-exit-told-as-neither-lost-nor-closed", () => { Sync160WorkerCases.LinkEndedAtExitIsToldAsNeitherLostNorClosed(); return Task.CompletedTask; }),
+            ("terminal.160.scope-on-calls-the-listener-until-dispose", Sync160WorkerCases.ScopeOnCallsTheListenerUntilDispose),
             ("plugins.discovery-validates-and-orders", Discovery),
             ("plugins.rollout-continues-failures-and-stops-explicitly", RolloutOrder),
             ("plugins.new-failed-plugin-retains-dirty-mark", FailedAddedPlugin),

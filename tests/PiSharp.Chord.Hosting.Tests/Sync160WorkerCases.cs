@@ -1,9 +1,11 @@
-// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/chord/src/node/workers/workers.ts, packages/chord/src/node/workers/process.ts.
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/chord/src/node/workers/workers.ts, packages/chord/src/node/workers/process.ts,
+// packages/chord/src/tui/scope.ts.
 // Authored native regressions from the Pi 1.6.0 tests packages/chord/test/node/workers/workers.test.ts ("passes admit to its route", the
-// three cases of "a worker's exit", "a worker's incarnation") and node/workers/process.test.ts ("closes its link at its exit"); not an
-// upstream execution capture. The fixtures test/node/fixtures/workers/{child,control,worker}.ts are RunChildAsync here (this test assembly run as a real worker process): Control's report, reportAndExit and crash,
-// and the start data's reportAtStart. Upstream's holdNextCommit (internal here) is a store export holding the commit queue, with the
-// queue's tail (SettledAsync) telling when a commit was queued behind it.
+// three cases of "a worker's exit", "a worker's incarnation"), node/workers/process.test.ts ("closes its link at its exit") and
+// tui/scope.test.ts ("a scope's event subscriptions"); not an upstream execution capture. The fixtures
+// test/node/fixtures/workers/{child,control,worker}.ts are RunChildAsync here (this test assembly run as a real worker process):
+// Control's report, reportAndExit and crash, and the start data's reportAtStart. Upstream's holdNextCommit (internal here) is a store
+// export holding the commit queue, with the queue's tail (SettledAsync) telling when a commit was queued behind it.
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Reflection;
@@ -15,6 +17,7 @@ using PiSharp.Chord.Documents;
 using PiSharp.Chord.Host;
 using PiSharp.Chord.Hosting.App;
 using PiSharp.Chord.Hosting.Plugins;
+using PiSharp.Chord.Hosting.Terminal;
 using PiSharp.Chord.Hosting.Workers;
 using PiSharp.Chord.Link;
 using PiSharp.Chord.State;
@@ -65,6 +68,10 @@ internal static class Sync160WorkerCases
         Schema = Obj(("lines", Arr(Str()))), Version = 1, Initial = () => new JsonObject { ["lines"] = new JsonArray() },
         Persist = true, CheckpointWhen = (_, _, _) => false,
     });
+    /// <summary>The scope case's notes: a text, a write and the event it emits.</summary>
+    private static readonly Contract Notes = Contract.Local("w160.notes", new()
+    { Version = 1, Params = [], Members = new() { ["text"] = Str(), ["write"] = Method(Str()), ["written"] = Event(Str()) } });
+
     private static string Sdk => Environment.GetEnvironmentVariable("PISHARP_TEST_DOTNET") ?? Environment.GetEnvironmentVariable("DOTNET_HOST_PATH") ??
         (string.Equals(Path.GetFileNameWithoutExtension(Environment.ProcessPath), "dotnet", StringComparison.OrdinalIgnoreCase) ? Environment.ProcessPath! : throw new InvalidOperationException("Run with pinned dotnet host"));
 
@@ -391,6 +398,47 @@ internal static class Sync160WorkerCases
         other.Close(); Ended(closedLink).Wait(TimeSpan.FromSeconds(5)); End(closedLink);
         Check(events.SequenceEqual(["link lost", "closed", "link closed", "closed"]) && Ended(lostLink).IsCompleted && Ended(closedLink).IsCompleted,
             "a lost or closed link was told: " + string.Join(", ", events));
+    }
+
+    // scope.test.ts "a scope's event subscriptions: call the listener for each event, never changed by themselves, until dispose".
+    public static async Task ScopeOnCallsTheListenerUntilDispose()
+    {
+        await using var host = Hosts.Create(new() { OnError = _ => { } });
+        var loaded = await host.LoadAsync([new("w160.notes", Facet.Define((h, _) => h.Serve(Notes, (_, _, self) =>
+        {
+            var text = self.Writable<JsonNode?>(JsonValue.Create("first"));
+            var written = self.Events();
+            return new(new Dictionary<string, object?>
+            {
+                ["text"] = self.Derive([text], values => ((JsonNode?)values[0])?.DeepClone()),
+                ["written"] = written,
+                ["write"] = (HostMethod)((arguments, _) =>
+                {
+                    text.Set(((JsonNode)arguments!).DeepClone());
+                    written.Emit(((JsonNode)arguments!).DeepClone());
+                    return Task.FromResult<object?>(null);
+                }),
+            });
+        })))], Context);
+        Check(loaded.Failed.Count == 0, "the notes facet failed to load: " + string.Join(" | ", loaded.Failed.Select(failure => failure.Error.Message)));
+        var changes = 0;
+        var scope = new TerminalScope(host, () => Interlocked.Increment(ref changes));
+        var notes = scope.Hold(Notes, new());
+        await Until(() => notes.State.Value.Kind == "live", "the notes are live: " + notes.State.Value + " " + notes.State.Value.Cause?.Error.Message);
+        var seen = new ConcurrentQueue<string>();
+        scope.On(notes.Event("written"), e => seen.Enqueue(e.Value!.GetValue<string>()));
+        await Task.Delay(50);
+        var before = Volatile.Read(ref changes);
+        await notes.CallAsync("write", JsonValue.Create("a"), Context);
+        await Until(() => seen.Count == 1, "the listener got the event");
+        await Task.Delay(50);
+        // The event called its listener only (the text is not followed here: nothing else changed).
+        Check(Volatile.Read(ref changes) == before, "an event called changed");
+        scope.Dispose();
+        using var again = await host.GetAsync(Notes, new(), Context);
+        await again.CallAsync("write", JsonValue.Create("b"), Context);
+        await Task.Delay(100);
+        Check(seen.SequenceEqual(["a"]), "a disposed scope's listener was called: " + string.Join(", ", seen));
     }
 
     /// <summary>Holds <paramref name="store"/>'s commit queue: <c>Entered</c> completes once a commit was queued behind the hold,
