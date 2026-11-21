@@ -232,6 +232,18 @@ test('the committed policy maps every 1.6.0 work package to existing suites and 
   assert.deepEqual(policy.documentationEdits, [], 'documentation wording belongs to closeout-docs; root adds exact edits before applying');
   const provenance = repoJson(policy.catalog.provenance);
   assert.deepEqual([provenance.version, provenance.sourceCommit], [policy.version, policy.sourceCommit]);
-  assert(!existsSync(resolve(repo, SYNC.record)), 'no 1.6.0 acceptance record exists before root applies one');
-  for (const path of [policy.ledger, policy.coverage]) assert(!existsSync(resolve(repo, path)), `${path} is root's frozen snapshot`);
+});
+
+// Until root applies an acceptance, the candidate is an unreleased source candidate whose integrated validation is pending.
+test('the 1.6.0 candidate records match the acceptance state', () => {
+  const policy = repoJson(SYNC.policy), table = repoJson(SYNC.table), candidate = repoJson(SYNC.implementationStatus)[SYNC.candidateKey];
+  const pointer = repoJson(SYNC.map).currentImplementation.candidate;
+  assert.deepEqual([candidate.sourceVersion, candidate.sourceCommit, candidate.released], [policy.version, policy.sourceCommit, false]);
+  assert.deepEqual([candidate.applicability, candidate.durableOverlay, candidate.decision], [SYNC.table, SYNC.overlay, SYNC.decision]);
+  if (!existsSync(resolve(repo, SYNC.record))) {
+    assert.deepEqual([candidate.status, candidate.acceptance, table.acceptance, pointer.status], [PENDING, null, undefined, PENDING]);
+    assert(table.rows.every(row => [PENDING, 'no-op'].includes(row.status)), 'no row is tested before acceptance');
+  } else {
+    assert.deepEqual([candidate.acceptance, table.acceptance.record, pointer.acceptance], [SYNC.record, SYNC.record, SYNC.record]);
+  }
 });

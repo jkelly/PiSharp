@@ -28,7 +28,7 @@ function checkHistoricalEvidence() {
   for(const [path,expected] of Object.entries(historicalDigests)) {
     const value=read(path); delete value.currentImplementation; delete value.currentGapStatus;
     // Candidate metadata does not rewrite the historical implementation evidence this hash protects.
-    if (path === 'compatibility/implementation-status.json') delete value.pi152Candidate;
+    if (path === 'compatibility/implementation-status.json') { delete value.pi152Candidate; delete value.pi160Candidate; }
     for(const row of value.rows??value.files??[]) {
       delete row.currentImplementation;
       if('historicalPisharp' in row) {row.pisharp=row.historicalPisharp;delete row.historicalPisharp;}
