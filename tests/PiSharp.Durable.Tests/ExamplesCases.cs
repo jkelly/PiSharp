@@ -67,6 +67,14 @@ using PiSharp.Durable.Examples;
 // through 34-submit-in-commit; 35-37 wait for phase 6's Chord host). The notes above, and those of earlier areas below, name the examples
 // by the numbers they had when each area ported them: Pi v1.2.0's (05-watches through 31-reload-and-restart), and 32- through 35- for
 // v1.5.0's 31- through 34-. The fixture file names (examples-19-json-*.upstream.jsonl) keep the v1.2.0 name they were captured under.
+// Pi v1.6.0 sync (faac585884ae2c013a6b1400f3e9e77f10b34bac): 38-signals through 47-fit-images are v1.6.0's examples. Their lines are
+// authored from those examples (console.log's arguments joined with spaces; a value that is not a string as JSON in place of
+// util.inspect), not captured: the upstream checkout has no node_modules to run them under Node. Three values are placeholders: the model's
+// tool call IDs (tool:<id>, random on both sides), 40's "wake while parked" deadline (the system clock plus two hours) and 41's count of
+// onWake calls, which depends on how many wake values the scheduler reports between the host's reads (13 here). The lines a task or tool
+// prints come in upstream's order relative to the host's lines where the example's gates fix it (samples/Durable.Examples, ExampleTurn);
+// 38's "[greeter] woke" line for the first greeter is placed after the four deliveries, where upstream's task may have printed earlier.
+// Their file backends read back the tasks' outcomes (38, 39) or the transcript's kinds.
 internal static partial class Program
 {
     private static readonly string[] CodingToolsTranscript =
@@ -393,7 +401,123 @@ internal static partial class Program
         "> ana: Add a test for the build.",
         "agent: Built, and I added the test Ana asked for.",
         SubmitInCommitRecorded,
+        // Pi v1.6.0 sync: v1.6.0's 38-signals.ts through 47-fit-images.ts, authored (see the file header).
+        "== 38-signals",
+        "early: delivered",
+        "retry: duplicate",
+        "bad value: invalid",
+        "unknown task: not_found",
+        """  [greeter] woke by {"reason":"signal","signal":"example.greeting","key":"hello"}, read "hi there""" + "\"",
+        """result: {"status":"completed","result":"hi there"}""",
+        "after the end: closed",
+        """asleep, wake: {"active":false}""",
+        "late: delivered",
+        """  [greeter] woke by {"reason":"signal","signal":"example.greeting","key":"hello"}, read "good morning""" + "\"",
+        SignalsLastLine,
+        "== 39-ask-a-person",
+        """inbox: ["Deploy to production?"]""",
+        // Date.UTC(2026, 10, 9, 9) plus four hours.
+        """wake while asleep: {"active":false,"at":1794229200000} deadline in 4 h""",
+        "deliver: delivered",
+        """  [ask] woke: signal, read: {"value":{"text":"yes"}}""",
+        """result: {"status":"completed","result":{"answer":"yes"}}""",
+        """inbox: ["Delete the staging database?"]""",
+        """  [ask] woke: expired, read: {"expired":true}""",
+        """result: {"status":"completed","result":{"answer":null}}""",
+        "late deliver: closed",
+        AskAPersonLastLine,
+        "== 40-tool-waits-for-webhook",
+        """builds after the first attempt: ["build-1"]""",
+        """builds after the rerun: ["build-1"]""",
+        """parked slot: {"callId":"tool:<id>","name":"run_ci","taskId":12,"status":"sleeping","details":{"buildId":"build-1"}}""",
+        """wake while parked: {"active":false,"at":<time>} deadline in 2 h""",
+        "webhook: delivered",
+        "retry: duplicate",
+        "result: CI passed: https://ci/1",
+        "  [cancel] cancelling build-2",
+        """builds: [{"id":"build-1","ref":"main","cancelled":false},{"id":"build-2","ref":"feature","cancelled":true}]""",
+        "result: <harness>",
+        "[error] Tool run_ci was aborted",
+        WebhookLastLine,
+        "== 41-tool-polls",
+        "  [poll 1 at 0s] job-7 is running",
+        """asleep until 1 s: {"active":false,"at":1000}""",
+        "  [poll 2 at 1s] job-7 is running",
+        """asleep until 3 s: {"active":false,"at":3000}""",
+        "  [poll 3 at 3s] job-7 is running",
+        """asleep until 7 s: {"active":false,"at":7000}""",
+        "  [poll 4 at 7s] job-7 is done",
+        "result: job-7 done after 4 polls",
+        "durationMs (first run to result, on the Harness clock): 7000",
+        ToolPollsLastLine,
+        "== 42-parallel-children",
+        "  [research_both] run with wake undefined, 0 of 2 done",
+        """tool: ["research_both waiting"] nested: ["tool:<id>/a sleeping","tool:<id>/b sleeping"]""",
+        """wake while everything is parked: {"active":false}""",
+        "report b: delivered",
+        """  [research_both] run with wake {"reason":"tasks","ended":[16]}, 1 of 2 done""",
+        "report a: delivered",
+        """  [research_both] run with wake {"reason":"tasks","ended":[14]}, 2 of 2 done""",
+        "result:",
+        "durable objects: one per object, with storage",
+        ParallelChildrenLastLine,
+        "== 43-subagent-waits",
+        "parent call: subagent sleeping",
+        """the person is asked: ["May we deploy today?"]""",
+        """wake while everything waits for the person: {"active":false}""",
+        "answer: delivered",
+        "parent: done",
+        SubagentWaitsLastLine,
+        "== 44-approval-gate",
+        // Date.UTC(2026, 10, 9, 9) plus a day: the deadline each question's first pass fixed.
+        """asked to approve "rm -rf build"; the call is sleeping; wake: {"active":false,"at":1794301200000}""",
+        "  approve: delivered",
+        "  result: ran: rm -rf build (quiet-hours gate asked 2 times)",
+        """asked to approve "rm -rf dist"; the call is sleeping; wake: {"active":false,"at":1794301200000}""",
+        "  deny: delivered",
+        "  result: <harness> [error] Tool call blocked: Not approved </harness> (quiet-hours gate asked 2 times)",
+        """asked to approve "rm -rf cache"; the call is sleeping; wake: {"active":false,"at":1794301200000}""",
+        ApprovalGateLastLine,
+        "== 45-review-on-yield",
+        "while reviewing, the input is: placed",
+        """  [review] "Yes." -> {"continue":"Too short: explain your reasoning."}""",
+        """  [review] "Yes: the build passed and the tests are green, so it can ship." -> {}""",
+        "input: done",
+        """["> Can we ship?","Yes.","> Too short: explain your reasoning.","Yes: the build passed and the tests are green, so it can ship."]""",
+        """  [review] "No." -> {"continue":"Too short: explain your reasoning."}""",
+        """  [review] "Answering the queued question instead." -> {}""",
+        ReviewOnYieldLastLine,
+        "== 46-after-tools-terminate",
+        """round 1 done, asking the person; wake: {"active":false}""",
+        "answer: delivered",
+        """round 2 done, asking again; wake: {"active":false}""",
+        "answer: delivered",
+        "run: done with requests: 2",
+        "> Do the work, step by step",
+        "  tool: did step 1",
+        "> The person says: go on.",
+        AfterToolsTerminateLastLine,
+        "== 47-fit-images",
+        "status: done",
+        """user: "Compare this photo with the screen.\nResized from 4000x3000 to 1000x750. Multiply coordinates by 4.00 to map them to the original.""" + "\"",
+        "user: 1000x750 image/png",
+        "tool result: 1000x333 image/png",
+        FitImagesLastLine,
     ];
+
+    private const string SignalsLastLine = """result: {"status":"completed","result":"good morning"}""";
+    private const string AskAPersonLastLine = """last onWake: {"active":false}""";
+    private const string WebhookLastLine = "</harness>";
+    private const string ToolPollsLastLine = "onWake calls: <n>";
+    private const string ParallelChildrenLastLine = "sqlite: embedded, single file";
+    private const string SubagentWaitsLastLine = "subagent result: The person says yes, after 5 pm.";
+    private const string ApprovalGateLastLine =
+        "  result: <harness> [error] Tool call blocked: No approval within a day </harness> (quiet-hours gate asked 2 times)";
+    private const string ReviewOnYieldLastLine = """["> Is it Friday?","No.","> Skip that: what is 2 + 2?","Answering the queued question instead."]""";
+    private const string AfterToolsTerminateLastLine = "  tool: did step 2";
+    private const string FitImagesLastLine =
+        """tool result: "<harness>\n[info] Resized from 3000x1000 to 1000x333. Multiply coordinates by 3.00 to map them to the original.\n</harness>""" + "\"";
+    private const string ToolRoundTranscript = """transcript: ["pi.user","pi.system","pi.assistant","pi.tool-result","pi.assistant"]""";
 
     private const string TurnLimitTranscript =
         """transcript: ["pi.user","pi.system","pi.assistant","pi.tool-result","pi.assistant","pi.tool-result","pi.assistant","pi.tool-result","pi.assistant","pi.tool-result","pi.assistant"]""";
@@ -553,6 +677,25 @@ internal static partial class Program
         [SubmitInCommitRecorded] = [SubmitInCommitRecorded],
         [TurnLimitLastLine] = [TurnLimitTranscript],
         [TestsAfterEditsLastLine] = [TestsAfterEditsTranscript],
+        // Pi v1.6.0 sync: 38 through 47.
+        [SignalsLastLine] = ["""task 7: {"status":"completed","result":"hi there"}""", """task 8: {"status":"completed","result":"good morning"}"""],
+        [AskAPersonLastLine] =
+            ["""task 7: {"status":"completed","result":{"answer":"yes"}}""", """task 8: {"status":"completed","result":{"answer":null}}"""],
+        // The second run was stopped while its call was parked: it ends with the aborted call's result.
+        [WebhookLastLine] =
+            ["""transcript: ["pi.user","pi.system","pi.assistant","pi.tool-result","pi.assistant","pi.user","pi.assistant","pi.tool-result"]"""],
+        [ToolPollsLastLine] = [ToolRoundTranscript],
+        [ParallelChildrenLastLine] = [ToolRoundTranscript],
+        [SubagentWaitsLastLine] = [ToolRoundTranscript],
+        [ApprovalGateLastLine] =
+        [
+            """transcript: ["pi.user","pi.system","pi.assistant","pi.tool-result","pi.assistant","pi.user","pi.assistant","pi.tool-result","pi.assistant","pi.user","pi.assistant","pi.tool-result","pi.assistant"]""",
+        ],
+        [ReviewOnYieldLastLine] = ["""transcript: ["pi.user","pi.assistant","pi.user","pi.assistant","pi.user","pi.assistant","pi.user","pi.assistant"]"""],
+        // The person's "stop" ended the run after the second round: no answer follows its result.
+        [AfterToolsTerminateLastLine] =
+            ["""transcript: ["pi.user","pi.system","pi.assistant","pi.tool-result","pi.user","pi.assistant","pi.tool-result"]"""],
+        [FitImagesLastLine] = [ToolRoundTranscript],
     };
 
     private static IEnumerable<(string, Func<Task>)> ExamplesCases()
@@ -603,6 +746,10 @@ internal static partial class Program
         line = Regex.Replace(line, "\"sessionId\":\"[^\"]+\"", "\"sessionId\":\"<session>\"");
         line = Regex.Replace(line, "^cat /tmp/1gb.txt took [0-9]+ ms$", "cat /tmp/1gb.txt took <ms> ms");
         line = Regex.Replace(line, "^storage: .+$", "storage: <dir>");
+        // Pi v1.6.0 sync (38 through 47): the model's tool call IDs, 40's deadline on the system clock, 41's count of wake reports.
+        line = Regex.Replace(line, "tool:[0-9a-f]{12}", "tool:<id>");
+        line = Regex.Replace(line, "^(wake while parked: \\{\"active\":false,\"at\":)[0-9]+", "$1<time>");
+        line = Regex.Replace(line, "^onWake calls: [1-9][0-9]*$", "onWake calls: <n>");
         return Regex.Replace(line, "^bash ran in: .*/pi-durable-agent-[A-Za-z0-9]+", "bash ran in: <workspace>");
     }
 }
