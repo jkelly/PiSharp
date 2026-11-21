@@ -1,8 +1,35 @@
 # Partial immutable baseline evidence
 
-## Current target: Pi v1.5.0 (source-level re-freeze)
+## Current target: Pi v1.6.0 (unreleased source candidate)
 
-Under [decision 0013](../decisions/0013-pi-1.5.0-sync.md), the source target is public Pi **v1.5.0** at `f9a26365568127461c47a07a37dcb42c140a3ac5` (tree `b7734e15f2c1a10846284f77034a2214746a4da6`), recorded in [target.lock.json](../../compatibility/target.lock.json). The sync goes straight from v1.2.0: v1.3.0 and v1.4.0 get no lock of their own. [refreeze-baseline.mjs](../../tools/CompatibilityReport/refreeze-baseline.mjs) generated it from the v1.2.0 target lock under the unchanged hash policy:
+Under [decision 0015](../decisions/0015-pi-1.6.0-sync.md), the source target is public Pi **v1.6.0** at `faac585884ae2c013a6b1400f3e9e77f10b34bac` (tree `7b395e942aa81ffe0dba09ae2939184c200e4d3b`), recorded in [target.lock.json](../../compatibility/target.lock.json) with v1.5.2 as `previousTarget` and v0.99.1 as `previousBaseline`. It is a candidate source target: PiSharp 1.6.0 is not released, and the published release stays PiSharp 1.5.2 on Pi v1.5.2.
+
+[refreeze-baseline.mjs](../../tools/CompatibilityReport/refreeze-baseline.mjs) generated the lock from the preserved v1.5.2 lock plus every surviving path changed in the range:
+- it holds 3,149 source files and the source archive: 1,853 unchanged from the v1.5.2 lock, 662 changed and 634 newly recorded;
+- 50 carried paths no longer exist upstream and are dropped;
+- every package under `packages/` is at 1.6.0 in it.
+
+[sync-1.6.0-files.json](../../compatibility/sync-1.6.0-files.json) is the complete `v1.5.2..v1.6.0` inventory from local Git: 1,311 changes (764 modified, 495 added, 37 renamed, 15 deleted), 746 of them under the upstream `apps/` folder. [sync-1.6.0-applicability.json](../../compatibility/sync-1.6.0-applicability.json) gives each one a work package and a status.
+
+To verify the target lock against a clean upstream checkout:
+
+```powershell
+node tools/CompatibilityReport/verify-baseline.mjs --upstream <checkout of v1.6.0>
+```
+
+The `meta` work package ran it against the frozen v1.6.0 checkout: 6,353 checks passed, with 3,149 source blobs and the source archive verified. `tools/CompatibilityReport/check.mjs` does not pass: it stops at an unregistered v0.99.1 fixture manifest, as it did for the 1.5.2 sync.
+
+Source citations: [sync-1.6.0-citations.json](../../compatibility/sync-1.6.0-citations.json) is the report of [repin-sources.mjs](../../tools/CompatibilityReport/repin-sources.mjs) for the range, written without `--write`. When the `meta` package wrote it, it listed 86 citations whose named upstream files are byte-identical at both tags, 60 pending with their owners, 11 unparsed and 8 non-header pins. A citation moves to the v1.6.0 commit with the verified port of the file it names.
+
+Earlier locks stay byte-for-byte: `target.v1.5.2.lock.json`, `target.v1.5.0.lock.json`, `target.v1.2.0.lock.json`, `target.v1.1.0.lock.json` and the v0.99.1 evidence lock `baseline.lock.json`. The v1.5.2 and earlier inventories, applicability tables, captures and release evidence stay validated against their own locks.
+
+## Previous target: Pi v1.5.2
+
+Under [decision 0014](../decisions/0014-pi-1.5.2-sync.md), the source target was public Pi **v1.5.2** at `b4afdddf44e059c67ccf5097e5317d913521b470`, including v1.5.1. It is the baseline of the published PiSharp 1.5.2 release and is preserved byte-for-byte in [target.v1.5.2.lock.json](../../compatibility/target.v1.5.2.lock.json) (SHA-256 `5934c0481fd2c908ada840dfc33d1f9a69b11b03d1848d7080edf9116782eb66`). [sync-1.5.2-files.json](../../compatibility/sync-1.5.2-files.json), [sync-1.5.2-applicability.json](../../compatibility/sync-1.5.2-applicability.json) and [sync-1.5.2-acceptance.json](../../compatibility/sync-1.5.2-acceptance.json) keep referring to it.
+
+## Earlier target: Pi v1.5.0 (source-level re-freeze)
+
+Under [decision 0013](../decisions/0013-pi-1.5.0-sync.md), the source target was public Pi **v1.5.0** at `f9a26365568127461c47a07a37dcb42c140a3ac5` (tree `b7734e15f2c1a10846284f77034a2214746a4da6`), now preserved in [target.v1.5.0.lock.json](../../compatibility/target.v1.5.0.lock.json). The sync went straight from v1.2.0: v1.3.0 and v1.4.0 get no lock of their own. [refreeze-baseline.mjs](../../tools/CompatibilityReport/refreeze-baseline.mjs) generated it from the v1.2.0 target lock under the unchanged hash policy:
 - it carries forward the previous 121 source-file paths and drops the two that upstream removed: `ai/scripts/generate-models.ts` (the catalog generator moved to `ai/catalog/`) and `ai/src/utils/assistant-message-frame.ts` (removed in v1.3.0);
 - it adds 78:
   - the new pi-ai sources: `ai/src/auth/oauth/trusted-url.ts`, `ai/src/providers/schema-builders.ts`, `ai/src/telemetry.ts` and `ai/src/utils/{identity,openrouter-cost,streaming-json,string-enum,version}.ts`;
