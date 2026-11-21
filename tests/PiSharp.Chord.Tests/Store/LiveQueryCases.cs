@@ -451,6 +451,9 @@ internal static partial class Program
             var (query, target) = LiveQueryOver(handle, store, owner, state);
             var (_, context, counts) = await ChordSupport.Metered();
             await query.LoadAsync(target, context);
+            // A run counts itself and the rows it fetched (chord.query.runs, chord.query.rows).
+            Equal(1d, counts().GetValueOrDefault("chord.query.runs"), "the load is one run");
+            Equal(2d, counts().GetValueOrDefault("chord.query.rows"), "of two rows");
             // The rows a run decodes: an unchanged stored row is the row decoded before (upstream: the same object), a changed one is new.
             var plan = new ReadPlan(target.Spec.Query, handle.Sql.Table, Projection.All, ReadShape.Rows, store.ReadIndex);
             var statement = plan.Select(new ReadRange(10));
