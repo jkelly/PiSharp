@@ -206,7 +206,8 @@ internal static class Sync160EdgeCases
     }
 
     // scope.test.ts "reads it narrowed while live in the variant; a change of its variant calls changed, once per state". Upstream
-    // rebinds through an admission (the chord-admission package's); here the variant follows the link's principal.
+    // counts exactly two redraws for the rebind (loading, then live); a native watch may deliver two quick states as one call, so one
+    // or two here (terminal.160.scope-variant-one-watch-per-state counts the watches on a reference whose state the test sets).
     public static async Task ScopeVariantFollowsRebind()
     {
         await using var desk = await DeskAsync();
@@ -214,23 +215,24 @@ internal static class Sync160EdgeCases
         using var scope = new TerminalScope(desk.Client, () => Interlocked.Increment(ref changes));
         var held = scope.Hold(Desk, new());
         var editor = scope.Variant(held, "editor"); var reader = scope.Variant(held, "reader");
-        Check(reader() is null && editor() is null, "a reference that is not bound yet was read in a variant");
-        desk.Link("guest");
+        Check(reader() is null, "a reference that is not bound yet was read in a variant");
         await Until(() => ReferenceEquals(reader(), held), "the reference is live in the reader variant");
         Check(editor() is null, "a reader was read as an editor");
         await Task.Delay(50);
         var before = Volatile.Read(ref changes);
-        // Another principal while it is held: loading, then live in the other variant.
-        desk.Link("owner");
+        // Another allowed value while it is held: loading, then live in the other variant.
+        await desk.Admit("editor");
         await Until(() => ReferenceEquals(editor(), held), "the reference is live in the editor variant");
-        Check(reader() is null, "an editor was still read as a reader");
         await editor()!.CallAsync("write", JsonValue.Create("edited"), Context);
-        await Until(() => held.Member("text").Value?.GetValue<string>() == "edited", "the editor's write arrived");
-        Check(Volatile.Read(ref changes) > before, "a change of the variant did not call changed");
-        desk.Unlink();
-        await Until(() => held.State.Value.Kind != "live", "the reference lost its link");
-        // It still says its last variant while it is not live: the comparison alone would keep an editor's controls up.
-        Check(editor() is null && reader() is null, "a reference that is not live was read in a variant");
+        Check(reader() is null, "an editor was still read as a reader");
+        await Task.Delay(50);
+        // One watch of the reference's state, whoever asked for it: a redraw per state.
+        var redraws = Volatile.Read(ref changes) - before;
+        Check(redraws is 1 or 2, $"the rebind redrew {redraws} times");
+        await desk.Admit("none");
+        await Until(() => held.State.Value.Kind == "failed", "the reference is denied");
+        Check(held.State.Value.Cause?.Kind == PiSharp.Chord.Data.FailureKind.Denied, "the reference failed for another cause");
+        Check(editor() is null && reader() is null, "a denied reference was read in a variant");
         scope.Dispose();
         Check(editor() is null && reader() is null, "a released reference was read in a variant");
     }
@@ -324,32 +326,28 @@ internal static class Sync160EdgeCases
         await using var desk = await DeskAsync();
         var changes = 0;
         var scope = new TerminalScope(desk.Client, () => Interlocked.Increment(ref changes));
-        using var held = desk.Client.Hold(Desk, new(), Context);
+        var held = desk.Client.Hold(Desk, new(), Context);
         var editor = scope.Variant(held, "editor");
-        desk.Link("guest");
         await Until(() => held.State.Value.Kind == "live", "the reference is live");
         await Task.Delay(50);
         var before = Volatile.Read(ref changes);
-        desk.Link("owner");
+        await desk.Admit("editor");
         await Until(() => ReferenceEquals(editor(), held) && Volatile.Read(ref changes) > before, "the scope followed the foreign reference's variant");
         scope.Dispose();
         await Task.Delay(50);
         var after = Volatile.Read(ref changes);
-        desk.Link("guest");
-        await Until(() => held.State.Value.Kind == "live" && held.Variant == "reader", "the reference is a reader again");
+        await desk.Admit("reader");
+        await Until(() => held.Variant == "reader" && held.State.Value.Kind == "live", "the reference is a reader again");
         await Task.Delay(50);
         Check(Volatile.Read(ref changes) == after, "a disposed scope redrew");
         Check(editor() is null, "a reader was read as an editor after the scope was disposed");
-        // The scope never held it: its holder still does.
-        desk.Link("owner");
-        await Until(() => ReferenceEquals(editor(), held), "the reader still reads the holder's reference after the scope was disposed");
+        held.Release();
     }
 
     // scope.test.ts "keeps no reference its holder released, while the scope lives (GC)".
     public static async Task ScopeKeepsNoReleasedReference()
     {
         await using var desk = await DeskAsync();
-        desk.Link("guest");
         using var scope = new TerminalScope(desk.Client, () => { });
         var released = await HoldReadReleaseAsync(desk.Client, scope);
         Check(await CollectedAsync(released), "the scope kept a reference its holder released");

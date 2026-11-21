@@ -1,8 +1,7 @@
 // PiSharp-only (no upstream Pi source): the helpers of the Pi 1.6.0 chord-edge cases of this suite (Surfaces/Sync160*Cases.cs,
 // Sync/Sync160*Cases.cs). They stand in for the parts of packages/chord/test/surfaces/client.test.ts `setup` and
-// packages/chord/test/support.ts `desk()` at faac585884ae2c013a6b1400f3e9e77f10b34bac that these cases use. `desk()` rebinds a held
-// reference to another variant through an admission, which is the chord-admission package's: here the variant follows the principal
-// of the client's link, and a rebind is a reconnect as another principal.
+// packages/chord/test/support.ts `desk()` at faac585884ae2c013a6b1400f3e9e77f10b34bac that these cases use. `desk()` admits the
+// variant a local mode names, so a held reference rebinds to another variant, or is denied, when the mode is set.
 using System.Text.Json.Nodes;
 using PiSharp.Chord;
 using PiSharp.Chord.Contracts;
@@ -142,21 +141,26 @@ internal static partial class Program
 
     // ---- variant.test.ts ----
 
-    /// <summary>A remote type with an editor variant for owners and a reader variant for everyone else.</summary>
+    /// <summary>A desk its caller reads or edits by its admitted mode: a variant each (upstream <c>Desk</c>).</summary>
     private static readonly Contract Sync160Desk = Contract.Remote("test.160.desk", new()
     {
-        Version = 1, Params = new(), HostAddress = _ => ChordSupport.Server.Address(),
+        Version = 1, Params = new(), HostAddress = _ => ChordSupport.Server.Address(), Admission = OneOf("reader", "editor"),
         Variants = new()
         {
-            ["editor"] = new() { State = { ["text"] = Str() }, Methods = { ["write"] = Method(Str()) } },
             ["reader"] = new() { State = { ["text"] = Str() } },
+            ["editor"] = new() { State = { ["text"] = Str() }, Methods = { ["write"] = Method(Str()) } },
         },
     });
 
-    /// <summary>A server serving <see cref="Sync160Desk"/> and a loaded client that is not linked yet.</summary>
+    /// <summary>The mode <see cref="Sync160Desk"/>'s admission reads (upstream <c>DeskMode</c>).</summary>
+    private static readonly Contract Sync160DeskMode = Contract.Local("test.160.desk.mode", new()
+    { Version = 1, Params = new(), Members = new() { ["mode"] = Str(), ["set"] = Method(Str()) } });
+
+    /// <summary>A server serving <see cref="Sync160Desk"/> and a client linked to it, admitted as the desk's mode says:
+    /// <c>reader</c> or <c>editor</c> binds that variant, anything else is denied (upstream <c>desk()</c>).</summary>
     private sealed class Sync160DeskWorld : IAsyncDisposable
     {
-        private ILink? link;
+        private IReference mode = null!;
         public ChordHost Server { get; private set; } = null!;
         public ChordHost Client { get; private set; } = null!;
 
@@ -167,32 +171,43 @@ internal static partial class Program
                 Server = Hosts.Create(new() { Address = ChordSupport.Server.Address(), Principal = new() { ["kind"] = "server" }, OnError = _ => { } }),
                 Client = Hosts.Create(new() { OnError = _ => { } }),
             };
-            var loaded = await world.Server.LoadAsync([new("test.desk", Facet.Define((host, _) => host.Serve(Sync160Desk, (_, principal, self) =>
+            var loaded = await world.Server.LoadAsync([new("test.desk", Facet.Define((host, _) =>
             {
-                var text = self.Writable<JsonNode?>(JsonValue.Create("first"));
-                var members = new Dictionary<string, object?> { ["text"] = self.Derive([text], values => ((JsonNode?)values[0])?.DeepClone()) };
-                if (principal?["kind"]?.GetValue<string>() != "owner") return new(members, "reader");
-                members["write"] = (HostMethod)((arguments, _) => { text.Set((arguments as JsonNode)?.DeepClone()); return Task.FromResult<object?>(null); });
-                return new(members, "editor");
-            })))], ChordContext.Background);
+                host.Serve(Sync160DeskMode, (_, _, self) =>
+                {
+                    var mode = self.Writable<JsonNode?>(JsonValue.Create("reader"));
+                    return new(new Dictionary<string, object?>
+                    {
+                        ["mode"] = self.Derive([mode], values => ((JsonNode?)values[0])?.DeepClone()),
+                        ["set"] = (HostMethod)((arguments, _) => { mode.Set((arguments as JsonNode)?.DeepClone()); return Task.FromResult<object?>(null); }),
+                    });
+                });
+                host.Serve(Sync160Desk, (_, _, admitted, self) =>
+                {
+                    var text = self.Writable<JsonNode?>(JsonValue.Create("a desk"));
+                    var members = new Dictionary<string, object?> { ["text"] = self.Derive([text], values => ((JsonNode?)values[0])?.DeepClone()) };
+                    if (admitted?.GetValue<string>() == "reader") return new(members, "reader");
+                    members["write"] = (HostMethod)((arguments, _) => { text.Set((arguments as JsonNode)?.DeepClone()); return Task.FromResult<object?>(null); });
+                    return new(members, "editor");
+                }, new ServeOptions(Admit: (_, _, self) => self.Derive([self.Get(Sync160DeskMode, new()).Member("mode")], values =>
+                    ((JsonNode?)values[0])?.GetValue<string>() is { } mode && mode is "reader" or "editor"
+                        ? Admission.Allow(JsonValue.Create(mode)) : Admission.Deny("no access"))));
+            }))], ChordContext.Background);
             Equal(0, loaded.Failed.Count, "the desk facet loaded");
             await world.Client.LoadAsync([], ChordContext.Background);
+            world.mode = await world.Server.GetAsync(Sync160DeskMode, new(), ChordContext.Background);
+            var pair = MemoryLinkPair.Create();
+            world.Server.Accept(pair.First, new() { Principal = new() { ["kind"] = "guest" } }, ChordContext.Background);
+            world.Client.Connect(pair.Second, new() { Principal = new() { ["kind"] = "server" } }, ChordContext.Background);
             return world;
         }
 
-        /// <summary>Links the client to the server as <paramref name="kind"/> (<c>owner</c> binds the editor variant), dropping the link
-        /// it had: a held reference loads again and binds the variant the new principal gets.</summary>
-        public void Link(string kind)
-        {
-            link?.Close();
-            var pair = MemoryLinkPair.Create(); link = pair.Second;
-            Server.Accept(pair.First, new() { Principal = new() { ["kind"] = kind } }, ChordContext.Background);
-            Client.Connect(pair.Second, new() { Principal = new() { ["kind"] = "server" } }, ChordContext.Background);
-        }
-        public void Unlink() { link?.Close(); link = null; }
+        /// <summary>Sets the desk's mode: <c>reader</c> or <c>editor</c> admits that variant, anything else denies.</summary>
+        public Task Admit(string next) => mode.CallAsync("set", JsonValue.Create(next), ChordContext.Background);
 
         public async ValueTask DisposeAsync()
         {
+            mode.Release();
             await Client.CloseAsync(ChordContext.Background);
             await Server.CloseAsync(ChordContext.Background);
         }
