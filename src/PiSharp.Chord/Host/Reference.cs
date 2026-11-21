@@ -33,7 +33,9 @@ internal sealed partial class Binding : IReference, IHolder
     internal readonly Dictionary<(string Member, string Key), ReferenceKeySource> KeySources = new();
     internal int PendingKeys;
     private readonly TimeSpan timeout;
-    private TaskCompletionSource changed = NewSignal();
+    // What waits for its next state change (a getter, a parked call), in the order the waits were made: each is told in that order, so
+    // calls parked on one reference, and on references sharing one remote object, go out in the order they were made once it is live.
+    private readonly List<TaskCompletionSource<bool>> waiters = [];
     internal event Action? Changed;
     // Its events, for a contract with event members only (decision "Events: fire-and-forget members"): the instance its members tap and
     // the host's counter value of its binding to it (taken whenever it attaches to another instance shown live, used or not, so a
@@ -57,7 +59,27 @@ internal sealed partial class Binding : IReference, IHolder
     public string? Variant => Host.Dispatcher.Invoke(() => { AssertUsable(); return Target?.Variant; });
     public bool Following => members.Count > 0;
     internal string Label => Target?.Label ?? Contract.Name;
-    private static TaskCompletionSource NewSignal() => new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private void Wake()
+    {
+        if (waiters.Count == 0) return;
+        var waiting = waiters.ToArray(); waiters.Clear();
+        foreach (var waiter in waiting) waiter.TrySetResult(true);
+    }
+    // Waits for its next state change: false at the timeout; the context's abort cancels the wait. A waiter's continuation is posted to
+    // the dispatcher when it is told, so waiters go on in the order they were told (Task.WaitAsync would send each through the pool).
+    private Task<bool> NextChange(TimeSpan remaining, ChordContext context)
+    {
+        var waiter = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var current = Host; waiters.Add(waiter);
+        var timer = current.Options.TimeProvider.CreateTimer(_ => waiter.TrySetResult(false), null, remaining, Timeout.InfiniteTimeSpan);
+        var abort = context.AbortSignal is { CanBeCanceled: true } signal ? signal.Register(() => waiter.TrySetCanceled(signal)) : default;
+        _ = waiter.Task.ContinueWith(_ =>
+        {
+            timer.Dispose(); abort.Dispose();
+            current.Dispatcher.Post(() => waiters.Remove(waiter));
+        }, CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
+        return waiter.Task;
+    }
     internal void AssertUsable() { if (Ended) throw state.Error ?? HostErrors.Released(); }
     internal void Bind(ITarget target)
     {
@@ -170,7 +192,7 @@ internal sealed partial class Binding : IReference, IHolder
     {
         if (ReferenceEquals(next, state)) return;
         state = next; source.Moved();
-        var signal = changed; changed = NewSignal(); signal.TrySetResult(); Changed?.Invoke();
+        Wake(); Changed?.Invoke();
     }
     internal async Task ReadyAsync(ChordContext context)
     {
@@ -182,8 +204,8 @@ internal sealed partial class Binding : IReference, IHolder
             if (state.Cause?.Kind == FailureKind.Broken) throw state.Cause.Error;
             var remaining = deadline - Host.Options.TimeProvider.GetUtcNow();
             if (remaining <= TimeSpan.Zero) throw state.Cause?.Error ?? new ChordError("unavailable", $"{Label}: did not become live within {timeout.TotalMilliseconds} ms");
-            try { await changed.Task.WaitAsync(remaining, Host.Options.TimeProvider, context.AbortSignal ?? CancellationToken.None); }
-            catch (TimeoutException) { throw state.Cause?.Error ?? new ChordError("unavailable", $"{Label}: did not become live within {timeout.TotalMilliseconds} ms"); }
+            context.AbortSignal?.ThrowIfCancellationRequested();
+            if (!await NextChange(remaining, context)) throw state.Cause?.Error ?? new ChordError("unavailable", $"{Label}: did not become live within {timeout.TotalMilliseconds} ms");
         }
     }
     internal Task ReadyAsOldWorkAsync(ChordContext context)
@@ -241,7 +263,7 @@ internal sealed partial class Binding : IReference, IHolder
         foreach (var member in members.Values) member.Release();
         foreach (var key in KeySources.Values.ToArray()) key.Release();
         KeySources.Clear(); keyed.Clear();
-        members.Clear(); source.Released(); changed.TrySetResult(); Changed?.Invoke(); Changed = null;
+        members.Clear(); source.Released(); Wake(); Changed?.Invoke(); Changed = null;
         target?.Unhold(this); Host.Forget(this); host = null; Dependent = null; AcquisitionContext = ChordContext.Background;
     }
 }

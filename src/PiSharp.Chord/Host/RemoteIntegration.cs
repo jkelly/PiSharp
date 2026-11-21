@@ -139,6 +139,8 @@ public sealed partial class ChordHost
     {
         remoteLinks.Remove(link);
         foreach (var relay in Relays.Values.ToArray()) relay.Unlinked(link);
+        // While the host closes, its remote objects end with it (CloseRemote, then every reference): none goes loading on the way.
+        if (Closed) return;
         parentPath.Disconnected(link);
         foreach (var route in remoteRoutes.Values.ToArray()) route.Closed(link);
     }
@@ -194,7 +196,7 @@ public sealed partial class ChordHost
         heartbeatTimer?.Dispose(); heartbeatTimer = null;
         foreach (var link in remoteLinks.ToArray()) link.Close();
         foreach (var route in remoteRoutes.Values) route.Stop();
-        foreach (var holder in parentPath.Holders.Concat(unplacedPath.Holders))
+        foreach (var holder in remoteRoutes.Values.SelectMany(route => route.Holders).Concat(parentPath.Holders).Concat(unplacedPath.Holders).ToArray())
             if (holder is RemoteObject remote) remote.Lost(HostErrors.Closed());
         remoteLinks.Clear(); remoteRoutes.Clear(); Relays.Clear();
     }

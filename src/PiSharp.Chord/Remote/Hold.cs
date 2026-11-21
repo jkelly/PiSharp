@@ -156,6 +156,10 @@ internal sealed class IncomingHold : IIncomingHold, IHolder, IReloadAwareHolder
     public void Moved()
     {
         if (released || target is null) return;
+        // Its version is no longer bound and no open old attempt serves it any more (a version-dropping reload's drain ended): it leaves
+        // its object and waits unbound, as at the publication that removes a type (upstream hold.ts `removed`).
+        if (target is ChordObject held && !DataInternal.Binds(held.Served.Provider, request.Version, request.Fingerprint) && !held.OldServes(request.Version, request.Fingerprint))
+        { Removed(new ChordError("contract_mismatch", $"{request.Type} v{request.Version}: not served")); return; }
         var state = target.StateFor(request.Version, request.Fingerprint);
         if (state.Kind == "ended") { End(state.Error ?? HostErrors.Released()); return; }
         if (state.Kind == "live")
