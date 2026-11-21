@@ -197,6 +197,8 @@ public sealed class App : IAsyncDisposable
         if (TelemetryTarget is { } target) core.Add(new("chord.app.telemetry", IngestFacet.CreateFacet(new()
         {
             Target = target, TimeProvider = options.TimeProvider,
+            // Every link of the kit's server is signed in: its pages are the app's own people's.
+            Admit = _ => true,
             WorkerHost = principal => workerPrincipals.FirstOrDefault(pair => AppPrincipals.Same(pair.Value, principal)).Key,
             PrincipalAttributes = principal => principal is null ? new SpanAttributes() : options.PrincipalAttributes?.Invoke(principal) ?? new SpanAttributes(),
         })));
