@@ -61,11 +61,11 @@ internal static partial class ModelResolver
     internal const string DefaultThinkingLevel = "medium";
     internal static readonly ImmutableArray<string> ThinkingLevels = ["off", "minimal", "low", "medium", "high", "xhigh", "max"];
 
-    /// <summary>Source defaultModelPerProvider at 7d073328e44337d3292a7db9b0f0308f679c5e97, in declaration order.</summary>
+    /// <summary>Source defaultModelPerProvider at faac585884ae2c013a6b1400f3e9e77f10b34bac (Pi 1.6.0), in declaration order.</summary>
     internal static readonly ImmutableArray<(string Provider, string Model)> DefaultModelPerProvider =
     [
         ("amazon-bedrock", "us.anthropic.claude-opus-5-5"), ("ant-ling", "Ring-2.6-1T"), ("anthropic", "claude-opus-5-5"),
-        ("openai", "gpt-6.1-sol"), ("azure", "gpt-6.1-sol"), ("openai-codex", "gpt-6.1-sol"), ("radius", "balanced"),
+        ("openai", "gpt-6.2-sol"), ("azure", "gpt-6.2-sol"), ("openai-codex", "gpt-6.2-sol"), ("radius", "balanced"),
         ("nvidia", "nvidia/nemotron-3.5-super-vl-120b-a12b"), ("deepseek", "deepseek-v4-pro"), ("google", "gemini-4-argon"),
         ("google-vertex", "gemini-4-argon"), ("github-copilot", "gpt-6.1-sol"), ("openrouter", "moonshotai/kimi-k2.7-code"),
         ("vercel-ai-gateway", "zai/glm-5.3"), ("xai", "grok-4.7"), ("groq", "openai/gpt-oss-120b"), ("cerebras", "gpt-oss-120b"),
