@@ -15,6 +15,7 @@ public sealed partial class ChordHost : IAsyncDisposable
     internal readonly HostOptions Options;
     internal readonly OldWork OldWork = new();
     internal readonly ReloadCycles ReloadCycles = new();
+    internal readonly HostEvents Events;
     internal readonly UnboundClock UnboundClock;
     internal TimeSpan ReloadDrainTimeout => Options.ReloadDrainTimeout < Options.CloseTimeout ? Options.ReloadDrainTimeout : Options.CloseTimeout;
     internal readonly Batch Batch;
@@ -48,7 +49,8 @@ public sealed partial class ChordHost : IAsyncDisposable
         if (options.Principal is { } principal && ChordJson.AsString(principal["kind"]) is null)
             throw new ArgumentException("A host principal needs a kind", nameof(options));
         if (options.ReadyTimeout < TimeSpan.Zero || options.CloseTimeout < TimeSpan.Zero || options.ReloadDrainTimeout < TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(options));
-        Options = options;
+        if (options.CallWindow < 1 || options.EventWindow < 1) throw new ArgumentOutOfRangeException(nameof(options), "CallWindow and EventWindow are positive");
+        Options = options; Events = new(this);
         UnboundClock = new(options.TimeProvider, Dispatcher.Post, Report);
         Dispatcher.Unhandled = error => Report(new("runtime_failed", error));
         Store = options.Store as ChordStore;

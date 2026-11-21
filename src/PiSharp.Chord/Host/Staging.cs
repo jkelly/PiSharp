@@ -68,7 +68,7 @@ internal static class PluginStaging
         finally { self.Declaring = false; }
     }
 
-    internal static void ValidateImplementation(Contract contract, HostImplementation implementation)
+    internal static void ValidateImplementation(Contract contract, HostImplementation implementation, Attempt? attempt = null)
     {
         ArgumentNullException.ThrowIfNull(implementation);
         var variant = contract.Kind == ContractKind.Local ? ContractsInternal.Local : implementation.Variant;
@@ -93,8 +93,12 @@ internal static class PluginStaging
         foreach (var member in shape.Methods.Keys)
             if (!members.TryGetValue(member, out var value) || value is not HostMethod)
                 throw new ArgumentException($"{contract.Name}.{member}: expected a method");
+        // Event members (Pi 1.6.0): the attempt's own sources or references' event members; a recording's inert ones while staging.
+        foreach (var member in shape.Events.Keys)
+            if (!EventImplementations.Accepts(members.GetValueOrDefault(member), attempt))
+                throw new ArgumentException($"{contract.Name}.{member}: an event member is this object's own self.Events() or a reference's event member");
         foreach (var member in members.Keys)
-            if (!shape.State.ContainsKey(member) && !shape.Keyed.ContainsKey(member) && !shape.Methods.ContainsKey(member))
+            if (!shape.State.ContainsKey(member) && !shape.Keyed.ContainsKey(member) && !shape.Methods.ContainsKey(member) && !shape.Events.ContainsKey(member))
                 throw new ArgumentException($"{contract.Name}.{member}: not a member of the implementation variant");
     }
 
@@ -244,6 +248,7 @@ internal sealed class RecordingValue : ISingletonHandle, IKeyedHandle, IReferenc
     public Task RetireAsync(string key, ChordContext context) => throw NotActive();
     public IWatchable<JsonNode?> Member(string name) => this;
     public IKeyedHandle KeyedMember(string name) => this;
+    public IEventMember Event(string name) => RecordingEvents.Instance;
     public Task<object?> CallAsync(string name, object? arguments, ChordContext context) => throw NotActive();
     public void Retry() => throw NotActive();
     public void Release() { }

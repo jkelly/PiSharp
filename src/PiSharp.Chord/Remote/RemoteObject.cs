@@ -12,7 +12,16 @@ namespace PiSharp.Chord.Remote;
 
 internal sealed class RemoteObject : ITarget, IUpstream
 {
-    private sealed record Bound(string Variant, VariantData Data, VariantNames Names, Dictionary<string, Replica> Replicas);
+    // The last binding: its variant, the bound version's names (the wire's indexes), a replica per member, and a node per event member,
+    // at which the events arriving for this binding go out (a new binding has new nodes, so its reference's subscriptions move there from
+    // its counter value: nothing of an earlier binding reaches them).
+    private sealed record Bound(string Variant, VariantData Data, VariantNames Names, Dictionary<string, Replica> Replicas) : IEventInstance
+    {
+        private readonly Dictionary<string, EventNode>? nodes = Names.Events.Count == 0 ? null
+            : Names.Events.ToDictionary(member => member, _ => new EventNode(), StringComparer.Ordinal);
+        // Its reference binds at its own version: the provider mapped what arrives.
+        public EventNode? EventNode(string member, long version) => nodes?.GetValueOrDefault(member);
+    }
     private readonly ChordHost host;
     private readonly Contract contract;
     private readonly JsonObject parameters;
@@ -60,14 +69,14 @@ internal sealed class RemoteObject : ITarget, IUpstream
         var current = hold.Value;
         var index = bound.Names.Methods.ToList().IndexOf(method);
         var parent = context.Telemetry;
-        if (ChordTelemetry.IsUntraced(parent)) return current.Side.CallAsync(current.Id, index, data, args, context);
+        if (ChordTelemetry.IsUntraced(parent)) return current.Side.CallAsync(current.Id, index, data, args, this, context);
         var attributes = HoldAttributes(); attributes["member"] = ChordTelemetry.Capped(method);
         foreach (var pair in host.PrincipalAttributes(Caller.Principal, context)) attributes[pair.Key] = pair.Value;
         return parent.StartSpanAsync(new SpanOptions("chord.call") { Attributes = attributes }, async span =>
         {
             try
             {
-                var result = await current.Side.CallAsync(current.Id, index, data, args, ChordContext.WithTelemetry(span, context));
+                var result = await current.Side.CallAsync(current.Id, index, data, args, this, ChordContext.WithTelemetry(span, context));
                 span.SetAttributes(new() { ["outcome"] = "ok" }); return result;
             }
             catch (Exception error)
@@ -150,6 +159,31 @@ internal sealed class RemoteObject : ITarget, IUpstream
             foreach (var (replica, error) in failures) replica.Fail(error);
             foreach (var replica in retired) if (!updates.Any(x => ReferenceEquals(x.replica, replica))) replica.Retire();
         };
+    }
+    /// <summary>Where an event of member <paramref name="member"/> (an index into the bound version's event members) of its hold goes:
+    /// its live binding's node for it, when something taps it; null when the value is to be dropped unopened (not live, no listener).
+    /// Throws on an index outside the bound version (a protocol error).</summary>
+    internal EventNode? EventNode(long member)
+    {
+        if (State.Kind != "live" || bound is null) return null;
+        if (member < 0 || member >= bound.Names.Events.Count) throw new ArgumentException($"{Label}: no event member {member}");
+        var node = bound.EventNode(bound.Names.Events[(int)member], contract.Version)!;
+        return node.Tapped ? node : null;
+    }
+    /// <summary>One entry of an event message for its hold: the value of event member <paramref name="member"/> stamped
+    /// <paramref name="at"/>, taking this host's next counter value, at the node its reference's subscriptions tap; dropped past the link's
+    /// limits (<c>too_large</c>, counted; the hold stays bound).</summary>
+    internal void Event(long member, long at, Part value, HostLink link)
+    {
+        if (EventNode(member) is not { } node) return;
+        JsonNode? json;
+        try { json = Parts.Parse(link.OpenPart(value, link.Limits)); }
+        catch (ChordError error) when (error.Code == "too_large")
+        {
+            host.Events.Metrics.Counter("chord.events.dropped").Add(1, ChordTelemetry.EventsDropped("too_large")); return;
+        }
+        // Fresh JSON from the link: event values are never validated (as state).
+        host.Events.Push(node, json, at);
     }
     internal void WentLive() { Held("bound"); LastFailure = null; Move(RefState.Live); }
     internal void Failed(FailedMessage message)

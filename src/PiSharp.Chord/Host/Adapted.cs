@@ -1,4 +1,6 @@
-// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/chord/src/next/host/adapted.ts
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/chord/src/host/adapted.ts
+// 1.6.0: per changed event member one node mapping each value once per emit for all of a version's bindings (decision "Events:
+// fire-and-forget members"); a refused event member refuses the binding, a removed one gives none.
 using System.Text.Json.Nodes;
 using PiSharp.Chord.Contracts;
 using PiSharp.Chord.Data;
@@ -17,6 +19,14 @@ internal sealed class AdaptedMembers(ServedType served, string? variant, string 
     private readonly Dictionary<string, IKeyedHandle> keyed = new(StringComparer.Ordinal);
     private readonly Dictionary<string, Dictionary<object, MappedKey>> keys = new(StringComparer.Ordinal);
     internal long Version { get; init; }
+    /// <summary>The instance's event member's node; null when its variant has none.</summary>
+    internal Func<string, EventNode?>? EventOf { get; init; }
+    /// <summary>Reports an event mapping's failure (<c>event_mapping_failed</c>), once per failure episode.</summary>
+    internal Action<string, Exception>? ReportEvent { get; init; }
+    /// <summary>The host's instruments: an event dropped by its mapping is counted (<c>chord.events.dropped</c>).</summary>
+    internal ChordMetrics? Metrics { get; init; }
+    // The event members mapped so far, each tapping the instance's node; made by the first.
+    private Dictionary<string, MappedEvents>? events;
 
     internal static ChordError? Refusal(ServedType served, long version, string? variant)
     {
@@ -28,7 +38,29 @@ internal sealed class AdaptedMembers(ServedType served, string? variant, string 
             if (StateMappingOf(served, mapping, variant, name) is { Refuses: true }) return Refused(served, version, name);
         foreach (var name in old.Keyed.Keys)
             if (mapping?.Keyed.GetValueOrDefault(name).Refuses == true) return Refused(served, version, name);
+        foreach (var name in old.Events.Keys)
+            if (SectionMapping(served, mapping?.Events, variant, name) is { Refuses: true }) return Refused(served, version, name);
         return null;
+    }
+
+    /// <summary>Event member <paramref name="name"/>'s node as this version's bindings tap it: the instance's own when unchanged since, a
+    /// mapping node (made by the first use) when changed; null when this version is not accepted, or the current variant lacks the member
+    /// (removed since: an older consumer receives none of it).</summary>
+    internal EventNode? Event(string name)
+    {
+        if (!Accepts(served, Version) || EventOf?.Invoke(name) is not { } node) return null;
+        var mapping = SectionMapping(served, Mappings(served, Version)?.Events, variant, name);
+        if (mapping is null) return node;
+        // A refused member refused the binding (Refusal): no binding of this version taps it.
+        if (mapping.Value.Map is not { } map) return null;
+        events ??= new(StringComparer.Ordinal);
+        if (!events.TryGetValue(name, out var mapped))
+            events.Add(name, mapped = new MappedEvents(node, value =>
+            {
+                using var lease = batch.RetainCallback?.Invoke(map, served.DeclaringFacet);
+                return AsJson(map(value));
+            }, error => ReportEvent?.Invoke(name, error), Metrics));
+        return mapped;
     }
 
     internal object Member(string name)
@@ -104,6 +136,8 @@ internal sealed class AdaptedMembers(ServedType served, string? variant, string 
 
     internal void Detach(Exception error)
     {
+        if (events is not null) foreach (var mapped in events.Values) mapped.Detach();
+        events = null;
         foreach (var derive in derives) derive.Detach(error);
         foreach (var bySource in keys.Values)
             foreach (var key in bySource.Values) key.Derive.Detach(error);
@@ -169,16 +203,53 @@ internal sealed class AdaptedMembers(ServedType served, string? variant, string 
     private void AssertAccepted() { if (!Accepts(served, Version)) throw Mismatch(served, Version); }
     private static bool Accepts(ServedType served, long version) => version == served.Contract.Version || served.Provider.Accepted.Any(entry => entry.Version == version);
     private static VersionMappings? Mappings(ServedType served, long version) => served.Provider.Accepts.GetValueOrDefault(version);
-    private static StateMapping? StateMappingOf(ServedType served, VersionMappings? mappings, string? variant, string name)
+    private static StateMapping? StateMappingOf(ServedType served, VersionMappings? mappings, string? variant, string name) =>
+        SectionMapping(served, mappings?.State, variant, name);
+    // The mapping of a member of variant in a section of state or events mappings (a remote contract's by variant, a local one's flat);
+    // null when it is unchanged.
+    private static StateMapping? SectionMapping(ServedType served, OrderedDictionary<string, StateEntry>? section, string? variant, string name)
     {
-        if (mappings is null) return null;
-        if (served.Contract.Kind == ContractKind.Local) return mappings.State.GetValueOrDefault(name).Value is StateMapping local ? local : null;
-        return mappings.State.GetValueOrDefault(variant ?? "").Value is StateSection section && section.TryGetValue(name, out var remote) ? remote : null;
+        if (section is null) return null;
+        if (served.Contract.Kind == ContractKind.Local) return section.GetValueOrDefault(name).Value is StateMapping local ? local : null;
+        return section.GetValueOrDefault(variant ?? "").Value is StateSection mappings && mappings.TryGetValue(name, out var remote) ? remote : null;
     }
     private static JsonNode? AsJson(object? value) => value switch
     { null => null, JsonNode json => json, _ => throw new InvalidOperationException("a state mapping must return a JsonNode or null") };
     private static ChordError Mismatch(ServedType served, long version) => new("contract_mismatch", $"{served.Contract.Name} v{version} is not served here");
     private static ChordError Refused(ServedType served, long version, string name) => new("contract_mismatch", $"{served.Contract.Name} v{version}: member \"{name}\" is refused by its provider");
+    /// <summary>An older version's event member: a node tapping the instance's (every entry), mapping each value once for all of this
+    /// version's bindings, delivered to them with its stamp and counter value. A mapping that throws drops that emit for this version only
+    /// (counted), reported once per failure episode, and is tried again at the next emit. The mapping gets a copy of the value: a
+    /// <see cref="JsonNode"/> has one parent, so a mapping may build its result from parts of what it was given.</summary>
+    private sealed class MappedEvents : EventNode
+    {
+        private readonly EventNode source;
+        private readonly Tap tap;
+        private bool failing;
+        internal MappedEvents(EventNode source, Func<JsonNode?, JsonNode?> mapping, Action<Exception> report, ChordMetrics? metrics)
+        {
+            this.source = source;
+            // Every entry: its own bindings judge them by their counter values.
+            tap = new Tap(long.MinValue, (entry, flush) =>
+            {
+                if (!Tapped) return;
+                JsonNode? value;
+                try { value = mapping(entry.Value?.DeepClone()); }
+                catch (Exception error)
+                {
+                    metrics?.Counter("chord.events.dropped").Add(1, ChordTelemetry.EventsDropped("mapping"));
+                    if (!failing) report(error);
+                    failing = true; return;
+                }
+                failing = false;
+                Deliver(new EventEntry(this, value, entry.At, entry.N), flush);
+            });
+            source.Tap(tap);
+        }
+        /// <summary>Its version's last binding left, or its instance ended: it maps nothing more.</summary>
+        internal void Detach() { source.Untap(tap); Clear(); }
+    }
+
     private sealed class MappedKey(Derive derive)
     {
         internal Derive Derive { get; } = derive;

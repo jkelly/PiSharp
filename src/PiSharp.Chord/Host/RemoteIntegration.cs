@@ -75,11 +75,11 @@ public sealed partial class ChordHost
         ResolveUnbound();
     });
 
-    internal HostLink MakeLink(ILink link, LinkOptions options, LinkRole role, ChordContext context)
+    internal HostLink MakeLink(ILink link, LinkOptions options, LinkRole role, ChordContext context, Action<string>? opened = null)
     {
         ArgumentNullException.ThrowIfNull(link); ArgumentNullException.ThrowIfNull(options);
         if (ChordJson.AsString(options.Principal["kind"]) is null) throw new ArgumentException("A link principal needs a kind", nameof(options));
-        var made = new HostLink(this, link, options, role, context);
+        var made = new HostLink(this, link, options, role, context, opened);
         remoteLinks.Add(made);
         made.Start();
         if (!made.Open) remoteLinks.Remove(made);

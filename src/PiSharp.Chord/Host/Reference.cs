@@ -31,10 +31,19 @@ internal sealed partial class Binding : IReference, IHolder
     private readonly TimeSpan timeout;
     private TaskCompletionSource changed = NewSignal();
     internal event Action? Changed;
+    // Its events, for a contract with event members only (decision "Events: fire-and-forget members"): the instance its members tap and
+    // the host's counter value of its binding to it (taken whenever it attaches to another instance shown live, used or not, so a
+    // subscription made later still gets what was emitted since; none while it points at nothing); its members' subscriptions and
+    // re-exposing nodes (made by the first use); the members it handed out.
+    private readonly bool hasEvents;
+    private (IEventInstance Instance, long BoundAt)? eventsAt;
+    private ReferenceEventTaps? eventTaps;
+    private Dictionary<string, ReferenceEvents>? eventMembers;
     internal Binding(ChordHost host, Contract contract, CheckedParams parameters, Caller caller, TimeSpan timeout, ChordObject? dependent)
     {
         this.host = host; Contract = contract; Parameters = parameters; Caller = caller; this.timeout = timeout; Dependent = dependent;
         source = new ReferenceState(this, host.Batch);
+        hasEvents = ContractsInternal.CurrentVariants(contract).Values.Any(variant => variant.Events.Count > 0);
     }
     public INativeWatchable<RefState> State => source;
     internal RefState RefState => state;
@@ -53,6 +62,8 @@ internal sealed partial class Binding : IReference, IHolder
     {
         var target = Target; Target = null; target?.Unhold(this);
         Waiting(new ChordError("unavailable", $"{Contract.Name} is not served here")); Retarget();
+        // Unbound: no events until it binds again (then from that binding's counter value, even to the same instance).
+        RetargetEvents();
     }
     internal void Failed(FailureCause failure)
     {
@@ -79,8 +90,46 @@ internal sealed partial class Binding : IReference, IHolder
             next = RefState.Failed(new(FailureKind.Waiting, refusal));
         if (next.Kind == "live" && PendingKeys > 0) next = RefState.Loading;
         Move(next);
+        RetargetEvents();
         Host.ChangedPresence();
     }
+    // Its event members follow the instance it points at from the host's counter value now, when that is another instance than they
+    // follow: only while it shows its object live (a failed instance's admitted commits still reach its members, never its events).
+    private void RetargetEvents()
+    {
+        if (!hasEvents || Ended) return;
+        var instance = state.Kind == "live" ? Target?.Instance as IEventInstance : null;
+        if (ReferenceEquals(instance, eventsAt?.Instance)) return;
+        eventsAt = instance is null ? null : (instance, Host.Events.Counter);
+        eventTaps?.Retarget(eventsAt);
+    }
+    public IEventMember Event(string name) => Host.Dispatcher.Invoke(() =>
+    {
+        AssertUsable();
+        if (!ContractsInternal.DataOf(Contract).Kinds.TryGetValue(name, out var kind) || kind != MemberKind.Event) throw HostErrors.InvalidMember(name);
+        eventMembers ??= new(StringComparer.Ordinal);
+        if (!eventMembers.TryGetValue(name, out var member)) eventMembers.Add(name, member = new ReferenceEvents(this, name));
+        return (IEventMember)member;
+    });
+    /// <summary>Subscribes <paramref name="listener"/> to event member <paramref name="member"/> at once, bound or not: it gets what this
+    /// reference receives while it is bound to an instance whose variant has the member. Fails <c>released</c> once released, and with the
+    /// cancellation of an aborted <paramref name="context"/>.</summary>
+    internal Task<IEventSubscription> SubscribeEvents(string member, Action<ChordEvent> listener, ChordContext context)
+    {
+        if (host is not { } current) return Task.FromException<IEventSubscription>(state.Error ?? HostErrors.Released());
+        return current.Dispatcher.Invoke(() =>
+        {
+            if (Ended) return Task.FromException<IEventSubscription>(state.Error ?? HostErrors.Released());
+            var taps = EventTaps();
+            return EventSubscriptions.Subscribe(current, listener, context, subscription => taps.Subscribe(member, subscription),
+                subscription => eventTaps?.Unsubscribe(member, subscription));
+        });
+    }
+    /// <summary>Feeds <paramref name="node"/> (an object's member re-exposing event member <paramref name="member"/>) what this reference
+    /// receives, until <see cref="UnforwardEvents"/>; nothing for a released reference.</summary>
+    internal void ForwardEvents(string member, EventNode node) { if (!Ended) EventTaps().Forward(member, node); }
+    internal void UnforwardEvents(string member, EventNode node) => eventTaps?.Unforward(member, node);
+    private ReferenceEventTaps EventTaps() => eventTaps ??= new ReferenceEventTaps(Contract.Version, eventsAt);
     private void Move(RefState next)
     {
         if (ReferenceEquals(next, state)) return;
@@ -151,6 +200,8 @@ internal sealed partial class Binding : IReference, IHolder
         Host.UnboundClock.Stop(this);
         Ended = true; var target = Target; Target = null;
         state = RefState.Ended(error);
+        // Its subscriptions end and its event members untap (taken out first: a stopping subscription finds none).
+        var taps = eventTaps; eventTaps = null; eventsAt = null; eventMembers = null; taps?.End();
         foreach (var member in members.Values) member.Release();
         foreach (var key in KeySources.Values.ToArray()) key.Release();
         KeySources.Clear(); keyed.Clear();

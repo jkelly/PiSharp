@@ -24,6 +24,14 @@ public sealed class HostOptions
     public Func<JsonObject, SpanAttributes>? PrincipalAttributes { get; init; }
     public TimeSpan HeartbeatPing { get; init; } = TimeSpan.FromSeconds(15);
     public TimeSpan HeartbeatClose { get; init; } = TimeSpan.FromSeconds(30);
+    /// <summary>How many concurrent calls of one origin this host accepts on a link it was not given as trusted (its call window,
+    /// announced in <c>hello</c>); a positive number. On a trusted link it announces none (Pi 1.6.0, decision "Call windows only for
+    /// untrusted links"): the app's own hosts never queue calls behind each other.</summary>
+    public int CallWindow { get; init; } = 10_000;
+    /// <summary>How many <c>event</c> messages of its own this host leaves unacknowledged per link and origin (Pi 1.6.0, decision "Events:
+    /// fire-and-forget members"); a positive number. A flush finding the window full drops that origin's events (counted): nothing waits
+    /// for a slow consumer.</summary>
+    public int EventWindow { get; init; } = 32;
     public IStore? Store { get; init; }
     public PiSharp.Chord.Link.ICompression? Compression { get; init; }
     public Func<JsonObject, IEnumerable<JsonNode?>>? RevokedBy { get; init; }
@@ -84,6 +92,9 @@ public interface IReference : IDisposable
     IWatchable<JsonNode?> Member(string name);
     IKeyedHandle KeyedMember(string name);
     IHostKeyedHandle HostKeyedMember(string name) => throw new NotSupportedException("Host-keyed members are not available on this reference.");
+    /// <summary>The event member <paramref name="name"/> (Pi 1.6.0, decision "Events: fire-and-forget members"): its listeners get what
+    /// this reference receives while it is bound to an instance whose variant has the member; never an event emitted before it bound.</summary>
+    IEventMember Event(string name) => throw new NotSupportedException("Event members are not available on this reference.");
     Task<object?> CallAsync(string name, object? arguments, ChordContext context);
     void Retry();
     void Release();
@@ -93,6 +104,11 @@ public interface ISelf
     ISingletonHandle State(StateDefinition definition);
     IKeyedHandle KeyedState(StateDefinition definition);
     IHostKeyedHandle HostKeyedState(StateDefinition definition) => throw new NotSupportedException("Host-keyed state is not available on this implementation.");
+    /// <summary>An event source of this attempt (Pi 1.6.0, decision "Events: fire-and-forget members"), implementing an event member:
+    /// <c>Emit</c> delivers a JSON value once to each reference bound to the object before it, at the event flush, after the state
+    /// published before it; never kept, never folded, dropped for a holder that cannot keep up. Emits are no transaction work; after the
+    /// attempt's seal <c>Emit</c> throws <c>released</c>.</summary>
+    IEventSource Events() => throw new NotSupportedException("Event sources are not available on this implementation.");
     IWatchable<JsonNode?> Derive(IReadOnlyList<object> sources, Func<IReadOnlyList<object?>, JsonNode?> compute);
     IReference Get(Contract type, JsonObject parameters);
     IRegistryValue<V> Registry<C, V>(Registry<C, V> registry);

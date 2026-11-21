@@ -8,7 +8,10 @@ using PiSharp.Telemetry;
 
 namespace PiSharp.Chord.Host;
 
-public sealed record ResolvedLink(ILink Link, LinkOptions Options);
+/// <summary>What a route's <c>Resolve</c> returns. <paramref name="Opened"/> (Pi 1.6.0) is called once, when the link's handshake
+/// completed, with the incarnation of the host at the other end: before anything else that host sent is handled and before this host sends
+/// on the link; never for a link that closes before its handshake. It must not throw.</summary>
+public sealed record ResolvedLink(ILink Link, LinkOptions Options, Action<string>? Opened = null);
 public sealed class RouteOptions
 {
     public required Func<JsonObject, Address, bool> Authorize { get; init; }
@@ -129,7 +132,7 @@ internal sealed class HostRoute
             var resolved = await options.Resolve(routed.Address, traced);
             routed.Resolving = false;
             if (host.Closed) { resolved.Link.Close(); return; }
-            var link = host.MakeLink(resolved.Link, resolved.Options, LinkRole.Route, context);
+            var link = host.MakeLink(resolved.Link, resolved.Options, LinkRole.Route, context, resolved.Opened);
             if (!link.Open) { Settle(routed, new ChordError("unavailable", $"{routed.Address.Key}: the link closed before its handshake")); return; }
             routed.Failure = null; links.Add(link, (routed, link.Greeted)); routed.Path.Connected(link);
             span?.Span.SetAttributes(new SpanAttributes { ["outcome"] = "linked" });
