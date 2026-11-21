@@ -33,6 +33,9 @@
 // records no failure and settles nothing for such a run however it ends (its inputs settled done when it answered), and copies run.first
 // into runFailure.first. Both are optional fields of version 3, as upstream adds them without a version bump. Upstream's LiveRun and
 // LiveState types are this JSON shape; C# reads pi.live as JSON, so neither is a C# type.
+// Pi v1.6.0 sync (faac585884ae2c013a6b1400f3e9e77f10b34bac): a slot's status may be `sleeping` or `waiting` while its call is parked,
+// holding no output (ClearOutput keeps its details and diagnostics); pi.live.run.yield {answer, tasks}, present while the tasks an
+// onYield hook asked for decide whether the answer stands, so a scheduler outcome ends such a run done with that answer.
 using System.Collections.Immutable;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Chord.Delta;
@@ -272,7 +275,16 @@ public static class Live
     /// <summary>Removes what a tool published while running; its result entry or a rerun replaces it (upstream <c>clearProgress</c>).</summary>
     public static void ClearProgress(DraftObject slot)
     {
-        foreach (var key in new[] { "output", "droppedBytes", "droppedLines", "details", "diagnostics" }) slot.Delete(key);
+        ClearOutput(slot);
+        slot.Delete("details");
+        slot.Delete("diagnostics");
+    }
+
+    /// <summary>Removes a slot's running output only: a parked call, and its next run, keep its details and diagnostics (upstream
+    /// <c>clearOutput</c>).</summary>
+    public static void ClearOutput(DraftObject slot)
+    {
+        foreach (var key in new[] { "output", "droppedBytes", "droppedLines" }) slot.Delete(key);
     }
 
     /// <summary>
@@ -313,6 +325,13 @@ public static class Live
         if (!RunTaskKinds.Contains(record.Kind)) return;
         var live = await tx.DocAsync(LiveDoc, record.ConversationId).ConfigureAwait(false);
         if (RunTaskId(live) != record.Id.Value) return;
+        // The run answered and waited for its onYield tasks: it ends with its answer, without a failure.
+        if (live.Get("run") is JsonObjectValue run && run.TryGetValue("yield", out var yielded) && yielded is JsonObjectValue held &&
+            held.TryGetValue("answer", out var answered) && answered is JsonNumberValue answer)
+        {
+            EndRun(tx, live, record.Id, RunEnd.Done(new EntryId((long)answer.Value)));
+            return;
+        }
         // Cut off, the abort handler may have died converting the partial: the run ends without it.
         if (!cutOff) await HarnessTasks.ConvertPartialAsync(tx, live, record.ConversationId).ConfigureAwait(false);
         EndRun(tx, live, record.Id, outcome switch

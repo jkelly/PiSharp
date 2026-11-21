@@ -459,7 +459,11 @@ internal static class ToolsTests
         });
 
         // #10549
-        yield return Case(prefix + "records-how-long-execute-took-excluding-hooks-and-nothing-for-calls-that-did-not-run", async () =>
+        // Pi v1.6.0 sync (faac585884ae2c013a6b1400f3e9e77f10b34bac): upstream's "records each result's span from the call's first run, hooks
+        // included, also for calls that did not execute" replaces "records how long execute() took, excluding hooks, and nothing for calls
+        // that did not run": durationMs is the span from the tool task's first run to its result. Only lower bounds are checked, so the
+        // hook sleeps upstream's 100 ms again.
+        yield return Case(prefix + "records-each-result-s-span-from-the-call-s-first-run-hooks-included-also-for-calls-that-did-not-execute", async () =>
         {
             var setup = Setup();
             AddTool(setup.Registry, Tool("slow", async (_, _, _) =>
@@ -476,9 +480,7 @@ internal static class ToolsTests
             {
                 BeforeTool = async (call, _, _) =>
                 {
-                    // Upstream sleeps 100 ms here and bounds durationMs below 100. A loaded macOS runner measured a 30 ms execute at 138 ms, so
-                    // the hook delay and the bound are scaled together: a duration that included the hook would still be at least the bound.
-                    await Sleep(1000);
+                    await Sleep(100);
                     return S(call["id"]) == "blocked" ? new BeforeToolDecision(Block: "no") : null;
                 },
             });
@@ -487,10 +489,10 @@ internal static class ToolsTests
             foreach (var id in new[] { "slow", "thrower" })
             {
                 var duration = N(byId[id]["durationMs"]);
-                Check(duration >= 25 && duration < 1000, $"{id} durationMs {duration}");
+                Check(duration >= 125, $"{id} durationMs {duration}");
             }
             Check(IsError(byId["thrower"]), "thrower isError");
-            Check(!byId["blocked"].ContainsKey("durationMs"), "blocked has no durationMs");
+            Check(N(byId["blocked"]["durationMs"]) >= 95, $"blocked durationMs {byId["blocked"]["durationMs"].ToJson()}");
             await ran.Harness.CloseAsync(Context);
         });
 
@@ -618,7 +620,7 @@ internal static class ToolsTests
                 AfterTools = (assistant, entries, _, _) =>
                 {
                     observed.Add($"{assistant.Value}:[{string.Join(",", entries.Select(entry => entry.Value))}]");
-                    return Task.CompletedTask;
+                    return Task.FromResult<IReadOnlyList<HookTask>?>(null);
                 },
             });
             var ran = await Run(fresh, setup, [Calls(("echo", Obj(), "c1")), Done]);
@@ -749,7 +751,7 @@ internal static class ToolsTests
             var yields = 0;
             AddHooks(setup.Registry, HarnessTasks.GenerationTask, new GenerationHooks
             {
-                OnYield = (_, _, _) => Task.FromResult<JsonValue?>(yields++ == 0 ? JsonValue.Array(FauxText("keep going")) : null),
+                OnYield = (_, _, _) => Task.FromResult<OnYieldResult?>(yields++ == 0 ? JsonValue.Array(FauxText("keep going")) : null),
             });
             var ran = await Run(fresh, setup, [record, record]);
             Equal(SubmissionStatus.Done, ran.Status, "status");
@@ -842,7 +844,7 @@ internal static class ToolsTests
             SubmissionStatus? statusAtSecondRequest = null;
             AddHooks(setup.Registry, HarnessTasks.GenerationTask, new GenerationHooks
             {
-                OnYield = (_, _, _) => Task.FromResult<JsonValue?>(yields++ == 0 ? (JsonValue)"again" : null),
+                OnYield = (_, _, _) => Task.FromResult<OnYieldResult?>(yields++ == 0 ? (JsonValue)"again" : null),
             });
             FauxStep second = new FauxResponseFactory(async _ =>
             {
@@ -906,14 +908,14 @@ internal static class ToolsTests
             var yields = 0;
             AddHooks(setup.Registry, HarnessTasks.GenerationTask, new GenerationHooks
             {
-                OnYield = (_, _, _) => Task.FromResult<JsonValue?>(yields++ == 0 ? (JsonValue)"first" : null),
+                OnYield = (_, _, _) => Task.FromResult<OnYieldResult?>(yields++ == 0 ? (JsonValue)"first" : null),
             });
             AddHooks(setup.Registry, HarnessTasks.GenerationTask, new GenerationHooks
             {
                 OnYield = (_, _, _) =>
                 {
                     called.Add("second onYield");
-                    return Task.FromResult<JsonValue?>(called.Snapshot().Count(name => name == "second onYield") == 1 ? (JsonValue)"second" : null);
+                    return Task.FromResult<OnYieldResult?>(called.Snapshot().Count(name => name == "second onYield") == 1 ? (JsonValue)"second" : null);
                 },
             });
             var ran = await Run(fresh, setup, [FauxAssistantMessage("a"), FauxAssistantMessage("b"), FauxAssistantMessage("c")]);

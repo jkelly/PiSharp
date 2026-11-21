@@ -10,6 +10,8 @@
 // pi.live.runFailure where v1.2.0 expected an empty pi.live, with (area run-end, 7e15f9601) its first, "<number>".
 // Pi v1.5.0 sync (area events, f3255de76): "appends a data-only write mid-run ..." reads the view's history (LiveSupport.cs's viewHistory)
 // where v1.2.0 listened to watchEvents (removed): the first view that shows the write ends with it while pi.live's run still holds the input.
+// Pi v1.6.0 sync (faac585884ae2c013a6b1400f3e9e77f10b34bac): added the "input entries" case "keeps onAbort: keep inputs queued through a
+// conversation abort; the next input places them"; `onAbort: "keep"` is InputOnAbort.Keep, which the Input helper now passes on.
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Sqlite;
@@ -95,7 +97,8 @@ internal static class InputEntriesTests
     private static InputEntry Mention(string text) => new("chat.mention", Obj(("author", "ann"), ("text", text)));
 
     private static Task<ISubmission> Input(IConversation root, string content, InputEntry? entry = null, WhenBusy? whenBusy = null,
-        string? requestId = null) => root.SubmitAsync(SubmissionDraft.Input(content, whenBusy, requestId, entry), Context);
+        string? requestId = null, InputOnAbort? onAbort = null) =>
+        root.SubmitAsync(SubmissionDraft.Input(content, whenBusy, requestId, entry, onAbort: onAbort), Context);
 
     private static Task<ISubmission> Write(IConversation root, EntryDraft entry, string? requestId = null) =>
         root.SubmitAsync(SubmissionDraft.Write(entry, requestId), Context);
@@ -217,6 +220,44 @@ internal static class InputEntriesTests
             MatchJson("""{"status":"unanswered","reason":"aborted"}""", (await input.WaitAsync(Context)).ToJson(), "input");
             Equal(0, (await InboxItems(harness, root)).Count, "inbox");
             Check(!(await AllEntries(root)).Any(entry => entry.Kind == "chat.mention"), "no mention placed");
+            await harness.CloseAsync(Context);
+        });
+
+        yield return Case(prefix + "keeps-onabort-keep-inputs-queued-through-a-conversation-abort-the-next-input-places-them", async () =>
+        {
+            var setup = Setup();
+            var first = Gated(Answer("first"));
+            var requests = new SyncList<List<string>>();
+            setup.Faux.SetResponses(first.Step);
+            var (harness, root) = await OpenChat(new MemoryStorage(), setup);
+            var input = await Input(root, "a");
+            await first.Reached;
+            var withdrawn = await Input(root, "w");
+            var kept = await Input(root, "k", Mention("k"), WhenBusy.FollowUp, onAbort: InputOnAbort.Keep);
+            await root.AbortAsync(Context);
+            MatchJson("""{"status":"unanswered","reason":"aborted"}""", (await withdrawn.WaitAsync(Context)).ToJson(), "withdrawn");
+            MatchJson("""{"status":"unanswered","reason":"aborted"}""", (await input.WaitAsync(Context)).ToJson(), "input");
+            // Kept as a failed run keeps its queue: still queued, no run started for it.
+            SameJson($$$"""
+                [{"id":{{{kept.Id}}},"mode":"followUp","content":"k","entry":{"kind":"chat.mention","data":{"author":"ann","text":"k"} },"onAbort":"keep"}]
+                """, await InboxItems(harness, root), "inbox");
+            Equal(SubmissionStatus.Queued, (await kept.StatusAsync(Context)).Status, "kept");
+            Check(await harness.SnapshotAsync(Live.LiveDoc, root.Id, Context) is not { } live || !live.ContainsKey("run"), "no run");
+            // The next input queues behind it and places it first (one follow-up at a time: a run each).
+            setup.Faux.SetResponses(RequestLog(requests, Answer("second")), RequestLog(requests, Answer("third")));
+            var next = await Input(root, "n");
+            MatchJson("""{"status":"done"}""", (await kept.WaitAsync(Context)).ToJson(), "kept settled");
+            MatchJson("""{"status":"done"}""", (await next.WaitAsync(Context)).ToJson(), "next settled");
+            Seq(["user:k", "user:n"], requests.Snapshot().Select(messages => messages[^1]), "requests");
+            // The explicit withdrawal still withdraws a kept input.
+            var busy = Gated(Answer("fourth"));
+            setup.Faux.SetResponses(busy.Step);
+            var running = await Input(root, "b");
+            await busy.Reached;
+            var explicitly = await Input(root, "e", onAbort: InputOnAbort.Keep);
+            Equal(SubmissionAbortResult.Aborted, await explicitly.AbortAsync(Context), "explicit abort");
+            busy.Release();
+            MatchJson("""{"status":"done"}""", (await running.WaitAsync(Context)).ToJson(), "running");
             await harness.CloseAsync(Context);
         });
 

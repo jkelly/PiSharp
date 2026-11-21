@@ -246,7 +246,7 @@ internal static class InboxTests
                 OnYield = (_, _, _) =>
                 {
                     yielded.Resolve(session!.LineBacklog);
-                    return Task.FromResult<JsonValue?>(null);
+                    return Task.FromResult<OnYieldResult?>(null);
                 },
             });
             var storage = new ControlledStorage(fresh());
@@ -556,7 +556,7 @@ internal static class InboxTests
             var yields = 0;
             AddHooks(setup.Registry, HarnessTasks.GenerationTask, new GenerationHooks
             {
-                OnYield = (_, _, _) => Task.FromResult<JsonValue?>(Interlocked.Increment(ref yields) == 1 ? (JsonValue)"more" : null),
+                OnYield = (_, _, _) => Task.FromResult<OnYieldResult?>(Interlocked.Increment(ref yields) == 1 ? (JsonValue)"more" : null),
             });
             var (harness, root) = await OpenChat(fresh(), setup);
             var input = await Submit(root, "a");
@@ -706,7 +706,7 @@ internal static class InboxTests
             var yields = 0;
             AddHooks(setup.Registry, HarnessTasks.GenerationTask, new GenerationHooks
             {
-                OnYield = (_, _, _) => Task.FromResult<JsonValue?>(Interlocked.Increment(ref yields) == 1 ? (JsonValue)"more" : null),
+                OnYield = (_, _, _) => Task.FromResult<OnYieldResult?>(Interlocked.Increment(ref yields) == 1 ? (JsonValue)"more" : null),
             });
             var (harness, root) = await OpenChat(fresh(), setup);
             var input = await Submit(root, "a");
@@ -726,7 +726,7 @@ internal static class InboxTests
             var setup = Setup();
             var first = Gated(Answer("first"));
             setup.Faux.SetResponses(first.Step);
-            AddHooks(setup.Registry, HarnessTasks.GenerationTask, new GenerationHooks { OnYield = (_, _, _) => Task.FromResult<JsonValue?>("more") });
+            AddHooks(setup.Registry, HarnessTasks.GenerationTask, new GenerationHooks { OnYield = (_, _, _) => Task.FromResult<OnYieldResult?>("more") });
             var (harness, root) = await OpenChat(fresh(), setup);
             var input = await Submit(root, "a");
             await first.Reached;

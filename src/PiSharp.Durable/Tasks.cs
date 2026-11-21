@@ -5,6 +5,9 @@
 // input, checkpoints and results are JsonValue, and every checkpoint is a JSON object whose "phase" names its handler. The phase map is
 // keyed by that name. Phases and Abort are optional so a definition that only creates records (the Session tests and samples) still
 // compiles; a task whose phase or abort handler is missing faults when the scheduler reaches it.
+//
+// Pi v1.6.0 sync (faac585884ae2c013a6b1400f3e9e77f10b34bac): NextTaskState.Sleeping takes signals and an optional time, and a task never
+// writes its own `wake` (upstream types NextTaskState's running variant with `wake?: never`; Check rejects one here).
 using System.Collections.Immutable;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Internal;
@@ -111,6 +114,8 @@ public sealed class RunningTask
     public int? Restarts => Record.Restarts;
     /// <summary>The complete durable state execution resumes from.</summary>
     public JsonValue Checkpoint => State.Checkpoint;
+    /// <summary>Why the task woke from its last wait or sleep, while it runs at the checkpoint it woke at (upstream <c>state.wake</c>).</summary>
+    public WakeReason? Wake => State.Wake;
     /// <summary>The checkpoint's <c>phase</c>; null when the checkpoint names none.</summary>
     public string? Phase => Checkpoint is JsonObjectValue checkpoint && checkpoint.TryGetValue("phase", out var phase) &&
         phase is JsonStringValue name ? name.Value : null;
@@ -126,11 +131,16 @@ public static class NextTaskState
 {
     /// <summary><c>{status: "running", checkpoint}</c>.</summary>
     public static RunningTaskState Running(JsonValue checkpoint) => new(checkpoint);
-    /// <summary><c>{status: "waiting", checkpoint, on, policy}</c>: park until every task in <paramref name="on"/> is terminal.</summary>
+    /// <summary><c>{status: "waiting", checkpoint, on, policy}</c>: park until every task in <paramref name="on"/> is terminal, or, with
+    /// <see cref="JoinPolicy.Any"/>, until one is.</summary>
     public static WaitingTaskState Waiting(JsonValue checkpoint, IEnumerable<TaskId> on, JoinPolicy policy) => new(checkpoint, [.. on], policy);
     /// <summary><c>{status: "sleeping", checkpoint, until}</c>: hold no invocation until the Harness clock reaches <paramref name="until"/>,
     /// then resume at <paramref name="checkpoint"/> (<see cref="ITaskRuntime.SleepUntilAsync"/> commits the same).</summary>
     public static SleepingTaskState Sleeping(JsonValue checkpoint, double until) => new(checkpoint, until);
+    /// <summary><c>{status: "sleeping", checkpoint, until?, signals}</c>: hold no invocation until one of <paramref name="signals"/> holds a
+    /// value no wake used, or the Harness clock reaches <paramref name="until"/> when given, whichever comes first (Pi v1.6.0).</summary>
+    public static SleepingTaskState Sleeping(JsonValue checkpoint, double? until, IEnumerable<SignalKey> signals) =>
+        new(checkpoint, until, [.. signals ?? throw new ArgumentNullException(nameof(signals))]);
     /// <summary><c>{status: "terminal", outcome}</c>.</summary>
     public static TerminalTaskState Terminal(TaskOutcome outcome) => new(outcome);
     /// <summary><c>{status: "terminal", outcome: {status: "completed", result}}</c>.</summary>
@@ -145,5 +155,6 @@ public static class NextTaskState
     {
         if (state.Status is not (DurableTaskStatus.Running or DurableTaskStatus.Waiting or DurableTaskStatus.Sleeping or DurableTaskStatus.Terminal))
             throw new ArgumentException($"A task commits a running, waiting, sleeping or terminal state, not {WireName.Of(state.Status)}");
+        if (state is RunningTaskState { Wake: not null }) throw new ArgumentException("A task never writes its own wake");
     }
 }

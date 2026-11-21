@@ -2,6 +2,10 @@
 // callers may add and resolve from any thread; a waiter's task completes asynchronously (a promise's continuation is a later microtask),
 // so resolving one never runs its caller's code under the lock or inline in a Session listener. Upstream's optionalExtension is a spread
 // helper for an optional property; C# reports set ReportInfo.Extension (null when unknown) instead, so it has no counterpart here.
+// Pi v1.6.0 sync (faac585884ae2c013a6b1400f3e9e77f10b34bac; #11963, #11820): a waiter's rejection is observed when it is created.
+// Callers may hand the task out only after later awaits (a job's result on the line), and a caller that never gets it (its own wait was
+// cancelled, or the Harness closed first) would leave the rejection to the finalizer, which raises
+// TaskScheduler.UnobservedTaskException, .NET's counterpart of Node's unhandledRejection. The caller that does get it still sees it.
 using PiSharp.Durable.Chord;
 
 namespace PiSharp.Durable;
@@ -17,8 +21,15 @@ internal sealed class Waiters<TKey, T>
     public Task<T> Add(TKey key, DurableContext context)
     {
         var signal = context.Signal;
-        if (signal is { Token.IsCancellationRequested: true }) return Task.FromException<T>(signal.Error());
         var waiter = new TaskCompletionSource<T>(TaskCreationOptions.RunContinuationsAsynchronously);
+        // Handled now, so a rejection before the caller gets the task is not reported unobserved. The caller still gets it.
+        waiter.Task.ContinueWith(static failed => _ = failed.Exception, CancellationToken.None,
+            TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously, System.Threading.Tasks.TaskScheduler.Default);
+        if (signal is { Token.IsCancellationRequested: true })
+        {
+            waiter.TrySetException(signal.Error());
+            return waiter.Task;
+        }
         var slot = new Key(key);
         HashSet<TaskCompletionSource<T>> set;
         lock (gate)

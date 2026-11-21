@@ -18,6 +18,11 @@
 //   are never reused, is a list.
 // - wake()'s seeded records are TaskRecords whose states parse from upstream's JSON (TaskState.FromJson); its `extra` fields are `with`
 //   expressions, and commitWrites is CommitWritesAsync.
+// Pi v1.6.0 sync (faac585884ae2c013a6b1400f3e9e77f10b34bac): added the "kept context ranges" case "count a conversation whose live work
+// is all parked as inactive, and as busy once it runs again", with its signal Wake (WakeSignal here, as Wake is the record
+// IHarness.Wake() returns) and its task Parker, which open() installs beside Work. The case keeps the idle wait that it checks is still
+// pending, and awaits it once the parked task ended: the wait is then observed before the close, as this file's other idle waits are
+// (upstream's settled() handles the promise itself, so it may drop it).
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Storage;
@@ -99,6 +104,33 @@ internal static class IdleScopesTests
         }
     }
 
+    /// <summary>Upstream <c>Wake</c>: the signal <see cref="Parker"/> parks on; its value is pi-schema's <c>obj({})</c>.</summary>
+    private static readonly SignalToken WakeSignal = Signals.DefineSignal(new SignalDefinition
+    {
+        Name = "test.idle.wake",
+        Version = 1,
+        Schema = O("""{"type":"object","properties":{},"required":[],"additionalProperties":false}"""),
+    });
+
+    /// <summary>Reads the context of conversation <c>read</c>, then parks on <see cref="WakeSignal"/> until a delivery, and completes
+    /// (upstream <c>Parker</c>).</summary>
+    private static readonly DurableTask Parker = Tasks.DefineTask(new TaskDefinition
+    {
+        Name = "test.idle.parker",
+        Version = 1,
+        Initial = _ => O("""{"phase":"run"}"""),
+        Phases = new Dictionary<string, TaskPhaseHandler>
+        {
+            ["run"] = async (task, runtime, ctx) =>
+            {
+                await runtime.ContextAsync(new ConversationId((long)N(((JsonObjectValue)task.Input)["read"])), ctx);
+                await runtime.CommitAsync((_, _) => NextTaskState.Sleeping(O("""{"phase":"woke"}"""), null, [WakeSignal.Key("go")]), ctx);
+            },
+            ["woke"] = (_, runtime, ctx) => runtime.CommitAsync((_, _) => NextTaskState.Completed(JsonValue.Null), ctx),
+        },
+        Abort = (_, runtime, ctx) => runtime.CommitAsync((_, _) => NextTaskState.Aborted(), ctx),
+    });
+
     /// <summary>The idle state once the scheduler's pending passes have run (upstream <c>idleState</c>; see the file header).</summary>
     private static async Task<SchedulerIdleState> IdleState(IHarness harness)
     {
@@ -174,7 +206,7 @@ internal static class IdleScopesTests
     {
         var storage = new HarnessConversationTests.CountingStorage(new MemoryStorage());
         var registry = Registry.Create();
-        registry.Install(Define.Extension(new Extension { Name = "tasks", Tasks = [fixture.Work] }));
+        registry.Install(Define.Extension(new Extension { Name = "tasks", Tasks = [fixture.Work, Parker] }));
         var harness = await PiSharp.Durable.Harness.OpenAsync(storage, new HarnessOptions
         {
             Models = EmptyDurableModels.Instance,
@@ -305,6 +337,28 @@ internal static class IdleScopesTests
         // ─── kept context ranges ────────────────────────────────────────────────
 
         const string ranges = prefix + "kept-context-ranges.";
+
+        yield return Case(ranges + "count-a-conversation-whose-live-work-is-all-parked-as-inactive-and-as-busy-once-it-runs-again", async () =>
+        {
+            var opened = await Open(new IdleFixture());
+            var harness = opened.Harness;
+            var x = await opened.Conversation();
+            var parker = await x.CommitAsync(tx => tx.CreateTaskAsync(Parker, Obj(("read", x.Id.Value)), OwnConversation(x.Id)), Context);
+            await Eventually(async () => await StatusOf(harness, parker) == DurableTaskStatus.Sleeping);
+            await Quiet(harness);
+            // Not idle, as a wait for idleness says, but inactive: its context ages like an idle one's.
+            var idle = x.WaitForIdleAsync(Context);
+            Check(!await Settled(idle), "x not idle while its task is parked");
+            Matches(await IdleState(harness), "parked", contexts: 1, idleContexts: 1, idleMismatches: 0);
+            var running = await opened.Work("running", x);
+            await Quiet(harness);
+            Matches(await IdleState(harness), "running", contexts: 1, idleContexts: 0, idleMismatches: 0);
+            await opened.End("running", running);
+            await harness.SignalAsync(parker, WakeSignal, "go", JsonObjectValue.Empty, Context);
+            await harness.WaitForTaskAsync(parker, Context);
+            await idle;
+            await harness.CloseAsync(Context);
+        });
 
         yield return Case(ranges + "settles-a-run-end-whose-sweep-drops-the-chain-without-a-check-of-every-scope", async () =>
         {

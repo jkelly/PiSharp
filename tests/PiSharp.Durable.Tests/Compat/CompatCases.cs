@@ -43,6 +43,10 @@
 // - upgrade-from-v1.1.0: a v1.2.0 Harness opens copies of the v1.1.0 sessions (Fixtures/upstream-sessions) without resuming them, and
 //   resumes the resumable ones with their scenario's model, ending with the records upstream's v1.2.0 left (its v1 pi.tool tasks migrate to
 //   version 2 when they run; to version 3 since Pi v1.5.0, area tool-tasks).
+// Pi v1.6.0 sync (faac585884ae2c013a6b1400f3e9e77f10b34bac): the same cases compare with ToolTasks150.cs's forms at v1.6.0's task
+// versions (pi.tool 4, pi.generation 3) and with Durations160.cs's: v1.6.0 gives every result a tool task writes a durationMs, also
+// those of calls that never executed, and marks a nested call's document with its kind. A resume's events take the durations from their
+// second event on, as the first is the snapshot of what the capture held.
 // compat.ops.* replays the ops corpus (CompatOpsCases.cs); compat.reverse.* has the pinned upstream read PiSharp's sessions under Node.
 using System.Text.RegularExpressions;
 using Microsoft.Data.Sqlite;
@@ -395,8 +399,11 @@ internal static partial class CompatTests
                         // Pi v1.5.0 (area model-requests): the messages the resume classifies record the thinking level (ModelRequests150.cs).
                         var held = Expected(scenario.Name, "records.json", backend, root);
                         // (area restarts) and the backoff of the request the capture left in flight, which the resume charges (Restarts150.cs).
+                        // Pi v1.6.0: and the durationMs of every result the resume writes (Durations160.cs).
                         var events = CompatEvents.Expect(expectedEvents is null ? null
-                            : (JsonObjectValue)Restarts150.Charged(ModelRequests150.Authored(expectedEvents, held), held, CompatScenarios.Now), "resume");
+                            : Durations160.ResumedEvents(
+                                (JsonObjectValue)Restarts150.Charged(ModelRequests150.Authored(expectedEvents, held), held, CompatScenarios.Now), "resume"),
+                            "resume");
                         await CompatEvents.Record(events, () => resume(() => OpenBackend(backend, directory)));
                         // (area tool-tasks) the tool and generation tasks it reserves or creates at their v1.5.0 versions (ToolTasks150.cs).
                         // (area live-turns) the pi.live documents it changes at version 3 (LiveV3150.cs).
@@ -424,7 +431,8 @@ internal static partial class CompatTests
                     string AuthoredText(string text) =>
                         live.Text(ToolTasks150.WrittenText(runFailure.AuthoredText(ModelRequests150.AuthoredText(ToolsSchema150.AuthoredText(text)))));
                     var deferred = DeferredCommits150.For(Path.Combine(root, scenario.Name));
-                    var writtenEvents = expectedEvents is null ? null : (JsonObjectValue)Authored(expectedEvents);
+                    // Pi v1.6.0: every toolResult message of the events carries a durationMs (Durations160.cs).
+                    var writtenEvents = expectedEvents is null ? null : (JsonObjectValue)Durations160.WrittenEvents(Authored(expectedEvents));
                     var directory = Temp($"compat-written-{scenario.Name}-{backend}");
                     var runEvents = CompatEvents.Expect(writtenEvents, "run");
                     var observed = await CompatEvents.Record(runEvents, () => runScenario(() => OpenBackend(backend, directory)));
