@@ -540,6 +540,69 @@ internal static partial class Program
                 await hosted.Notes.CallAsync("drop", JsonValue.Create(300), hosted.Counting);
                 Json("299", board.Member("count").Value, "the count after a delete");
             }),
+            Case("host.query-reader.160-query-failed-names-the-named-query-for-a-live-query-a-count-and-a-list", async () =>
+            {
+                // Authored: HostError query_failed carries the reader's query (the named query's label), once per failure episode.
+                await using var store = await MemoryStore();
+                var errors = new List<HostError>();
+                await using var host = Q7Host(store, errors);
+                var three = Contract.Local("app.three", new()
+                {
+                    Version = 1,
+                    Params = new(),
+                    Members = new()
+                    {
+                        ["notes"] = Obj(("rows", Arr(ReaderNote)), ("more", Bool())),
+                        ["count"] = Int(),
+                        ["list"] = Obj(("rows", Arr(ReaderNote)), ("moreAfter", Bool())),
+                    },
+                });
+                var tagged = Q7Plugin("@test/tagged", ReaderServeTagged);
+                var readers = Q7Plugin("@test/three", h => h.Serve(three, (_, _, self) => new(new Dictionary<string, object?>
+                {
+                    ["notes"] = self.LiveQuery(ReaderTaggedQuery(self), new JsonObject { ["tag"] = "red" }, 5),
+                    ["count"] = self.Count(ReaderTaggedQuery(self), new JsonObject { ["tag"] = "red" }),
+                    ["list"] = self.List("tagged", [(ReaderTaggedQuery(self), new JsonObject { ["tag"] = "red" })], new ListOptions(5)).Value,
+                })));
+                await host.LoadAsync([tagged, Q7Plugin("@test/tags", ReaderServeTags), readers], context);
+                await host.GetAsync(ReaderTagStore, new(), context);
+                var view = await host.GetAsync(three, new(), context);
+                Json("""{"rows":[],"more":false}""", view.Member("notes").Value, "live");
+                // A reader that opened before the tags' table was bound reported its first run (it parked on it): those are not counted.
+                lock (errors) errors.Clear();
+                // The tags' new code declares no table: the set is served no more, and each read over it fails.
+                var bare = Q7Plugin("@test/tags", h => h.Serve(ReaderTagStore, (_, _, _) => new(new Dictionary<string, object?>
+                {
+                    ["tag"] = (HostMethod)((_, _) => Task.FromResult<object?>(null)),
+                })));
+                await host.ReloadAsync([tagged, bare, readers], context);
+                await host.DrainReloadsAsync(context);
+                await Q7Until(() => { lock (errors) return errors.Count(error => error.Kind == "query_failed" && error.Object == "app.three") == 3; }, "each reader reports its failure");
+                await Q7Settled(host);
+                List<HostError> failed;
+                lock (errors) failed = [.. errors.Where(error => error.Kind == "query_failed" && error.Object == "app.three")];
+                Sequence(Enumerable.Repeat("app.three/app.tagged-notes: query \"notes.tagged\"", 3), failed.Select(error => $"{error.Object}/{error.Query}"), "each names its object and the named query");
+                Check(failed.All(error => error.Error!.Message.Contains("\"tags.columns\" is not served", StringComparison.Ordinal)), "with the run's error");
+                StoreThrows(() => _ = view.Member("list").Value, "is not served", "the members are failed");
+                Equal("live", view.State.Value.Kind, "the object stays live");
+            }),
+            Case("host.query-reader.160-a-references-member-passes-its-live-querys-frame-on-as-it-is", async () =>
+            {
+                // Authored: a reference's member forwards its source's ops (it replaced the value whole in its first frame, and diffed the two
+                // values again in the later ones).
+                await using var hosted = await ReaderHost();
+                await hosted.Put(1, "a", "t1");
+                var board = await hosted.Board("a");
+                var watch = await board.Member("notes").WatchAsync(context);
+                var frames = ChordSupport.FramesOf(watch);
+                await hosted.Put(2, "a", "t2");
+                await Q7Settled(hosted.Host);
+                await hosted.Notes.CallAsync("rename", new JsonObject { ["id"] = 1, ["text"] = "T1" }, context);
+                await Q7Settled(hosted.Host);
+                Json("""[[["p",["rows"],0,0,[{"id":2,"text":"t2"}]]],[["s",["rows",1,"text"],"T1"]]]""",
+                    new JsonArray([.. frames.Select(frame => (JsonNode?)ChordSupport.OpsJson(frame.Ops))]), "the live query's own ops");
+                await watch.StopAsync();
+            }),
             Case("host.query-reader.memory-collects-a-readers-live-query-once-its-object-ended", async () =>
             {
                 ReaderHosted? hosted = await ReaderHost();

@@ -302,6 +302,20 @@ internal static partial class Program
                 hosted.Host.Dispatcher.Invoke(() => source.Unsubscribe(recorder));
                 await watch.StopAsync();
             }),
+            Case("host.list.160-through-a-reference-more-sends-only-the-new-rows-and-a-moving-row-is-one-insert-and-one-removal", async () =>
+            {
+                // Authored: what a holder of the screen gets. A reference's member passes the list's frame on as it is.
+                await using var hosted = await ListHosted.Create(3, 8);
+                var watch = await hosted.Screen.Member("list").WatchAsync(context);
+                var frames = FramesOf(watch);
+                await hosted.More();
+                await Q7Settled(hosted.Host);
+                await hosted.Touch(3, 100);
+                await Q7Settled(hosted.Host);
+                Json("""[[["p",["rows"],3,0,[{"id":5,"touched":5},{"id":4,"touched":4},{"id":3,"touched":3}]]],[["p",["rows"],0,0,[{"id":3,"touched":100}]],["p",["rows"],6,1,[]]]]""",
+                    new JsonArray([.. frames.Select(frame => (JsonNode?)OpsJson(frame.Ops))]), "only the new rows, then one move");
+                await watch.StopAsync();
+            }),
             Case("host.list.pages-moves-a-row-touched-in-a-later-page-to-the-top-one-frame-no-gap-no-duplicate", async () =>
             {
                 await using var hosted = await ListHosted.Create(3, 9);
