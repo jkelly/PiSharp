@@ -1,4 +1,4 @@
-// Pi b4afdddf44e059c67ccf5097e5317d913521b470 (MIT): packages/coding-agent/src/core/session-manager.ts.
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/coding-agent/src/core/session-manager.ts.
 // Ported to plain ESM for the PiSharp Node extension bridge (TypeScript types stripped mechanically; behaviour unchanged).
 import { getCurrentSystemMessage, uuidv7 } from "../../pi-ai.mjs";
 import { randomUUID } from "crypto";
@@ -443,40 +443,46 @@ async function buildSessionInfo(filePath, signal, fileStats) {
         const allMessages = [];
         let name;
         let lastActivityTime;
-        const rl = createInterface({
-            input: createReadStream(filePath, {
-                encoding: "utf8",
-                signal
-            }),
-            crlfDelay: Infinity
+        const stream = createReadStream(filePath, {
+            encoding: "utf8"
         });
-        for await (const line of rl){
-            const entry = parseSessionEntryLine(line);
-            if (!entry) continue;
-            if (!header) {
-                if (entry.type !== "session") return null;
-                header = entry;
-                continue;
+        try {
+            const rl = createInterface({
+                input: stream,
+                crlfDelay: Infinity
+            });
+            for await (const line of rl){
+                signal?.throwIfAborted();
+                const entry = parseSessionEntryLine(line);
+                if (!entry) continue;
+                if (!header) {
+                    if (entry.type !== "session") return null;
+                    header = entry;
+                    continue;
+                }
+                if (entry.type === "session_info") {
+                    name = entry.name?.trim() || undefined;
+                }
+                if (entry.type !== "message") continue;
+                messageCount++;
+                const activityTime = getMessageActivityTime(entry);
+                if (typeof activityTime === "number") {
+                    lastActivityTime = Math.max(lastActivityTime ?? 0, activityTime);
+                }
+                const message = entry.message;
+                if (!isMessageWithContent(message)) continue;
+                if (message.role !== "user" && message.role !== "assistant") continue;
+                const textContent = extractTextContent(message);
+                if (!textContent) continue;
+                allMessages.push(textContent);
+                if (!firstMessage && message.role === "user") {
+                    firstMessage = textContent;
+                }
             }
-            if (entry.type === "session_info") {
-                name = entry.name?.trim() || undefined;
-            }
-            if (entry.type !== "message") continue;
-            messageCount++;
-            const activityTime = getMessageActivityTime(entry);
-            if (typeof activityTime === "number") {
-                lastActivityTime = Math.max(lastActivityTime ?? 0, activityTime);
-            }
-            const message = entry.message;
-            if (!isMessageWithContent(message)) continue;
-            if (message.role !== "user" && message.role !== "assistant") continue;
-            const textContent = extractTextContent(message);
-            if (!textContent) continue;
-            allMessages.push(textContent);
-            if (!firstMessage && message.role === "user") {
-                firstMessage = textContent;
-            }
+        } finally{
+            stream.destroy();
         }
+        signal?.throwIfAborted();
         if (!header) return null;
         const cwd = typeof header.cwd === "string" ? header.cwd : "";
         const parentSessionPath = header.parentSession;

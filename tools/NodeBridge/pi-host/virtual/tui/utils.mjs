@@ -1,4 +1,4 @@
-// Pi b4afdddf44e059c67ccf5097e5317d913521b470 (MIT): packages/tui/src/utils.ts.
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/tui/src/utils.ts.
 // Ported to plain ESM for the PiSharp Node extension bridge (TypeScript types stripped mechanically; behaviour unchanged).
 import { eastAsianWidth } from "../vendor/east-asian-width.mjs";
 const graphemeSegmenter = new Intl.Segmenter(undefined, {
@@ -136,12 +136,55 @@ function finalizeTruncatedResult(prefix, prefixWidth, ellipsis, ellipsisWidth, m
     }
     return pad ? result + " ".repeat(Math.max(0, maxWidth - visibleWidth)) : result;
 }
-function graphemeWidth(segment) {
-    if (segment.length === 1) {
-        const code = segment.charCodeAt(0);
-        if (code >= 0x20 && code <= 0x7e) return 1;
-        if (code === 0x09) return 3;
+function isStandaloneGraphemeUnit(code) {
+    if (code >= 0x20 && code <= 0x7e) return true;
+    if (code >= 0xa0 && code <= 0x2ff) return code !== 0xad;
+    if (code >= 0x2010 && code <= 0x2bff) {
+        return !(code >= 0x2028 && code <= 0x202e) && !(code >= 0x2060 && code <= 0x206f) && !(code >= 0x20d0 && code <= 0x20ff);
     }
+    return code >= 0x3040 && code <= 0x3096 || code >= 0x30a0 && code <= 0x30ff || code >= 0x4e00 && code <= 0x9fff || code >= 0xff01 && code <= 0xff60;
+}
+function isStandaloneGraphemeRun(text) {
+    for(let i = 0; i < text.length; i++){
+        if (!isStandaloneGraphemeUnit(text.charCodeAt(i))) return false;
+    }
+    return true;
+}
+function* segmentGraphemes(text) {
+    const standalone = (index)=>index < 0 || index >= text.length || isStandaloneGraphemeUnit(text.charCodeAt(index));
+    let complexStart = -1;
+    for(let i = 0; i < text.length; i++){
+        if (standalone(i) && standalone(i - 1) && standalone(i + 1)) {
+            if (complexStart >= 0) {
+                for (const { segment } of graphemeSegmenter.segment(text.slice(complexStart, i)))yield segment;
+                complexStart = -1;
+            }
+            yield text[i];
+        } else if (complexStart < 0) {
+            complexStart = i;
+        }
+    }
+    if (complexStart >= 0) {
+        for (const { segment } of graphemeSegmenter.segment(text.slice(complexStart)))yield segment;
+    }
+}
+function graphemesOf(text) {
+    return isStandaloneGraphemeRun(text) ? text : segmentGraphemes(text);
+}
+const singleUnitWidths = new Map();
+function graphemeWidth(segment) {
+    if (segment.length !== 1) return clusterWidth(segment);
+    const code = segment.charCodeAt(0);
+    if (code >= 0x20 && code <= 0x7e) return 1;
+    if (code === 0x09) return 3;
+    let width = singleUnitWidths.get(code);
+    if (width === undefined) {
+        width = clusterWidth(segment);
+        singleUnitWidths.set(code, width);
+    }
+    return width;
+}
+function clusterWidth(segment) {
     if (terminalSpacingMarkRegex.test(segment)) {
         return [
             ...segment
@@ -294,7 +337,17 @@ export function getGraphemeCellRange(line, column) {
         }
         let textEnd = i;
         while(textEnd < line.length && !extractAnsiCode(line, textEnd))textEnd++;
-        for (const { segment } of graphemeSegmenter.segment(line.slice(i, textEnd))){
+        const text = line.slice(i, textEnd);
+        if (isPrintableAscii(text)) {
+            if (column >= currentCol && column < currentCol + text.length) return {
+                start: column,
+                end: column + 1
+            };
+            currentCol += text.length;
+            i = textEnd;
+            continue;
+        }
+        for (const segment of graphemesOf(text)){
             const width = graphemeWidth(segment);
             if (width > 0 && column >= currentCol && column < currentCol + width) {
                 return {
@@ -1022,7 +1075,21 @@ export function sliceWithWidth(line, startCol, length, strict = false) {
         }
         let textEnd = i;
         while(textEnd < line.length && !extractAnsiCode(line, textEnd))textEnd++;
-        for (const { segment } of graphemeSegmenter.segment(line.slice(i, textEnd))){
+        const text = line.slice(i, textEnd);
+        if (isPrintableAscii(text)) {
+            const from = Math.max(0, startCol - currentCol);
+            const to = Math.min(text.length, endCol - currentCol);
+            if (to > from) {
+                result += pendingAnsi + text.slice(from, to);
+                pendingAnsi = "";
+                resultWidth += to - from;
+            }
+            currentCol += text.length;
+            i = textEnd;
+            if (currentCol >= endCol) break;
+            continue;
+        }
+        for (const segment of graphemesOf(text)){
             const w = graphemeWidth(segment);
             const inRange = currentCol >= startCol && currentCol < endCol;
             const fits = !strict || currentCol + w <= endCol;

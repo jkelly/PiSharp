@@ -228,10 +228,10 @@ test('generators reproduce the v1.2.0 inventories byte-for-byte from upstream so
   run('build-command-rpc-inventory.mjs', '--lock', V1_2_0_LOCK, '--template', NEW_INVENTORY, '--check', V1_2_0_INVENTORY);
 });
 
-// v1.5.0: generated from the v1.2.0 inventories for the current target (compatibility/target.lock.json), with no overlay yet;
+// v1.5.0: generated from the v1.2.0 inventories for the v1.5.0 target (its preserved lock, compatibility/target.v1.5.0.lock.json), with no overlay yet;
 // native statuses carry over from v1.2.0 until the sync's areas reassess them (sync-1.5.0-applicability.json).
 const V1_5_0_CATALOG = 'compatibility/extensions/event-catalog.v1.5.0.json', V1_5_0_INVENTORY = 'compatibility/coding-agent-command-rpc-inventory.v1.5.0.json';
-const V1_5_0_LOCK = 'compatibility/target.lock.json', current150 = json(V1_5_0_LOCK);
+const V1_5_0_LOCK = 'compatibility/target.v1.5.0.lock.json', current150 = json(V1_5_0_LOCK);
 
 test('v1.5.0 event catalog: re-derived rows with no event changes since v1.2.0', () => {
   const previous = json(V1_2_0_CATALOG), current = json(V1_5_0_CATALOG);

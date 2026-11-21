@@ -1,4 +1,4 @@
-// Pi b4afdddf44e059c67ccf5097e5317d913521b470 (MIT): packages/tui/src/colors.ts.
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/tui/src/colors.ts.
 // Ported to plain ESM for the PiSharp Node extension bridge (TypeScript types stripped mechanically; behaviour unchanged).
 import { linearSrgbToRgb, okhslToRgb, oklabToLinearSrgb, rgbToOkhsl, rgbToOklab } from "./oklab.mjs";
 function requireFinite(value, name) {

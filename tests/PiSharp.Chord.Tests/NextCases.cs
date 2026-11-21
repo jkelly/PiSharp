@@ -14,8 +14,8 @@ internal static partial class Program
         Case("next.index.is-the-experimental-chord-next-entry-point", () =>
         {
             Equal("@earendil-works/chord", ChordNext.Module, "the module");
-            Equal("@earendil-works/chord@1.5.2", ChordNext.Package, "the package");
-            Equal("b4afdddf44e059c67ccf5097e5317d913521b470", ChordNext.Commit, "the pinned commit");
+            Equal("@earendil-works/chord@1.6.0", ChordNext.Package, "the package");
+            Equal("faac585884ae2c013a6b1400f3e9e77f10b34bac", ChordNext.Commit, "the pinned commit");
             var assembly = typeof(ChordNext).Assembly;
             Equal("PISHARP_CHORD001", assembly.GetCustomAttribute<ExperimentalAttribute>()?.DiagnosticId, "the assembly is experimental");
             var outside = assembly.GetExportedTypes()

@@ -156,7 +156,7 @@ const coverage = [];
 const expected = expectedExports();
 if (args.includes("--write-snapshot")) {
 	assert.ok(expected.source.startsWith("upstream"), "--write-snapshot needs --upstream <dir>");
-	fs.writeFileSync(snapshotPath, `${JSON.stringify({ commit: "b4afdddf44e059c67ccf5097e5317d913521b470", exports: expected.exports }, null, "\t")}\n`);
+	fs.writeFileSync(snapshotPath, `${JSON.stringify({ commit: "faac585884ae2c013a6b1400f3e9e77f10b34bac", exports: expected.exports }, null, "\t")}\n`);
 	console.log(`wrote ${snapshotPath}`);
 }
 for (const [mod, names] of Object.entries(expected.exports)) {
@@ -651,7 +651,7 @@ await test("pi-coding-agent: defineTool, guards, truncation, frontmatter, config
 	assert.equal(fm.body, "Body text");
 	assert.equal(ca.stripFrontmatter("---\na: 1\n---\nrest"), "rest");
 	assert.equal(ca.CONFIG_DIR_NAME, ".pi");
-	assert.equal(ca.VERSION, "1.5.2");
+	assert.equal(ca.VERSION, "1.6.0");
 	const previous = process.env.PI_CODING_AGENT_DIR;
 	process.env.PI_CODING_AGENT_DIR = path.join(here, "agent-dir-test");
 	assert.equal(ca.getAgentDir(), path.join(here, "agent-dir-test"));

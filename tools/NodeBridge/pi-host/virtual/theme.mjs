@@ -1,4 +1,4 @@
-// Pi b4afdddf44e059c67ccf5097e5317d913521b470 (MIT): packages/coding-agent/src/modes/interactive/theme/theme.ts.
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/coding-agent/src/modes/interactive/theme/theme.ts.
 // Ported to plain ESM for the PiSharp Node extension bridge (TypeScript types stripped mechanically; behaviour unchanged except for the marked PiSharp adaptations).
 import * as fs from "node:fs";
 import * as path from "node:path";
@@ -613,6 +613,7 @@ let cachedHighlightThemeFor;
 let cachedCliHighlightTheme;
 function buildCliHighlightTheme(t) {
     return {
+        default: (s)=>t.fg("text", s),
         keyword: (s)=>t.fg("syntaxKeyword", s),
         built_in: (s)=>t.fg("syntaxType", s),
         literal: (s)=>t.fg("syntaxNumber", s),
