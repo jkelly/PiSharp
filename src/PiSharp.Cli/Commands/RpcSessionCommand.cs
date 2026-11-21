@@ -611,10 +611,12 @@ public static class RpcSessionCommand
         }
         // main.ts buildSessionOptions: a model the run selected (--model) is the model of every session, so nothing is restored.
         var snapshot = replacement.Snapshot; var model = snapshot.Agent.Model;
-        if (startupSelection is not { FromCliModel: true } && model != LiveSessionSelection.UnselectedModel &&
+        // sdk.ts createAgentSession: the branch's model is restored when it exists and its provider has configured auth.
+        if (registry is not null && startupSelection is not { FromCliModel: true } && model != LiveSessionSelection.UnselectedModel &&
             SessionBranchSelection.Select(snapshot.Context.Ancestry, (provider, id) =>
-                registry?.Find(provider, id) is { } known && PiSharp.Cli.Models.VirtualModels.IsVirtual(known)) is { } saved &&
-            (saved.Provider != model.Provider || saved.ModelId != model.Id))
+                registry.Find(provider, id) is { } known && PiSharp.Cli.Models.VirtualModels.IsVirtual(known)) is { } saved &&
+            (saved.Provider != model.Provider || saved.ModelId != model.Id) &&
+            !(registry.Find(saved.Provider, saved.ModelId) is { } restorable && registry.HasConfiguredAuth(restorable.Provider)))
             diagnostics.Add(new("warning", $"Could not restore model {saved.Provider}/{saved.ModelId}. Using {model.Provider}/{model.Id}"));
         return diagnostics.ToImmutable();
     }
