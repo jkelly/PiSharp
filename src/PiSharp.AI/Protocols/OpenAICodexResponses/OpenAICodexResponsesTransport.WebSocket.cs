@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/ai/src/api/openai-codex-responses.ts (the WebSocket transport of stream:
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/ai/src/api/openai-codex-responses.ts (the WebSocket transport of stream:
 // the response.create frame, connectWebSocket, acquireWebSocket and the per-session connection cache with its idle and age limits,
 // parseWebSocket, the cached-context continuation with previous_response_id, the retries for websocket_connection_limit_reached and
 // previous_response_not_found, the SSE fallback with its provider_transport_failure diagnostic, and the debug stats) and
@@ -156,7 +156,11 @@ public sealed partial class OpenAICodexResponsesTransport
     private const string ConnectionLimitReached = "websocket_connection_limit_reached";
     private const string PreviousResponseNotFound = "previous_response_not_found";
     private static readonly TimeSpan SessionCacheTtl = TimeSpan.FromMinutes(5);
-    private static readonly TimeSpan SessionMaxAge = TimeSpan.FromMinutes(55);
+    // The server closes a socket after 60 minutes, even mid-response, and the in-flight response is lost. New requests open a fresh
+    // socket after 45 minutes (55 before Pi 1.6.0, #12124), leaving 15 minutes for long responses. A limit reached mid-stream ends the
+    // message as a retryable error (utils/retry.ts "websocket connection limit reached"): the failed call closed its connection and
+    // dropped the continuation, so the retry opens a fresh connection and sends the full context.
+    private static readonly TimeSpan SessionMaxAge = TimeSpan.FromMinutes(45);
     private static readonly TimeSpan DefaultConnectTimeout = TimeSpan.FromMilliseconds(15_000);
 
     private TimeProvider Clock => _options.Time ?? TimeProvider.System;
@@ -334,8 +338,8 @@ public sealed partial class OpenAICodexResponsesTransport
         return new JsonArray([.. current.Skip(baseline.Count).Select(item => item?.DeepClone())]);
     }
 
-    /// <summary>The response's own items for the next delta: the assistant message projected as request input (no system prompt), less
-    /// any tool outputs.</summary>
+    /// <summary>The response's own items for the next delta: the assistant message projected as request input (without configuration
+    /// updates: the next request's own projection puts the reply's recorded level before these items), less any tool outputs.</summary>
     private JsonArray ResponseItems(AssistantMessage message)
     {
         var projector = new ResponsesTranscriptProjector(ProjectionOptions());
@@ -346,7 +350,7 @@ public sealed partial class OpenAICodexResponsesTransport
     }
 
     /// <summary>acquireWebSocket: without a session a fresh connection closed after the request. With one, the cached connection of the
-    /// session and account when it is idle, open and younger than 55 minutes; a busy one gets a fresh uncached connection; otherwise
+    /// session and account when it is idle, open and younger than 45 minutes; a busy one gets a fresh uncached connection; otherwise
     /// a new connection replaces it in the cache. A kept connection closes after five idle minutes.</summary>
     private async Task<WebSocketLease> AcquireAsync(Uri url, List<KeyValuePair<string, string>> headers, string? sessionId, string accountId,
         CancellationToken cancellation)
