@@ -1,4 +1,6 @@
-// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/chord/src/next/host/staging.ts
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/chord/src/host/{staging,members}.ts
+// 1.6.0 here: event members (chord-remote), exposed sets checked once (chord-store), queries members in the member check and a
+// recording's named queries, readers and lists (chord-queries; the recording's declarations are in Host/ReadDeclarations.cs).
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using PiSharp.Chord.Contracts;
@@ -97,8 +99,15 @@ internal static class PluginStaging
         foreach (var member in shape.Events.Keys)
             if (!EventImplementations.Accepts(members.GetValueOrDefault(member), attempt))
                 throw new ArgumentException($"{contract.Name}.{member}: an event member is this object's own self.Events() or a reference's event member");
+        // Queries members (Pi 1.6.0, slice 14 §3.1): what self.Queries returned, with a builder for every query the contract lists.
+        foreach (var (member, listed) in shape.Queries)
+        {
+            try { QueryImplementations.Check(member, listed, members.GetValueOrDefault(member), attempt); }
+            catch (ArgumentException error) { throw new ArgumentException($"{contract.Name}.{error.Message}", error); }
+        }
         foreach (var member in members.Keys)
-            if (!shape.State.ContainsKey(member) && !shape.Keyed.ContainsKey(member) && !shape.Methods.ContainsKey(member) && !shape.Events.ContainsKey(member))
+            if (!shape.State.ContainsKey(member) && !shape.Keyed.ContainsKey(member) && !shape.Methods.ContainsKey(member) && !shape.Events.ContainsKey(member) &&
+                !shape.Queries.ContainsKey(member))
                 throw new ArgumentException($"{contract.Name}.{member}: not a member of the implementation variant");
     }
 
@@ -250,6 +259,7 @@ internal sealed class RecordingValue : ISingletonHandle, IKeyedHandle, IReferenc
     public IWatchable<JsonNode?> Member(string name) => this;
     public IKeyedHandle KeyedMember(string name) => this;
     public IEventMember Event(string name) => RecordingEvents.Instance;
+    public IReadOnlyDictionary<string, INamedQuery> QueriesMember(string name) => RecordingQueries.OfReference;
     public Task<object?> CallAsync(string name, object? arguments, ChordContext context) => throw NotActive();
     public void Retry() => throw NotActive();
     public void Release() { }

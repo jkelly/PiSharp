@@ -2,7 +2,10 @@
 // 1.6.0 here: a binding's event members (decision "Events: fire-and-forget members"), and what references sharing one wire hold need
 // (decision "References share one wire hold"): calls and retries name their binding, a binding joining a bound remote object records
 // the members it has not seen (Joined, Seen), and a retry alone moves it to a private object (Transfer). Named queries (QueryMember,
-// FollowInstance) and the denied state are chord-queries' and chord-admission's.
+// FollowInstance) are a partial of Binding in Host/NamedQuery.cs; the denied state is chord-admission's.
+// A reference's member passes its source's frame on as it is when that frame is the batch's only change of it (upstream's reference
+// source forwards its source's call): a list's or a live query's narrow frame stays narrow for a holder of the object that re-exposes or
+// watches it. Before 1.6.0 the member diffed the two values again, and its first frame replaced the value whole.
 using System.Collections.Immutable;
 using System.Text.Json.Nodes;
 using PiSharp.Chord.Contracts;
@@ -149,6 +152,8 @@ internal sealed partial class Binding : IReference, IHolder
         if (next.Kind == "live" && PendingKeys > 0) next = RefState.Loading;
         Move(next);
         RetargetEvents();
+        // The readers of its object's named queries read another live instance's (a restart's successor).
+        ToldOfInstance();
         Host.ChangedPresence();
     }
     // Its event members follow the instance it points at from the host's counter value now, when that is another instance than they
@@ -262,7 +267,7 @@ internal sealed partial class Binding : IReference, IHolder
         var taps = eventTaps; eventTaps = null; eventsAt = null; eventMembers = null; taps?.End();
         foreach (var member in members.Values) member.Release();
         foreach (var key in KeySources.Values.ToArray()) key.Release();
-        KeySources.Clear(); keyed.Clear();
+        KeySources.Clear(); keyed.Clear(); queryMembers = null; instanceFollowers = null; followedInstance = null;
         members.Clear(); source.Released(); Wake(); Changed?.Invoke(); Changed = null;
         target?.Unhold(this); Host.Forget(this); host = null; Dependent = null; AcquisitionContext = ChordContext.Background;
     }
@@ -307,6 +312,10 @@ internal sealed class ReferenceMember(Binding binding, string name) : Source(bin
     private JsonNode? value;
     private JsonNode? before;
     private bool hasValue, framed, hasBefore, retired, ended;
+    // The ops of its source's frame, while that frame is the batch's only change of this member: passed on as they are (upstream's
+    // reference source forwards its source's call), so a member's frame is as narrow as its source's. Any other change in the batch (a
+    // retarget, a second frame, a failure) falls back to the diff of the two values.
+    private ImmutableArray<Op>? passed;
     private Exception? failure;
     private bool heldFailure;
     private bool toldFailure;
@@ -351,13 +360,23 @@ internal sealed class ReferenceMember(Binding binding, string name) : Source(bin
         // A vanished/failed member remains failed while its object is unavailable. Turning that member's
         // last good value into an ordinary held value would hide its original error before recovery.
         if (holding && failure is not null && !heldFailure) return;
-        if (!framed) { before = value; hasBefore = hasValue && failure is null && !toldFailure; framed = true; }
+        // Kept from its first change in a batch to that batch's frame, while something follows it: unwatched, no frame is delivered, and
+        // the next change takes the value it has then (a first frame after a watch opens is a diff from the value the watch started at).
+        if (!framed) { before = value; hasBefore = hasValue && failure is null && !toldFailure; framed = Watched; passed = null; }
+        else passed = null;
         if (error is null) { value = next; hasValue = true; }
         failure = error; heldFailure = holding && hasValue; toldFailure |= error is not null; Changed();
     }
     public void Advance(WatchCall<JsonNode?> call, ChordContext context)
     {
-        if (call is WatchValueCall<JsonNode?> next) { retired |= next.Retired; Record(next.Value, null); }
+        if (call is WatchValueCall<JsonNode?> next)
+        {
+            retired |= next.Retired;
+            var first = !framed;
+            Record(next.Value, null);
+            // Its source's ops turn the value its watches have into this one: the member followed every frame since it took that value.
+            if (first && framed && hasBefore) passed = next.Ops;
+        }
         else if (call is WatchFailedCall<JsonNode?> failed) Record(value, failed.Error as Exception ?? DataInternal.AsChordError(failed.Error, name));
     }
     public void End(WatchEnd end) { source = null; }
@@ -366,10 +385,10 @@ internal sealed class ReferenceMember(Binding binding, string name) : Source(bin
     {
         if (!framed) return;
         framed = false;
-        if (failure is { } error) { FailWatches(error, context); return; }
-        var ops = hasBefore ? DeltaDiff.DiffRevisions(before, value) : ImmutableArray.Create<Op>(new ReplaceOp(value));
+        if (failure is { } error) { passed = null; FailWatches(error, context); return; }
+        var ops = passed ?? (hasBefore ? DeltaDiff.DiffRevisions(before, value) : ImmutableArray.Create<Op>(new ReplaceOp(value)));
         if (ops.Length > 0 || retired) Publish(value, ops, retired, context);
-        retired = false; before = null; toldFailure = false;
+        retired = false; before = null; toldFailure = false; passed = null;
     }
     internal void Release() { ended = true; source?.Unsubscribe(this); source = null; EndWatches(); }
 }

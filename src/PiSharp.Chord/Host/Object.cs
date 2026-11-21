@@ -1,4 +1,6 @@
-// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/chord/src/next/host/object.ts
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/chord/src/host/object.ts
+// 1.6.0 here: UnbindSets (chord-store), calls for a holder (chord-remote), and in Host/NamedQuery.cs a partial with what its lists keep
+// across its attempts and its queries members (chord-queries). Admission (readmit, rebuild, cut) is chord-admission's.
 using System.Text.Json.Nodes;
 using PiSharp.Chord.Contracts;
 using PiSharp.Chord.Data;
