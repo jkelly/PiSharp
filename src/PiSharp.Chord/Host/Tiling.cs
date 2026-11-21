@@ -5,6 +5,7 @@
 // their runs are adopted, from the rows just read, with no I/O, so no frame loses a loaded row. Mappings:
 // - A position is the values of the order's columns as the store returned them (a string, a long or a double); two are ordered as SQLite
 //   orders them (text by code point, numbers numerically).
+// - A page an adoption makes (the rest of an overflowing range, a page behind a cut run) is loaded in a later turn (LoadLater).
 // - Threads: a tiling belongs to its site's batch, that is to the host's dispatcher (Store/OpenQuery.cs): it is made, started, told of
 //   adoptions and closed there.
 using PiSharp.Chord.Store;
@@ -149,6 +150,11 @@ internal sealed class Tiling
         return page;
     }
 
+    // Loads a page an adoption made, in a later turn of the host: upstream's load is asynchronous and starts its run after the adoption
+    // that made the page settled the tiling, while a store's read here may complete at once, inside the adoption (nothing awaits the load;
+    // a page closed meanwhile loads nothing).
+    private void LoadLater(Page page) => query.Site.Batch.Schedule(() => _ = page.Read.LoadAsync());
+
     // The range a page of (after, through] reads: the open last page one page; a bounded one everything between its bookmarks, up to the
     // overflow bound.
     private ReadRange Range(IReadOnlyList<object?>? after, IReadOnlyList<object?>? through) =>
@@ -205,7 +211,7 @@ internal sealed class Tiling
             {
                 page.Read.Close();
                 var again = NewPage(page.After, page.Through);
-                _ = again.Read.LoadAsync();
+                LoadLater(again);
                 patched.Add(again);
                 continue;
             }
@@ -263,7 +269,7 @@ internal sealed class Tiling
             {
                 var rest = NewPage(after, page.Through);
                 tiled.Add(rest);
-                _ = rest.Read.LoadAsync();
+                LoadLater(rest);
             }
         }
         pages = Merged(tiled);
