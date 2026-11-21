@@ -6,6 +6,8 @@
 //   node tools/CompatibilityReport/sync-1.6.0-applicability.mjs            write the table, the Durable overlay and the candidate pointer
 //   node tools/CompatibilityReport/sync-1.6.0-applicability.mjs --check    regenerate in memory and fail when the files on disk differ
 //
+//   node tools/CompatibilityReport/sync-1.6.0-applicability.mjs --accepted-ledger <ledger> ...   accept-sync-1.6.0.mjs, with its arguments
+//
 // The generator writes a fresh pending snapshot. It refuses to overwrite a table that carries an acceptance record or a
 // status it did not write, unless --reset-pending is given.
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
@@ -15,6 +17,12 @@ import { createHash } from 'node:crypto';
 import { dispositions } from './sync-1.6.0-dispositions.mjs';
 
 const repo = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
+if (process.argv.includes('--accepted-ledger') || process.argv.includes('--ledger')) {
+  const { runAcceptanceCli } = await import('./accept-sync-1.6.0.mjs');
+  runAcceptanceCli();
+  process.exit(process.exitCode ?? 0);
+}
+if (process.argv.includes('--apply')) throw new Error('--apply requires --accepted-ledger and exact evidence hashes');
 const read = path => JSON.parse(readFileSync(resolve(repo, path), 'utf8'));
 const PENDING = 'implementation-pending-validation', NO_OP = 'no-op';
 
