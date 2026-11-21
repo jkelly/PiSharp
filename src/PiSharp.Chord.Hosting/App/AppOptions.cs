@@ -1,4 +1,4 @@
-// Pi b4afdddf44e059c67ccf5097e5317d913521b470 (MIT): packages/chord/src/node/app/app.ts.
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/chord/src/node/app/app.ts.
 using System.Net;
 using System.Reflection;
 using System.Text.Json.Nodes;
@@ -15,7 +15,7 @@ namespace PiSharp.Chord.Hosting.App;
 
 public sealed record AppListen(IPAddress Address, int Port = 0);
 public sealed record AppTimeouts(TimeSpan? Close = null, TimeSpan? Ready = null, TimeSpan? ReloadDrain = null);
-public sealed record AppLimits(int EphemeralSessions = 1000, int PendingPairings = 100, int PairingsPerAddress = 10,
+public sealed record AppLimits(int EphemeralSignIns = 1000, int PendingPairings = 100, int PairingsPerAddress = 10,
     int Uploads = 64, long ImportBytes = 4L * 1024 * 1024 * 1024, int ImportEntries = 100000);
 public sealed record AppPrincipalsOptions(JsonObject Server, JsonObject Owner, Func<Address, JsonObject>? Worker = null);
 public sealed record AppError(string Kind, Exception? Error = null, string? Base = null, object? Details = null);
@@ -36,7 +36,7 @@ public sealed class AppWorkerKind
 }
 
 /// <summary>Services available while the application's explicitly selected core facets are assembled.</summary>
-public sealed record AppServices(ChordHost Host, IStore Store, AppLayout Layout, Sessions Sessions);
+public sealed record AppServices(ChordHost Host, IStore Store, AppLayout Layout, SignIns SignIns);
 
 public sealed class AppOptions
 {

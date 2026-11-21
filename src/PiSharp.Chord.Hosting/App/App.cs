@@ -1,4 +1,6 @@
 // Pi b4afdddf44e059c67ccf5097e5317d913521b470 (MIT): packages/chord/src/node/app/app.ts.
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/chord/src/node/app/app.ts sign-in names (`chord.app.sign-ins`, `signIns.opened`) and the telemetry
+// ingest's `admit`. Not yet at v1.6.0: the workers component's `store` is the chord-workers package's.
 using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using System.Text;
@@ -38,7 +40,7 @@ public sealed class App : IAsyncDisposable
     private ChordHttp? http;
     private PluginRuntime? runtime;
     private FilesService? files;
-    private Sessions? sessions;
+    private SignIns? signIns;
     private OwnerLink? owner;
     private AppArchiveService? archives;
     private BaseInputs? serverInputs;
@@ -49,7 +51,7 @@ public sealed class App : IAsyncDisposable
     public IStore Store => store ?? throw new InvalidOperationException("server has not started");
     public IReadOnlyDictionary<string, ProcessWorkers> Workers => workers;
     public PluginManager Plugins => managers["server"];
-    public Sessions Sessions => sessions ?? throw new InvalidOperationException("server has not started");
+    public SignIns SignIns => signIns ?? throw new InvalidOperationException("server has not started");
     public AppLayout Layout => directory?.Layout ?? throw new InvalidOperationException("data directory is not open");
     public string DataDir => Layout.DataDir;
     public string OwnerTokenFile => Layout.OwnerTokenFile;
@@ -90,7 +92,7 @@ public sealed class App : IAsyncDisposable
             if (!options.Kinds.ContainsKey(worker.Facet)) throw new ArgumentException($"worker facet kind '{worker.Facet}' is not configured", nameof(options));
             if (worker.Kind.Kind is "server" || worker.Kind.Kind.Contains('/') || worker.Kind.Kind.Contains('\\')) throw new ArgumentException("worker kind must be a distinct directory name", nameof(options));
         }
-        if (options.Limits.EphemeralSessions < 1 || options.Limits.PendingPairings < 1 || options.Limits.PairingsPerAddress < 1 || options.Limits.Uploads < 1 || options.Limits.ImportBytes < 0 || options.Limits.ImportEntries < 1)
+        if (options.Limits.EphemeralSignIns < 1 || options.Limits.PendingPairings < 1 || options.Limits.PairingsPerAddress < 1 || options.Limits.Uploads < 1 || options.Limits.ImportBytes < 0 || options.Limits.ImportEntries < 1)
             throw new ArgumentOutOfRangeException(nameof(options), "application limits are invalid");
         if (options.Listen.Port is < 0 or > 65535 || options.Timeouts.Close <= TimeSpan.Zero || options.Timeouts.Ready <= TimeSpan.Zero || options.Timeouts.ReloadDrain <= TimeSpan.Zero)
             throw new ArgumentOutOfRangeException(nameof(options), "application listen or timeout options are invalid");
@@ -134,12 +136,12 @@ public sealed class App : IAsyncDisposable
             ReloadDrainTimeout = options.Timeouts.ReloadDrain ?? TimeSpan.FromSeconds(5), OnError = error => Report(new("host", error.Error, Details: error)),
         });
         callbackRegistration = host.RegisterCallbackLifetime((_, _) => callbacks.Acquire());
-        sessions = new(secret, options.Limits.EphemeralSessions, options.TimeProvider);
-        owner = new(options.Principal.Owner, sessions, options.TimeProvider);
-        var pairings = new Pairings(options.Principal.Owner, sessions, new(options.Limits.PendingPairings, options.Limits.PairingsPerAddress), options.TimeProvider);
+        signIns = new(secret, options.Limits.EphemeralSignIns, options.TimeProvider);
+        owner = new(options.Principal.Owner, signIns, options.TimeProvider);
+        var pairings = new Pairings(options.Principal.Owner, signIns, new(options.Limits.PendingPairings, options.Limits.PairingsPerAddress), options.TimeProvider);
         http = new(host, new()
         {
-            Address = options.Listen.Address, Port = options.Listen.Port, LinksPath = "/chord", LinksOpened = sessions.LinksOpenedAsync,
+            Address = options.Listen.Address, Port = options.Listen.Port, LinksPath = "/chord", LinksOpened = signIns.LinksOpenedAsync,
             Telemetry = options.Telemetry, Configure = options.ConfigureHttp, CloseTimeout = options.Timeouts.Close ?? TimeSpan.FromSeconds(30),
             OnError = error => Report(new("http", error.Error, Details: error)),
         });
@@ -183,7 +185,7 @@ public sealed class App : IAsyncDisposable
         files = await FilesService.OpenAsync((ChordStore)store, Layout.FilesDirectory, context, options.Files, options.Limits.Uploads, Server.Address().Key, options.TimeProvider).ConfigureAwait(false);
         var core = new List<PluginFacet>
         {
-            new("chord.app.http", http.Facet), new("chord.app.sessions", sessions.Facet), new("chord.app.owner", owner.Facet!),
+            new("chord.app.http", http.Facet), new("chord.app.sign-ins", signIns.Facet), new("chord.app.owner", owner.Facet!),
             new("chord.app.pairing", pairings.Facet!), new("chord.app.info", Info.AppInfoFacet(new(DataDir, options.Name, options.Api.Versions[0], options.Principal.Owner))),
             new("chord.app.files", FilesFacet.Create(files)),
             new("chord.themes", Themes.Facet()), new("chord.theme-choice", ThemeChoice.Facet()),
@@ -202,13 +204,13 @@ public sealed class App : IAsyncDisposable
             WorkerHost = principal => workerPrincipals.FirstOrDefault(pair => AppPrincipals.Same(pair.Value, principal)).Key,
             PrincipalAttributes = principal => principal is null ? new SpanAttributes() : options.PrincipalAttributes?.Invoke(principal) ?? new SpanAttributes(),
         })));
-        if (options.CoreFacets is { } additional) core.AddRange(additional(new(host, store, Layout, sessions)));
+        if (options.CoreFacets is { } additional) core.AddRange(additional(new(host, store, Layout, signIns)));
         var build = await manager.BuildAsync(context.AbortSignal ?? CancellationToken.None).ConfigureAwait(false);
         var loaded = await runtime.LoadAsync(build, core, context).ConfigureAwait(false);
         var coreFailure = loaded.Failed.FirstOrDefault(failed => core.Any(item => item.Name == failed.Plugin));
         if (coreFailure is not null) throw new PluginError("application core failed: " + coreFailure.Plugin + ": " + coreFailure.Error.Message);
-        await sessions.AttachAsync(host, life).WaitAsync(context.AbortSignal ?? CancellationToken.None).ConfigureAwait(false);
-        await global::PiSharp.Chord.Hosting.App.OwnerLink.EnsureTokenFileAsync(Layout.OwnerTokenFile, options.Principal.Owner, sessions, context).ConfigureAwait(false);
+        await signIns.AttachAsync(host, life).WaitAsync(context.AbortSignal ?? CancellationToken.None).ConfigureAwait(false);
+        await global::PiSharp.Chord.Hosting.App.OwnerLink.EnsureTokenFileAsync(Layout.OwnerTokenFile, options.Principal.Owner, signIns, context).ConfigureAwait(false);
         listening = await http.ListeningAsync(context).ConfigureAwait(false);
         archives = new(options.Name, options.Api.Versions[0], Layout, host, workers, new(options.Limits.ImportBytes, options.Limits.ImportEntries));
         BasesBuilt = BuildBasesAsync(); BaseWatched = WatchBasesAsync();
@@ -291,7 +293,7 @@ public sealed class App : IAsyncDisposable
         foreach (var surface in options.Surfaces) await Cleanup(() => surface.DisposeAsync().AsTask()).ConfigureAwait(false);
         foreach (var worker in workers.Values) await Cleanup(() => worker.DisposeAsync().AsTask()).ConfigureAwait(false);
         await Cleanup(() => apply.WaitAsync()).ConfigureAwait(false);
-        if (sessions is not null) await Cleanup(() => sessions.DisposeAsync().AsTask()).ConfigureAwait(false);
+        if (signIns is not null) await Cleanup(() => signIns.DisposeAsync().AsTask()).ConfigureAwait(false);
         if (host is not null) await Cleanup(() => host.CloseAsync(ChordContext.Background)).ConfigureAwait(false);
         // Public host deadlines may release callers before their originals settle. Keep the store and lock owned.
         await Cleanup(() => callbacks.Drained).ConfigureAwait(false);

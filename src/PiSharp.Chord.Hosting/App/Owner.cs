@@ -1,4 +1,4 @@
-// Pi b4afdddf44e059c67ccf5097e5317d913521b470 (MIT): packages/chord/src/node/app/owner.ts.
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/chord/src/node/app/owner.ts.
 using System.Net;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -20,7 +20,7 @@ public sealed class OwnerLink
 
     public OwnerLink(TimeProvider? time = null) => this.time = time ?? TimeProvider.System;
 
-    public OwnerLink(JsonObject owner, Sessions sessions, TimeProvider? time = null) : this(time)
+    public OwnerLink(JsonObject owner, SignIns signIns, TimeProvider? time = null) : this(time)
     {
         var principal = AppPrincipals.Require(owner);
         Facet = PiSharp.Chord.Host.Facet.Define((_, self) => self.Contribute(HttpRegistries.Http, new HttpContribution
@@ -32,7 +32,7 @@ public sealed class OwnerLink
                 {
                     var body = await request.JsonAsync(4096, context.AbortSignal).ConfigureAwait(false);
                     if (!AuthHttp.TryString(body, "token", out var token) || !Consume(token)) return AuthHttp.Error(403);
-                    var issued = await sessions.IssueAsync(principal, "owner browser", SessionKind.Browser, request.Provenance.Kind != "local", context.Context).ConfigureAwait(false);
+                    var issued = await signIns.IssueAsync(principal, "owner browser", SignInKind.Browser, request.Provenance.Kind != "local", context.Context).ConfigureAwait(false);
                     return AuthHttp.SignedIn(issued.Cookie);
                 }, Public: true),
             },
@@ -68,34 +68,34 @@ public sealed class OwnerLink
         return address.Uri.AbsoluteUri;
     }
 
-    /// <summary>Reuses only a valid session of this owner; replacing the owner revokes the previous file session.</summary>
-    public static async Task<string> EnsureTokenFileAsync(string path, JsonObject owner, Sessions sessions, ChordContext context)
+    /// <summary>Reuses only a valid sign-in of this owner; replacing the owner revokes the previous file sign-in.</summary>
+    public static async Task<string> EnsureTokenFileAsync(string path, JsonObject owner, SignIns signIns, ChordContext context)
     {
         var existing = await Secrets.ReadSecretAsync(path).ConfigureAwait(false);
         if (existing is not null)
         {
-            var principal = await sessions.VerifyAsync(existing, context).ConfigureAwait(false);
+            var principal = await signIns.VerifyAsync(existing, context).ConfigureAwait(false);
             if (AppPrincipals.Same(principal, owner)) { Layout.PrivateFile(path); return existing; }
             if (principal is not null)
             {
                 var dot = existing.IndexOf('.');
-                if (dot > 0) await sessions.RevokeAsync(existing[..dot], context).ConfigureAwait(false);
+                if (dot > 0) await signIns.RevokeAsync(existing[..dot], context).ConfigureAwait(false);
             }
         }
-        var issued = await sessions.IssueAsync(owner, "owner token file", SessionKind.Device, false, context).ConfigureAwait(false);
+        var issued = await signIns.IssueAsync(owner, "owner token file", SignInKind.Device, false, context).ConfigureAwait(false);
         try
         {
             if (!await Secrets.WriteSecretAsync(path, issued.Token, replace: existing is not null).ConfigureAwait(false))
             {
-                await sessions.RevokeAsync(issued.Id, ChordContext.Background).ConfigureAwait(false);
+                await signIns.RevokeAsync(issued.Id, ChordContext.Background).ConfigureAwait(false);
                 var winner = await Secrets.ReadSecretAsync(path).ConfigureAwait(false);
-                if (winner is not null && AppPrincipals.Same(await sessions.VerifyAsync(winner, context).ConfigureAwait(false), owner)) return winner;
+                if (winner is not null && AppPrincipals.Same(await signIns.VerifyAsync(winner, context).ConfigureAwait(false), owner)) return winner;
                 throw new IOException("The owner token file changed during creation.");
             }
         }
         catch
         {
-            await sessions.RevokeAsync(issued.Id, ChordContext.Background).ConfigureAwait(false);
+            await signIns.RevokeAsync(issued.Id, ChordContext.Background).ConfigureAwait(false);
             throw;
         }
         return issued.Token;

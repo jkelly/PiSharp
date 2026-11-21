@@ -1,4 +1,4 @@
-// Pi b4afdddf44e059c67ccf5097e5317d913521b470 (MIT): packages/chord/src/node/app/sessions.ts.
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/chord/src/node/app/sign-ins.ts.
 using System.Text;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
@@ -10,23 +10,23 @@ using static PiSharp.Chord.Contracts.Schemas;
 
 namespace PiSharp.Chord.Hosting.App;
 
-public enum SessionKind { Browser, Device, Ephemeral }
-public sealed record IssuedSession(string Id, string Token, string Cookie);
-public sealed record SessionInfo(string Id, string Label, SessionKind Kind, JsonObject Principal, long Created, long LastUsed);
+public enum SignInKind { Browser, Device, Ephemeral }
+public sealed record IssuedSignIn(string Id, string Token, string Cookie);
+public sealed record SignInInfo(string Id, string Label, SignInKind Kind, JsonObject Principal, long Created, long LastUsed);
 
 /// <summary>Hashed credentials stored in the host's persisted document, and bounded in-memory ephemeral credentials.</summary>
-public sealed partial class Sessions : IAsyncDisposable
+public sealed partial class SignIns : IAsyncDisposable
 {
-    public const string CookieName = "chord-session";
+    public const string CookieName = "chord-sign-in";
     public static readonly TimeSpan IdleExpiry = TimeSpan.FromDays(400);
     private static readonly TimeSpan TouchInterval = TimeSpan.FromMinutes(1);
     private readonly byte[] cookieSecret;
-    private readonly EphemeralSessions ephemeral;
+    private readonly EphemeralSignIns ephemeral;
     private readonly TimeProvider time;
     private IReference? reference;
     private bool disposed;
     public Facet Facet { get; }
-    public static Contract Type { get; } = Contract.Local("chord.app.sessions", new()
+    public static Contract Type { get; } = Contract.Local("chord.app.sign-ins", new()
     {
         Version = 1, Params = [], Members = new()
         {
@@ -35,13 +35,13 @@ public sealed partial class Sessions : IAsyncDisposable
             ["verify"] = Method(Str(), Unknown()), ["revoke"] = Method(Str()),
         },
     });
-    private static StateDefinition Document { get; } = StateDefinition.Define("chord.app.sessions", new()
+    private static StateDefinition Document { get; } = StateDefinition.Define("chord.app.sign-ins", new()
     {
-        Version = 1, Persist = true, Initial = () => new() { ["sessions"] = new JsonObject() },
-        Schema = Obj(("sessions", Map(Obj(("hash", Str()), ("label", Str()), ("kind", OneOf("browser", "device")), ("principal", Str()), ("created", Num()), ("lastUsed", Num()))))),
+        Version = 1, Persist = true, Initial = () => new() { ["signIns"] = new JsonObject() },
+        Schema = Obj(("signIns", Map(Obj(("hash", Str()), ("label", Str()), ("kind", OneOf("browser", "device")), ("principal", Str()), ("created", Num()), ("lastUsed", Num()))))),
         CheckpointWhen = (_, _, info) => info.DeltasSinceBase >= 50,
     });
-    public Sessions(string cookieSecret, int maxEphemeral = 1000, TimeProvider? time = null)
+    public SignIns(string cookieSecret, int maxEphemeral = 1000, TimeProvider? time = null)
     {
         if (string.IsNullOrEmpty(cookieSecret)) throw new ArgumentException("cookie signing secret is required", nameof(cookieSecret));
         this.cookieSecret = Encoding.UTF8.GetBytes(cookieSecret); this.time = time ?? TimeProvider.System;
@@ -62,8 +62,8 @@ public sealed partial class Sessions : IAsyncDisposable
                         var kind = ParseKind(input["kind"]!.GetValue<string>());
                         var id = Secrets.NewToken(12); var secret = Secrets.NewToken(); var now = this.time.GetUtcNow().ToUnixTimeMilliseconds();
                         var hash = Secrets.HashToken(secret);
-                        if (kind == SessionKind.Ephemeral) ephemeral.Issue(id, hash, principal);
-                        else await document.ChangeAsync(draft => draft["sessions"]![id] = new JsonObject
+                        if (kind == SignInKind.Ephemeral) ephemeral.Issue(id, hash, principal);
+                        else await document.ChangeAsync(draft => draft["signIns"]![id] = new JsonObject
                         {
                             ["hash"] = hash, ["label"] = input["label"]!.GetValue<string>(), ["kind"] = KindName(kind),
                             ["principal"] = principal.ToJsonString(), ["created"] = now, ["lastUsed"] = now,
@@ -75,23 +75,23 @@ public sealed partial class Sessions : IAsyncDisposable
                     {
                         if (args is not JsonValue value || !value.TryGetValue<string>(out var token) || !TryToken(token, out var id, out var secret)) return null;
                         var temporary = ephemeral.Verify(id, secret); if (temporary is not null) return temporary;
-                        var sessions = (JsonObject)document.Value!["sessions"]!;
-                        if (sessions[id] is not JsonObject session || !Secrets.MatchesHash(secret, session["hash"]!.GetValue<string>())) return null;
-                        var now = this.time.GetUtcNow().ToUnixTimeMilliseconds(); var last = session["lastUsed"]!.GetValue<long>();
+                        var signIns = (JsonObject)document.Value!["signIns"]!;
+                        if (signIns[id] is not JsonObject signIn || !Secrets.MatchesHash(secret, signIn["hash"]!.GetValue<string>())) return null;
+                        var now = this.time.GetUtcNow().ToUnixTimeMilliseconds(); var last = signIn["lastUsed"]!.GetValue<long>();
                         if (now - last > IdleExpiry.TotalMilliseconds)
                         {
-                            await document.ChangeAsync(draft => ((JsonObject)draft["sessions"]!).Remove(id), ctx.Context).ConfigureAwait(false); return null;
+                            await document.ChangeAsync(draft => ((JsonObject)draft["signIns"]!).Remove(id), ctx.Context).ConfigureAwait(false); return null;
                         }
-                        var principal = JsonNode.Parse(session["principal"]!.GetValue<string>()) as JsonObject;
+                        var principal = JsonNode.Parse(signIn["principal"]!.GetValue<string>()) as JsonObject;
                         if (principal is null) return null; AppPrincipals.Require(principal);
                         if (now - last >= TouchInterval.TotalMilliseconds)
-                            await document.ChangeAsync(draft => { if (draft["sessions"]![id] is JsonObject stored) stored["lastUsed"] = now; }, ctx.Context).ConfigureAwait(false);
+                            await document.ChangeAsync(draft => { if (draft["signIns"]![id] is JsonObject stored) stored["lastUsed"] = now; }, ctx.Context).ConfigureAwait(false);
                         return principal;
                     }),
                     ["revoke"] = (HostMethod)(async (args, ctx) =>
                     {
                         var id = ((JsonValue)args!).GetValue<string>();
-                        if (!ephemeral.Revoke(id)) await document.ChangeAsync(draft => ((JsonObject)draft["sessions"]!).Remove(id), ctx.Context).ConfigureAwait(false);
+                        if (!ephemeral.Revoke(id)) await document.ChangeAsync(draft => ((JsonObject)draft["signIns"]!).Remove(id), ctx.Context).ConfigureAwait(false);
                         return null;
                     }),
                 });
@@ -110,7 +110,7 @@ public sealed partial class Sessions : IAsyncDisposable
                     if (signed?.Expires is not { } expires || expires - this.time.GetUtcNow() > IdleExpiry - TimeSpan.FromDays(1) ||
                         await VerifyAsync(signed.Value, ctx.Context).ConfigureAwait(false) is null) return response;
                     var headers = new Dictionary<string, string[]>(response.Headers, StringComparer.OrdinalIgnoreCase)
-                    { ["Set-Cookie"] = [Cookie(signed.Value, SessionKind.Browser, IsSecure(request))] };
+                    { ["Set-Cookie"] = [Cookie(signed.Value, SignInKind.Browser, IsSecure(request))] };
                     return response with { Headers = headers };
                 }, Phase: "headers", All: true)],
             });
@@ -119,13 +119,13 @@ public sealed partial class Sessions : IAsyncDisposable
     public async Task AttachAsync(ChordHost host, ChordContext context)
     {
         ObjectDisposedException.ThrowIf(disposed, this);
-        if (reference is not null) throw new InvalidOperationException("sessions already attached");
+        if (reference is not null) throw new InvalidOperationException("sign-ins already attached");
         var acquired = await host.GetAsync(Type, new(), context).ConfigureAwait(false);
-        if (disposed) { acquired.Dispose(); throw new ObjectDisposedException(nameof(Sessions)); }
+        if (disposed) { acquired.Dispose(); throw new ObjectDisposedException(nameof(SignIns)); }
         reference = acquired;
     }
-    private IReference Reference => !disposed && reference is { } value ? value : throw new InvalidOperationException("sessions must be attached to a loaded host");
-    public async Task<IssuedSession> IssueAsync(JsonObject principal, string label, SessionKind kind, bool secure, ChordContext context)
+    private IReference Reference => !disposed && reference is { } value ? value : throw new InvalidOperationException("sign-ins must be attached to a loaded host");
+    public async Task<IssuedSignIn> IssueAsync(JsonObject principal, string label, SignInKind kind, bool secure, ChordContext context)
     {
         AppPrincipals.Require(principal);
         var result = (JsonObject)(await Reference.CallAsync("issue", new JsonObject
@@ -138,20 +138,22 @@ public sealed partial class Sessions : IAsyncDisposable
         return await reference.CallAsync("verify", JsonValue.Create(token), context).ConfigureAwait(false) as JsonObject;
     }
     public async Task RevokeAsync(string id, ChordContext context) => _ = await Reference.CallAsync("revoke", JsonValue.Create(id), context).ConfigureAwait(false);
-    public Task<IReadOnlyList<SessionInfo>> ListAsync(ChordContext context)
+    public Task<IReadOnlyList<SignInInfo>> ListAsync(ChordContext context)
     {
         context.AbortSignal?.ThrowIfCancellationRequested();
         var result = ((JsonArray)Reference.Member("list").Value!).Select(item =>
         {
-            var value = (JsonObject)item!; return new SessionInfo(value["id"]!.GetValue<string>(), value["label"]!.GetValue<string>(),
+            var value = (JsonObject)item!; return new SignInInfo(value["id"]!.GetValue<string>(), value["label"]!.GetValue<string>(),
                 ParseKind(value["kind"]!.GetValue<string>()), (JsonObject)value["principal"]!.DeepClone(), value["created"]!.GetValue<long>(), value["lastUsed"]!.GetValue<long>());
         }).ToArray();
-        return Task.FromResult<IReadOnlyList<SessionInfo>>(result);
+        return Task.FromResult<IReadOnlyList<SignInInfo>>(result);
     }
-    public Task<Func<Task>?> LinksOpenedAsync(HttpRequestContext request, JsonObject principal)
+    /// <summary>The links endpoint's <c>opened</c> hook: an ephemeral sign-in's links are counted (it ends with its last). The kit does not
+    /// use <paramref name="close"/>.</summary>
+    public Task<Func<Task>?> LinksOpenedAsync(HttpRequestContext request, JsonObject principal, Action close)
     {
-        var token = RequestToken(request); Action? close = token is not null && TryToken(token, out var id, out _) ? ephemeral.LinkOpened(id) : null;
-        return Task.FromResult<Func<Task>?>(close is null ? null : () => { close(); return Task.CompletedTask; });
+        var token = RequestToken(request); Action? closed = token is not null && TryToken(token, out var id, out _) ? ephemeral.LinkOpened(id) : null;
+        return Task.FromResult<Func<Task>?>(closed is null ? null : () => { closed(); return Task.CompletedTask; });
     }
     private string? RequestToken(HttpRequestContext request)
     {
@@ -160,8 +162,8 @@ public sealed partial class Sessions : IAsyncDisposable
         return match.Success ? match.Groups[1].Value : SignedCookies.Read(request.Headers.Cookie.ToString(), CookieName, cookieSecret, time);
     }
     public static bool IsSecure(HttpRequestContext request) => request.Provenance.Kind != "local";
-    public string Cookie(string token, SessionKind kind, bool secure) => SignedCookies.Create(CookieName, token, cookieSecret, secure,
-        kind == SessionKind.Ephemeral ? null : IdleExpiry, clock: time);
+    public string Cookie(string token, SignInKind kind, bool secure) => SignedCookies.Create(CookieName, token, cookieSecret, secure,
+        kind == SignInKind.Ephemeral ? null : IdleExpiry, clock: time);
     internal static bool TryToken(string token, out string id, out string secret)
     {
         id = secret = "";
@@ -171,9 +173,9 @@ public sealed partial class Sessions : IAsyncDisposable
         return id.All(IsTokenCharacter) && secret.All(IsTokenCharacter);
     }
     private static bool IsTokenCharacter(char c) => char.IsAsciiLetterOrDigit(c) || c is '-' or '_';
-    private static SessionKind ParseKind(string kind) => kind switch { "browser" => SessionKind.Browser, "device" => SessionKind.Device, "ephemeral" => SessionKind.Ephemeral, _ => throw new ArgumentException("invalid session kind") };
-    private static string KindName(SessionKind kind) => kind switch { SessionKind.Browser => "browser", SessionKind.Device => "device", SessionKind.Ephemeral => "ephemeral", _ => throw new ArgumentOutOfRangeException(nameof(kind)) };
-    private static JsonArray ListJson(JsonObject document) => new(((JsonObject)document["sessions"]!).Select(pair =>
+    private static SignInKind ParseKind(string kind) => kind switch { "browser" => SignInKind.Browser, "device" => SignInKind.Device, "ephemeral" => SignInKind.Ephemeral, _ => throw new ArgumentException("invalid sign-in kind") };
+    private static string KindName(SignInKind kind) => kind switch { SignInKind.Browser => "browser", SignInKind.Device => "device", SignInKind.Ephemeral => "ephemeral", _ => throw new ArgumentOutOfRangeException(nameof(kind)) };
+    private static JsonArray ListJson(JsonObject document) => new(((JsonObject)document["signIns"]!).Select(pair =>
     {
         var stored = (JsonObject)pair.Value!;
         return (JsonNode?)new JsonObject { ["id"] = pair.Key, ["label"] = stored["label"]!.DeepClone(), ["kind"] = stored["kind"]!.DeepClone(),

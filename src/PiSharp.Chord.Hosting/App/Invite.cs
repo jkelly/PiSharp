@@ -1,4 +1,4 @@
-// Pi b4afdddf44e059c67ccf5097e5317d913521b470 (MIT): packages/chord/src/node/app/invite.ts.
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/chord/src/node/app/invite.ts.
 using System.Text.Json.Nodes;
 using PiSharp.Chord.Host;
 using PiSharp.Chord.Hosting.Http;
@@ -17,7 +17,7 @@ public sealed class Invite
     private readonly int maxPending;
     public Facet Facet { get; }
 
-    public Invite(JsonObject owner, Sessions sessions, int maxPending = 1000, TimeProvider? time = null)
+    public Invite(JsonObject owner, SignIns signIns, int maxPending = 1000, TimeProvider? time = null)
     {
         if (maxPending < 1) throw new ArgumentOutOfRangeException(nameof(maxPending));
         this.maxPending = maxPending; this.time = time ?? TimeProvider.System;
@@ -43,7 +43,7 @@ public sealed class Invite
                     var body = await request.JsonAsync(4096, context.AbortSignal).ConfigureAwait(false);
                     var invite = AuthHttp.TryString(body, "token", out var token) ? Consume(token) : null;
                     if (invite is null) return AuthHttp.Error(403);
-                    var issued = await sessions.IssueAsync(invite.Principal, invite.Label, SessionKind.Browser, request.Provenance.Kind != "local", context.Context).ConfigureAwait(false);
+                    var issued = await signIns.IssueAsync(invite.Principal, invite.Label, SignInKind.Browser, request.Provenance.Kind != "local", context.Context).ConfigureAwait(false);
                     return AuthHttp.SignedIn(issued.Cookie);
                 }, Public: true),
             },

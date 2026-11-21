@@ -30,7 +30,15 @@ Contributions contain typed routes, wrappers, sockets, allowed hosts, relay vali
 
 Each route, stream, or socket runs in one Chord root, so acquired references remain alive until its response settles. JSON, text, HTML, redirects, empty responses, pulled byte bodies, file bodies, single ranges, HEAD, bounded request bodies, signed cookies, and WebSocket upgrades are supported. Plugin WebSocket receives enforce the contribution's frame bound. A links endpoint passes a `WebSocketLink` directly to `ChordHost.Accept`; it does not define another wire protocol. Router updates revoke sockets whose host, relay, or handler disappeared.
 
+`ChordHttpOptions.LinksOpened` runs when a link is accepted, with its request, its principal and `close`. `close` terminates that link at once: the socket is aborted with no close handshake a peer could ignore, other links stay open, and a call after the link is gone does nothing. An application keeps it to end the links of a credential it revoked. The cleanup the hook returns runs once when the socket closes, however it closed.
+
 Call `ChordHttp.CloseAsync` before `ChordHost.CloseAsync` to drain requests up to `CloseTimeout`; after the bound, their scopes are canceled. The listener is a host-owned native resource, so host close also stops it. The default listener is 127.0.0.1. Signing keys are supplied only to server-side `SignedCookies` helpers and are never emitted as response data.
+
+## Application kit
+
+`App.StartServerAsync` issues sign-ins through `SignIns` (`App.SignIns`, `AppServices.SignIns`): a browser carries its token in the signed `chord-sign-in` cookie, a command-line client in `Authorization: Bearer`. Browser and device sign-ins persist in the server's store under the document `chord.app.sign-ins`; ephemeral ones live in memory, bounded by `AppLimits.EphemeralSignIns`, and end with their client's last link. These names replaced `Sessions`, `chord-session` and `chord.app.sessions` at Pi 1.6.0 with no migration: after the update every browser and device signs in again, the owner token file is written again at the next start, and a store's old `chord.app.sessions` document stays unread.
+
+The kit's telemetry ingest admits every signed-in page. An application that serves `TelemetryIngest.CreateFacet` itself must supply `TelemetryIngestOptions.Admit`: a page whose principal it refuses fails to hold `chord.telemetry.page` with `forbidden`. `Info.AppInfoFacet` and `Info.WorkerInfoFacet` are public for an application that runs hosts of its own.
 
 ## Native workers
 
