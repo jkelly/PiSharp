@@ -1,3 +1,6 @@
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/chord/src/host/{object,reference,dependencies,internal}.ts (the shapes
+// the host's files share). 1.6.0: a holder's calls and retries name it, a queries member's named query, the park step's Parking and
+// IBlocked, a served type's admission, and `denied` as what a reference follows of an object an admission refused its caller.
 using System.Text.Json.Nodes;
 using PiSharp.Chord.Contracts;
 using PiSharp.Chord.Data;
@@ -12,6 +15,9 @@ internal sealed record CheckedParams(JsonObject Value, string Key);
 internal sealed record ServedType(string Plugin, Contract Contract, HostFactory Factory, ServeOptions Options, Provider Provider)
 {
     internal Facet? DeclaringFacet { get; init; }
+    /// <summary>Its admission, when its contract declares one (remote types only): its attempts run it before <see cref="Factory"/>'s
+    /// counterpart that takes the admitted value (<c>ServedAdmission.Factory</c>; <see cref="Factory"/> itself is never called then).</summary>
+    internal ServedAdmission? Admission { get; init; }
     internal bool HostLifetime => Contract.Kind == ContractKind.Local && ContractsInternal.DataOf(Contract).Params.Fields.Count == 0;
 }
 internal sealed record RegistryServing(string Name, long Version, IRegistryProvider Provider)
@@ -22,6 +28,9 @@ internal sealed record ContributionDeclaration(string Name, long Version, object
 internal sealed record LoadedPlugin(string Name, Facet Facet, IReadOnlyList<ServedType> Types,
     IReadOnlyList<RegistryServing> Registries, IReadOnlyList<ContributionDeclaration> Contributions);
 internal sealed record RetryWalk(HashSet<ITarget> Visited, int Hops = 16);
+/// <summary>What a reference follows of its target for one state member: <c>live</c> (the member of the instance it follows),
+/// <c>lacking</c> (its live variant has no such member), <c>loading</c>, <c>failed</c> (the cause's error; it keeps its last value), or
+/// <c>denied</c> (Pi 1.6.0, slice 14 §2.2: an admission refused its caller; no value is kept, reads throw the error).</summary>
 internal sealed record Followed(string Kind, object? Source = null, object? Instance = null, ChordError? Error = null, object? Last = null);
 internal interface IHolder
 {

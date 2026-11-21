@@ -1016,5 +1016,8 @@ internal static partial class Program
         public void Attach(HostLink link) { }
         public void Dropped(ChordError error) { }
         public void Unreachable(ChordError error) { }
+        public Caller Caller { get; } = new(null, "h6");
+        public void Withheld(PiSharp.Chord.Data.FailureCause cause) { }
+        public void Admitted() { }
     }
 }

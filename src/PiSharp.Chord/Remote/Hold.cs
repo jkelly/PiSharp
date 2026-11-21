@@ -1,7 +1,8 @@
 // Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/chord/src/remote/hold.ts.
 // 1.6.0: a bound hold taps its instance's event members from the counter value of its bound (decision "Events: fire-and-forget
 // members"), until it unbinds or its object no longer shows it live. Its calls are decoded by what its consumer had applied when it sent
-// them: one binding fence per unacknowledged bound, replacing the single previous binding of 1.5.2.
+// them: one binding fence per unacknowledged bound, replacing the single previous binding of 1.5.2. A denial (slice 14 §2.2: an
+// admission refused its caller) rejects its calls in flight, and the ones that crossed its failed on the wire, forbidden/revoked.
 using System.Collections.Immutable;
 using System.Text.Json.Nodes;
 using PiSharp.Chord.Contracts;
@@ -180,7 +181,9 @@ internal sealed class IncomingHold : IIncomingHold, IHolder, IReloadAwareHolder
             if (state.Cause is { } failure)
             {
                 names = null; variant = null;
-                provider.Unbound(this, failure.Error);
+                // Its calls in flight are rejected with the failure's error, forbidden/revoked for a denial (access withdrawn under a
+                // running call).
+                provider.Unbound(this, AdmissionInternal.Cut(target.Label, failure));
             }
             else provider.Unbind(this);
             if (state.Kind == "loading") provider.Send(new LoadingMessage(Id));
@@ -191,8 +194,10 @@ internal sealed class IncomingHold : IIncomingHold, IHolder, IReloadAwareHolder
             provider.Send(new FailedMessage(Id, new(cause.Kind.ToString().ToLowerInvariant(), WireError.FromException(cause.Error)),
                 state.RetryAt is { } retry ? (long)Math.Max(0, retry - now) : null));
             // Told a failure, its consumer rejects what it still waits on: calls by the old names are not taken any more. One that still
-            // arrives was sent before its consumer learnt of the failure.
-            names = null; variant = null; refusal = cause.Error; toldFailed = true; latest = new(null, null, cause.Error);
+            // arrives was sent before its consumer learnt of the failure; for a denial that is access withdrawn under the call
+            // (forbidden/revoked), whether it had reached this host or not.
+            var crossed = AdmissionInternal.Cut(target.Label, cause);
+            names = null; variant = null; refusal = crossed; toldFailed = true; latest = new(null, null, crossed);
         }
         else if (toldFailed) { toldFailed = false; refusal = null; provider.Send(new LoadingMessage(Id)); }
     }
