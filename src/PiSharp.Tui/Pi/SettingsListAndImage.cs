@@ -1,4 +1,4 @@
-// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/tui/src/components/settings-list.ts and components/image.ts.
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/tui/src/components/settings-list.ts and components/image.ts.
 namespace PiSharp.Tui.Pi;
 
 /// <summary>A settings row: cycles through <see cref="Values"/> or opens a <see cref="Submenu"/>.</summary>
@@ -125,7 +125,14 @@ public sealed class SettingsList : IComponent, IInputHandler, IMouseHandler
         else if (pageIndex is { } page) { if (display.Count == 0) return; selectedIndex = page; }
         else if (kb.Matches(data, "tui.select.confirm") || data == " " && (!searchEnabled || searchInput?.GetValue().Length == 0)) ActivateItem();
         else if (kb.Matches(data, "tui.select.cancel")) onCancel();
-        else if (searchEnabled && searchInput is not null) { searchInput.HandleInput(data); filtered = Fuzzy.Filter(items, searchInput.GetValue(), item => item.Label); selectedIndex = 0; }
+        else if (searchEnabled && searchInput is not null)
+        {
+            // Cursor keys leave the query as it is and must not move the selection.
+            var previousQuery = searchInput.GetValue();
+            searchInput.HandleInput(data);
+            var query = searchInput.GetValue();
+            if (query != previousQuery) { filtered = Fuzzy.Filter(items, query, item => item.Label); selectedIndex = 0; }
+        }
     }
 
     private (int Start, int End) VisibleRange(List<SettingItem> display)
