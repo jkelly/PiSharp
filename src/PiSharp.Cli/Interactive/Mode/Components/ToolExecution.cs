@@ -206,7 +206,7 @@ internal sealed class ToolExecutionComponent : Container, IDisposableComponent
         UpdateDisplay();
     }
 
-    public override List<string> Render(int width)
+    public override IReadOnlyList<string> Render(int width)
     {
         if (disposed) return [];
         if (argsPending) UpdateDisplay();

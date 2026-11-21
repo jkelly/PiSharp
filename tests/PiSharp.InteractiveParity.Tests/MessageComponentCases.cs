@@ -734,7 +734,7 @@ internal static class MessageComponentCases
         });
     }
 
-    private static string Lines2(List<string> lines) => string.Join("\n", lines);
+    private static string Lines2(IReadOnlyList<string> lines) => string.Join("\n", lines);
 
     private static string RenderText(IComponent component) => Strip(string.Join("\n", component.Render(80)));
 

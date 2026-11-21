@@ -105,7 +105,7 @@ public sealed partial class Markdown : IComponent
         }
     }
 
-    public List<string> Render(int width)
+    public IReadOnlyList<string> Render(int width)
     {
         if (cachedLines is not null && cachedText == text && cachedWidth == width) return cachedLines;
         var contentWidth = Math.Max(1, width - paddingX * 2);

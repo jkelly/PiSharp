@@ -39,7 +39,7 @@ internal static class TuiSyncCases
     private sealed class FixedLines(params string[] lines) : IComponent
     {
         public List<string> Lines { get; set; } = [.. lines];
-        public List<string> Render(int width) => [.. Lines];
+        public IReadOnlyList<string> Render(int width) => [.. Lines];
         public void Invalidate() { }
     }
 
@@ -48,7 +48,7 @@ internal static class TuiSyncCases
         public bool Focused { get; set; }
         public List<string> Inputs { get; } = [];
         public void HandleInput(string data) => Inputs.Add(data);
-        public List<string> Render(int width) => ["overlay"];
+        public IReadOnlyList<string> Render(int width) => ["overlay"];
         public void Invalidate() { }
     }
 
@@ -56,7 +56,7 @@ internal static class TuiSyncCases
     {
         public List<string> Inputs { get; } = [];
         public void HandleInput(string data) => Inputs.Add(data);
-        public List<string> Render(int width) => [""];
+        public IReadOnlyList<string> Render(int width) => [""];
         public void Invalidate() { }
     }
 

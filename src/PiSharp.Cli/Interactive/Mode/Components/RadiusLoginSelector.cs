@@ -50,9 +50,10 @@ internal sealed class RadiusLoginMenuComponent : IComponent, IInputHandler, IMou
     /// <summary>Color <paramref name="text"/> with the Radius logo colors flowing left to right; <paramref name="elapsedMs"/> is the animation time.</summary>
     internal static string RadiusShimmer(string text, double elapsedMs) => ProviderBrand.RadiusShimmer(text, elapsedMs);
 
-    public List<string> Render(int width)
+    public IReadOnlyList<string> Render(int width)
     {
-        var lines = selector.Render(width);
+        // Container output is shared across frames; copy before replacing the animated line.
+        var lines = new List<string>(selector.Render(width));
         var (label, text) = radiusOption;
         var selectedRendered = new Text(theme.Fg("accent", "→ ") + theme.Fg("accent", label), 1, 0).Render(width);
         var index = selectedRendered.Count == 0 ? -1 : lines.IndexOf(selectedRendered[0]);

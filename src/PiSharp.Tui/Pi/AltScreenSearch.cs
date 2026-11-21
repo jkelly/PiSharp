@@ -134,7 +134,7 @@ public sealed class AltScreenSearchComponent(Action<string> onQueryChange, Func<
     private static string FormatKey(string? key) => key is null ? "Unbound" : string.Join('+', key.Split('+').Select(part =>
         OperatingSystem.IsMacOS() && part.Equals("alt", StringComparison.OrdinalIgnoreCase) ? "Option" : part.Length == 0 ? part : char.ToUpperInvariant(part[0]) + part[1..]));
 
-    public List<string> Render(int width)
+    public IReadOnlyList<string> Render(int width)
     {
         var safeWidth = Math.Max(1, width); var inner = Math.Max(0, safeWidth - 2);
         var kb = KeybindingsManager.Global;

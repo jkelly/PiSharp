@@ -21,7 +21,11 @@ public sealed record TuiMouseDispatchResult(TuiMouseDispatchTarget Target, bool 
 /// <summary>Everything rendered by the TUI: lines for a width, and invalidation of cached state.</summary>
 public interface IComponent
 {
-    List<string> Render(int width);
+    /// <summary>Lines to draw. Components may return a cached list (as <see cref="Container"/>, <see cref="Box"/>, <see cref="Text"/> and
+    /// <see cref="Markdown"/> do while nothing changed): callers must not modify it, and a component whose output changed must
+    /// return a new list rather than the earlier one with different contents. Copy before modifying, for example
+    /// <c>[.. base.Render(width)]</c>.</summary>
+    IReadOnlyList<string> Render(int width);
     void Invalidate();
     /// <summary>While focused, fullscreen viewport keys (<c>tui.altScreen.*</c> scrolling and prompt jumps) go to this component
     /// instead of scrolling the transcript, as they do for a focused overlay. Default is false.</summary>
@@ -58,11 +62,70 @@ public static class Mouse
     { X = mouseEvent.ScreenX - target.OriginX, Y = mouseEvent.ScreenY - target.OriginY, Width = target.Width, Height = target.Height };
 }
 
+/// <summary>Concatenated child output of a container, kept across frames.</summary>
+[System.Diagnostics.CodeAnalysis.Experimental("PISHARP_TUI001")]
+public sealed class ChildLines
+{
+    public int Width { get; }
+    public IReadOnlyList<IComponent> Children { get; }
+    public IReadOnlyList<IReadOnlyList<string>> Parts { get; }
+    public IReadOnlyList<string> Lines { get; }
+
+    private ChildLines(int width, IComponent[] children, IReadOnlyList<string>[] parts, string[] lines)
+    { Width = width; Children = children; Parts = parts; Lines = lines; }
+
+    private static bool SameLines(IReadOnlyList<string> a, IReadOnlyList<string> b)
+    {
+        if (ReferenceEquals(a, b)) return true;
+        if (a.Count != b.Count) return false;
+        for (var index = 0; index < a.Count; index++) if (!string.Equals(a[index], b[index], StringComparison.Ordinal)) return false;
+        return true;
+    }
+
+    /// <summary>Renders children and concatenates their lines. Returns <paramref name="previous"/> unchanged when the children and
+    /// their lines are unchanged. Unchanged subtrees then keep list identity, so every ancestor container skips its copy too.
+    /// Without this, each frame of a long fullscreen transcript copied every rendered line once per nesting level. Callers must
+    /// treat the returned lines as read-only, like any component's cached render output.</summary>
+    public static ChildLines Render(IReadOnlyList<IComponent> children, int width, ChildLines? previous)
+    {
+        // A snapshot: a child's render may add or remove siblings.
+        var rendered = new IComponent[children.Count];
+        for (var index = 0; index < rendered.Length; index++) rendered[index] = children[index];
+        var parts = new IReadOnlyList<string>[rendered.Length];
+        var total = 0;
+        for (var index = 0; index < rendered.Length; index++) { parts[index] = rendered[index].Render(width); total += parts[index].Count; }
+        if (previous is not null && previous.Width == width && previous.Children.Count == rendered.Length)
+        {
+            var same = true;
+            for (var index = 0; same && index < rendered.Length; index++)
+                same = ReferenceEquals(rendered[index], previous.Children[index]) && SameLines(parts[index], previous.Parts[index]);
+            if (same) return previous;
+        }
+        var lines = new string[total]; var offset = 0;
+        foreach (var part in parts) for (var index = 0; index < part.Count; index++) lines[offset++] = part[index];
+        return new ChildLines(width, rendered, parts, lines);
+    }
+
+    /// <summary>Dispatches a mouse event to the child of a vertical child layout that covers its row.</summary>
+    public TuiMouseDispatchResult? DispatchMouse(TuiMouseEvent mouseEvent)
+    {
+        var childY = 0;
+        for (var index = 0; index < Children.Count; index++)
+        {
+            var height = Parts[index].Count;
+            if (mouseEvent.Y >= childY && mouseEvent.Y < childY + height)
+                return Mouse.Dispatch(Children[index], mouseEvent with { Y = mouseEvent.Y - childY, Height = height });
+            childY += height;
+        }
+        return null;
+    }
+}
+
 /// <summary>A component that stacks its children vertically.</summary>
 public class Container : IComponent, IMouseHandler
 {
     public List<IComponent> Children { get; protected set; } = [];
-    private (int Width, List<(IComponent Component, int Height)> Children)? mouseLayout;
+    private ChildLines? childLines;
     public virtual void AddChild(IComponent component) => Children.Add(component);
     public virtual void RemoveChild(IComponent component) => Children.Remove(component);
     public virtual void Clear() => Children = [];
@@ -70,32 +133,17 @@ public class Container : IComponent, IMouseHandler
     public virtual TuiMouseEventResult? HandleMouse(TuiMouseEvent mouseEvent)
     {
         if (mouseEvent.Y < 0 || mouseEvent.Y >= mouseEvent.Height) return null;
-        var children = mouseLayout is { } layout && layout.Width == mouseEvent.Width ? layout.Children :
-            Children.Select(component => (component, component.Render(mouseEvent.Width).Count)).ToList();
-        var childY = 0;
-        foreach (var (child, height) in children)
-        {
-            if (mouseEvent.Y >= childY && mouseEvent.Y < childY + height)
-            {
-                var result = Mouse.Dispatch(child, mouseEvent with { Y = mouseEvent.Y - childY, Height = height });
-                if (result is { Focus: true } && this is IInputHandler) return result with { FocusTarget = this };
-                return result;
-            }
-            childY += height;
-        }
-        return null;
+        var layout = childLines is { } cached && cached.Width == mouseEvent.Width ? cached : ChildLines.Render(Children, mouseEvent.Width, null);
+        var result = layout.DispatchMouse(mouseEvent);
+        if (result is { Focus: true } && this is IInputHandler) return result with { FocusTarget = this };
+        return result;
     }
-    public virtual List<string> Render(int width)
+    /// <summary>The children's lines, stacked. Returns the same cached list while the children and their output are unchanged;
+    /// a subclass that modifies the result must copy it first.</summary>
+    public virtual IReadOnlyList<string> Render(int width)
     {
-        var lines = new List<string>(); var children = new List<(IComponent, int)>();
-        foreach (var child in Children.ToArray())
-        {
-            var childLines = child.Render(width);
-            children.Add((child, childLines.Count));
-            lines.AddRange(childLines);
-        }
-        mouseLayout = (width, children);
-        return lines;
+        childLines = ChildLines.Render(Children, width, childLines);
+        return childLines.Lines;
     }
 }
 
@@ -203,6 +251,9 @@ public abstract partial class TuiBase : Container, ITui
     private readonly List<Func<string, TuiInputListenerResult?>> inputListeners = [];
     public Action? OnDebug { get; set; }
     private bool renderRequested, immediateRenderScheduled;
+    // Whether a render request since the last frame may have changed component output. Only RequestViewRender() leaves it clear,
+    // so a renderer may reuse the previous frame's output. An int so a request from another thread is never lost to a frame.
+    private int contentChanged = 1;
     private IDisposable? renderTimer;
     private long lastRenderAt;
     private const int MinRenderIntervalMs = 16;
@@ -289,6 +340,8 @@ public abstract partial class TuiBase : Container, ITui
 
     private void SetFocusInternal(IComponent? component, bool clearRestore)
     {
+        // Focused components draw a cursor, so a focus change must not reuse earlier output.
+        MarkContentChanged();
         var previous = focusedComponent; var next = component;
         var previousOverlay = previous is null ? null : overlayStack.FirstOrDefault(entry => entry.Component == previous && IsOverlayVisible(entry));
         var nextIsOverlay = next is not null && overlayStack.Any(entry => entry.Component == next);
@@ -509,9 +562,15 @@ public abstract partial class TuiBase : Container, ITui
         AfterTerminalStop(preserveScreen);
     }
 
+    private void MarkContentChanged() => Volatile.Write(ref contentChanged, 1);
+    /// <summary>Whether component output may have changed since the last frame; clears the flag for the frame being rendered.</summary>
+    [System.Diagnostics.CodeAnalysis.Experimental("PISHARP_TUI001")]
+    protected bool ConsumeContentChanged() => Interlocked.Exchange(ref contentChanged, 0) != 0;
+
     public void RenderNow(bool force = false)
     {
         if (force) ResetRenderState();
+        MarkContentChanged();
         renderRequested = false; CancelRenderTimer();
         lastRenderAt = Stopwatch.GetTimestamp();
         DoRender();
@@ -520,6 +579,14 @@ public abstract partial class TuiBase : Container, ITui
     public void RequestRender(bool force = false)
     {
         if (force) { ResetRenderState(); RequestImmediateRender(); return; }
+        MarkContentChanged();
+        RequestViewRender();
+    }
+
+    /// <summary>Requests a frame for a change that leaves component output unchanged, such as a scroll position.</summary>
+    [System.Diagnostics.CodeAnalysis.Experimental("PISHARP_TUI001")]
+    protected void RequestViewRender()
+    {
         if (renderRequested) return;
         renderRequested = true;
         Loop.NextTick(ScheduleRender);
@@ -527,6 +594,7 @@ public abstract partial class TuiBase : Container, ITui
 
     private void RequestImmediateRender()
     {
+        MarkContentChanged();
         CancelRenderTimer();
         renderRequested = true;
         if (immediateRenderScheduled) return;
@@ -712,7 +780,7 @@ public abstract partial class TuiBase : Container, ITui
         {
             var (width, _, _, maxHeight) = ResolveOverlayLayout(entry.Options, 0, termWidth, termHeight);
             var overlayLines = ResolveFakeCursors(entry.Component.Render(width));
-            if (maxHeight is { } mh && overlayLines.Count > mh) overlayLines = overlayLines.Take(mh).ToList();
+            if (maxHeight is { } mh && overlayLines.Count > mh) overlayLines.RemoveRange(mh, overlayLines.Count - mh);
             var (_, row, col, _) = ResolveOverlayLayout(entry.Options, overlayLines.Count, termWidth, termHeight);
             entry.Bounds = new(row, col, width, overlayLines.Count);
             rendered.Add((entry, overlayLines, row, col, width));
@@ -739,11 +807,12 @@ public abstract partial class TuiBase : Container, ITui
     /// <summary>Resolves fake cursor markers to reverse video. When the hardware cursor is shown, a fake cursor directly after
     /// <see cref="CursorMarker"/> is dropped because the terminal cursor is drawn there. Fake cursors of components without focus
     /// have no <see cref="CursorMarker"/> and stay visible.</summary>
-    protected List<string> ResolveFakeCursors(List<string> lines)
+    protected List<string> ResolveFakeCursors(IReadOnlyList<string> lines)
     {
         var result = new List<string>(lines.Count);
-        foreach (var line in lines)
+        for (var index = 0; index < lines.Count; index++)
         {
+            var line = lines[index];
             if (!line.Contains(FakeCursorStart, StringComparison.Ordinal)) { result.Add(line); continue; }
             var resolved = showHardwareCursor ? FocusedFakeCursor.Replace(line, "$1$2", 1) : line;
             result.Add(resolved.Replace(FakeCursorStart, "\u001b[7m", StringComparison.Ordinal).Replace(FakeCursorEnd, "\u001b[27m", StringComparison.Ordinal));

@@ -134,7 +134,7 @@ internal static class Sync152TuiTests
     private sealed class Lines(params string[] lines) : IComponent
     {
         public List<string> Values { get; } = [.. lines];
-        public List<string> Render(int width) => [.. Values];
+        public IReadOnlyList<string> Render(int width) => [.. Values];
         public void Invalidate() { }
     }
     private sealed class RecordingTerminal : ITerminal

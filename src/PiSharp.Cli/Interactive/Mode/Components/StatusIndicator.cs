@@ -82,7 +82,7 @@ internal sealed class IdleStatus : IComponent
         // No cached state to invalidate.
     }
 
-    public List<string> Render(int width)
+    public IReadOnlyList<string> Render(int width)
     {
         var emptyLine = new string(' ', Math.Max(0, width));
         return [emptyLine, emptyLine];

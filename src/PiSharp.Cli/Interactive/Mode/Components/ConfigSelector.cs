@@ -226,7 +226,7 @@ internal sealed partial class ConfigSelectorComponent
 
         public void Invalidate() { }
 
-        public List<string> Render(int width)
+        public IReadOnlyList<string> Render(int width)
         {
             var title = theme.Bold(writeScope == "project" ? "Project Local Resources" : "Global Resources");
             var sep = theme.Fg("muted", " · ");
@@ -406,7 +406,7 @@ internal sealed partial class ConfigSelectorComponent
 
         public void Invalidate() { }
 
-        public List<string> Render(int width)
+        public IReadOnlyList<string> Render(int width)
         {
             var lines = new List<string>();
 

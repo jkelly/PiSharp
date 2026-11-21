@@ -210,7 +210,7 @@ internal sealed partial class FooterComponent : IComponent
         return sessionStats;
     }
 
-    public List<string> Render(int width)
+    public IReadOnlyList<string> Render(int width)
     {
         var stateModel = session.StateModel;
         var (_, _, _, _, _, _, usageTotals, latestCacheHitRate, contextUsage) = GetSessionStats();

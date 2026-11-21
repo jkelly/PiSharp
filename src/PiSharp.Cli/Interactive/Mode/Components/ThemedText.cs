@@ -22,7 +22,7 @@ internal sealed class ThemedText(Func<string> build, int paddingX = 1, int paddi
         stale = true;
     }
 
-    public override List<string> Render(int width)
+    public override IReadOnlyList<string> Render(int width)
     {
         if (stale)
         {

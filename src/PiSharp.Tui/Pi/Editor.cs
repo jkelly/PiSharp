@@ -274,7 +274,7 @@ public partial class Editor : IEditorComponent, IFocusable, IMouseHandler
     protected virtual string RenderTopBorder(int width, int hidden) => (BorderColor ?? (s => s))(hidden > 0 ? CreateScrollBorder("↑", hidden, width) : TextUtils.Repeat("─", width));
     protected virtual string RenderBottomBorder(int width, int hidden) => (BorderColor ?? (s => s))(hidden > 0 ? CreateScrollBorder("↓", hidden, width) : TextUtils.Repeat("─", width));
 
-    public virtual List<string> Render(int width)
+    public virtual IReadOnlyList<string> Render(int width)
     {
         var maxPadding = Math.Max(0, (width - 1) / 2);
         var padX = Math.Min(paddingX, maxPadding);

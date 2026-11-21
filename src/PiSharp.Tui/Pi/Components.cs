@@ -1,4 +1,4 @@
-// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/tui/src/components/text.ts, truncated-text.ts, box.ts, spacer.ts,
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/tui/src/components/text.ts, truncated-text.ts, box.ts, spacer.ts,
 // loader.ts, cancellable-loader.ts, input.ts, select-list.ts.
 namespace PiSharp.Tui.Pi;
 
@@ -27,7 +27,7 @@ public class Text : IComponent
     public void SetPaddingX(int value) { paddingX = value; Invalidate(); }
     public virtual void Invalidate() { cachedText = null; cachedWidth = null; cachedLines = null; }
 
-    public virtual List<string> Render(int width)
+    public virtual IReadOnlyList<string> Render(int width)
     {
         if (cachedLines is not null && cachedText == text && cachedWidth == width) return cachedLines;
         if (string.IsNullOrEmpty(text) || TextUtils.JsTrim(text).Length == 0)
@@ -55,7 +55,7 @@ public class Text : IComponent
 public sealed class TruncatedText(string text, int paddingX = 0, int paddingY = 0) : IComponent
 {
     public void Invalidate() { }
-    public List<string> Render(int width)
+    public IReadOnlyList<string> Render(int width)
     {
         var result = new List<string>(); var empty = new string(' ', Math.Max(0, width));
         for (var i = 0; i < paddingY; i++) result.Add(empty);
@@ -76,54 +76,46 @@ public class Box : IComponent, IMouseHandler
     private int paddingX;
     private readonly int paddingY;
     private Func<string, string>? bg;
-    private (List<string> ChildLines, int Width, string? BgSample, List<string> Lines)? cache;
-    private (int Width, List<(IComponent Component, int Height)> Children)? mouseLayout;
+    private (IReadOnlyList<string> ChildLines, int Width, string? BgSample, List<string> Lines)? cache;
+    private ChildLines? childLines;
 
     public Box(int paddingX = 1, int paddingY = 1, Func<string, string>? bg = null) { this.paddingX = paddingX; this.paddingY = paddingY; this.bg = bg; }
-    public void AddChild(IComponent component) { Children.Add(component); cache = null; }
-    public void RemoveChild(IComponent component) { if (Children.Remove(component)) cache = null; }
-    public void Clear() { Children = []; cache = null; }
+    public void AddChild(IComponent component) { Children.Add(component); InvalidateCache(); }
+    public void RemoveChild(IComponent component) { if (Children.Remove(component)) InvalidateCache(); }
+    public void Clear() { Children = []; InvalidateCache(); }
+    // Don't invalidate here: the background sample taken in Render() detects the change.
     public void SetBgFn(Func<string, string>? value) => bg = value;
-    public void SetPaddingX(int value) { paddingX = value; cache = null; }
-    public virtual void Invalidate() { cache = null; foreach (var child in Children.ToArray()) child.Invalidate(); }
+    public void SetPaddingX(int value) { paddingX = value; InvalidateCache(); }
+    private void InvalidateCache() { cache = null; childLines = null; }
+    public virtual void Invalidate() { InvalidateCache(); foreach (var child in Children.ToArray()) child.Invalidate(); }
 
     public TuiMouseEventResult? HandleMouse(TuiMouseEvent mouseEvent)
     {
         var contentWidth = Math.Max(1, mouseEvent.Width - paddingX * 2);
         var contentY = mouseEvent.Y - paddingY; var contentX = mouseEvent.X - paddingX;
         if (contentY < 0 || contentX < 0 || contentX >= contentWidth) return null;
-        var children = mouseLayout is { } layout && layout.Width == contentWidth ? layout.Children :
-            Children.Select(component => (component, component.Render(contentWidth).Count)).ToList();
-        var childY = 0;
-        foreach (var (child, height) in children)
-        {
-            if (contentY >= childY && contentY < childY + height)
-                return Mouse.Dispatch(child, mouseEvent with { X = contentX, Y = contentY - childY, Width = contentWidth, Height = height });
-            childY += height;
-        }
-        return null;
+        var layout = childLines is { } cached && cached.Width == contentWidth ? cached : ChildLines.Render(Children, contentWidth, null);
+        return layout.DispatchMouse(mouseEvent with { X = contentX, Y = contentY, Width = contentWidth });
     }
 
-    public virtual List<string> Render(int width)
+    public virtual IReadOnlyList<string> Render(int width)
     {
         if (Children.Count == 0) return [];
         var contentWidth = Math.Max(1, width - paddingX * 2);
         var leftPad = new string(' ', paddingX);
-        var childLines = new List<string>(); var mouseChildren = new List<(IComponent, int)>();
-        foreach (var child in Children.ToArray())
-        {
-            var lines = child.Render(contentWidth);
-            mouseChildren.Add((child, lines.Count)); childLines.AddRange(lines);
-        }
-        mouseLayout = (contentWidth, mouseChildren);
-        if (childLines.Count == 0) return [];
+        // Keep the child lines unpadded: unchanged children keep their line list, so the cache check below is one identity
+        // comparison. Padding here would create new strings every frame.
+        childLines = ChildLines.Render(Children, contentWidth, childLines);
+        var lines = childLines.Lines;
+        if (lines.Count == 0) return [];
+        // Check if the background changed by sampling its output.
         var bgSample = bg?.Invoke("test");
-        if (cache is { } c && c.Width == width && c.BgSample == bgSample && c.ChildLines.SequenceEqual(childLines, StringComparer.Ordinal)) return c.Lines;
-        var result = new List<string>();
+        if (cache is { } c && ReferenceEquals(c.ChildLines, lines) && c.Width == width && c.BgSample == bgSample) return c.Lines;
+        var result = new List<string>(lines.Count + paddingY * 2);
         for (var i = 0; i < paddingY; i++) result.Add(ApplyBg("", width));
-        foreach (var line in childLines) result.Add(ApplyBg(leftPad + line, width));
+        foreach (var line in lines) result.Add(ApplyBg(leftPad + line, width));
         for (var i = 0; i < paddingY; i++) result.Add(ApplyBg("", width));
-        cache = (childLines, width, bgSample, result);
+        cache = (lines, width, bgSample, result);
         return result;
     }
 
@@ -140,7 +132,7 @@ public sealed class Spacer(int lines = 1) : IComponent
     private int lines = lines;
     public void SetLines(int value) => lines = value;
     public void Invalidate() { }
-    public List<string> Render(int width) => Enumerable.Repeat("", Math.Max(0, lines)).ToList();
+    public IReadOnlyList<string> Render(int width) => Enumerable.Repeat("", Math.Max(0, lines)).ToList();
 }
 
 public sealed record LoaderIndicatorOptions(IReadOnlyList<string>? Frames = null, int? IntervalMs = null);
@@ -164,7 +156,7 @@ public class Loader : Text, IDisposableComponent
         SetIndicator(indicator);
     }
 
-    public override List<string> Render(int width) { var lines = new List<string> { "" }; lines.AddRange(base.Render(width)); return lines; }
+    public override IReadOnlyList<string> Render(int width) { var lines = new List<string> { "" }; lines.AddRange(base.Render(width)); return lines; }
     public void Start() { UpdateDisplay(); RestartAnimation(); }
     public void Stop() { interval?.Dispose(); interval = null; }
     public virtual void Dispose() => Stop();
@@ -383,7 +375,7 @@ public sealed class Input : IComponent, IFocusable, IInputHandler, IMouseHandler
 
     public void Invalidate() { }
 
-    public List<string> Render(int width)
+    public IReadOnlyList<string> Render(int width)
     {
         var available = width - TextUtils.VisibleWidth(prompt);
         if (available <= 0) return [TextUtils.TruncateToWidth(prompt, width, "")];
@@ -460,7 +452,7 @@ public sealed class SelectList : IComponent, IInputHandler, IMouseHandler
 
     private static string SingleLine(string text) => TextUtils.JsTrim(System.Text.RegularExpressions.Regex.Replace(text, "[\r\n]+", " "));
 
-    public List<string> Render(int width)
+    public IReadOnlyList<string> Render(int width)
     {
         var lines = new List<string>();
         if (filtered.Count == 0) { lines.Add(theme.NoMatch("  No matching commands")); return lines; }

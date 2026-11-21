@@ -361,7 +361,7 @@ internal sealed partial class LoginDialogComponent
 
         public void Invalidate() { }
 
-        public List<string> Render(int width)
+        public IReadOnlyList<string> Render(int width)
         {
             var available = width - TextUtils.VisibleWidth(Prompt);
             if (available <= 0) return [TextUtils.TruncateToWidth(Prompt, width, "")];

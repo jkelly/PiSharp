@@ -48,7 +48,7 @@ public sealed class SettingsList : IComponent, IInputHandler, IMouseHandler
         if (index != -1) selectedIndex = index;
     }
     public void Invalidate() => submenu?.Invalidate();
-    public List<string> Render(int width) => submenu?.Render(width) ?? RenderMain(width);
+    public IReadOnlyList<string> Render(int width) => submenu?.Render(width) ?? RenderMain(width);
     private List<SettingItem> DisplayItems => searchEnabled ? filtered : items;
 
     private List<string> RenderMain(int width)
@@ -214,7 +214,7 @@ public sealed class Image : IComponent
     public int? ImageId => imageId;
     public void Invalidate() { cachedLines = null; cachedWidth = null; }
 
-    public List<string> Render(int width)
+    public IReadOnlyList<string> Render(int width)
     {
         if (cachedLines is not null && cachedWidth == width) return cachedLines;
         var maxWidth = Math.Max(1, Math.Min(width - 2, options.MaxWidthCells ?? 60));

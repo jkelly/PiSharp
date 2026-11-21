@@ -110,7 +110,7 @@ internal sealed class ArminComponent : IComponent, IDisposableComponent
 
     public void Invalidate() => cachedWidth = 0;
 
-    public List<string> Render(int width)
+    public IReadOnlyList<string> Render(int width)
     {
         if (width == cachedWidth && cachedVersion == gridVersion) return cachedLines;
 
