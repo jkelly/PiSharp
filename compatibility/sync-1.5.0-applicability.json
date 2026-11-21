@@ -10731,9 +10731,7 @@
       "pisharp": [
         "src/PiSharp.Durable/Harness/Generation.cs",
         "src/PiSharp.Durable/Harness/Tool.cs",
-        "src/PiSharp.Durable/Harness/Live.cs",
-        "tests/PiSharp.Durable.Tests/Harness/HarnessToolsCases.cs",
-        "tests/PiSharp.Durable.Tests/Compat/CompatCases.cs"
+        "src/PiSharp.Durable/Harness/Live.cs"
       ],
       "release": "1.5.0",
       "notes": "PiSharp has pi.tool version 2 and pi.generation version 1 (Tool.cs:54, Generation.cs:39), and Generation.cs:720 still answers unoffered calls without a task. Both version bumps are record compatibility changes: PiSharp 1.2.0.x leaves such tasks blocked. Depends on durable.after-tool-every-result.",
@@ -10760,6 +10758,23 @@
           "tests/PiSharp.Durable.Tests/Harness/HarnessChatDifferentialCases.cs: unavailable-tool",
           "tests/PiSharp.Durable.Tests/Harness/HarnessToolsDifferentialCases.cs: round"
         ]
+      },
+      "historicalPisharp": [
+        "src/PiSharp.Durable/Harness/Generation.cs",
+        "src/PiSharp.Durable/Harness/Tool.cs",
+        "src/PiSharp.Durable/Harness/Live.cs",
+        "tests/PiSharp.Durable.Tests/Harness/HarnessToolsCases.cs",
+        "tests/PiSharp.Durable.Tests/Compat/CompatCases.cs"
+      ],
+      "currentImplementation": {
+        "mapping": "compatibility/gap-status-2026-11-08.json",
+        "id": "durable.unoffered-tool-calls",
+        "sourceStatus": "source-implemented",
+        "runtimeStatus": "pending-integrated-validation",
+        "note": "The Pi Durable 1.6.0 port moved pi.tool to version 4 and pi.generation to version 3, so the authored case that reserves a stored version 2 task now names version 4. The v1.5.0 release evidence keeps the case name it ran under; the replacement names the current authored case, not a passing execution.",
+        "testReplacements": {
+          "tests/PiSharp.Durable.Tests/HarnessNestedToolsCases.cs: reserves-a-stored-version-2-task-under-version-3-and-runs-it-as-a-model-issued-call": "tests/PiSharp.Durable.Tests/HarnessNestedToolsCases.cs: reserves-a-stored-version-2-task-under-version-4-and-runs-it-as-a-model-issued-call"
+        }
       }
     },
     {

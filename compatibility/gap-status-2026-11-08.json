@@ -2965,15 +2965,38 @@
       "testReplacements": {
         "tests/PiSharp.ExtensionParity.Tests/Sync150RuntimeCases.cs: sync150.pi-runtime-manifest-pins-undici-and-keeps-pi-1.2.0": "tests/PiSharp.ExtensionParity.Tests/Sync150RuntimeCases.cs: sync150.pi-runtime-manifest-pins-undici-and-pi-1.5.0"
       }
+    },
+    {
+      "id": "durable.unoffered-tool-calls",
+      "historicalStatus": "ported",
+      "sourceStatus": "source-implemented",
+      "runtimeStatus": "pending-integrated-validation",
+      "reports": [
+        "AI_DOCS/agent-reports/sync-1.6.0-durable-core.md"
+      ],
+      "sourcePaths": [
+        "src/PiSharp.Durable/Harness/Generation.cs",
+        "src/PiSharp.Durable/Harness/Tool.cs",
+        "src/PiSharp.Durable/Harness/Live.cs"
+      ],
+      "testPaths": [
+        "tests/PiSharp.Durable.Tests/HarnessNestedToolsCases.cs",
+        "tests/PiSharp.Durable.Tests/Harness/HarnessToolsCases.cs",
+        "tests/PiSharp.Durable.Tests/Compat/CompatCases.cs"
+      ],
+      "disposition": "The Pi Durable 1.6.0 port moved pi.tool to version 4 and pi.generation to version 3, so the authored case that reserves a stored version 2 task now names version 4. The v1.5.0 release evidence keeps the case name it ran under; the replacement names the current authored case, not a passing execution.",
+      "testReplacements": {
+        "tests/PiSharp.Durable.Tests/HarnessNestedToolsCases.cs: reserves-a-stored-version-2-task-under-version-3-and-runs-it-as-a-model-issued-call": "tests/PiSharp.Durable.Tests/HarnessNestedToolsCases.cs: reserves-a-stored-version-2-task-under-version-4-and-runs-it-as-a-model-issued-call"
+      }
     }
   ],
   "summary": {
     "changes": 37,
     "baselineRows": 56,
     "durableFiles": 20,
-    "additionalRows": 1,
+    "additionalRows": 2,
     "sourceStatuses": {
-      "source-implemented": 111,
+      "source-implemented": 112,
       "implemented-with-retained-native-difference": 3
     }
   }

@@ -77,6 +77,7 @@ const groups = {
   corpus: group(['J1', 'X1', 'packaging-readiness'], ['tests/PiSharp.Chord.Tests/Schema/FullDeclarations.cs', 'tests/PiSharp.Chord.Tests/Schema/Proofs.cs', 'tests/PiSharp.Chord.Tests/Schema/CorpusCases.cs'], ['tests/PiSharp.Chord.Tests/Schema/CorpusCases.cs'], 'Full tables/jobs/real-host corpus source is present. Frozen recorded/schema/store artifacts remain original; comparison execution is pending.'),
   evals: group(['R9'], ['tools/PiSharp.Evals/Harness.cs', 'tools/PiSharp.Evals/Plan.cs', 'tools/PiSharp.Evals/Report.cs', 'tools/PiSharp.Evals/StagedRuntime.cs'], ['tests/PiSharp.Evals.Tests'], 'Offline staged runner implemented; live executable/container providers remain explicit opt-in and were not exercised by MAP.'),
   ci: group(['I13'], ['.github/workflows/core.yml', '.github/workflows/gap-regressions.yml', 'tools/ci/gap-suites.json', 'tools/ci/run_gap_suites.py'], ['tools/ci/test_gap_runner.py', 'tools/ci/validation-manifest.test.mjs'], 'Workflow/source checks do not establish a successful hosted three-OS or full integrated run.'),
+  recordVersions: group(['sync-1.6.0-durable-core'], ['src/PiSharp.Durable/Harness/Generation.cs', 'src/PiSharp.Durable/Harness/Tool.cs', 'src/PiSharp.Durable/Harness/Live.cs'], ['tests/PiSharp.Durable.Tests/HarnessNestedToolsCases.cs', 'tests/PiSharp.Durable.Tests/Harness/HarnessToolsCases.cs', 'tests/PiSharp.Durable.Tests/Compat/CompatCases.cs'], 'The Pi Durable 1.6.0 port moved pi.tool to version 4 and pi.generation to version 3, so the authored case that reserves a stored version 2 task now names version 4. The v1.5.0 release evidence keeps the case name it ran under; the replacement names the current authored case, not a passing execution.'),
   capture: group(['V04'], ['tools/DurableFixtures150/capture.mjs', 'tools/DurableFixtures150/worker.mjs'], ['tests/PiSharp.Durable150.Capture.Tests'], 'New bounded genuine v1.5.0 captures are separate from preserved historical corpora; C# full-scenario replay and all OS/provider/recovery coverage are not implied.'),
 };
 
@@ -144,6 +145,15 @@ export function buildStatus() {
     const mapped = merge(...spec.groups);
     return { upstream, historicalStatus: historical.status, sourceStatus:'source-implemented', runtimeStatus:pending, ...mapped, ...(spec.sourcePaths ? {sourcePaths:spec.sourcePaths}:{}), ...(spec.disposition ? {disposition:spec.disposition}:{}) };
   });
+  // Ported rows outside the baseline whose authored test was renamed by later work. The row's historical evidence keeps the
+  // old case name; testReplacements names the current case, which is source evidence only (runtimeStatus stays pending).
+  const additionalRows=[{id:'bridge.undici-gondolin-advisories',historicalStatus:'ported',sourceStatus:'source-implemented',runtimeStatus:pending,...merge('overlay'),testReplacements:{
+      'tests/PiSharp.ExtensionParity.Tests/Sync150RuntimeCases.cs: sync150.pi-runtime-manifest-pins-undici-and-keeps-pi-1.2.0':'tests/PiSharp.ExtensionParity.Tests/Sync150RuntimeCases.cs: sync150.pi-runtime-manifest-pins-undici-and-pi-1.5.0'
+    },disposition:'The approved current Node runtime uses Pi 1.5.0 while retaining the undici 8.12.3 override. Historical Pi 1.2.0 release choice and test reference remain preserved; this replacement names the current authored test, not a passing execution.'},
+    {id:'durable.unoffered-tool-calls',historicalStatus:'ported',sourceStatus:'source-implemented',runtimeStatus:pending,...merge('recordVersions'),testReplacements:{
+      'tests/PiSharp.Durable.Tests/HarnessNestedToolsCases.cs: reserves-a-stored-version-2-task-under-version-3-and-runs-it-as-a-model-issued-call':'tests/PiSharp.Durable.Tests/HarnessNestedToolsCases.cs: reserves-a-stored-version-2-task-under-version-4-and-runs-it-as-a-model-issued-call'
+    }}];
+  const counted=[...changes,...baselineRows,...durableFiles,...additionalRows];
   return {
     schemaVersion:1, updatedOn:'2026-11-08', productBaseline:register.productCommit,
     upstreamRelease:{version:'1.5.0',commit:'f9a26365568127461c47a07a37dcb42c140a3ac5'}, upstreamCandidate:register.upstreamCandidate,
@@ -162,10 +172,8 @@ export function buildStatus() {
       'CLR explicit drafts, immutable copies and scheduling differ from JavaScript proxy revocation, ownedSlice and microtask-count assertions.',
       'Final integrated suites, stable-source receipts, new capture consumers, package-only consumers and SQL latency measurements remain separate gates. Preliminary worker results do not close them.'
     ], changes, baselineRows, durableFiles,
-    additionalRows:[{id:'bridge.undici-gondolin-advisories',historicalStatus:'ported',sourceStatus:'source-implemented',runtimeStatus:pending,...merge('overlay'),testReplacements:{
-      'tests/PiSharp.ExtensionParity.Tests/Sync150RuntimeCases.cs: sync150.pi-runtime-manifest-pins-undici-and-keeps-pi-1.2.0':'tests/PiSharp.ExtensionParity.Tests/Sync150RuntimeCases.cs: sync150.pi-runtime-manifest-pins-undici-and-pi-1.5.0'
-    },disposition:'The approved current Node runtime uses Pi 1.5.0 while retaining the undici 8.12.3 override. Historical Pi 1.2.0 release choice and test reference remain preserved; this replacement names the current authored test, not a passing execution.'}],
-    summary:{changes:changes.length,baselineRows:baselineRows.length,durableFiles:durableFiles.length,additionalRows:1,sourceStatuses:Object.fromEntries([...new Set([...changes,...baselineRows,...durableFiles].map(x=>x.sourceStatus))].map(status=>[status,[...changes,...baselineRows,...durableFiles].filter(x=>x.sourceStatus===status).length+(status==='source-implemented'?1:0)]))},
+    additionalRows,
+    summary:{changes:changes.length,baselineRows:baselineRows.length,durableFiles:durableFiles.length,additionalRows:additionalRows.length,sourceStatuses:Object.fromEntries([...new Set(counted.map(x=>x.sourceStatus))].map(status=>[status,counted.filter(x=>x.sourceStatus===status).length]))},
   };
 }
 
@@ -174,7 +182,8 @@ export function validateStatus(status) {
   assert.equal(status.baselineRows.length,56);
   assert.equal(status.changes.length,37);
   assert.equal(status.durableFiles.length,20);
-  assert.equal(status.additionalRows.length,1);
+  assert.equal(status.additionalRows.length,2);
+  assert.equal(status.summary.additionalRows,status.additionalRows.length);
   assert.equal(Object.values(status.summary.sourceStatuses).reduce((sum,count)=>sum+count,0),status.changes.length+status.baselineRows.length+status.durableFiles.length+status.additionalRows.length);
   for(const entries of [status.changes,status.baselineRows,status.durableFiles,status.additionalRows]) {
     assert.equal(new Set(entries.map(row=>row.id??row.upstream)).size,entries.length);
