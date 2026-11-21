@@ -50,11 +50,11 @@ internal static class AppStartTests
                 ownerToken = (await File.ReadAllTextAsync(app.OwnerTokenFile)).Trim();
                 client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", ownerToken);
                 Check(await client.GetStringAsync("/private") == "private" && requested == 1, "owner token did not authenticate");
-                var issued = await app.Sessions.IssueAsync(new() { ["kind"] = "user", ["id"] = "persistent" }, "device", SessionKind.Device, false, Context);
+                var issued = await app.SignIns.IssueAsync(new() { ["kind"] = "user", ["id"] = "persistent" }, "device", SignInKind.Device, false, Context);
                 token = issued.Token;
                 var seq = app.Store.LastSeq;
-                for (var i = 0; i < 5; i++) Check(await app.Sessions.VerifyAsync(token, Context) is not null, "issued session failed verification");
-                Check(app.Store.LastSeq == seq, "session verification wrote lastUsed more than once a minute");
+                for (var i = 0; i < 5; i++) Check(await app.SignIns.VerifyAsync(token, Context) is not null, "issued sign-in failed verification");
+                Check(app.Store.LastSeq == seq, "sign-in verification wrote lastUsed more than once a minute");
                 var serial = new Uri(app.OwnerLink); var oneTime = serial.Fragment[1..];
                 using var browser = new HttpClient(new HttpClientHandler { UseCookies = false }) { BaseAddress = app.Listening };
                 using var post = await browser.PostAsync("/_chord/owner", new StringContent(new JsonObject { ["token"] = oneTime }.ToJsonString(), Encoding.UTF8, "application/json"));
@@ -65,14 +65,14 @@ internal static class AppStartTests
                 try { await app.CloseAsync(ChordContext.WithAbortSignal(cancelled.Token, Context)); } catch (OperationCanceledException) { }
                 await app.CloseAsync(Context);
                 var persisted = await File.ReadAllBytesAsync(app.Layout.StoreFile);
-                Check(!Encoding.UTF8.GetString(persisted).Contains(token, StringComparison.Ordinal), "plaintext session token was stored in SQLite");
+                Check(!Encoding.UTF8.GetString(persisted).Contains(token, StringComparison.Ordinal), "plaintext sign-in token was stored in SQLite");
             }
             await using (var app = await App.StartServerAsync(Options(), Context))
             {
-                Check(await app.Sessions.VerifyAsync(token, Context) is { } principal && principal["id"]!.GetValue<string>() == "persistent", "persistent session did not survive restart");
-                Check((await File.ReadAllTextAsync(app.OwnerTokenFile)).Trim() == ownerToken, "same owner did not reuse its file session after restart");
-                await app.Sessions.RevokeAsync(token.Split('.')[0], Context);
-                Check(await app.Sessions.VerifyAsync(token, Context) is null, "revoked session still authenticates");
+                Check(await app.SignIns.VerifyAsync(token, Context) is { } principal && principal["id"]!.GetValue<string>() == "persistent", "persistent sign-in did not survive restart");
+                Check((await File.ReadAllTextAsync(app.OwnerTokenFile)).Trim() == ownerToken, "same owner did not reuse its file sign-in after restart");
+                await app.SignIns.RevokeAsync(token.Split('.')[0], Context);
+                Check(await app.SignIns.VerifyAsync(token, Context) is null, "revoked sign-in still authenticates");
             }
             var missing = Path.Combine(root, "missing-root");
             try { await App.StartServerAsync(Options(missing), Context); throw new InvalidOperationException("missing required root was accepted"); }
@@ -83,35 +83,35 @@ internal static class AppStartTests
         finally { if (Directory.Exists(root)) Directory.Delete(root, true); }
     }
 
-    public static async Task SessionExpiryAndEphemeralLinks()
+    public static async Task SignInExpiryAndEphemeralLinks()
     {
-        var root = Path.GetFullPath(Path.Combine(Environment.CurrentDirectory, "artifacts", "app-sessions", Guid.NewGuid().ToString("N")));
+        var root = Path.GetFullPath(Path.Combine(Environment.CurrentDirectory, "artifacts", "app-sign-ins", Guid.NewGuid().ToString("N")));
         Directory.CreateDirectory(root);
         try
         {
             await using var store = await Layout.OpenStoreAsync(Path.Combine(root, "store.sqlite"), Context);
             await using var host = Hosts.Create(new() { Store = store, Principal = new() { ["kind"] = "server" }, OnError = _ => { } });
-            var clock = new SessionClock(); await using var sessions = new Sessions("test-session-key", maxEphemeral: 2, time: clock);
-            await host.LoadAsync([new("app.sessions", sessions.Facet)], Context); await sessions.AttachAsync(host, Context);
+            var clock = new SignInClock(); await using var signIns = new SignIns("test-sign-in-key", maxEphemeral: 2, time: clock);
+            await host.LoadAsync([new("app.sign-ins", signIns.Facet)], Context); await signIns.AttachAsync(host, Context);
             var principal = new JsonObject { ["kind"] = "user", ["id"] = "one" };
-            var first = await sessions.IssueAsync(principal, "device", SessionKind.Device, true, Context);
+            var first = await signIns.IssueAsync(principal, "device", SignInKind.Device, true, Context);
             Check(first.Cookie.Contains("Secure", StringComparison.Ordinal) && first.Cookie.Contains("HttpOnly", StringComparison.Ordinal) && first.Cookie.Contains("SameSite=Strict", StringComparison.Ordinal), "persistent cookie security attributes missing");
-            Check(await sessions.VerifyAsync("__proto__.bad", Context) is null && await sessions.VerifyAsync("constructor.bad", Context) is null && await sessions.VerifyAsync(new string('x', 10000), Context) is null, "malicious token ID was accepted");
+            Check(await signIns.VerifyAsync("__proto__.bad", Context) is null && await signIns.VerifyAsync("constructor.bad", Context) is null && await signIns.VerifyAsync(new string('x', 10000), Context) is null, "malicious token ID was accepted");
             clock.Now += TimeSpan.FromMinutes(2); var seq = store.LastSeq;
-            Check(await sessions.VerifyAsync(first.Token, Context) is not null && store.LastSeq == seq + 1, "last-used touch was not persisted");
-            seq = store.LastSeq; await sessions.VerifyAsync(first.Token, Context); Check(store.LastSeq == seq, "same-minute touch wrote again");
-            clock.Now += Sessions.IdleExpiry + TimeSpan.FromMilliseconds(1);
-            Check(await sessions.VerifyAsync(first.Token, Context) is null, "unused session did not expire after 400 days");
-            var a = await sessions.IssueAsync(principal, "a", SessionKind.Ephemeral, false, Context);
-            var b = await sessions.IssueAsync(principal, "b", SessionKind.Ephemeral, false, Context);
-            var c = await sessions.IssueAsync(principal, "c", SessionKind.Ephemeral, false, Context);
-            Check(await sessions.VerifyAsync(a.Token, Context) is null && await sessions.VerifyAsync(b.Token, Context) is not null, "ephemeral cap did not evict oldest");
-            Check((await sessions.ListAsync(Context)).All(info => info.Kind != SessionKind.Ephemeral), "ephemeral sessions were listed");
+            Check(await signIns.VerifyAsync(first.Token, Context) is not null && store.LastSeq == seq + 1, "last-used touch was not persisted");
+            seq = store.LastSeq; await signIns.VerifyAsync(first.Token, Context); Check(store.LastSeq == seq, "same-minute touch wrote again");
+            clock.Now += SignIns.IdleExpiry + TimeSpan.FromMilliseconds(1);
+            Check(await signIns.VerifyAsync(first.Token, Context) is null, "unused sign-in did not expire after 400 days");
+            var a = await signIns.IssueAsync(principal, "a", SignInKind.Ephemeral, false, Context);
+            var b = await signIns.IssueAsync(principal, "b", SignInKind.Ephemeral, false, Context);
+            var c = await signIns.IssueAsync(principal, "c", SignInKind.Ephemeral, false, Context);
+            Check(await signIns.VerifyAsync(a.Token, Context) is null && await signIns.VerifyAsync(b.Token, Context) is not null, "ephemeral cap did not evict oldest");
+            Check((await signIns.ListAsync(Context)).All(info => info.Kind != SignInKind.Ephemeral), "ephemeral sign-ins were listed");
             Check(!c.Cookie.Contains("Max-Age", StringComparison.Ordinal), "ephemeral cookie has persistent lifetime");
             clock.Advance(TimeSpan.FromMinutes(1));
-            Check(await sessions.VerifyAsync(b.Token, Context) is null && await sessions.VerifyAsync(c.Token, Context) is null, "ephemeral session without initial link did not expire");
+            Check(await signIns.VerifyAsync(b.Token, Context) is null && await signIns.VerifyAsync(c.Token, Context) is null, "ephemeral sign-in without initial link did not expire");
 
-            using var temporary = new EphemeralSessions(2, TimeSpan.FromMinutes(1), clock);
+            using var temporary = new EphemeralSignIns(2, TimeSpan.FromMinutes(1), clock);
             temporary.Issue("linked", Secrets.HashToken("secret"), principal);
             var close = temporary.LinkOpened("linked")!; clock.Advance(TimeSpan.FromMinutes(2));
             Check(temporary.Verify("linked", "secret") is not null, "active ephemeral link expired");
@@ -119,7 +119,7 @@ internal static class AppStartTests
             var reclose = temporary.LinkOpened("linked")!; clock.Advance(TimeSpan.FromMinutes(1));
             Check(temporary.Verify("linked", "secret") is not null, "reconnect failed to cancel expiry");
             reclose(); clock.Advance(TimeSpan.FromMinutes(1));
-            Check(temporary.Verify("linked", "secret") is null, "last link close did not expire session");
+            Check(temporary.Verify("linked", "secret") is null, "last link close did not expire sign-in");
         }
         finally { if (Directory.Exists(root)) Directory.Delete(root, true); }
     }
@@ -221,7 +221,7 @@ internal static class AppStartTests
         }
         finally { release.TrySetResult(); if (Directory.Exists(root)) Directory.Delete(root, true); }
     }
-    private sealed class SessionClock : TimeProvider
+    private sealed class SignInClock : TimeProvider
     {
         private readonly List<ManualTimer> timers = [];
         public DateTimeOffset Now { get; set; } = new(2026, 1, 1, 0, 0, 0, TimeSpan.Zero);
@@ -233,7 +233,7 @@ internal static class AppStartTests
             Now += delta;
             foreach (var timer in timers.ToArray()) timer.Fire();
         }
-        private sealed class ManualTimer(SessionClock clock, TimerCallback callback, object? state) : ITimer
+        private sealed class ManualTimer(SignInClock clock, TimerCallback callback, object? state) : ITimer
         {
             private DateTimeOffset? due;
             private TimeSpan period;

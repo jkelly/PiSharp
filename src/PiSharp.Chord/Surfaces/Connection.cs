@@ -1,4 +1,4 @@
-// Pi b4afdddf44e059c67ccf5097e5317d913521b470 (MIT): packages/chord/src/surfaces/connection.ts.
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/chord/src/surfaces/connection.ts.
 namespace PiSharp.Chord.Surfaces;
 
 public enum ConnectionState { Connecting, Connected, Waiting }
@@ -50,11 +50,14 @@ public sealed class ConnectionOptions
 {
     public required Func<ISocketEvents, ILoopLink> Open { get; init; }
     public required Action<ConnectionState> OnState { get; init; }
+    /// <summary>Asked after a close, while the next attempt goes ahead, one question at a time (closes while one is open ask nothing
+    /// more); <c>false</c> stops the loop (and closes that attempt). A failure counts as <c>true</c> (unreachable, try again).</summary>
     public required Func<Task<bool>> CanRetry { get; init; }
     public required ILoopEnvironment Environment { get; init; }
 }
 
-/// <summary>One current connection, bounded reconnect backoff and a wake grace period for queued pings.</summary>
+/// <summary>One current connection, bounded reconnect backoff, a wake grace period for queued pings, an immediate retry for a drop soon
+/// after a wake, and <c>CanRetry</c> asked beside the next attempt, never before it.</summary>
 public sealed class ConnectionLoop : IDisposable
 {
     public const double RetryInitialMilliseconds = 250, RetryMaximumMilliseconds = 5000,
@@ -67,7 +70,10 @@ public sealed class ConnectionLoop : IDisposable
     private Attempt? current;
     private Action? cancelRetry, cancelStale;
     private int failures;
-    private bool deciding, wokeWhileDeciding, stopped;
+    // When the last wake came, until a close used it (the next attempt then goes at once).
+    private double? wokenAt;
+    // Whether CanRetry is being asked: one question at a time, its answer covering the closes meanwhile.
+    private bool asking, stopped;
 
     private ConnectionLoop(ConnectionOptions options)
     { this.options = options; environment = options.Environment; removeWake = environment.OnWake(Wake); }
@@ -113,26 +119,46 @@ public sealed class ConnectionLoop : IDisposable
             cancelStale?.Invoke(); cancelStale = null;
             if (stopped) return;
             options.OnState(ConnectionState.Waiting);
-            if (attempt.OpenedAt is { } opened && environment.Now() - opened >= StableMilliseconds) failures = 0;
-            deciding = true; wokeWhileDeciding = false;
-            _ = DecideAsync();
+            var now = environment.Now();
+            if (attempt.OpenedAt is { } opened && now - opened >= StableMilliseconds) failures = 0;
+            // Once per wake: a server down would otherwise be retried in a tight loop.
+            var woke = wokenAt is { } at && now - at <= StaleMilliseconds + WakeGraceMilliseconds;
+            wokenAt = null;
+            Schedule(woke);
+            Ask();
         }
     }
 
-    private async Task DecideAsync()
+    // Asks CanRetry unless a question is open (its answer covers this close too). Beside the next attempt, not before it: the app's
+    // check (a page asks the server's base over HTTP) may take seconds on a network just woken, and its "no" stops the loop whenever it
+    // comes.
+    private void Ask()
+    {
+        if (asking) return;
+        asking = true;
+        _ = AskAsync();
+    }
+
+    private async Task AskAsync()
     {
         bool retry;
         try { retry = await options.CanRetry().ConfigureAwait(false); }
         catch { retry = true; }
         lock (gate)
         {
-            deciding = false;
-            if (stopped) return;
-            if (!retry) { Stop(); return; }
-            var backoff = Math.Min(RetryMaximumMilliseconds, RetryInitialMilliseconds * Math.Pow(2, Math.Min(failures++, 30)));
-            var delay = wokeWhileDeciding ? 0 : environment.Online() ? backoff : RetryMaximumMilliseconds;
-            cancelRetry = environment.After(delay, Connect);
+            asking = false;
+            if (!retry) Stop();
         }
+    }
+
+    // Schedules the next attempt: at once (now), else after the backoff (offline: the longest pause).
+    private void Schedule(bool now)
+    {
+        if (stopped) return;
+        var backoff = Math.Min(RetryMaximumMilliseconds, RetryInitialMilliseconds * Math.Pow(2, Math.Min(failures++, 30)));
+        // Offline an attempt fails at once; the online wake retries sooner than this.
+        var delay = now ? 0 : environment.Online() ? backoff : RetryMaximumMilliseconds;
+        cancelRetry = environment.After(delay, Connect);
     }
 
     private void Wake()
@@ -140,8 +166,8 @@ public sealed class ConnectionLoop : IDisposable
         lock (gate)
         {
             if (stopped) return;
+            wokenAt = environment.Now();
             if (cancelRetry is { } retry) { retry(); cancelRetry = null; Connect(); return; }
-            if (deciding) { wokeWhileDeciding = true; return; }
             var attempt = current;
             if (attempt?.OpenedAt is null) return;
             cancelStale?.Invoke();
@@ -165,8 +191,12 @@ public sealed class ConnectionLoop : IDisposable
             stopped = true;
             removeWake(); cancelRetry?.Invoke(); cancelRetry = null;
             cancelStale?.Invoke(); cancelStale = null;
-            current?.CancelTimeout?.Invoke();
-            current?.Link?.Close(); current = null;
+            // An attempt the stop ended is reported Waiting (its last state): a late "no" after the next link opened leaves no
+            // Connected behind it.
+            var attempt = current;
+            attempt?.CancelTimeout?.Invoke();
+            attempt?.Link?.Close(); current = null;
+            if (attempt is not null) options.OnState(ConnectionState.Waiting);
         }
     }
     public void Dispose() => Stop();

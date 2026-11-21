@@ -1,4 +1,4 @@
-// Pi b4afdddf44e059c67ccf5097e5317d913521b470 (MIT): packages/chord/src/sync/client.ts.
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/chord/src/sync/client.ts.
 using System.Runtime.CompilerServices;
 using System.Text.Json.Nodes;
 using PiSharp.Chord.Data;
@@ -40,7 +40,8 @@ public sealed record UploadOptions
     public required string SessionId { get; init; }
     public required string Device { get; init; }
     public required IStore Source { get; init; }
-    public required ISessionSyncStore Store { get; init; }
+    /// <summary>Only <c>PutBatchAsync</c> is used: an upload creates slots and never reads the remote.</summary>
+    public required ISessionSyncUploader Store { get; init; }
     public required ISyncStateStore State { get; init; }
     public required ChordContext Context { get; init; }
     public long? Epoch { get; init; }
@@ -89,6 +90,10 @@ public static class SessionSync
         return outbox.ReadAsync(after, limit, context);
     }
 
+    /// <summary>Uploads what the outbox holds after the head shared with the remote, a slot at a time. Where the outbox does not reach
+    /// back to that head, the next slot is an archive slot (the store's export at its head): a session's first slot when its outbox was
+    /// turned on late or trimmed, or the slot after the remote's head when the outbox was turned off (dropping commits not uploaded yet)
+    /// and on again, so the history goes on from a full state.</summary>
     public static async Task<UploadResult> UploadSessionAsync(UploadOptions options)
     {
         var (sessionId, device, source, remote, state, context) =
@@ -105,7 +110,7 @@ public static class SessionSync
             IAsyncEnumerable<ReadOnlyMemory<byte>> body;
             ExportedSnapshot? snapshot = null;
             var archive = false;
-            if (synced == SyncRemote.LogStart && outbox.Floor > 0)
+            if (outbox.Floor > synced)
             {
                 snapshot = await ExportSnapshotAsync(source, context).ConfigureAwait(false);
                 to = snapshot.To;
@@ -285,25 +290,29 @@ public static class SessionSync
             {
                 context.AbortSignal?.ThrowIfCancellationRequested();
                 if (body.To <= At()) continue;
-                var bytes = await body.Read().ConfigureAwait(false) ?? throw new HistoryUnavailableError(At());
-                await state.SetAsync(sessionId, new SyncState(At(), body.To), context).ConfigureAwait(false);
-                if (body.Archive)
+                var opened = await body.Read().ConfigureAwait(false) ?? throw new HistoryUnavailableError(At());
+                await ReadBodyAsync(opened, async bytes =>
                 {
-                    if (target is not null || local is not LocalCopy.Empty empty) throw new HistoryUnavailableError(At());
-                    target = await Tables.ImportStoreAsync(empty.Backend,
-                        SyncCodec.DecodeSnapshot(bytes, context.AbortSignal ?? default), context,
-                        new StoreOptions { Outbox = true }).ConfigureAwait(false);
-                }
-                else
-                {
-                    if (target is null)
+                    await state.SetAsync(sessionId, new SyncState(At(), body.To), context).ConfigureAwait(false);
+                    if (body.Archive)
                     {
-                        if (local is not LocalCopy.Empty empty) throw new InvalidOperationException("A store copy has no target");
-                        target = await Tables.OpenStoreAsync(empty.Backend, context, new StoreOptions { Outbox = true }).ConfigureAwait(false);
+                        // An archive restores a whole store: only into an empty backend.
+                        if (target is not null || local is not LocalCopy.Empty empty) throw new HistoryUnavailableError(At());
+                        target = await Tables.ImportStoreAsync(empty.Backend,
+                            SyncCodec.DecodeSnapshot(bytes, context.AbortSignal ?? default), context,
+                            new StoreOptions { Outbox = true }).ConfigureAwait(false);
                     }
-                    if (target is not ChordStore chord) throw new ArgumentException("Batch replay requires a ChordStore", nameof(options));
-                    await ApplyBodyAsync(chord, bytes, context).ConfigureAwait(false);
-                }
+                    else
+                    {
+                        if (target is null)
+                        {
+                            if (local is not LocalCopy.Empty empty) throw new InvalidOperationException("A store copy has no target");
+                            target = await Tables.OpenStoreAsync(empty.Backend, context, new StoreOptions { Outbox = true }).ConfigureAwait(false);
+                        }
+                        if (target is not ChordStore chord) throw new ArgumentException("Batch replay requires a ChordStore", nameof(options));
+                        await ApplyBodyAsync(chord, bytes, context).ConfigureAwait(false);
+                    }
+                }, context.AbortSignal ?? default).ConfigureAwait(false);
                 await state.SetAsync(sessionId, new SyncState(At()), context).ConfigureAwait(false);
             }
             if (target is null)
@@ -328,6 +337,38 @@ public static class SessionSync
         }
     }
 
+    // Runs `read` over a remote's body, then releases the body: also when `read` stopped early or never started it (upstream readBody,
+    // whose iterator.return() is the enumerator's DisposeAsync here). A body may hold a file or a connection until its enumerator is
+    // disposed, which `await foreach` does only once it started; a body that is itself disposable is disposed too.
+    private static async Task ReadBodyAsync(IAsyncEnumerable<ReadOnlyMemory<byte>> body,
+        Func<IAsyncEnumerable<ReadOnlyMemory<byte>>, Task> read, CancellationToken cancellationToken)
+    {
+        var enumerator = body.GetAsyncEnumerator(cancellationToken);
+        try { await read(new OpenedBody(enumerator)).ConfigureAwait(false); }
+        finally
+        {
+            await enumerator.DisposeAsync().ConfigureAwait(false);
+            if (body is IAsyncDisposable asyncDisposable) await asyncDisposable.DisposeAsync().ConfigureAwait(false);
+            else if (body is IDisposable disposable) disposable.Dispose();
+        }
+    }
+
+    // The one enumerator ReadBodyAsync opened, handed to its reader: the reader's own `await foreach` neither opens a second one nor
+    // disposes this one (ReadBodyAsync does, whatever the reader did).
+    private sealed class OpenedBody(IAsyncEnumerator<ReadOnlyMemory<byte>> enumerator) : IAsyncEnumerable<ReadOnlyMemory<byte>>, IAsyncEnumerator<ReadOnlyMemory<byte>>
+    {
+        private bool taken;
+        public IAsyncEnumerator<ReadOnlyMemory<byte>> GetAsyncEnumerator(CancellationToken cancellationToken = default)
+        {
+            if (taken) throw new InvalidOperationException("A sync body is a single-pass stream");
+            taken = true;
+            return this;
+        }
+        public ReadOnlyMemory<byte> Current => enumerator.Current;
+        public ValueTask<bool> MoveNextAsync() => enumerator.MoveNextAsync();
+        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+    }
+
     public static async Task<long?> FoldSessionAsync(FoldOptions options)
     {
         var (sessionId, remote, scratch, context) = (options.SessionId, options.Store, options.Scratch, options.Context);
@@ -343,8 +384,9 @@ public static class SessionSync
             await using var snapshot = await ExportSnapshotAsync(restored.Store, context).ConfigureAwait(false);
             await remote.PutSnapshotAsync(sessionId, snapshot.To, snapshot.Body, context).ConfigureAwait(false);
             await snapshot.DisposeAsync().ConfigureAwait(false);
+            // Every slot the snapshot covers, also those before an archive slot the restore started from.
             await remote.FoldBatchesAsync(sessionId,
-                [.. history.Batches.Where(batch => batch.To <= snapshot.To).Select(batch => batch.After)], context).ConfigureAwait(false);
+                [.. listing.Batches.Where(batch => batch.To <= snapshot.To && !batch.Folded).Select(batch => batch.After)], context).ConfigureAwait(false);
             await remote.DeleteSnapshotsAsync(sessionId, [.. listing.Snapshots.Where(at => at < snapshot.To)], context).ConfigureAwait(false);
             return snapshot.To;
         }

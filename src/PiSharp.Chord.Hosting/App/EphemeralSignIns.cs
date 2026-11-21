@@ -1,10 +1,10 @@
-// Pi b4afdddf44e059c67ccf5097e5317d913521b470 (MIT): packages/chord/src/node/app/ephemeral-sessions.ts.
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/chord/src/node/app/ephemeral-sign-ins.ts.
 using System.Text.Json.Nodes;
 
 namespace PiSharp.Chord.Hosting.App;
 
-/// <summary>Bounded, process-local sessions. No link for a minute ends a session, including its first link.</summary>
-public sealed class EphemeralSessions : IDisposable
+/// <summary>Bounded, process-local sign-ins. No link for a minute ends a sign-in, including its first link.</summary>
+public sealed class EphemeralSignIns : IDisposable
 {
     private sealed class Entry(string hash, JsonObject principal)
     {
@@ -19,7 +19,7 @@ public sealed class EphemeralSessions : IDisposable
     private readonly TimeSpan grace;
     private readonly TimeProvider time;
     private bool disposed;
-    public EphemeralSessions(int maximum = 1000, TimeSpan? grace = null, TimeProvider? time = null)
+    public EphemeralSignIns(int maximum = 1000, TimeSpan? grace = null, TimeProvider? time = null)
     {
         if (maximum < 1) throw new ArgumentOutOfRangeException(nameof(maximum));
         this.maximum = maximum; this.grace = grace ?? TimeSpan.FromMinutes(1); this.time = time ?? TimeProvider.System;
