@@ -1,4 +1,4 @@
-// Pi b4afdddf44e059c67ccf5097e5317d913521b470 (MIT): packages/chord/src/store/host-data.ts
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/chord/src/store/host-data.ts
 using System.Text.Json.Nodes;
 using PiSharp.Chord.Contracts;
 using PiSharp.Chord.Data;
@@ -255,12 +255,11 @@ internal static partial class StoreInternal
         var chord = (ChordStore)store;
         var kind = ContractsInternal.KindOfKey(key);
         var owners = new HashSet<string>(StringComparer.Ordinal);
-        static string OwnerOf(string table) => table[..table.IndexOf(':')];
         foreach (var record in chord.Catalog.Values)
-            if (HostColumn(record, kind) is not null) owners.Add(OwnerOf(record.Table));
+            if (HostColumn(record, kind) is not null) owners.Add(TableOwner(record.Table));
         if (archive is not null)
         {
-            foreach (var table in archive.Tables) owners.Add(OwnerOf(table.Write.Table));
+            foreach (var table in archive.Tables) owners.Add(TableOwner(table.Write.Table));
             foreach (var document in archive.Documents) owners.Add(document.Record.Owner);
         }
         var rows = await chord.ReadAsync(executor => executor.AllAsync($"SELECT DISTINCT owner FROM {StoreTables.Documents} WHERE host = ?", key), context).ConfigureAwait(false);
@@ -293,10 +292,14 @@ internal static partial class StoreInternal
         return counts;
     }
 
-    internal static async Task<HostDataCounts> DeleteHostDataAsync(IStore store, string key, HostCommit commit, ChordContext context)
+    /// <summary>Deletes the data of host <paramref name="key"/> (canonical) in one commit: every record whose host is the key retired,
+    /// every row holding it in a <c>host(...)</c> column of its kind deleted; with <paramref name="owners"/>, only the records and tables
+    /// of those owners (object types; upstream <c>deleteHostData</c>).</summary>
+    internal static async Task<HostDataCounts> DeleteHostDataAsync(IStore store, string key, HostCommit commit, ChordContext context,
+        IReadOnlySet<string>? owners = null)
     {
         HostDataCounts counts = new(0, 0);
-        await CommitHostOperationAsync(store, async (step, writes) => counts = await RemoveHostDataAsync(step, key, writes).ConfigureAwait(false), commit, context).ConfigureAwait(false);
+        await CommitHostOperationAsync(store, async (step, writes) => counts = await RemoveHostDataAsync(step, key, writes, owners).ConfigureAwait(false), commit, context).ConfigureAwait(false);
         return counts;
     }
 
@@ -359,13 +362,17 @@ internal static partial class StoreInternal
         return placed.Count;
     }
 
-    private static async Task<HostDataCounts> RemoveHostDataAsync(Step step, string key, List<StoreWrite> writes)
+    /// <summary>Retires the records of host <paramref name="key"/> and deletes its rows in <paramref name="step"/>, recording the writes;
+    /// with <paramref name="owners"/>, only those owners' records and tables. Returns the counts (upstream <c>removeHostData</c>).</summary>
+    private static async Task<HostDataCounts> RemoveHostDataAsync(Step step, string key, List<StoreWrite> writes, IReadOnlySet<string>? owners = null)
     {
-        var records = await DocumentEngine.ListHostRecordsAsync(step, key, 0, MaxSafeIntegerLong).ConfigureAwait(false);
+        var all = await DocumentEngine.ListHostRecordsAsync(step, key, 0, MaxSafeIntegerLong).ConfigureAwait(false);
+        IReadOnlyList<DocumentRecord> records = owners is null ? all : [.. all.Where(record => owners.Contains(record.Owner))];
         foreach (var record in records) writes.AddRange(await RetireDocument(record.Id, record.Revision).ApplyAsync(step).ConfigureAwait(false));
         long rows = 0;
         foreach (var (table, column) in HostTables(step, ContractsInternal.KindOfKey(key)))
         {
+            if (owners is not null && !owners.Contains(TableOwner(table))) continue;
             var count = await step.RunCountedAsync($"DELETE FROM {Quote(table)} WHERE {Quote(column)} = ?", key).ConfigureAwait(false);
             step.Rows += count;
             rows += count;
@@ -381,6 +388,10 @@ internal static partial class StoreInternal
             if (await step.GetAsync($"SELECT 1 AS found FROM {Quote(table)} WHERE {Quote(column)} = ? LIMIT 1", key).ConfigureAwait(false) is not null) return true;
         return false;
     }
+
+    /// <summary>The owner (object type) of table <paramref name="table"/>, from its SQL name <c>&lt;owner&gt;:&lt;table&gt;</c> (upstream
+    /// <c>tableOwner</c>).</summary>
+    internal static string TableOwner(string table) => table[..table.IndexOf(':')];
 
     private static IEnumerable<(string Table, string Column)> HostTables(Step step, string kind) =>
         step.Records().Select(record => (record.Table, Column: HostColumn(record, kind))).Where(each => each.Column is not null).Select(each => (each.Table, each.Column!));

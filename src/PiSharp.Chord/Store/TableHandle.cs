@@ -1,4 +1,4 @@
-// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/chord/src/next/store/table-handle.ts
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/chord/src/store/table-handle.ts
 //
 // Table handles (slice 6a §6; decision "Query runner"): what self.table(Def) returns, one per attempt and table: reads of committed rows
 // (page, rows, get, count) through the store's guarded reads, and what a transaction's writes to the table are staged with; a handle of an
@@ -41,8 +41,8 @@ public interface ITable
     Task<long> CountAsync(Query query, ChordContext context);
 }
 
-/// <summary>Who owns a table handle: its object (whose transactions alone write it), liveness check and live failure (upstream
-/// <c>TableOwner</c>).</summary>
+/// <summary>Who owns a table handle: its object (whose transactions alone write it), its liveness check and live failure (upstream
+/// <c>TableOwner</c>; its live queries are the store's reads since 1.6.0).</summary>
 internal interface ITableOwner
 {
     /// <summary>The owner's name in refusals.</summary>
@@ -51,20 +51,11 @@ internal interface ITableOwner
     /// <summary>The object's documents: a transaction of another object refuses the handle.</summary>
     object Scope { get; }
 
-    /// <summary>The live queries registered by the owner's active attempts.</summary>
-    LiveQueries Queries => TableOwnerQueries.Get(this);
-
     /// <summary>Throws <c>released</c> once the object ended.</summary>
     void AssertLive();
 
     /// <summary>A row the code cannot read (a <c>json(...)</c> cell, slice 6a §9) fails the owner <c>broken</c> (§1.4).</summary>
     void Fail(ChordError error);
-}
-
-internal static class TableOwnerQueries
-{
-    private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<ITableOwner, LiveQueries> Owners = new();
-    internal static LiveQueries Get(ITableOwner owner) => Owners.GetValue(owner, static _ => new LiveQueries());
 }
 
 internal static partial class StoreInternal
@@ -95,20 +86,8 @@ internal sealed class TableHandle : ITable
 
     public async Task<Page> PageAsync(Query query, long limit, ChordContext context, PageOptions? options = null)
     {
-        Owner.AssertLive();
-        AssertVersion();
-        AssertQuery(query);
-        if (limit < 1 || limit > StoreInternal.MaxSafeInteger) throw DataInternal.Invalid("args", $"{Definition.Name}: limit is a positive integer");
-        var order = query.Order;
-        var after = options?.After is null ? null : StoreInternal.DecodeCursor(Definition, Sql.Table, order, options.After);
-        var statement = Sql.Select(query.Condition, order, after, limit + 1);
-        var stored = (await Store.ReadAsync(executor => executor.AllAsync(statement.Sql, [.. statement.Params]), context).ConfigureAwait(false)).ToList();
-        var more = stored.Count > limit;
-        if (more) stored.RemoveRange((int)limit, stored.Count - (int)limit);
-        var items = stored.Select(row => (IReadOnlyDictionary<string, JsonNode?>)Decode(row, context)).ToList();
-        if (!more) return new Page(items);
-        var last = stored[(int)limit - 1];
-        return new Page(items, StoreInternal.EncodeCursor(Sql.Table, order, [.. order.Columns.Select(column => last[column])]));
+        var page = await StoreInternal.ReadPageAsync(Store, Plan(query, ReadShape.Rows), limit, options?.After, context).ConfigureAwait(false);
+        return new Page([.. page.Stored.Select(row => (IReadOnlyDictionary<string, JsonNode?>)Decode(row, context))], page.Next);
     }
 
     public async IAsyncEnumerable<IReadOnlyDictionary<string, JsonNode?>> Rows(Query query, ChordContext context)
@@ -133,10 +112,7 @@ internal sealed class TableHandle : ITable
 
     public async Task<long> CountAsync(Query query, ChordContext context)
     {
-        Owner.AssertLive();
-        AssertVersion();
-        AssertQuery(query);
-        var statement = Sql.Count(query.Condition);
+        var statement = Plan(query, ReadShape.Count).Count();
         var row = await Store.ReadAsync(executor => executor.GetAsync(statement.Sql, [.. statement.Params]), context).ConfigureAwait(false);
         return row?["count"] is { } count ? (long)StoreInternal.SqliteNumber(count) : 0;
     }
@@ -168,10 +144,17 @@ internal sealed class TableHandle : ITable
         }
     }
 
-    /// <summary>A query of another table is refused (<c>invalid/args</c>).</summary>
-    private void AssertQuery(Query query)
+    /// <summary>The plan of a read of <paramref name="query"/> through this handle, checked: the object is live, the handle's version is
+    /// the store's, the query is of this table and joins nothing (a handle reads its own table's rows; a joined query is a named query's,
+    /// which maps the pair). Its <c>exists</c> are compiled against the store's bindings (upstream <c>#plan</c>).</summary>
+    private ReadPlan Plan(Query query, ReadShape shape)
     {
+        Owner.AssertLive();
+        AssertVersion();
         if (!ReferenceEquals(query?.Table, Definition))
             throw DataInternal.Invalid("args", $"{Owner.Label}: a query of table \"{query?.Table.Name}\" run on \"{Definition.Name}\"");
+        if (query.Joined is not null)
+            throw DataInternal.Invalid("args", $"{Owner.Label}: a joined query is read as a named query, not through a table");
+        return new ReadPlan(query, Sql.Table, Projection.All, shape, Store.ReadIndex);
     }
 }

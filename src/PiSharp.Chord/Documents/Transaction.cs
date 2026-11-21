@@ -1,4 +1,4 @@
-// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/chord/src/next/documents/transaction.ts
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/chord/src/documents/transaction.ts
 //
 // Transactions (§9, R12, R13): drafts of an object's documents, prepared and adopted in one batch, with Chord's own staged changes (job
 // runs, §15), fenced by the token they run under; they run on the object's line (Line.cs). Mappings:
@@ -120,7 +120,8 @@ internal sealed class Transaction : ITx, ILineHolder
     private (IChordStore Store, List<IStagedWrite> Staged)? writes;
     // The tables written, each with its writes and overlay.
     private Dictionary<TableHandle, TableChanges>? tables;
-    private QueryRefresh? queryRefresh;
+    // The refresh of the store's reads over the tables written (slice 14 §3.2); made when the commit stages its writes.
+    private ReadRefresh? queryRefresh;
     private IReadOnlyList<Adoption> committedAdoptions = [];
     private long committedRows;
     // tx reads underway: a callback settling with one is refused (rule 3, as Durable's).
@@ -386,10 +387,13 @@ internal sealed class Transaction : ITx, ILineHolder
             lock (gate) state = TxState.Committed;
             return null;
         }
-        if (tables is { Count: > 0 })
+        if (tables is { Count: > 0 } written)
         {
-            queryRefresh = StoreInternal.RefreshOf(tables.Values.Where(changes => changes.HasWrites).Select(changes => changes.Handle), ChordContext.WithoutAbortSignal(context));
-            if (queryRefresh is not null) store.Staged.Add(queryRefresh.Write);
+            // The reads are chosen and tested in the commit step, after every table write staged so far, and published in the commit's
+            // batch. Staged whether or not a read exists now: one opened while this commit waits is refreshed too.
+            queryRefresh = new ReadRefresh(store.Store.ReadIndex, [.. written.Keys.Select(handle => handle.Sql.Table)],
+                () => [.. written.Values.SelectMany(changes => changes.Changes())], ChordContext.WithoutAbortSignal(context));
+            store.Staged.Add(queryRefresh.Write);
         }
         return StepAsync(store.Store, store.Staged, adoptions);
     }
