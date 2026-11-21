@@ -212,8 +212,8 @@
   "summary": {
     "files": 1311,
     "byStatus": {
-      "no-op": 914,
-      "implementation-pending-validation": 397
+      "no-op": 916,
+      "implementation-pending-validation": 395
     },
     "byWorkPackage": {
       "meta": 787,
@@ -239,7 +239,7 @@
       "upstream-documentation": 52,
       "upstream-app": 746,
       "version-only": 8,
-      "node-runtime-only": 8,
+      "node-runtime-only": 10,
       "example-or-fixture": 35,
       "typescript-only": 15,
       "no-native-delta": 5,
@@ -247,11 +247,10 @@
       "evals-version-only": 1
     },
     "pendingByFinding": {
-      "ported": 371,
-      "already-ported": 17,
-      "pending-package": 9
+      "ported": 378,
+      "already-ported": 17
     },
-    "withPendingParts": 4
+    "withPendingParts": 0
   },
   "rows": [
     {
@@ -28487,10 +28486,7 @@
           "chord-edge",
           "chord-workers"
         ],
-        "finding": "ported",
-        "pendingParts": [
-          "chord-workers"
-        ]
+        "finding": "ported"
       },
       "source": {
         "before": {
@@ -29403,7 +29399,8 @@
       "status": "implementation-pending-validation",
       "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
       "review": {
-        "finding": "pending-package"
+        "finding": "ported",
+        "note": "chord-workers: ObservedLink.End() ends a worker's link at its exit, told as neither lost nor closed; ObservedLink.Ended is awaited before the store wait (src/PiSharp.Chord.Hosting/Workers/ObservedLink.cs)."
       },
       "source": {
         "before": {
@@ -29440,7 +29437,8 @@
       "status": "implementation-pending-validation",
       "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
       "review": {
-        "finding": "pending-package"
+        "finding": "ported",
+        "note": "chord-workers: ProcessWorkerOptions.Store (required) and the settled wait before an exit is published, ProcessWorkerOptions.Admit passed to the route, ProcessWorkerState.Incarnation, ResolvedLink(link, options, opened) (src/PiSharp.Chord.Hosting/Workers/ProcessWorkers.cs). Beyond the upstream lines: a fatal, a link lost before ready and a closed control pipe are published with the exit; a worker whose control pipe closes while its process lives is killed after CloseTimeout."
       },
       "source": {
         "before": {
@@ -31297,9 +31295,6 @@
           "chord-workers"
         ],
         "finding": "ported",
-        "pendingParts": [
-          "chord-workers"
-        ],
         "note": "chord-edge: `TuiScope.on` deferred to chord-workers: needs event members (chord-remote)."
       },
       "source": {
@@ -33614,10 +33609,11 @@
       "reports": [
         "AI_DOCS/agent-reports/sync-1.6.0-chord-workers.md"
       ],
-      "status": "implementation-pending-validation",
-      "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
+      "status": "no-op",
+      "category": "node-runtime-only",
+      "reason": "The grandchild now inherits the forked child's IPC channel (fd 3); a Node IPC handle has no native form (chord-workers).",
       "review": {
-        "finding": "pending-package"
+        "finding": "no-op"
       },
       "source": {
         "before": {
@@ -33654,7 +33650,8 @@
       "status": "implementation-pending-validation",
       "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
       "review": {
-        "finding": "pending-package"
+        "finding": "ported",
+        "note": "chord-workers: the Server kind and Reports contract are native fixtures in tests/PiSharp.Chord.Hosting.Tests/Sync160WorkerCases.cs."
       },
       "source": {
         "before": {
@@ -33691,7 +33688,8 @@
       "status": "implementation-pending-validation",
       "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
       "review": {
-        "finding": "pending-package"
+        "finding": "ported",
+        "note": "chord-workers: the report during startup is the native fixture worker (--worker-160-fixture). The process that keeps its IPC channel open after its exit has no native form."
       },
       "source": {
         "before": {
@@ -34130,10 +34128,11 @@
       "reports": [
         "AI_DOCS/agent-reports/sync-1.6.0-chord-workers.md"
       ],
-      "status": "implementation-pending-validation",
-      "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
+      "status": "no-op",
+      "category": "node-runtime-only",
+      "reason": "The change moves a Node socket file under /tmp so its path fits sun_path on macOS; chord-workers reports it a no-op natively (the native lock case has no socket path).",
       "review": {
-        "finding": "pending-package"
+        "finding": "no-op"
       },
       "source": {
         "before": {
@@ -34170,7 +34169,8 @@
       "status": "implementation-pending-validation",
       "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
       "review": {
-        "finding": "pending-package"
+        "finding": "ported",
+        "note": "chord-workers: the link-end case over ObservedLink (by reflection) in tests/PiSharp.Chord.Hosting.Tests/Sync160WorkerCases.cs."
       },
       "source": {
         "before": {
@@ -34207,7 +34207,8 @@
       "status": "implementation-pending-validation",
       "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
       "review": {
-        "finding": "pending-package"
+        "finding": "ported",
+        "note": "chord-workers: the helper's store and Server additions are the native fixtures of tests/PiSharp.Chord.Hosting.Tests/Sync160WorkerCases.cs."
       },
       "source": {
         "before": {
@@ -34244,7 +34245,8 @@
       "status": "implementation-pending-validation",
       "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
       "review": {
-        "finding": "pending-package"
+        "finding": "ported",
+        "note": "chord-workers: passes admit, the three exit-ordering cases and incarnation in tests/PiSharp.Chord.Hosting.Tests/Sync160WorkerCases.cs. holdNextCommit is internal upstream; the cases hold the commit queue through a public store export. The aborted report is asserted not committed rather than by the unavailable code."
       },
       "source": {
         "before": {
@@ -35015,9 +35017,6 @@
           "chord-workers"
         ],
         "finding": "ported",
-        "pendingParts": [
-          "chord-workers"
-        ],
         "note": "Not covered by the adapted case: the denied state and the per-state sequence. Not ported: the typing case (\"narrows a held and a got reference to the variant's members\")."
       },
       "source": {
@@ -35207,9 +35206,6 @@
           "chord-workers"
         ],
         "finding": "ported",
-        "pendingParts": [
-          "chord-workers"
-        ],
         "note": "chord-edge: the events case (`on`) is deferred to chord-workers; the two admission cases rebind by reconnecting as another principal."
       },
       "source": {
