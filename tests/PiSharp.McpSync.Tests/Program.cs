@@ -50,6 +50,7 @@ internal static partial class Program
         cases.AddRange(Sync150CliCases());
         cases.AddRange(Sync150OwnerDefaultsCases());
         cases.AddRange(Sync152McpCases());
+        cases.AddRange(Sync160McpCases());
         // Linked existing contract cases (tests/PiSharp.Extensions.ContractTests/McpConfigurationTests.cs).
         cases.AddRange(McpConfigurationTests.Cases().Select(item => ("linked." + item.Name, item.Run)));
         var results = new List<object>(); var failures = 0;
