@@ -1,3 +1,6 @@
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/coding-agent/src/core/exec.ts (execCommand's result: stdout, stderr, code,
+// killed, truncated, spawn errors in stderr, maxBuffer), over PiSharp's separated process runner. Admission, ownership and the
+// close protocol have no upstream counterpart.
 using System.Collections.Immutable;
 using PiSharp.Extensions;
 using PiSharp.Extensions.Facade.Execution;
@@ -148,8 +151,31 @@ public sealed class NativeExtensionExecHost : IExtensionExecFacade, IAsyncDispos
         if (receipt.Status == ProcessRunStatus.Exited && receipt.ExitCode != 0 ||
             receipt.Status == ProcessRunStatus.NonZeroExit && receipt.ExitCode == 0)
             throw new IOException("Actual process status and exit code disagree.");
-        var code = receipt.ExitCode ?? 0;
+        var code = ExitCode(receipt.ExitCode, killed, OperatingSystem.IsWindows(), receipt.ShellExitBeforeTimeout is not null);
         return new(result.StandardOutput.Content, result.StandardError.Content, truncated && code == 0 ? 1 : code, killed) { Truncated = truncated };
+    }
+
+    private const int SigKill = 9, SigTerm = 15;
+    /// <summary>The exit code <see cref="WindowsProcessLifetime"/> gives the processes of a job it terminates.</summary>
+    private const int WindowsStopExitCode = 1;
+
+    /// <summary>
+    /// Source exec.ts (#12088): a command ended by a signal has no exit code and reports 128 + the signal number, as a shell does, so a
+    /// timeout, an abort or a crash never reads as success.
+    /// <para>Unix: the runner reaps the command with waitpid and its receipt already holds 128 + the terminating signal. This host stops
+    /// a command (timeout, abort, output over maxBuffer) by killing its process group with SIGKILL at once, where Pi sends SIGTERM and
+    /// SIGKILL five seconds later, so a stopped command reads 137 (Pi: 143, or 137 for a command that ignored SIGTERM); a command
+    /// killed by someone else reads that signal (143 for SIGTERM, 137 for SIGKILL), as in Pi.</para>
+    /// <para>Windows has no signals. A stop terminates the command's job, which ends its processes with exit code 1; Node reports the
+    /// same TerminateProcess as the SIGTERM it was asked to send, so Pi reads 143 there and so does this host. A code other than the
+    /// stop's is the command's own (it ended before the stop took effect), as is the code of a command the runner saw exit before the
+    /// timeout (<paramref name="endedBeforeStop"/>); a command ended by someone else keeps the exit code Windows recorded, as in Pi.</para>
+    /// </summary>
+    internal static int ExitCode(int? receiptCode, bool killed, bool windows, bool endedBeforeStop = false)
+    {
+        if (!killed) return receiptCode ?? 1;
+        if (windows) return receiptCode is null || receiptCode == WindowsStopExitCode && !endedBeforeStop ? 128 + SigTerm : receiptCode.Value;
+        return receiptCode ?? 128 + SigKill;
     }
     // The message names the command as Node's spawn error does; a missing executable or cwd reads ENOENT on every platform.
     private static string SpawnError(NativeExtensionExecInvocation invocation, ProcessRequest request, ProcessDiagnostic launch, int? error) =>
