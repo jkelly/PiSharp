@@ -226,7 +226,7 @@ internal sealed class SteppedSubmenu : Container, IInputHandler
             step.Searchable || step.Layout is not null ? new SelectSubmenuOptions(step.Searchable, step.Layout) : null);
     }
 
-    public override List<string> Render(int width) => activeComponent.Render(width);
+    public override IReadOnlyList<string> Render(int width) => activeComponent.Render(width);
 
     public void HandleInput(string data) => (activeComponent as IInputHandler)?.HandleInput(data);
 

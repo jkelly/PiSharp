@@ -45,7 +45,7 @@ internal static class GapOverlaySnapshotCases
     }
     private sealed class Rows(Action onRender) : IComponent
     {
-        public List<string> Render(int width) { onRender(); return ["overlay"]; }
+        public IReadOnlyList<string> Render(int width) { onRender(); return ["overlay"]; }
         public void Invalidate() { }
     }
     private sealed class QuietTerminal : ITerminal

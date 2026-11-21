@@ -1032,7 +1032,7 @@ internal sealed class EasterEgg3dAnimation : IComponent, IInputHandler, IMouseHa
         ansiCache.Clear();
     }
 
-    public List<string> Render(int width)
+    public IReadOnlyList<string> Render(int width)
     {
         var height = Math.Max(1, tui.Terminal.Rows);
         var foreground = this.foreground;

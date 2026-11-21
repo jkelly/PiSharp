@@ -304,7 +304,7 @@ internal sealed class SessionList : IComponent, IFocusable, IInputHandler
 
     public void Invalidate() { }
 
-    public List<string> Render(int width)
+    public IReadOnlyList<string> Render(int width)
     {
         var lines = new List<string>();
 
@@ -541,7 +541,7 @@ internal sealed class SessionSelectorComponent : Container, IComponent, IFocusab
     {
         private readonly Func<string, string> color = color ?? (s => theme.Fg("border", s));
         public void Invalidate() { }
-        public List<string> Render(int width) => [color(TextUtils.Repeat("─", Math.Max(1, width)))];
+        public IReadOnlyList<string> Render(int width) => [color(TextUtils.Repeat("─", Math.Max(1, width)))];
     }
 
     private sealed class SessionSelectorHeader(SessionScope scope, SortMode sortMode, NameFilter nameFilter, Action requestRender,
@@ -597,7 +597,7 @@ internal sealed class SessionSelectorComponent : Container, IComponent, IFocusab
 
         public void Invalidate() { }
 
-        public List<string> Render(int width)
+        public IReadOnlyList<string> Render(int width)
         {
             var title = scope == SessionScope.Current ? "Resume Session (Current Folder)" : "Resume Session (All)";
             var leftText = theme.Bold(title);

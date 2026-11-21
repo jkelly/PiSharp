@@ -179,7 +179,7 @@ internal sealed class BashExecutionComponent : Container
         private int? cachedWidth;
         private List<string>? cachedLines;
 
-        public List<string> Render(int width)
+        public IReadOnlyList<string> Render(int width)
         {
             if (cachedLines is null || cachedWidth != width)
             {

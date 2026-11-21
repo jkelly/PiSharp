@@ -55,7 +55,7 @@ internal sealed class NodeEditorComponent : IEditorComponent
     private void Send(string method, params JsonNode?[] args) =>
         _ = host.CallComponentAsync(id, method, new JsonArray(args), CancellationToken.None).ContinueWith(static task => _ = task.Exception, TaskScheduler.Default);
 
-    public List<string> Render(int width)
+    public IReadOnlyList<string> Render(int width)
     {
         using var timeout = new CancellationTokenSource(Wait);
         try { return [.. host.RenderComponentAsync(id, width, timeout.Token).WaitAsync(Wait).GetAwaiter().GetResult()]; }

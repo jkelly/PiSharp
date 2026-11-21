@@ -465,7 +465,7 @@ internal sealed partial class InteractiveMode
             mode.ui.RequestRender();
         }
 
-        public List<string> Render(int width) =>
+        public IReadOnlyList<string> Render(int width) =>
             [.. content.Render(width).Select(line => TextUtils.VisibleWidth(line) > width ? TextUtils.TruncateToWidth(line, width, "") : line)];
 
         public void Invalidate() => content.Invalidate();

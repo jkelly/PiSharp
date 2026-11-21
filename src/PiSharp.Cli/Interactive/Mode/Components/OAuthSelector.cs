@@ -161,7 +161,7 @@ internal sealed class OAuthSelectorComponent : Container, IComponent, IFocusable
     private Func<string, double, string>? GetSelectedBrandStyle() => selectedIndex >= 0 && selectedIndex < filteredProviders.Count
         ? ProviderBrand.GetStyle(filteredProviders[selectedIndex].Id) : null;
 
-    public override List<string> Render(int width)
+    public override IReadOnlyList<string> Render(int width)
     {
         if (animationTimer is not null && GetSelectedBrandStyle() is not null) UpdateList();
         return base.Render(width);

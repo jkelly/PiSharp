@@ -28,6 +28,7 @@ internal sealed class AssistantMessageComponent : Container
     private bool hasToolCalls;
     private bool isStreaming;
     private bool contentUpdatePending;
+    private (IReadOnlyList<string> Source, List<string> Lines)? zoneLines;
     private readonly Dictionary<int, bool> thinkingVisibilityOverrides = [];
     /// <summary>The Markdown blocks of the last update. The next update reuses each at the same position for the same kind of content, so
     /// a streamed answer keeps the blocks it already rendered, also once the stream ends.</summary>
@@ -85,15 +86,21 @@ internal sealed class AssistantMessageComponent : Container
         if (lastMessage is not null) UpdateContent(lastMessage);
     }
 
-    public override List<string> Render(int width)
+    public override IReadOnlyList<string> Render(int width)
     {
         if (contentUpdatePending && lastMessage is not null) UpdateContent(lastMessage);
         var lines = base.Render(width);
         if (hasToolCalls || lines.Count == 0) return lines;
 
-        lines[0] = Osc133ZoneStart + lines[0];
-        lines[^1] = Osc133ZoneEnd + Osc133ZoneFinal + lines[^1];
-        return lines;
+        // Container output is shared across frames; copy it once per change instead of mutating it.
+        if (zoneLines is not { } cached || !ReferenceEquals(cached.Source, lines))
+        {
+            var zoned = new List<string>(lines);
+            zoned[0] = Osc133ZoneStart + zoned[0];
+            zoned[^1] = Osc133ZoneEnd + Osc133ZoneFinal + zoned[^1];
+            zoneLines = cached = (lines, zoned);
+        }
+        return cached.Lines;
     }
 
     public void UpdateContent(JsonObject message, bool? isStreaming = null)

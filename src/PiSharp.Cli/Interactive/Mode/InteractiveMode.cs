@@ -23,7 +23,7 @@ internal class ExpandableText : Text, IExpandable
     { collapsed = getCollapsedText; this.expanded = getExpandedText; isExpanded = expanded; }
     public void SetExpanded(bool value) { isExpanded = value; Invalidate(); }
     public override void Invalidate() { base.Invalidate(); stale = true; }
-    public override List<string> Render(int width)
+    public override IReadOnlyList<string> Render(int width)
     {
         if (stale) { stale = false; SetText(isExpanded ? expanded() : collapsed()); }
         return base.Render(width);

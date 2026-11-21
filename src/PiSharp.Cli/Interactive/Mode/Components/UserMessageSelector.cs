@@ -32,7 +32,7 @@ internal sealed class UserMessageList : IComponent, IInputHandler
         // No cached state to invalidate currently
     }
 
-    public List<string> Render(int width)
+    public IReadOnlyList<string> Render(int width)
     {
         var lines = new List<string>();
 
