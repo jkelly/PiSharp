@@ -5,6 +5,10 @@ description: Run Pi's TypeScript and JavaScript extensions in PiSharp through th
 
 PiSharp runs Pi's TypeScript and JavaScript extensions unchanged. It starts Node, loads each extension with Pi's own packages, and connects the extension to the C# session. Write extensions as Pi's [Extensions](https://github.com/earendil-works/pi/blob/v1.5.2/packages/coding-agent/docs/extensions.md) page describes.
 
+:::note[Unreleased 1.6.0 source candidate]
+The source candidate installs exact Pi 1.6.0 packages into a separate `1.6.0-no-default-attribution-v1` cache, pins `undici` to 8.12.4 and regenerates the fallback modules from the pinned 1.6.0 source. `typebox` 1.3.27 and `jiti` 2.7.0 are unchanged. It preserves older caches and explicit extension identities. Three Pi 1.6.0 changes reach extensions: a component's `render()` returns a read-only array, so an extension that changes render output in place must copy it first; an exception thrown by a `pi.events` handler is reported as an extension error; and `pi.exec` reports 128 plus the signal number for a command ended by a signal. Integrated candidate validation is pending. The 1.5.2 runtime details below describe the published PiSharp 1.5.2 release.
+:::
+
 :::note[PiSharp 1.5.2 runtime]
 PiSharp 1.5.2 installs exact Pi 1.5.2 packages into a separate `1.5.2-no-default-attribution-v1` cache and regenerates the fallback modules from the pinned source. It preserves older caches and explicit extension identities. Validation retains explicit suite and platform limitations.
 :::

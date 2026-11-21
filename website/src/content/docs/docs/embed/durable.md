@@ -9,6 +9,10 @@ description: "Build crash-safe agents on PiSharp.Durable: the harness, storage, 
 The durable libraries ship as experimental from PiSharp 1.2.0.1, the members marked "(from 1.2.0.2)" from 1.2.0.2, and those marked "(from 1.5.0)" from 1.5.0. Every public type carries `[Experimental("PISHARP_DURABLE001")]`, and the API may change or be removed in any release without notice. PiSharp 1.5.0 follows `pi-durable` v1.5.0 and breaks code and storage written for 1.2.0.x: see [Upgrading from 1.2.0.x](#upgrading-from-120x).
 :::
 
+:::note[Unreleased 1.6.0 source candidate]
+The source on `main` follows `pi-durable` v1.6.0: signals, tools that park, gates, hooks that start tasks, code-mode namespaces declared by extensions, and image fitting. It is not released, and it breaks some 1.5.2 code and storage. This page describes the published 1.5.2 packages, except [The 1.6.0 source candidate](#the-160-source-candidate).
+:::
+
 ## Install
 
 Add the packages and suppress the experimental diagnostic:
@@ -47,6 +51,170 @@ PiSharp 1.5.0 follows `pi-durable` v1.5.0, which changed the API and the stored 
 - **One-time effects.** The built-in tools are declared with a different key order, so the next turn of a 1.2.0.x conversation records their declarations once more. A model request that was in flight when a 1.2.0.x process died counts as a failed attempt and waits for the retry backoff, instead of being sent again.
 - **Streamed progress is deferred.** Partial answers and tool output are stored about once a second, so a crash loses up to about a second of streamed text. `ProgressSettings.PersistWithinMs = 0` stores each one at once.
 - **The examples were renumbered** to upstream v1.5.0's names (see [Samples](#samples)).
+
+## The 1.6.0 source candidate
+
+The source on `main` follows `pi-durable` v1.6.0. It is unreleased: the packages on NuGet are 1.5.2, and the rest of this page describes them. Build from source to use what this section describes. The [candidate notes](https://github.com/jkelly/PiSharp/blob/main/docs/release-notes/1.6.0.md) list what was tested and what was not.
+
+### What breaks
+
+- **Storage.** `pi.tool` is version 4 and `pi.generation` version 3. A database written by 1.6.0 is not meant to be opened by PiSharp 1.5.2, which would block these tasks (`task_too_old`) and treat a sleep without `until` as due. Keep a copy of a session before you open it with 1.6.0 if you may need to go back.
+- **`RunEndTask` is `HookTask`.** `Define.RunEndTask(task, input)` is `Define.HookTask(task, input)`, with no alias. Rename it in `AfterRun` hooks.
+- **Hook return types.** `GenerationHooks.AfterTools` returns `Task<IReadOnlyList<HookTask>?>`; an existing hook returns null. `GenerationHooks.OnYield` returns `Task<OnYieldResult?>`: an async lambda that returns its continuation still compiles, and `Task.FromResult<JsonValue?>(...)` becomes `Task.FromResult<OnYieldResult?>(...)`.
+- **`Until` is nullable** on `SleepingTaskState` and `TaskGraphState`, because a sleep may wait for signals only.
+- **`Now()` is declared on `IHookApi`.** `ITaskRuntime` inherits it, so callers compile unchanged.
+- **`Inbox.WithdrawQueuedInputsAsync`** has no default reason.
+- **New interface members.** `IToolExecutionApi`, `IHookApi`, `ITx` and `IHarness` gain members. A tool API wrapper that derives from `DelegatingToolExecutionApi` compiles unchanged.
+- **Code-mode namespaces.** `CodemodeNamespace` and `CodemodeToolOptions.Namespaces` are removed, with no fallback. See [Code-mode namespaces](#code-mode-namespaces).
+- **`read` and images.** The durable `read` tool no longer adds "The current model does not support images; it sees a placeholder instead." to its `image` diagnostic. It names the model in `details.imageUnsupportedByModel`.
+- **`durationMs`** of a tool result is the span from the tool task's first run to its result on the harness clock, with hooks, parks, crash downtime and reruns included. It was the time of the last execution attempt.
+
+### Signals
+
+A signal is a typed JSON value delivered to a live task from outside. Define its kind once, with a name, a version and a JSON Schema:
+
+```csharp
+var greeting = Signals.DefineSignal(new SignalDefinition
+{
+    Name = "example.greeting",
+    Version = 1,
+    Schema = (JsonObjectValue)JsonValue.Parse(
+        """{"type":"object","properties":{"text":{"type":"string"}},"required":["text"],"additionalProperties":false}"""),
+});
+```
+
+A task sleeps until a value arrives under a key, with or without a deadline, and reads the value when it wakes:
+
+```csharp
+["work"] = (_, runtime, ctx) =>
+    runtime.CommitAsync((_, _) => NextTaskState.Sleeping(
+        JsonValue.Object([new("phase", "greeted")]), null, [greeting.Key("hello")]), ctx),
+["greeted"] = async (task, runtime, ctx) =>
+{
+    var state = await runtime.ReadSignalAsync(greeting, "hello", ctx);   // Value, or Expired
+    var text = state?.Value is JsonObjectValue value ? ((JsonStringValue)value["text"]).Value : "(none)";
+    await runtime.CommitAsync((_, _) => NextTaskState.Completed(text), ctx);
+},
+```
+
+The host delivers it:
+
+```csharp
+SignalResult result = await harness.SignalAsync(taskId, greeting, "hello", JsonValue.Object([new("text", "hi there")]), context);
+```
+
+| Result | Meaning |
+| --- | --- |
+| `Delivered` | The value is stored in the task. A sleep on its key wakes. |
+| `Duplicate` | The key already has a value. A retried webhook gets this. |
+| `Invalid` | The value does not match the schema. Nothing is stored. |
+| `Closed` | The task has ended. |
+| `NotFound` | There is no such task. |
+
+- A value that arrives before the task sleeps on its key is kept, and the sleep then wakes at once.
+- A key serves one wait: the wake marks it consumed.
+- `ITx.SignalAsync` delivers inside a commit. `ReadSignalAsync` is on `ITaskRuntime`, `IHookApi` and `IToolExecutionApi`.
+- A woken task reads why in its state's `Wake` (`WakeReason`: time, expired, signal or tasks), kept until it commits another checkpoint.
+- A sleep ends at whichever comes first, the deadline or a signal. A sleeping task holds no invocation, and `harness.Wake()` reports it inactive; a sleep without a deadline adds no `At`.
+- A wait may use `JoinPolicy.Any` to resume once one of its tasks ends.
+
+**No PiSharp host delivers signals yet.** `pisharp durable`, the device server and the Web Agent have no endpoint that calls `SignalAsync`. In a hosted session a task parked on a signal is woken only by code in the same process, by its deadline or by an abort.
+
+### Tools that park
+
+A tool's `Execute` may return a park instead of a result. The call then holds no invocation, its slot shows `sleeping` or `waiting`, and `Execute` runs again once it is woken, with `api.Wake` and `api.Checkpoint` set:
+
+```csharp
+Execute = async (arguments, api, ctx) =>
+{
+    var state = await api.ReadSignalAsync(ciResult, "done", ctx);
+    if (state?.Value is JsonObjectValue value)
+        return new ToolExecutionResult { Output = TextOutput($"CI {((JsonStringValue)value["status"]).Value}") };
+    if (state is not null)   // the deadline passed
+        return new ToolExecutionResult { Output = TextOutput("CI never reported"), IsError = true };
+
+    var buildId = Trigger(arguments);
+    return ToolPark.Sleeping(api.Now() + 2 * 60 * 60 * 1000, [ciResult.Key("done")], JsonValue.Object([new("buildId", buildId)]));
+},
+Cancel = async (_, api, ctx) => { /* stop the external work of a parked call that is aborted */ },
+```
+
+`TextOutput`, `Trigger` and `ciResult` stand for your own code. The pieces:
+
+- `ToolPark.Sleeping(until, signals, checkpoint)` sleeps until a time, a signal or both. `ToolPark.Waiting(on, policy, checkpoint)` waits for tasks. A `ToolPark` converts to a `ToolExecutionResult`, so `Execute`'s signature is unchanged.
+- An invalid park, such as one with a result field, ends the call with an `invalid_park` result.
+- `ToolRegistration.Cancel` cleans up the external work of a parked call that is aborted.
+- Wrappers never park: a composite's park that its base did not return is invalid.
+- `api.StartToolAsync(name, arguments, context, new NestedCallOptions { Key = "a" })` starts or finds a nested call without waiting and returns its `TaskId` and `ResultAsync`, so a tool can park on its nested calls. After a wake, nested calls and tasks need explicit keys; `api.CreateTaskAsync` takes a key too.
+- `SubmissionDraft.Input(..., notify: new SubmissionNotify(api.TaskId, "answered"))` delivers the built-in `Signals.SubmissionSettled` signal when the submission settles, so a subagent tool can park until its child conversation answers.
+- `SubmissionDraft.Input(..., onAbort: InputOnAbort.Keep)` keeps an input queued through an abort. The default withdraws it.
+
+### Gates
+
+A `BeforeTool` hook may park a call before it runs. Every wake, every registry publication and every open runs the whole `call` phase again, so the gates installed then decide:
+
+```csharp
+BeforeTool = async (call, api, ctx) =>
+{
+    var state = await api.ReadSignalAsync(approval, key, ctx);
+    if (state is null) return new BeforeToolDecision(Sleep: new GateSleep(until, ImmutableArray.Create(approval.Key(key))));
+    if (state.Expired) return new BeforeToolDecision(Block: "No approval within a day");
+    return IsAllowed(state.Value) ? null : new BeforeToolDecision(Block: "Not approved");
+},
+```
+
+`approval`, `key`, `until` and `IsAllowed` stand for your own code. `IHookApi.Now()` reads the harness clock.
+
+### Hooks that start tasks
+
+`AfterTools` and `OnYield` hooks may return tasks, which run as the generation's children:
+
+```csharp
+AfterTools = (_, _, _, _) => Task.FromResult<IReadOnlyList<HookTask>?>([Define.HookTask(askToGoOn, JsonValue.Null)]),
+OnYield = (_, _, _) => Task.FromResult<OnYieldResult?>(OnYieldResult.Tasks([Define.HookTask(review, JsonValue.Null)])),
+```
+
+- An `AfterTools` task ends the run by completing with an `AfterToolsDecision`, or answers it with a steer.
+- `OnYield` tasks decide whether an answer stands while the run's inputs stay open. Once all are terminal, the first in creation order that completed with a valid continuation (`YieldDecision`) continues the run, unless a user message or a reset was queued meanwhile.
+
+### Code-mode namespaces
+
+Namespaces come from extensions, not from name prefixes. Declare one on the extension that brings the tools:
+
+```csharp
+new Extension
+{
+    Name = "github",
+    Namespace = new ToolNamespace("mcp__github", "GitHub issues and pull requests"),
+    Tools = [/* ... */],
+}
+```
+
+- A tool that several extensions name belongs to the first.
+- A tool whose name starts with a server prefix belongs to no namespace unless its extension declares one.
+- The `codemode` section lists every namespace of a selected extension, also one without tools yet, as its name and one-line description, without tool counts.
+- `DurableCodemode.NamespacesOf(extensions)` maps tool names to their namespaces.
+
+To migrate, move each `CodemodeNamespace` from `CodemodeToolOptions.Namespaces` into the extension that brings those tools, as a `ToolNamespace(name, description, instructions)`.
+
+### Image fitting
+
+`FitImages` in `PiSharp.Durable.Tools` fits the images that enter a conversation to its model's limits before they are stored:
+
+```csharp
+var images = ImageProcessors.CreateThreaded(BuiltinImageCodec.Instance);
+registry.Install(FitImages.CreateExtension(images));   // fits the results of every tool the model calls
+
+var photo = await FitImages.FitImageAsync(bytes, "image/png", CodingTools.ImageLimitsOf(model), images);
+if (photo is FittedImage.Fitted fitted) { /* submit fitted.Image, with fitted.Notes */ }
+```
+
+- `FitImages.CreateExtension(processor)` is an `afterTool` hook for tool results, such as MCP tools and code mode's `image()`.
+- `FitImageAsync` and `FitAsync` fit a host's own input before it is submitted. An image that cannot be prepared is left out with a note (`FittedImage.Omitted`).
+- `ImageLimits.Of(model)`, also `CodingTools.ImageLimitsOf(model)`, resolves a model's limits as `read` does.
+- `BuiltinImageCodec` reads and writes PNG. Pass `SkiaImageCodec.Instance` for JPEG or WebP input.
+
+**No PiSharp host installs image fitting yet.** `pisharp durable`, the device host and the Web Agent store the images that tools return as they are.
 
 ## How it fits together
 
@@ -481,6 +649,8 @@ AfterRun = async (run, api, hookContext) =>
 },
 ```
 
+In the unreleased 1.6.0 source candidate `Define.RunEndTask` is `Define.HookTask`, and `AfterTools` and `OnYield` hooks may return tasks too: see [Hooks that start tasks](#hooks-that-start-tasks).
+
 `IHookApi.EntryAsync` and `ITaskRuntime.EntriesAsync` read the same history. A tool round whose result asks for a handoff no longer ends the run: the reset entry is written and the same run continues in the new context, so the submission settles with the eventual answer. Example `32-tests-after-edits` runs a project's tests after every run that edited files.
 
 ## Your own documents
@@ -714,6 +884,18 @@ PiSharp 1.2.0.x numbered them as upstream v1.2.0 did: v1.5.0 dropped `04-chord-s
 | `32-tests-after-edits` | (from 1.5.0) An `AfterRun` hook runs the tests after every run that edited files; a failure starts a fix run. |
 | `33-turn-limit-and-continue` | (from 1.5.0) A turn limit stops a long run; a continue resumes it without a user message. |
 | `34-submit-in-commit` | (from 1.5.0) Messages that only steer a running agent, admitted inside the host's own commit. |
+| `38-signals` | (1.6.0 source candidate) A typed JSON value delivered to a live task, and what each delivery returns. |
+| `39-ask-a-person` | (1.6.0 source candidate) A task that sleeps until a person answers. |
+| `40-tool-waits-for-webhook` | (1.6.0 source candidate) A tool that parks until a webhook reports, with a deadline and a `Cancel`. |
+| `41-tool-polls` | (1.6.0 source candidate) A tool that parks between polls. |
+| `42-parallel-children` | (1.6.0 source candidate) A tool that starts nested calls and parks until they end. |
+| `43-subagent-waits` | (1.6.0 source candidate) A subagent tool that parks until its child conversation answers. |
+| `44-approval-gate` | (1.6.0 source candidate) A `BeforeTool` gate that parks a risky call until it is approved. |
+| `45-review-on-yield` | (1.6.0 source candidate) An `OnYield` task that reviews an answer before it stands. |
+| `46-after-tools-terminate` | (1.6.0 source candidate) An `AfterTools` task that ends the run. |
+| `47-fit-images` | (1.6.0 source candidate) Images fitted to the model's limits before they are stored. |
+
+Examples 38 to 47 are in the source on `main` only. Their expected output is written from the upstream example source and checked against the C# run; they were not run under Node.
 
 PiSharp 1.5.0.1 adds `35-durable-on-the-store`, `36-durable-views` and `37-harness-registry` in the separate [Durable.Chord.Examples project](/docs/embed/durable-store/#run-examples-3537), using the real host and SQLite.
 

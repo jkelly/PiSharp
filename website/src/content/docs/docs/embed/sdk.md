@@ -142,7 +142,7 @@ Some APIs carry `[Experimental("<ID>")]`. The compiler reports an error when you
 | `PISHARP_SCHEMA001` | The port of pi-schema in `PiSharp.Contracts` (namespace `PiSharp.Contracts.Schema`): `JsonSchemaValidator`, `CoercingJsonSchemaValidator`, `JsonSchemaCompileOptions`, `JsonSchemaFormats` and their results and errors. | Released as experimental in 1.5.0. |
 | `PISHARP_TELEMETRY001` | Every public type in `PiSharp.Telemetry`, and the telemetry members of `PiSharp.AI`. See [Telemetry](/docs/embed/telemetry/). | Released as experimental in 1.5.0. |
 | `PISHARP_TOOLSEARCH001` | `ToolSearchDocument.NamespaceText` in `PiSharp.Extensions.Abstractions`, which ranks a tool's namespace text. | Released as experimental in 1.5.0. |
-| `PISHARP_TUI001` | TUI additions in `PiSharp.Tui`: `KeybindingsManager.GetSelectPageIndex`, `Terminal.RestoreOnExit`, `TextUtils.ReplaceControlCharacters` and `IComponent.CapturesViewportInput`. | Released as experimental in 1.5.0. |
+| `PISHARP_TUI001` | TUI additions in `PiSharp.Tui`: `KeybindingsManager.GetSelectPageIndex`, `Terminal.RestoreOnExit`, `TextUtils.ReplaceControlCharacters` and `IComponent.CapturesViewportInput`. The unreleased 1.6.0 source candidate adds `ChildLines`, `LayoutRenderCache`, `TuiBase.RequestViewRender`, `TuiBase.ConsumeContentChanged`, `ITui.SetSuspendSignalHandler`, `TuiBase.SetSuspendSignalHandler`, `TuiBase.SuspendSignalRegistrar`, and `TerminalImage.ImageLineExtent`, `GetImageLineExtent` and `StripImageSequences`. | Released as experimental in 1.5.0. The 1.6.0 additions are unreleased. |
 
 Suppress the IDs you use in your project file:
 

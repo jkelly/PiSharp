@@ -138,7 +138,7 @@ A component is anything that implements `IComponent`:
 
 | Interface | Members | Purpose |
 | --- | --- | --- |
-| `IComponent` | `List<string> Render(int width)`, `void Invalidate()` | Render lines for a width; drop cached output. |
+| `IComponent` | `IReadOnlyList<string> Render(int width)`, `void Invalidate()` | Render lines for a width; drop cached output. See [the render contract](#the-render-contract) for the return type in 1.5.2. |
 | `IInputHandler` | `void HandleInput(string data)`, `bool WantsKeyRelease` (default false) | Receive raw key input while focused. Kitty key-release events reach it only when `WantsKeyRelease` is true. |
 | `IFocusable` | `bool Focused { get; set; }` | Told when it gains or loses focus. Focused components emit `TuiBase.CursorMarker` where the cursor is. |
 | `IMouseHandler` | `TuiMouseEventResult? HandleMouse(TuiMouseEvent)` | Receive mouse events (fullscreen only). |
@@ -157,7 +157,8 @@ internal sealed class Counter : IComponent, IInputHandler
         else if (Keys.Matches(data, "down")) count--;
     }
 
-    public List<string> Render(int width) =>
+    // PiSharp 1.5.2 and earlier: List<string> Render(int width).
+    public IReadOnlyList<string> Render(int width) =>
         [TextUtils.TruncateToWidth($"Count: {count}  (up and down change it)", width)];
 
     public void Invalidate() { }
@@ -170,6 +171,23 @@ The rules come from Pi:
 - The TUI renders again after each key it routes to the focused component. When state changes for another reason (a timer, a background result), call `ui.RequestRender()`.
 - Cache output by width if rendering is expensive, and clear the cache in `Invalidate`. The TUI invalidates every component when the terminal reports a new cell size. Call `ui.Invalidate()` yourself after you change the theme.
 - The TUI ends each line with a style reset, so a style left open does not leak into the next line. It does not leak sideways into an overlay either.
+
+### The render contract
+
+The return type of `Render` changes with Pi 1.6.0, which made render output read-only:
+
+| Version | `IComponent.Render` | Contract |
+| --- | --- | --- |
+| PiSharp 1.5.2 and earlier (the published packages) | `List<string> Render(int width)` | A container copies its children's lines on every frame. |
+| 1.6.0 source candidate (unreleased) | `IReadOnlyList<string> Render(int width)` | Render output is read-only. `Container` and `Box` return the same list while their children are unchanged, as `Text` and `Markdown` do. |
+
+To move a component to 1.6.0:
+
+- Change the return type to `IReadOnlyList<string>`. A `List<string>` or a collection expression still works as the value.
+- Return a new list when the output changed. Do not change a list you returned earlier: `Container` compares each child's output by identity before it compares contents, so a list changed in place can be taken for unchanged output.
+- Copy before you change output you did not make. That includes the result of `base.Render(width)` in a `Container` subclass and the output of a component you embed: `var lines = base.Render(width).ToList();`.
+
+The same change makes `LayoutBox.Lines` and `LayoutBox.ScrollContentLines` `IReadOnlyList<string>`, adds the positional member `RenderCache` to `LayoutFrame`, and makes `TuiBase.ResolveFakeCursors` take an `IReadOnlyList<string>`.
 
 ### Built-in components
 
@@ -450,11 +468,29 @@ Heights only exist in fullscreen. There, `LayoutEngine.RenderFrame(root, width, 
 | `QueryTerminalColors(timeoutMs, onLateReply)` | Asks the terminal for its foreground, background and palette. |
 | `OnTerminalColorSchemeChange`, `SetTerminalColorSchemeNotifications` | Follow the terminal's dark and light mode reports. |
 | `OnDebug` | Called on Shift+Ctrl+D. |
+| `SetSuspendSignalHandler(Action?)` | 1.6.0 source candidate (unreleased), experimental (`PISHARP_TUI001`). Sets a handler called when the process receives `SIGTSTP` while the TUI owns the terminal, from `Start()` until `Stop()`. See [Suspend from outside](#suspend-from-outside). |
 | `Mode`, `Terminal`, `Loop`, `FullRedraws`, `Invalidate()` | The renderer kind, its terminal and loop, a redraw counter, and invalidation of every component. |
 
 Both renderers take `(ITerminal terminal, UiLoop loop, bool? showHardwareCursor = null, string? logDirectory = null, ...)`. The log directory is where crash and debug logs go. `TuiMainScreen` also takes an environment lookup, and `TuiAltScreen` its options.
 
 Input goes through the TUI in this order: replies to the TUI's color queries, input listeners, Shift+Ctrl+D when `OnDebug` is set, then the focused component.
+
+### Suspend from outside
+
+This section describes the unreleased 1.6.0 source candidate. `kill -TSTP <pid>` from another process stops a terminal program without giving it a chance to restore the terminal, which leaves mouse tracking and the Kitty keyboard protocol on at the shell prompt. `SetSuspendSignalHandler` lets the application suspend the way its own Ctrl+Z handling does:
+
+```csharp
+ui.SetSuspendSignalHandler(() => SuspendLikeCtrlZ());   // your own stop, suspend and redraw
+ui.Start();
+```
+
+- The handler is called on the UI loop. It replaces the default stop, so it must suspend the process itself.
+- The listener is registered only between `Start()` and `Stop()`. After `Stop()` a child that owns the terminal is suspended normally.
+- Pass `null` to remove the handler.
+- On Windows nothing is registered, because there is no `SIGTSTP`.
+- An `ITui` implementation of your own must add the member.
+
+Delivery of a real `SIGTSTP` on Linux and macOS has not been exercised for the candidate; the tests drive the registration through a seam.
 
 ## Key bindings
 

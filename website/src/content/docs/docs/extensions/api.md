@@ -385,6 +385,17 @@ The three session calls return the facade of the new session, or null when a han
 
 A member the host doesn't support throws `NotSupportedException`. In `pisharp`, `ExecAsync` throws: plain `pisharp` has no execution host for native extensions.
 
+`ExecAsync` returns an `ExtensionExecResult` with `Stdout`, `Stderr`, `Code` and `Killed`. In the unreleased 1.6.0 source candidate, as in Pi 1.6.0, `Code` is 128 plus the signal number when the command was ended by a signal, not 0:
+
+| How the command ended | TypeScript extension (`pi.exec`) | C# extension (`ExecAsync`) |
+| --- | --- | --- |
+| Stopped by the host (timeout, abort, output over `MaxBuffer`) on Linux or macOS | 143, or 137 if the command ignored SIGTERM for five seconds | 137: the native runner kills the process group at once |
+| Stopped by the host on Windows | 143 | 143. PiSharp 1.5.2 reported 1 |
+| Killed by another process on Linux or macOS | 128 plus the signal number | 128 plus the signal number |
+| Exits by itself | Its exit code | Its exit code |
+
+On Windows, a command that exits with code 1 by itself in the instant a stop is under way reads 143 for a C# extension. The Linux and macOS values for C# extensions are checked as a mapping; no process ran on those systems for the candidate.
+
 ```csharp
 using PiSharp.Extensions.Facade.Context;
 using PiSharp.Extensions.Runtime.Facade.Context;
