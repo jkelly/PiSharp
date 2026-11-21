@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/ai/src/api/anthropic-messages.ts (buildParams/convertMessages/convertTools,
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/ai/src/api/anthropic-messages.ts (buildParams/convertMessages/convertTools,
 // getBetaFeatures and insertThinkingLevelMessages for compat.supportsMidConvoEffort)
 // and packages/ai/src/api/constrained-sampling.ts (strict conversion with Anthropic's unsupported keywords).
 using System.Collections.Immutable;
@@ -568,10 +568,12 @@ public sealed class AnthropicMessagesRequestProjector
             var input = strict ? schema.DeepClone().AsObject() : new JsonObject();
             input["type"] = "object"; input["properties"] = schema["properties"]?.DeepClone() ?? new JsonObject(); input["required"] = schema["required"]?.DeepClone() ?? new JsonArray();
             // Local references in non-strict properties still resolve against the root schema, including
-            // preferred-strict fallbacks and inline tool additions that use this same conversion.
+            // preferred-strict fallbacks and inline tool additions that use this same conversion. Pi 1.6.0 (#12067) also keeps the
+            // root additionalProperties, so the model knows whether extra arguments are allowed; other root keywords stay out
+            // (Anthropic rejects root anyOf/oneOf/allOf with a 400).
             if (!strict)
-                foreach (var definitions in new[] { "$defs", "definitions" })
-                    if (schema.TryGetPropertyValue(definitions, out var value)) input[definitions] = value?.DeepClone();
+                foreach (var kept in new[] { "additionalProperties", "$defs", "definitions" })
+                    if (schema.TryGetPropertyValue(kept, out var value)) input[kept] = value?.DeepClone();
             var tool = new JsonObject { ["name"] = name, ["description"] = String(declaration, "description"), ["input_schema"] = input };
             if (options.SupportsEagerToolInputStreaming != false) tool["eager_input_streaming"] = true;
             if (strict) tool["strict"] = true;
@@ -607,6 +609,8 @@ public sealed class AnthropicMessagesRequestProjector
             token.ThrowIfCancellationRequested();
             if (node is not JsonObject schema || UnsupportedStrictKeys.Any(schema.ContainsKey) ||
                 schema.Any(pair => AnthropicStrictUnsupported(pair.Key, pair.Value))) throw new StrictSchemaException();
+            // Pi 1.6.0 constrained-sampling.ts (#12049): a node without a type is not strict; a bare enum counts as typed, a bare const does not.
+            if (!schema.ContainsKey("type") && !schema.ContainsKey("anyOf") && !schema.ContainsKey("enum")) throw new StrictSchemaException();
             if (schema.ContainsKey("anyOf"))
             {
                 if (schema["anyOf"] is not JsonArray variants || variants.Count == 0) throw new StrictSchemaException();

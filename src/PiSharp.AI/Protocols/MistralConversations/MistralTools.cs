@@ -1,3 +1,5 @@
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/ai/src/api/mistral-conversations.ts (toFunctionTools, mapToolChoice, the simple
+// reasoning options and the replay of assistant and tool result messages).
 using System.Globalization;
 using System.Collections.Immutable;
 using System.Text.Json;
@@ -64,13 +66,17 @@ public sealed partial class MistralTextHttpSseTransport
                             declaration.Remove("constrainedSampling");
                 return new TranscriptEntry("system", JsonData.Parse(body.ToJsonString()));
             }).ToImmutableArray();
-            var declarations = new ResponsesToolDeclarationProjector(new(SupportsStrictMode: true, Strict: false,
+            // Pi 1.6.0 toFunctionTools(tools, model.compat?.supportsStrictMode ?? false): strict tools are opt-in (#12148). Without it a
+            // "prefer" tool keeps its declared schema and a "require" tool fails locally.
+            var declarations = new ResponsesToolDeclarationProjector(new(SupportsStrictMode: options.SupportsStrictMode, Strict: false,
                 MaximumInputCharacters: options.MaximumContentCharacters, MaximumOutputBytes: options.MaximumPayloadBytes,
                 MaximumJsonDepth: options.MaximumJsonDepth)).Project(request with { Messages = systems });
             var result = new JsonArray();
             foreach (var declaration in declarations.Value.EnumerateArray())
             {
                 var function = JsonNode.Parse(declaration.GetRawText(), documentOptions: PiSharp.Contracts.JsonData.DocumentOptions)!.AsObject(); function.Remove("type");
+                // strict: strict ?? false is always written.
+                if (!function.ContainsKey("strict")) function["strict"] = false;
                 result.Add(new JsonObject { ["type"] = "function", ["function"] = function });
             }
             return result;

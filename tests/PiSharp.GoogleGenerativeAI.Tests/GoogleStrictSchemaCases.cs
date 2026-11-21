@@ -16,16 +16,39 @@ internal static class GoogleStrictSchemaCases
         {"id":"gemini-3-flash-preview","api":"google-generative-ai","provider":"google","baseUrl":"https://google.invalid/v1beta",
         "reasoning":true,"input":["text"],"cost":{"input":0,"output":0,"cacheRead":0,"cacheWrite":0},"opaque":{"keep":null}}
         """);
+    // Pi 1.6.0 constrained-sampling.ts (faac585884ae2c013a6b1400f3e9e77f10b34bac, #12049): a node without a type is not strict, and a
+    // bare const does not count as typed (a bare enum does). The authored vector file predates the rule and is hash-pinned, so it
+    // stays byte-identical: this names the one vector whose expectation the rule changed, and the vectors below add its cases.
+    private static readonly HashSet<string> UntypedSince160 = new(StringComparer.Ordinal) { "supported-optional-null-const" };
+    private const string Sync160Vectors = """
+        [
+          { "id": "sync160-untyped-array-items", "supported": false,
+            "schema": {"type":"object","properties":{"x":{"type":"array","items":{}}}} },
+          { "id": "sync160-untyped-description-only", "supported": false,
+            "schema": {"type":"object","properties":{"x":{"description":"Any JSON value"}},"required":["x"]} },
+          { "id": "sync160-untyped-nested-object-property", "supported": false,
+            "schema": {"type":"object","properties":{"x":{"type":"object","properties":{"y":{}},"required":["y"]}},"required":["x"]} },
+          { "id": "sync160-supported-enum-only", "supported": true,
+            "schema": {"type":"object","properties":{"x":{"enum":["low","high"]}},"required":["x"]},
+            "expectedSchema": {"type":"object","properties":{"x":{"enum":["low","high"]}},"required":["x"],"additionalProperties":false} },
+          { "id": "sync160-supported-anyof-without-type", "supported": true,
+            "schema": {"type":"object","properties":{"x":{"anyOf":[{"type":"string"},{"type":"number"}]}},"required":["x"]},
+            "expectedSchema": {"type":"object","properties":{"x":{"anyOf":[{"type":"string"},{"type":"number"}]}},"required":["x"],"additionalProperties":false} }
+        ]
+        """;
     public static async Task RunAsync()
     {
         var vectors = JsonData.Parse(File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "strict-schema-cases.json")));
         var root = vectors.Value;
         Check(root.GetProperty("status").GetString() == "AUTHORED_SOURCE_INFORMED_UNEXECUTED", "Unlabeled schema expectations.");
         Check(root.GetProperty("sourceBaseline").GetString() == "d86654abb8862e201933517d6f1fce9f88dd117f", "Wrong Source baseline.");
-        foreach (var vector in root.GetProperty("cases").EnumerateArray())
+        var sync160 = JsonData.Parse(Sync160Vectors);
+        Check(root.GetProperty("cases").EnumerateArray().Count(vector => UntypedSince160.Contains(vector.GetProperty("id").GetString()!)) == UntypedSince160.Count,
+            "A vector renamed away from its Pi 1.6.0 expectation.");
+        foreach (var vector in root.GetProperty("cases").EnumerateArray().Concat(sync160.Value.EnumerateArray()))
         foreach (var mode in new[] { "require", "prefer" })
         {
-            var id = vector.GetProperty("id").GetString()!; var supported = vector.GetProperty("supported").GetBoolean();
+            var id = vector.GetProperty("id").GetString()!; var supported = vector.GetProperty("supported").GetBoolean() && !UntypedSince160.Contains(id);
             var schema = JsonData.FromElement(vector.GetProperty("schema")); var originalSchema = schema.ToString();
             var declaration = new JsonObject { ["role"] = "system", ["content"] = "schema control",
                 ["toolsAdded"] = new JsonArray(new JsonObject { ["name"] = "inspect", ["description"] = "inert",

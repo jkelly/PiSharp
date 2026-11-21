@@ -433,6 +433,8 @@ public static class GoogleRequestProjector
         var schema = node as JsonObject ?? throw GoogleData.Fail(GoogleFailure.UnsupportedValue);
         foreach (var name in new[] { "$ref", "$defs", "definitions", "allOf", "oneOf", "patternProperties", "dependentSchemas", "dependencies", "unevaluatedProperties", "propertyNames", "contains", "prefixItems", "not", "if", "then", "else" })
             if (schema.ContainsKey(name)) throw GoogleData.Fail(GoogleFailure.UnsupportedValue);
+        // Pi 1.6.0 constrained-sampling.ts (#12049): a node without a type is not strict; a bare enum counts as typed, a bare const does not.
+        if (!schema.ContainsKey("type") && !schema.ContainsKey("anyOf") && !schema.ContainsKey("enum")) throw GoogleData.Fail(GoogleFailure.UnsupportedValue);
         if (schema.ContainsKey("anyOf"))
         {
             if (schema["anyOf"] is not JsonArray variants || variants.Count == 0) throw GoogleData.Fail(GoogleFailure.UnsupportedValue);
