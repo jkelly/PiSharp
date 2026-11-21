@@ -56,7 +56,7 @@ internal static class SpecNames
     public static bool IsDangerous(JsonObjectValue call) => None<bool>();
     public static bool Writes(JsonObjectValue call) => None<bool>();
     /// <summary>The input that continues the run, or null (upstream: <c>{ continue: UserInput } | undefined</c>).</summary>
-    public static Task<JsonValue?> RequestSecondPass(JsonObjectValue answer, IHookApi api, DurableContext context) => None<Task<JsonValue?>>();
+    public static Task<OnYieldResult?> RequestSecondPass(JsonObjectValue answer, IHookApi api, DurableContext context) => None<Task<OnYieldResult?>>();
     public static void RecordMetric(string name, double ms) => None<object>();
     public static Task<string> AnswerText(IToolExecutionApi api, EntryId entry, DurableContext context) => None<Task<string>>();
     public static Task<string> ChargePayment(string key) => None<Task<string>>();

@@ -157,7 +157,7 @@ internal static partial class Program
         "== 12-recovery",
         "tick 1",
         "tick 2",
-        """closed; saved checkpoint: {"status":"pending","checkpoint":{"phase":"tick","n":2}} memos: {"printed-1":true,"printed-2":true}""",
+        """closed; saved checkpoint: {"status":"pending","checkpoint":{"phase":"tick","n":2},"wake":{"reason":"time"}} memos: {"printed-1":true,"printed-2":true}""",
         "tick 3",
         "tick 4",
         "tick 5",

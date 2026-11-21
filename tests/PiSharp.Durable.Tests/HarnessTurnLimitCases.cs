@@ -116,7 +116,7 @@ internal static class TurnLimitTests
             var yields = 0;
             var (setup, harness, root) = await Open(memory, 2, chat => AddHooks(chat.Registry, HarnessTasks.GenerationTask, new GenerationHooks
             {
-                OnYield = (_, _, _) => Task.FromResult<JsonValue?>(Interlocked.Increment(ref yields) == 1 ? (JsonValue)"keep going" : null),
+                OnYield = (_, _, _) => Task.FromResult<OnYieldResult?>(Interlocked.Increment(ref yields) == 1 ? (JsonValue)"keep going" : null),
             }));
             // Round (1 turn), answer: the continuation resets the count; then two rounds reach the limit.
             setup.Faux.SetResponses(Round("c1"), Done(), Round("c2"), Round("c3"), Done());

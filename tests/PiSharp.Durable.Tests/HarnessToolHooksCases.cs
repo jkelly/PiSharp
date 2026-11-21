@@ -766,7 +766,8 @@ internal static class ToolHooksTests
                 var generation = new TaskId((long)N(((JsonObjectValue)live["run"])["taskId"]));
                 Seq(["c1:undefined", "c2:true"], ((JsonArrayValue)live["tools"]).OfType<JsonObjectValue>()
                     .Select(slot => $"{S(slot["callId"])}:{(slot.TryGetValue("unoffered", out var flag) ? flag.ToJson() : "undefined")}"), $"v{version} slots");
-                Equal(2, (await opened.Harness.GetTaskAsync(generation, Context))?.Version, $"v{version} generation version");
+                // Pi v1.6.0: pi.generation is version 3 (the case keeps upstream's title).
+                Equal(3, (await opened.Harness.GetTaskAsync(generation, Context))?.Version, $"v{version} generation version");
                 // The tools are offered when the round goes on: only the flag keeps `ghost` from running.
                 await root.ConfigureAsync(new AgentChange { Tools = Patch<ToolSelection>.Clear }, Context);
                 await opened.Harness.CloseAsync(Context);
@@ -781,7 +782,7 @@ internal static class ToolHooksTests
                 opened = await Open(openFile, killed, path, setup);
                 root = opened.Root;
                 Equal(SubmissionStatus.Done, (await Settled(opened.Harness, id)).Status, $"v{version} status");
-                Equal(2, (await opened.Harness.GetTaskAsync(generation, Context))?.Version, $"v{version} migrated version");
+                Equal(3, (await opened.Harness.GetTaskAsync(generation, Context))?.Version, $"v{version} migrated version");
                 var entries = await AllEntries(root);
                 Equal("tool_unavailable", Show(DiagnosticsOf(entries, "c2")), $"v{version} c2 diagnostics");
                 Check(!Text(Results(entries)["c2"]).Contains("ran", StringComparison.Ordinal), $"v{version} c2 text: {Text(Results(entries)["c2"])}");

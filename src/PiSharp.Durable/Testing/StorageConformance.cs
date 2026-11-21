@@ -13,6 +13,8 @@
 // ("refuses a creation and a change of one document in one commit, in either order"). The sleeping case v1.5.0 adds came with area sleep,
 // and area admission adds the continue-submission case ("stores continue submissions, which have no entry and are never queued",
 // fb524dd2e), so every v1.5.0 case is here, in upstream's order, and the citation moves to v1.5.0.
+// Pi v1.6.0 sync (faac585884ae2c013a6b1400f3e9e77f10b34bac): "round-trips sleeps on signals, any waits, and wakes": a sleep without
+// `until`, a sleep with signals and a stored signal memo, a wait with policy any, and pending and running states with a wake.
 using System.Collections.Immutable;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Chord.Delta;
@@ -45,6 +47,7 @@ public static class StorageConformance
             Case("replaces complete task records and pages filtered task scans", ReplacesTaskRecords),
             Case("stores owners and scans waiting and completing tasks by status", StoresOwnersAndWaitingTasks),
             Case("stores and scans sleeping tasks by status", StoresSleepingTasks),
+            Case("round-trips sleeps on signals, any waits, and wakes", RoundTripsSignalsAnyWaitsAndWakes),
             Case("indexes request IDs per conversation and replaces complete submission records", IndexesRequestIds),
             Case("stores passive write submissions without input-only lifecycle states", StoresPassiveWrites),
             Case("stores continue submissions, which have no entry and are never queued", StoresContinueSubmissions),
@@ -477,6 +480,31 @@ public static class StorageConformance
         await Commit(storage, new TaskWrite(running));
         ItemsEqual([], await Scan(DurableTaskStatus.Sleeping), "sleeping scan after waking");
         ItemsEqual([running], await Scan(DurableTaskStatus.Running), "running scan");
+    }
+
+    // Pi v1.6.0 sync: upstream's case for signals, `any` waits and wakes.
+    private static async Task RoundTripsSignalsAnyWaitsAndWakes(IStorage storage)
+    {
+        var rootId = await CreateRoot(storage);
+        var ids = new List<TaskId>();
+        for (var index = 0; index < 5; index++) ids.Add(await storage.MintIdAsync<TaskId>());
+        ImmutableArray<SignalKey> signals = [new SignalKey("app.answer", "a")];
+        var memos = O("{\"pi.signal.app.answer/a\":{\"version\":1,\"value\":{\"text\":\"yes\"}}}");
+        var next = O("{\"phase\":\"next\"}");
+        TaskRecord[] tasks =
+        [
+            // A sleep without `until`, waiting only for a signal.
+            PendingTask(ids[0], rootId) with { State = new SleepingTaskState(next, null, signals) },
+            PendingTask(ids[1], rootId) with { State = new SleepingTaskState(next, 61_000, signals), Memos = memos },
+            PendingTask(ids[2], rootId) with { State = new WaitingTaskState(next, [ids[0], ids[1]], JoinPolicy.Any) },
+            PendingTask(ids[3], rootId) with { State = new PendingTaskState(next, WakeReason.Tasks([ids[0]])) },
+            PendingTask(ids[4], rootId) with { State = new RunningTaskState(next, WakeReason.OfSignal("app.answer", "a")) },
+        ];
+        await Commit(storage, [.. tasks.Select(task => new TaskWrite(task))]);
+        foreach (var task in tasks) Equal<TaskRecord?>(task, await storage.GetTaskAsync(task.Id, Context), $"task {task.Id}");
+        async Task<ImmutableArray<TaskRecord>> Scan(DurableTaskStatus status) => (await storage.ScanTasksAsync(new() { Status = status }, 10, null, Context)).Items;
+        ItemsEqual([tasks[0], tasks[1]], await Scan(DurableTaskStatus.Sleeping), "sleeping scan");
+        ItemsEqual([tasks[2]], await Scan(DurableTaskStatus.Waiting), "waiting scan");
     }
 
     private static async Task IndexesRequestIds(IStorage storage)

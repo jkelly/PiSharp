@@ -101,7 +101,7 @@ public static partial class Examples
                             model[0] is JsonObjectValue message && message["role"] is JsonStringValue { Value: "toolResult" } &&
                             message["toolName"] is JsonStringValue { Value: "edit" });
                         // Each fix run asks again with a fresh turn budget: the extension caps the loop itself.
-                        return edited ? [Define.RunEndTask(runTestsTask, JsonValue.Object([new("attempt", ++attempts)]))] : null;
+                        return edited ? [Define.HookTask(runTestsTask, JsonValue.Object([new("attempt", ++attempts)]))] : null;
                     },
                 }),
             ],

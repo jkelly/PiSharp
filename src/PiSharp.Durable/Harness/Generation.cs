@@ -62,6 +62,14 @@
 // either ends the run without a failure (Live.EndRun). pi.live.run.first is the first entry the boundary that started a run placed
 // (BoundaryResult.First), a continue's the failed run's (Submissions.cs), otherwise its first tool-calling answer (StartToolRoundAsync);
 // RunSummary.first falls back to the answer. pi.generation stays version 2, as upstream adds the phases without a bump.
+// Pi v1.6.0 sync (faac585884ae2c013a6b1400f3e9e77f10b34bac): hooks that start tasks, and pi.generation version 3. afterTools hooks
+// return the tasks they ask for (PrepareHookTasks, CreateHookTasksAsync, shared with afterRun): the round then waits on them in
+// afterTools {phase, assistant, tools, tasks} and ends as the tools phase ends it (EndToolRoundAsync), the run too when one completed with
+// {terminate: true}; a task that completes with anything but an AfterToolsDecision is reported against the extension that installed it.
+// An onYield hook's first result wins: a continuation, or tasks that decide whether the answer stands. With tasks the answer is appended
+// without a boundary, the run's inputs stay open (pi.live.run.yield {answer, tasks}) and the generation waits in yield {phase, answer,
+// tasks}; then the first task in creation order that completed with a valid {continue} continues the run, as a hook's continuation does
+// (ConcludeAnswerAsync, shared with AnswerAsync), and otherwise the answer stands. An abort in yield ends the run done with its answer.
 //
 // Mappings:
 // - Checkpoints, live state and results are upstream's JSON, built in upstream's key order: prepare {phase, attempt, compacted?, overflow?},
@@ -89,7 +97,7 @@ using PiSharp.Durable.Internal.PiAi;
 
 namespace PiSharp.Durable;
 
-/// <summary>Built-in tasks: the generation task (upstream <c>GenerationTask</c>, kind <c>pi.generation</c>, version 2).</summary>
+/// <summary>Built-in tasks: the generation task (upstream <c>GenerationTask</c>, kind <c>pi.generation</c>, version 3).</summary>
 public static partial class HarnessTasks
 {
     /// <summary>
@@ -100,11 +108,11 @@ public static partial class HarnessTasks
     public static DurableTask GenerationTask { get; } = Tasks.DefineTask(new TaskDefinition
     {
         Name = "pi.generation",
-        Version = 2,
+        Version = 3,
         Initial = _ => JsonValue.Parse("""{"phase":"prepare","attempt":1}"""),
         // Version 2 leaves calls to tools not offered in a sequential round's `pending`, flagged `unoffered` in their slots. A version 1
-        // Harness would start their tool tasks unflagged, resolving the name, so it leaves version 2 blocked instead. A version 1 checkpoint
-        // has no such calls and is kept as it is.
+        // Harness would start their tool tasks unflagged, resolving the name, so it leaves version 2 blocked instead. Version 3 adds the
+        // afterTools and yield phases. Older checkpoints are kept as they are.
         Migrate = (input, checkpoint, _) => new TaskMigrationResult(input, checkpoint),
         Phases = new Dictionary<string, TaskPhaseHandler>(StringComparer.Ordinal)
         {
@@ -115,6 +123,8 @@ public static partial class HarnessTasks
             ["tools"] = GenerationPhases.ToolsAsync,
             ["finish"] = GenerationPhases.FinishAsync,
             ["drain"] = GenerationPhases.DrainAsync,
+            ["afterTools"] = GenerationPhases.AfterToolsAsync,
+            ["yield"] = GenerationPhases.YieldAsync,
         },
         Abort = GenerationPhases.AbortAsync,
     });
@@ -508,10 +518,10 @@ internal static class GenerationPhases
             return;
         }
         var prepared = new List<PreparedTask>();
-        await runtime.Hooks.EachAsync<GenerationHooks, Func<RunSummary, IHookApi, DurableContext, Task<IReadOnlyList<RunEndTask>?>>>(
+        await runtime.Hooks.EachAsync<GenerationHooks, Func<RunSummary, IHookApi, DurableContext, Task<IReadOnlyList<HookTask>?>>>(
             hooks => hooks.AfterRun, async hook =>
             {
-                if (await hook(run, runtime, context).ConfigureAwait(false) is { } asked) PrepareRunEndTasks(runtime, asked, prepared);
+                if (await hook(run, runtime, context).ConfigureAwait(false) is { } asked) PrepareHookTasks(runtime, asked, prepared);
             }).ConfigureAwait(false);
         if (prepared.Count == 0)
         {
@@ -520,9 +530,7 @@ internal static class GenerationPhases
         }
         await runtime.CommitAsync(async (tx, _) =>
         {
-            var tasks = new List<TaskId>();
-            foreach (var (definition, input) in prepared)
-                tasks.Add(await tx.CreateTaskAsync(definition, input, new TaskOptions(TaskOwnership.Task(runtime.TaskId))).ConfigureAwait(false));
+            var tasks = await CreateHookTasksAsync(tx, runtime, prepared).ConfigureAwait(false);
             var live = await tx.DocAsync(Live.LiveDoc, runtime.ConversationId).ConfigureAwait(false);
             if (HarnessTasks.RunTaskId(live) == runtime.TaskId.Value && live.GetObject("run").ContainsKey("afterRun"))
                 live.GetObject("run").GetObject("afterRun").Set("tasks", JsonValue.Array(tasks.Select(id => (JsonValue)id.ToJson())));
@@ -545,6 +553,65 @@ internal static class GenerationPhases
             return;
         }
         await EndAnsweredRunAsync(runtime, answer, context).ConfigureAwait(false);
+    }
+
+    /// <summary>The <c>afterTools</c> tasks are terminal: ends the round, the run too when one asked to terminate (upstream
+    /// <c>afterTools</c>).</summary>
+    public static async Task AfterToolsAsync(RunningTask task, ITaskRuntime runtime, DurableContext context)
+    {
+        if (Live.CutOffTooOften(task, runtime))
+        {
+            await EndCutOffAsync(runtime, task, context).ConfigureAwait(false);
+            return;
+        }
+        var checkpoint = (JsonObjectValue)task.Checkpoint;
+        var assistant = new EntryId(Id(checkpoint["assistant"]));
+        var tools = ((JsonArrayValue)checkpoint["tools"]).Select(id => new TaskId(Id(id))).ToList();
+        var tasks = ((JsonArrayValue)checkpoint["tasks"]).Select(id => new TaskId(Id(id))).ToList();
+        var terminate = false;
+        var outcomes = await runtime.OutcomesAsync(tasks, context).ConfigureAwait(false);
+        for (var index = 0; index < tasks.Count; index++)
+        {
+            if (outcomes[index] is not CompletedTaskOutcome completed) continue;
+            var decision = AfterToolsDecisionOf(completed.Result);
+            if (decision?.Terminate == true) terminate = true;
+            if (decision is not null) continue;
+            // Reported against the extension that installed the task, as a rule the one whose hook asked for it.
+            var kind = (await runtime.GetTaskAsync(tasks[index], context).ConfigureAwait(false))?.Kind;
+            var extension = runtime.Registry.Installed()
+                .LastOrDefault(installed => installed.Tasks?.Any(each => each.Definition.Name == kind) == true)?.Name;
+            runtime.Report(new InvalidOperationException($"afterTools task {tasks[index]} ({kind}) completed with no AfterToolsDecision"),
+                ReportFrom.FromExtension(extension));
+        }
+        await EndToolRoundAsync(runtime, assistant, tools, terminate, context).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// The <c>onYield</c> tasks are terminal: the first in creation order that completed with a continuation continues the run, as a hook's
+    /// continuation does; otherwise the answer stands and the run ends with it (upstream <c>yield</c>).
+    /// </summary>
+    public static async Task YieldAsync(RunningTask task, ITaskRuntime runtime, DurableContext context)
+    {
+        var checkpoint = (JsonObjectValue)task.Checkpoint;
+        var answer = new EntryId(Id(checkpoint["answer"]));
+        var tasks = ((JsonArrayValue)checkpoint["tasks"]).Select(id => new TaskId(Id(id))).ToList();
+        // The run answered: the limit ends it with the answer.
+        if (Live.CutOffTooOften(task, runtime))
+        {
+            await EndAnsweredCutOffAsync(runtime, task, answer, context).ConfigureAwait(false);
+            return;
+        }
+        var outcomes = await runtime.OutcomesAsync(tasks, context).ConfigureAwait(false);
+        var continuation = outcomes.Select(YieldContinuation).FirstOrDefault(input => input is not null);
+        var afterRun = await AsksAfterRunAsync(runtime, context).ConfigureAwait(false);
+        var conversationId = runtime.ConversationId;
+        await runtime.CommitAsync(async (tx, _) =>
+        {
+            var boundary = await Inbox.PrepareBoundaryAsync(tx, conversationId, runtime.Settings).ConfigureAwait(false);
+            var live = await tx.DocAsync(Live.LiveDoc, conversationId).ConfigureAwait(false);
+            if (HarnessTasks.RunTaskId(live) == runtime.TaskId.Value) live.GetObject("run").Delete("yield");
+            return (TaskState?)await ConcludeAnswerAsync(tx, runtime, live, boundary, answer, continuation, afterRun).ConfigureAwait(false);
+        }, context).ConfigureAwait(false);
     }
 
     public static async Task AbortAsync(RunningTask task, ITaskRuntime runtime, DurableContext context)
@@ -575,8 +642,11 @@ internal static class GenerationPhases
                     : ToolResults.HarnessError("aborted", $"Tool {name} was aborted");
                 await ToolResults.AppendToolResultAsync(tx, conversationId, call, result, runtime.Now()).ConfigureAwait(false);
             }
-            // In finish and drain the run answered already: it ends without a failure, its inputs stay done.
-            Live.EndRun(tx, live, runtime.TaskId, RunEnd.Unanswered(RunFailureReason.Aborted));
+            // In finish and drain the run answered already: it ends without a failure, its inputs stay done. In yield it answered too,
+            // and its inputs settle done with that answer.
+            Live.EndRun(tx, live, runtime.TaskId, phase == "yield"
+                ? RunEnd.Done(new EntryId(Id(checkpoint["answer"])))
+                : RunEnd.Unanswered(RunFailureReason.Aborted));
             return (TaskState?)NextTaskState.Aborted();
         }, context).ConfigureAwait(false);
     }
@@ -1069,52 +1139,121 @@ internal static class GenerationPhases
     }
 
     /// <summary>
-    /// A final answer; the final boundary places queued items (upstream <c>answer</c>, spec §6). The first <c>onYield</c> continuation appends
-    /// a user message and hands the run to a successor generation, starting its turn count over, but only when the inbox holds no user item
-    /// and no reset (<see cref="TakesContinuation"/>). Otherwise the run's inputs settle <c>done</c>; with <c>afterRun</c> hooks selected the
-    /// run waits for the tasks they ask for, in <c>finish</c> and <c>drain</c>, before the final boundary; without, selected user items start
-    /// the next run now.
+    /// A final answer; the final boundary places queued items (upstream <c>answer</c>, spec §6). The first <c>onYield</c> result wins: a
+    /// continuation appends a user message and hands the run to a successor generation, starting its turn count over, but only when the
+    /// inbox holds no user item and no reset (<see cref="TakesContinuation"/>); tasks decide whether the answer stands, in <c>yield</c>.
+    /// Otherwise the run's inputs settle <c>done</c>; with <c>afterRun</c> hooks selected the run waits for the tasks they ask for, in
+    /// <c>finish</c> and <c>drain</c>, before the final boundary; without, selected user items start the next run now.
     /// </summary>
     private static async Task AnswerAsync(ITaskRuntime runtime, JsonObjectValue message, DurableContext context)
     {
+        var decided = false;
         JsonValue? continuation = null;
-        await runtime.Hooks.EachAsync<GenerationHooks, Func<JsonObjectValue, IHookApi, DurableContext, Task<JsonValue?>>>(hooks => hooks.OnYield,
+        var prepared = new List<PreparedTask>();
+        await runtime.Hooks.EachAsync<GenerationHooks, Func<JsonObjectValue, IHookApi, DurableContext, Task<OnYieldResult?>>>(hooks => hooks.OnYield,
             async hook =>
             {
-                if (continuation is not null) return;
-                continuation = await hook(message, runtime, context).ConfigureAwait(false);
+                if (decided) return;
+                if (await hook(message, runtime, context).ConfigureAwait(false) is not { } decision) return;
+                decided = true;
+                if (decision.HookTasks is { } asked) PrepareHookTasks(runtime, asked, prepared);
+                else continuation = decision.Continuation;
             }).ConfigureAwait(false);
-        var afterRun = await AsksAfterRunAsync(runtime, context).ConfigureAwait(false);
         var conversationId = runtime.ConversationId;
+        if (prepared.Count > 0)
+        {
+            // The answer waits for its deciders: appended, no boundary, the inputs still open.
+            await runtime.CommitAsync(async (tx, _) =>
+            {
+                var live = await tx.DocAsync(Live.LiveDoc, conversationId).ConfigureAwait(false);
+                var entry = await HarnessTasks.AppendAssistantAsync(tx, conversationId, message).ConfigureAwait(false);
+                var tasks = await CreateHookTasksAsync(tx, runtime, prepared).ConfigureAwait(false);
+                var listed = JsonValue.Array(tasks.Select(id => (JsonValue)id.ToJson()));
+                live.Delete("generation");
+                if (HarnessTasks.RunTaskId(live) == runtime.TaskId.Value)
+                    live.GetObject("run").Set("yield", JsonValue.Object([
+                        KeyValuePair.Create("answer", (JsonValue)entry.Id.ToJson()),
+                        KeyValuePair.Create("tasks", (JsonValue)listed),
+                    ]));
+                var checkpoint = JsonValue.Object([
+                    KeyValuePair.Create("phase", (JsonValue)"yield"),
+                    KeyValuePair.Create("answer", (JsonValue)entry.Id.ToJson()),
+                    KeyValuePair.Create("tasks", (JsonValue)listed),
+                ]);
+                return (TaskState?)NextTaskState.Waiting(checkpoint, tasks, JoinPolicy.AllSettled);
+            }, context).ConfigureAwait(false);
+            return;
+        }
+        var afterRun = await AsksAfterRunAsync(runtime, context).ConfigureAwait(false);
         await runtime.CommitAsync(async (tx, _) =>
         {
             // Queue modes are read on the Session line, when the boundary is decided.
             var boundary = await Inbox.PrepareBoundaryAsync(tx, conversationId, runtime.Settings).ConfigureAwait(false);
             var live = await tx.DocAsync(Live.LiveDoc, conversationId).ConfigureAwait(false);
             var entry = await HarnessTasks.AppendAssistantAsync(tx, conversationId, message).ConfigureAwait(false);
-            var result = NextTaskState.Completed(EntryResult(entry.Id));
-            var continues = TakesContinuation(continuation, boundary) ? continuation : null;
-            if (continues is null && afterRun && HoldRun(tx, live, runtime, RunSummaryReason.Answer, entry.Id, entry.Id) is { } held)
-                return (TaskState?)held;
-            var (users, first, _) = await Inbox.ApplyBoundaryAsync(tx, boundary, true, runtime.Now()).ConfigureAwait(false);
-            if (continues is not null)
-            {
-                var user = JsonValue.Object([
-                    KeyValuePair.Create("role", (JsonValue)"user"),
-                    KeyValuePair.Create("content", continues),
-                    KeyValuePair.Create("timestamp", (JsonValue)runtime.Now()),
-                ]);
-                await tx.AppendEntryAsync(Entries.UserEntry, conversationId, new TypedEntryDraft { Model = JsonValue.Array(user) }).ConfigureAwait(false);
-                // The continuation starts the run's turn count over: bounding onYield loops is the extension's job.
-                HarnessTasks.SetRunTurns(live, runtime.TaskId, 0);
-                HarnessTasks.HandOver(live, runtime.TaskId, await HarnessTasks.CreateGenerationAsync(tx, conversationId).ConfigureAwait(false));
-                live.Delete("generation");
-                return (TaskState?)result;
-            }
-            Live.EndRun(tx, live, runtime.TaskId, RunEnd.Done(entry.Id));
-            if (!users.IsEmpty) await HarnessTasks.StartRunAsync(tx, conversationId, live, users, first).ConfigureAwait(false);
-            return (TaskState?)result;
+            return (TaskState?)await ConcludeAnswerAsync(tx, runtime, live, boundary, entry.Id, continuation, afterRun).ConfigureAwait(false);
         }, context).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Settles an answer that stands, or takes its continuation: shared by <see cref="AnswerAsync"/> and the <c>yield</c> phase (upstream
+    /// <c>concludeAnswer</c>). A continuation is taken only when the inbox holds no user item and no reset (<see cref="TakesContinuation"/>).
+    /// </summary>
+    private static async Task<TaskState> ConcludeAnswerAsync(ITx tx, ITaskRuntime runtime, DraftObject live, Inbox.Boundary boundary, EntryId answer,
+        JsonValue? continuation, bool afterRun)
+    {
+        var conversationId = runtime.ConversationId;
+        var result = NextTaskState.Completed(EntryResult(answer));
+        var continues = TakesContinuation(continuation, boundary) ? continuation : null;
+        if (continues is null && afterRun && HoldRun(tx, live, runtime, RunSummaryReason.Answer, answer, answer) is { } held) return held;
+        var (users, first, _) = await Inbox.ApplyBoundaryAsync(tx, boundary, true, runtime.Now()).ConfigureAwait(false);
+        if (continues is not null)
+        {
+            var user = JsonValue.Object([
+                KeyValuePair.Create("role", (JsonValue)"user"),
+                KeyValuePair.Create("content", continues),
+                KeyValuePair.Create("timestamp", (JsonValue)runtime.Now()),
+            ]);
+            await tx.AppendEntryAsync(Entries.UserEntry, conversationId, new TypedEntryDraft { Model = JsonValue.Array(user) }).ConfigureAwait(false);
+            // The continuation starts the run's turn count over: bounding onYield loops is the extension's job.
+            HarnessTasks.SetRunTurns(live, runtime.TaskId, 0);
+            HarnessTasks.HandOver(live, runtime.TaskId, await HarnessTasks.CreateGenerationAsync(tx, conversationId).ConfigureAwait(false));
+            live.Delete("generation");
+            return result;
+        }
+        Live.EndRun(tx, live, runtime.TaskId, RunEnd.Done(answer));
+        if (!users.IsEmpty) await HarnessTasks.StartRunAsync(tx, conversationId, live, users, first).ConfigureAwait(false);
+        return result;
+    }
+
+    /// <summary>The continuation an <c>onYield</c> task completed with (<see cref="YieldDecision"/>), when it holds a valid user input
+    /// (upstream <c>yieldContinuation</c>). Task results are task code's: the trust boundary of the decision's shape.</summary>
+    private static JsonValue? YieldContinuation(TaskOutcome outcome)
+    {
+        if (outcome is not CompletedTaskOutcome { Result: JsonObjectValue result } || !result.TryGetValue("continue", out var input)) return null;
+        if (input is JsonStringValue) return input;
+        return input is JsonArrayValue { Count: > 0 } items && items.All(IsUserContent) ? input : null;
+    }
+
+    /// <summary>A text item with its text, or an image item with its data and MIME type (upstream <c>isUserContent</c>).</summary>
+    private static bool IsUserContent(JsonValue item)
+    {
+        if (item is not JsonObjectValue fields) return false;
+        if (Str(fields, "type") == "text") return fields.TryGetValue("text", out var text) && text is JsonStringValue;
+        return Str(fields, "type") == "image" && fields.TryGetValue("data", out var data) && data is JsonStringValue &&
+            fields.TryGetValue("mimeType", out var mimeType) && mimeType is JsonStringValue;
+    }
+
+    /// <summary>An <c>afterTools</c> task's result as an <see cref="AfterToolsDecision"/>: none (JSON <c>null</c>) is one; anything else is
+    /// not (upstream <c>afterToolsDecision</c>).</summary>
+    private static AfterToolsDecision? AfterToolsDecisionOf(JsonValue? result)
+    {
+        if (result is JsonNullValue) return new AfterToolsDecision();
+        if (result is not JsonObjectValue fields) return null;
+        if (fields.Count == 0) return new AfterToolsDecision();
+        return fields.Count == 1 && fields.TryGetValue("terminate", out var terminate) && terminate is JsonBooleanValue { Value: true }
+            ? new AfterToolsDecision(true)
+            : null;
     }
 
     /// <summary>Whether the phase's agent selects an <c>afterRun</c> hook, so a run that answers waits for its tasks (upstream
@@ -1148,29 +1287,30 @@ internal static class GenerationPhases
         ]));
     }
 
-    /// <summary>A task an <c>afterRun</c> hook asked for, checked and ready to create (upstream <c>PreparedTask</c>).</summary>
+    /// <summary>A task a hook asked for, checked and ready to create (upstream <c>PreparedTask</c>).</summary>
     private sealed record PreparedTask(DurableTask Task, JsonValue Input);
 
     /// <summary>
-    /// Checks the tasks one <c>afterRun</c> hook asked for, off the line, and adds those that pass to <paramref name="prepared"/>, so a broken
-    /// request is skipped instead of failing the creating commit (upstream <c>prepareRunEndTasks</c>): its kind must be an installed task
+    /// Checks the tasks one hook (<c>afterTools</c>, <c>onYield</c>, <c>afterRun</c>) asked for, off the line, and adds those that pass to
+    /// <paramref name="prepared"/>, so a broken
+    /// request is skipped instead of failing the creating commit (upstream <c>prepareHookTasks</c>): its kind must be an installed task
     /// that is not built-in, and its definition's <c>Initial</c> must return a JSON checkpoint of one of its phases. The task is created from
     /// the installed definition, as every task runs under it, with that checkpoint, so <c>Initial</c> runs once. Then throws the rejections,
     /// which the hook runner reports against the hook's extension. A C# <see cref="JsonValue"/> input is strict JSON by construction (a
     /// non-finite number cannot be built), so upstream's copyJson check of the input rejects only a missing request, task or input here.
     /// </summary>
-    private static void PrepareRunEndTasks(ITaskRuntime runtime, IReadOnlyList<RunEndTask> requests, List<PreparedTask> prepared)
+    private static void PrepareHookTasks(ITaskRuntime runtime, IReadOnlyList<HookTask> requests, List<PreparedTask> prepared)
     {
         var rejected = new List<Exception>();
         foreach (var request in requests)
         {
             try
             {
-                if (request?.Task is not { } requested) throw new ArgumentException("An afterRun task request names no task");
+                if (request?.Task is not { } requested) throw new ArgumentException("A hook task request names no task");
                 var name = requested.Definition.Name;
-                if (name.StartsWith("pi.", StringComparison.Ordinal)) throw new InvalidOperationException($"An afterRun hook cannot start the built-in task {name}");
+                if (name.StartsWith("pi.", StringComparison.Ordinal)) throw new InvalidOperationException($"A hook cannot start the built-in task {name}");
                 var installed = runtime.Registry.GetTask(name) ?? throw new InvalidOperationException($"Task {name} is not installed");
-                var input = request.Input ?? throw new ArgumentException($"The afterRun request for task {name} has no input; expected strict JSON");
+                var input = request.Input ?? throw new ArgumentException($"The hook's request for task {name} has no input; expected strict JSON");
                 var definition = installed.Definition;
                 var checkpoint = definition.Initial(input);
                 var phase = checkpoint is JsonObjectValue fields && fields.TryGetValue("phase", out var named) ? named : null;
@@ -1188,7 +1328,17 @@ internal static class GenerationPhases
             }
         }
         if (rejected.Count == 1) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Throw(rejected[0]);
-        if (rejected.Count > 1) throw new AggregateException($"{rejected.Count} afterRun task requests were rejected", rejected);
+        if (rejected.Count > 1) throw new AggregateException($"{rejected.Count} hook task requests were rejected", rejected);
+    }
+
+    /// <summary>Creates the tasks hooks asked for, prepared by <see cref="PrepareHookTasks"/>, as children of the generation (upstream
+    /// <c>createHookTasks</c>).</summary>
+    private static async Task<List<TaskId>> CreateHookTasksAsync(ITx tx, ITaskRuntime runtime, IReadOnlyList<PreparedTask> prepared)
+    {
+        var tasks = new List<TaskId>();
+        foreach (var (definition, input) in prepared)
+            tasks.Add(await tx.CreateTaskAsync(definition, input, new TaskOptions(TaskOwnership.Task(runtime.TaskId))).ConfigureAwait(false));
+        return tasks;
     }
 
     /// <summary>A checkpoint's phase as upstream's <c>String(checkpoint.phase)</c> renders it.</summary>
@@ -1304,13 +1454,53 @@ internal static class GenerationPhases
         }, context).ConfigureAwait(false);
     }
 
-    /// <summary>
-    /// The round's tools are terminal: applies their controls, appends a <c>handoff</c>'s reset, and then ends the run at the final boundary
-    /// (<c>terminate</c>), ends it like a failure at the conversation's turn limit (<c>turn_limit</c>), ends it at a queued reset, or hands it
-    /// to the next generation at the <c>postTools</c> boundary, in the handoff's new context when there is one (upstream
-    /// <c>finishToolRound</c>, spec §8.5). A terminate round with <c>afterRun</c> hooks selected holds the run instead (<see cref="HoldRun"/>).
-    /// </summary>
+    /// <summary>The round's tools are terminal: asks the <c>afterTools</c> hooks, and waits for the tasks they ask for in <c>afterTools</c>,
+    /// or ends the round now (upstream <c>finishToolRound</c>).</summary>
     private static async Task FinishToolRoundAsync(ITaskRuntime runtime, EntryId assistant, IReadOnlyList<TaskId> tools, DurableContext context)
+    {
+        var (_, results) = await RoundSlotsAsync(runtime, context).ConfigureAwait(false);
+        var prepared = new List<PreparedTask>();
+        await runtime.Hooks.EachAsync<GenerationHooks, Func<EntryId, ImmutableArray<EntryId>, IHookApi, DurableContext, Task<IReadOnlyList<HookTask>?>>>(
+            hooks => hooks.AfterTools, async hook =>
+            {
+                if (await hook(assistant, results, runtime, context).ConfigureAwait(false) is { } asked) PrepareHookTasks(runtime, asked, prepared);
+            }).ConfigureAwait(false);
+        if (prepared.Count == 0)
+        {
+            await EndToolRoundAsync(runtime, assistant, tools, false, context).ConfigureAwait(false);
+            return;
+        }
+        await runtime.CommitAsync(async (tx, _) =>
+        {
+            var tasks = await CreateHookTasksAsync(tx, runtime, prepared).ConfigureAwait(false);
+            var checkpoint = new RecordJson.Writer()
+                .Add("phase", "afterTools")
+                .Add("assistant", assistant.ToJson())
+                .Add("tools", JsonValue.Array(tools.Select(id => (JsonValue)id.ToJson())))
+                .Add("tasks", JsonValue.Array(tasks.Select(id => (JsonValue)id.ToJson())))
+                .Build();
+            return (TaskState?)NextTaskState.Waiting(checkpoint, tasks, JoinPolicy.AllSettled);
+        }, context).ConfigureAwait(false);
+    }
+
+    /// <summary>The round's slots in call order, and the result entries they hold (upstream <c>roundSlots</c>).</summary>
+    private static async Task<(List<JsonObjectValue> Slots, ImmutableArray<EntryId> Results)> RoundSlotsAsync(ITaskRuntime runtime, DurableContext context)
+    {
+        var live = await runtime.SnapshotAsync(Live.LiveDoc, runtime.ConversationId, context).ConfigureAwait(false);
+        var slots = live is not null && live.TryGetValue("tools", out var listed) && listed is JsonArrayValue array
+            ? array.OfType<JsonObjectValue>().ToList() : [];
+        return (slots, slots.Where(slot => slot.ContainsKey("entry")).Select(slot => new EntryId(Id(slot["entry"]))).ToImmutableArray());
+    }
+
+    /// <summary>
+    /// Ends a tool round: applies its controls, appends a <c>handoff</c>'s reset, and then ends the run at the final boundary
+    /// (<c>terminate</c>, asked by every call or by an <c>afterTools</c> task), ends it like a failure at the conversation's turn limit
+    /// (<c>turn_limit</c>), ends it at a queued reset, or hands it to the next generation at the <c>postTools</c> boundary, in the handoff's
+    /// new context when there is one (upstream <c>endToolRound</c>, spec §8.5). A terminate round with <c>afterRun</c> hooks selected holds
+    /// the run instead (<see cref="HoldRun"/>).
+    /// </summary>
+    private static async Task EndToolRoundAsync(ITaskRuntime runtime, EntryId assistant, IReadOnlyList<TaskId> tools, bool taskTerminates,
+        DurableContext context)
     {
         var conversationId = runtime.ConversationId;
         var controls = new OrderedDictionary<TaskId, JsonObjectValue?>();
@@ -1320,17 +1510,12 @@ internal static class GenerationPhases
             controls[tools[index]] = outcomes[index] is CompletedTaskOutcome { Result: JsonObjectValue result } &&
                 !(result.TryGetValue("kind", out var kind) && kind is JsonStringValue { Value: "nested" }) &&
                 result.TryGetValue("control", out var control) && control is JsonObjectValue value ? value : null;
-        var live = await runtime.SnapshotAsync(Live.LiveDoc, conversationId, context).ConfigureAwait(false);
-        var slots = live is not null && live.TryGetValue("tools", out var listed) && listed is JsonArrayValue array
-            ? array.OfType<JsonObjectValue>().ToList() : [];
-        var results = slots.Where(slot => slot.ContainsKey("entry")).Select(slot => new EntryId(Id(slot["entry"]))).ToImmutableArray();
-        await runtime.Hooks.EachAsync<GenerationHooks, Func<EntryId, ImmutableArray<EntryId>, IHookApi, DurableContext, Task>>(hooks => hooks.AfterTools,
-            hook => hook(assistant, results, runtime, context)).ConfigureAwait(false);
+        var (slots, results) = await RoundSlotsAsync(runtime, context).ConfigureAwait(false);
         // In call order, the slots' order; a slot without a task (faulted or orphaned before it got one) has no control.
         var ordered = slots.Select(slot => slot.TryGetValue("taskId", out var taskId) ? controls.GetValueOrDefault(new TaskId(Id(taskId))) : null).ToList();
-        // Every call of the round must ask to terminate.
-        var terminate = slots.Count > 0 && ordered.All(control => control is not null && control.TryGetValue("terminate", out var flag) &&
-            flag is JsonBooleanValue { Value: true });
+        // Every call of the round must ask to terminate, unless an afterTools task asked for it.
+        var terminate = taskTerminates || (slots.Count > 0 && ordered.All(control => control is not null &&
+            control.TryGetValue("terminate", out var flag) && flag is JsonBooleanValue { Value: true }));
         var added = ordered.SelectMany(control => control is not null && control.TryGetValue("addTools", out var names) && names is JsonArrayValue list
             ? list.OfType<JsonStringValue>().Select(name => name.Value) : []).ToList();
         // The last handoff in call order wins.

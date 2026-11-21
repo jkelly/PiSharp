@@ -28,6 +28,8 @@
 // Pi v1.5.0 sync (area tool-tasks, 1c6928b30, #11043): pi.tool is version 3. "keeps version 2 tool task input as it is" and "reserves a
 // stored version 2 task under version 3 and runs it as a model-issued call" are v1.5.0's; describe("tool task version 1 and 2 records") is
 // harness.nested-tools.version-1-and-2.* (version-1.* before), whose migrated tasks settle at version 3.
+// Pi v1.6.0 sync (faac585884ae2c013a6b1400f3e9e77f10b34bac): pi.tool is version 4, so the stored version 1 and 2 tasks settle at version
+// 4 ("reserves a stored version 2 task under version 4 ..."), and a nested call that never executed has a durationMs in its summary too.
 using System.Collections.Immutable;
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
@@ -1090,7 +1092,7 @@ internal static class NestedToolsTests
             var slots = (JsonArrayValue)(await harness.SnapshotAsync(Live.LiveDoc, root.Id, Context))!["nestedTools"];
             MatchExactly(JsonValue.Array(
                 Obj(("callId", "c1/1"), ("status", "done"), ("summary", Obj(("isError", false), ("durationMs", "<number>")))),
-                Obj(("callId", "c1/2"), ("status", "done"), ("summary", Obj(("isError", true), ("error", "Tool missing is not available")))),
+                Obj(("callId", "c1/2"), ("status", "done"), ("summary", Obj(("isError", true), ("durationMs", "<number>"), ("error", "Tool missing is not available")))),
                 Obj(("callId", "c1/3"), ("status", "done"), ("summary", Obj(("isError", false), ("durationMs", "<number>"), ("usage", usage)))),
                 Obj(("callId", "c1/4"), ("status", "done"), ("summary", Obj(("isError", true), ("durationMs", "<number>"), ("error", "bad image")))),
                 Obj(("callId", "c1/5"), ("status", "done"), ("summary", Obj(("isError", true), ("durationMs", "<number>"), ("error", new string('e', 500)))))
@@ -1134,7 +1136,7 @@ internal static class NestedToolsTests
             Equal(1, (await harness.GetTaskAsync(id, Context))?.Version, "stored version");
             harness.Resume();
             var settled = await harness.WaitForTaskAsync(id, Context);
-            Equal(3, settled.Version, "version");
+            Equal(4, settled.Version, "version");
             MatchJson("""{"kind":"model","callId":"c1"}""", settled.Input, "input");
             MatchJson("""{"status":"completed","result":{"kind":"model"}}""", OutcomeOf(settled), "outcome");
             Equal(1, echo.Runs, "runs");
@@ -1152,7 +1154,7 @@ internal static class NestedToolsTests
             var (harness, root) = await OpenChat(await SqliteStorage.OpenAsync(path), setup);
             harness.Resume();
             var settled = await harness.WaitForTaskAsync(id, Context);
-            Equal(3, settled.Version, "version");
+            Equal(4, settled.Version, "version");
             MatchJson("""{"status":"failed","result":{"kind":"model"}}""", OutcomeOf(settled), "outcome");
             Equal(0, echo.Runs, "runs");
             var result = Results(await AllEntries(root))[0];
@@ -1162,7 +1164,7 @@ internal static class NestedToolsTests
         });
 
         // #11043
-        yield return Case(stored + "reserves-a-stored-version-2-task-under-version-3-and-runs-it-as-a-model-issued-call", async () =>
+        yield return Case(stored + "reserves-a-stored-version-2-task-under-version-4-and-runs-it-as-a-model-issued-call", async () =>
         {
             var setup = Setup();
             var echo = new EchoTool();
@@ -1172,7 +1174,7 @@ internal static class NestedToolsTests
             Equal(2, (await harness.GetTaskAsync(id, Context))?.Version, "stored version");
             harness.Resume();
             var settled = await harness.WaitForTaskAsync(id, Context);
-            Equal(3, settled.Version, "version");
+            Equal(4, settled.Version, "version");
             MatchExactly("""{"kind":"model","assistant":"<number>","callId":"c1"}""", settled.Input, "input");
             MatchJson("""{"status":"completed","result":{"kind":"model"}}""", OutcomeOf(settled), "outcome");
             Equal(1, echo.Runs, "runs");
