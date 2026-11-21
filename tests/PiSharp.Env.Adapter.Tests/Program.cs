@@ -76,7 +76,13 @@ await using (var legacy = new Connection(new() { Command = [.. command, "--legac
     Equal(FileErrorCode.NotSupported, (await legacyEnv.ListFilesAsync(".", null, context)).Error!.Code);
 }
 Equal(FileErrorCode.NotFound, (await env.FileInfoAsync("missing", context)).Error!.Code);
-Equal(FileErrorCode.NotFound, (await env.ListDirAsync(".", context)).Error!.Code);
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/env/src/remote-env.ts listDir (#11994). Until Pi 1.6.0 an entry removed
+// between enumeration and lstat failed the listing with not_found; it is now left out, like a name that is not valid UTF-8 (whose
+// lstat the daemon also reports as ENOENT) and like the directory reader below. Any other entry error still fails the listing.
+var listed = (await env.ListDirAsync(".", context)).GetOrThrow();
+Equal(1, listed.Length); Equal(("file", "/workspace/file", FileKind.File, 3L), (listed[0].Name, listed[0].Path, listed[0].Kind, listed[0].Size));
+var denied = (await env.ListDirAsync("denied", context)).Error!;
+Equal(FileErrorCode.PermissionDenied, denied.Code); Equal("/workspace/denied/locked", denied.Path);
 Ok(!(await env.ExistsAsync("missing", context)).GetOrThrow(), "missing does not exist");
 var directory = (await env.OpenDirReaderAsync(".", context)).GetOrThrow();
 var page = (await directory.NextAsync(2, context)).GetOrThrow();
@@ -172,7 +178,16 @@ static class Fixture
                     if (path.EndsWith("missing", StringComparison.Ordinal)) { await Send(new(FrameType.Error, frame.Id, new() { ["code"] = "ENOENT", ["path"] = path, ["message"] = "missing" })); continue; }
                     reply = Info(path, files.TryGetValue(path, out var data) ? data.Length : 0); break;
                 case "opendir": handles[++next] = (path, 0); reply["handle"] = next; break;
-                case "readdir": reply = new() { ["done"] = true, ["entries"] = new JsonArray(new JsonObject { ["name"] = "gone", ["error"] = new JsonObject { ["code"] = "ENOENT", ["message"] = "gone" } }, new JsonObject { ["name"] = "pipe", ["info"] = Info("pipe", 0, "other") }, new JsonObject { ["name"] = "file", ["info"] = Info("file", 3) }) }; break;
+                case "readdir":
+                    if (handles[json["handle"]!.GetValue<long>()].Path.EndsWith("denied", StringComparison.Ordinal))
+                    {
+                        reply = new() { ["done"] = true, ["entries"] = new JsonArray(new JsonObject { ["name"] = "locked", ["error"] = new JsonObject { ["code"] = "EACCES", ["message"] = "denied" } }, new JsonObject { ["name"] = "file", ["info"] = Info("file", 3) }) };
+                        break;
+                    }
+                    // "gone" was removed after enumeration; the second name is not valid UTF-8 (bytes 62 61 64 FF), as the daemon reports it.
+                    reply = new() { ["done"] = true, ["entries"] = new JsonArray(new JsonObject { ["name"] = "gone", ["error"] = new JsonObject { ["code"] = "ENOENT", ["message"] = "gone" } },
+                        new JsonObject { ["name"] = "bad\uFFFD", ["raw"] = new JsonArray(98, 97, 100, 255), ["error"] = new JsonObject { ["code"] = "ENOENT", ["message"] = "missing" } },
+                        new JsonObject { ["name"] = "pipe", ["info"] = Info("pipe", 0, "other") }, new JsonObject { ["name"] = "file", ["info"] = Info("file", 3) }) }; break;
                 case "listFiles":
                     if (args.Contains("--legacy")) throw new InvalidOperationException("Legacy daemon must not receive listFiles");
                     reply = new() { ["count"] = 1, ["truncated"] = false }; payload = Encoding.UTF8.GetBytes("fa.txt\0"); break;
