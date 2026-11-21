@@ -433,6 +433,9 @@ internal sealed partial class InteractiveMode
         UpdateAvailableProviderCount();
         UpdateEditorBorderColor();
         UpdateTerminalTitle();
+        // setRebindSession: what the replacement's runtime found (settings errors, model scope warnings, a model that could not be
+        // restored) goes in the chat once the mode is bound to the new session (#11264).
+        ShowRuntimeDiagnostics(context.TakeUnreportedRuntimeDiagnostics());
         footer.Invalidate();
         ui.RequestRender();
         renderedGeneration = Math.Max(renderedGeneration, state.Generation);
