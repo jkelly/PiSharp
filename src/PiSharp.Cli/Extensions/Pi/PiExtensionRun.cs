@@ -17,19 +17,23 @@ internal sealed class PiExtensionRun : IAsyncDisposable
     private readonly string _cwd, _agentDir, _home, _mode;
     private readonly bool _hasUI;
     private readonly TextWriter? _stderr;
+    private readonly PiSharp.Cli.Packages.PiPackageRunOutput _packages;
     private readonly HashSet<string> _installWarnings = new(StringComparer.Ordinal);
 
-    private PiExtensionRun(PiHost host, PiArgs parsed, string cwd, string agentDir, string home, string mode, bool hasUI, TextWriter? stderr)
-    { _host = host; _parsed = parsed; _cwd = cwd; _agentDir = agentDir; _home = home; _mode = mode; _hasUI = hasUI; _stderr = stderr; }
+    private PiExtensionRun(PiHost host, PiArgs parsed, string cwd, string agentDir, string home, string mode, bool hasUI, TextWriter? stderr,
+        PiSharp.Cli.Packages.PiPackageRunOutput packages)
+    { _host = host; _parsed = parsed; _cwd = cwd; _agentDir = agentDir; _home = home; _mode = mode; _hasUI = hasUI; _stderr = stderr; _packages = packages; }
 
     internal PiExtensionHost? Host => _loading.Host;
     internal IReadOnlyList<PiDiagnostic> Diagnostics => _loading.Diagnostics;
     internal bool HasLoadErrors => _loading.HasLoadErrors;
 
+    /// <param name="packages">Pi faac585884ae2c013a6b1400f3e9e77f10b34bac resource-loader.ts packageCommandOutput and onPackageProgress
+    /// (#11264): how the run's package managers treat git and npm output, at load and on every reload; null keeps live output.</param>
     internal static async Task<PiExtensionRun> LoadAsync(PiHost host, PiArgs parsed, string cwd, string agentDir, string home, bool projectTrusted,
-        string mode, bool hasUI, TextWriter? stderr, CancellationToken token)
+        string mode, bool hasUI, TextWriter? stderr, CancellationToken token, PiSharp.Cli.Packages.PiPackageRunOutput? packages = null)
     {
-        var run = new PiExtensionRun(host, parsed, cwd, agentDir, home, mode, hasUI, stderr);
+        var run = new PiExtensionRun(host, parsed, cwd, agentDir, home, mode, hasUI, stderr, packages ?? PiSharp.Cli.Packages.PiPackageRunOutput.Inherit);
         await run.LoadSourcesAsync(PiSettings.Load(cwd, agentDir, projectTrusted), projectTrusted, token).ConfigureAwait(false);
         return run;
     }
@@ -74,8 +78,7 @@ internal sealed class PiExtensionRun : IAsyncDisposable
         PiSettings settings, CancellationToken token)
     {
         var output = _stderr ?? TextWriter.Null;
-        var manager = new PiSharp.Cli.Packages.PiPackageManager(_cwd, _agentDir, _home, settings, _host.GetEnvironment,
-            _host.PackageProcesses?.Invoke(output, output) ?? new() { Output = output, ErrorOutput = output });
+        var manager = _packages.CreateManager(_host, _cwd, _agentDir, _home, settings, output, output);
         var cli = _parsed.Extensions is { Count: > 0 } paths
             ? await manager.ResolveExtensionSourcesAsync(paths, temporary: true, cancellationToken: token).ConfigureAwait(false)
             : PiSharp.Cli.Packages.PiResolvedPaths.Empty;
