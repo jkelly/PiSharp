@@ -1,5 +1,5 @@
-// Derived from Pi d86654abb8862e201933517d6f1fce9f88dd117f (MIT),
-// api/google-generative-ai.ts, google-shared.ts, transform-messages.ts and utils/transcript.ts.
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/ai/src/api/google-generative-ai.ts, google-vertex.ts (buildParams), google-shared.ts,
+// constrained-sampling.ts, transform-messages.ts and utils/transcript.ts.
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -91,6 +91,9 @@ public static class GoogleRequestProjector
                 strictAny ? "VALIDATED" : options.ToolChoice is null ? null : "AUTO";
             if (mode is not null) config["toolConfig"] = new JsonObject { ["functionCallingConfig"] = new JsonObject { ["mode"] = mode } };
         }
+        // Pi 1.6.0 buildParams: the SDK parameters turn off @google/genai 2.32.0's automatic continuation (extra requests and stream
+        // resumes inside the SDK). The member is part of the parameters a payload hook sees; it is an SDK switch, not a REST field.
+        config["automaticContinuation"] = false;
         if (GoogleData.True(model, "reasoning") && options.Thinking is { } thinking)
         {
             var control = new JsonObject();
@@ -132,6 +135,9 @@ public static class GoogleRequestProjector
         "responseLogprobs", "logprobs", "presencePenalty", "frequencyPenalty", "seed", "responseMimeType", "responseModalities", "mediaResolution",
         "thinkingConfig"];
     private static readonly string[] BodyConfigFields = ["serviceTier", "systemInstruction", "tools", "toolConfig"];
+    // SDK switches that never reach the REST body. This transport sends one request per call whatever automaticContinuation says: a
+    // CONTINUATION finish ends the turn as "length" and no continuation request follows.
+    private static readonly string[] ClientConfigFields = ["automaticContinuation"];
 
     /// <summary>
     /// The REST body @google/genai 2.21.0 sends for the SDK parameters <c>{ model, contents, config }</c>
@@ -148,7 +154,8 @@ public static class GoogleRequestProjector
         // tContents: an array of Content objects (a parts array each); no other shape is projected here.
         if (root["contents"] is not JsonArray { Count: > 0 } contents) throw GoogleData.Fail(GoogleFailure.UnsupportedValue);
         foreach (var field in config)
-            if (!GenerationFields.Contains(field.Key) && !BodyConfigFields.Contains(field.Key)) throw GoogleData.Fail(GoogleFailure.UnsupportedValue);
+            if (!GenerationFields.Contains(field.Key) && !BodyConfigFields.Contains(field.Key) && !ClientConfigFields.Contains(field.Key))
+                throw GoogleData.Fail(GoogleFailure.UnsupportedValue);
         var body = new JsonObject { ["contents"] = new JsonArray([.. contents.Select(content => (JsonNode)WireContent(Content(content), vertex))]) };
         if (Present(config, "serviceTier") is { } tier) body["serviceTier"] = tier.DeepClone();
         if (Present(config, "systemInstruction") is { } system) body["systemInstruction"] = WireContent(SystemContent(system), vertex);
