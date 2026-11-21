@@ -89,6 +89,7 @@ internal sealed class TuiReference(Func<TuiBase> current) : ITui
     public Action AddInputListener(Func<string, TuiInputListenerResult?> listener) => current().AddInputListener(listener);
     public Action OnTerminalColorSchemeChange(Action<TerminalColorScheme> listener) => current().OnTerminalColorSchemeChange(listener);
     public void SetTerminalColorSchemeNotifications(bool enabled) => current().SetTerminalColorSchemeNotifications(enabled);
+    public void SetSuspendSignalHandler(Action? handler) => current().SetSuspendSignalHandler(handler);
     public Task<TerminalColors> QueryTerminalColors(int timeoutMs, Action<TerminalColors>? onLateReply = null) => current().QueryTerminalColors(timeoutMs, onLateReply);
     public Action? OnDebug { get => current().OnDebug; set => current().OnDebug = value; }
     public void Invalidate() => current().Invalidate();

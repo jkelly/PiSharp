@@ -1,6 +1,7 @@
 // Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/tui/src/tui.ts.
 using System.Diagnostics;
 using System.Globalization;
+using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
 
 namespace PiSharp.Tui.Pi;
@@ -220,6 +221,11 @@ public interface ITui
     Action AddInputListener(Func<string, TuiInputListenerResult?> listener);
     Action OnTerminalColorSchemeChange(Action<TerminalColorScheme> listener);
     void SetTerminalColorSchemeNotifications(bool enabled);
+    /// <summary>Sets the handler called on SIGTSTP while this TUI owns the terminal (from <see cref="Start"/> until
+    /// <see cref="Stop"/>), or clears it with null. The listener is removed on <see cref="Stop"/>, so a child that owns the terminal
+    /// afterwards is suspended normally. Windows has no SIGTSTP: the handler is stored and never called there.</summary>
+    [System.Diagnostics.CodeAnalysis.Experimental("PISHARP_TUI001")]
+    void SetSuspendSignalHandler(Action? handler);
     Task<TerminalColors> QueryTerminalColors(int timeoutMs, Action<TerminalColors>? onLateReply = null);
     Action? OnDebug { get; set; }
     void Invalidate();
@@ -250,6 +256,11 @@ public abstract partial class TuiBase : Container, ITui
     private IComponent? focusedComponent;
     private readonly List<Func<string, TuiInputListenerResult?>> inputListeners = [];
     public Action? OnDebug { get; set; }
+    private Action? suspendSignalHandler;
+    // From Start() until Stop(). Unlike `stopped`, false before the first Start().
+    private bool ownsTerminal;
+    private IDisposable? suspendSignalRegistration;
+    private bool suspendSignalListening;
     private bool renderRequested, immediateRenderScheduled;
     // Whether a render request since the last frame may have changed component output. Only RequestViewRender() leaves it clear,
     // so a renderer may reuse the previous frame's output. An int so a request from another thread is never lost to a frame.
@@ -522,6 +533,8 @@ public abstract partial class TuiBase : Container, ITui
         stopped = false;
         AppDomain.CurrentDomain.ProcessExit -= RestoreTerminalOnExit;
         AppDomain.CurrentDomain.ProcessExit += RestoreTerminalOnExit;
+        ownsTerminal = true;
+        UpdateSuspendSignalListener();
         BeforeTerminalStart();
         Terminal.Start(data => HandleTerminalInput(data), () => RequestRender());
         AfterTerminalStart();
@@ -548,6 +561,45 @@ public abstract partial class TuiBase : Container, ITui
         schemeNotifications = enabled;
         if (!stopped) Terminal.Write(enabled ? "\u001b[?2031h" : "\u001b[?2031l");
     }
+    /// <summary>Registers a SIGTSTP listener and returns its registration, or null where the platform has no SIGTSTP. The default
+    /// uses <see cref="PosixSignalRegistration"/> and returns null on Windows; tests substitute it.</summary>
+    [System.Diagnostics.CodeAnalysis.Experimental("PISHARP_TUI001")]
+    public static Func<Action, IDisposable?> SuspendSignalRegistrar { get; set; } = RegisterPosixSuspendSignal;
+
+    private static IDisposable? RegisterPosixSuspendSignal(Action listener)
+    {
+        // Windows has no job-control stop signal; PosixSignalRegistration rejects SIGTSTP there.
+        if (OperatingSystem.IsWindows()) return null;
+        try
+        {
+            // Cancel the default action: like a Node listener, a registration replaces the stop.
+            return PosixSignalRegistration.Create(PosixSignal.SIGTSTP, context => { context.Cancel = true; listener(); });
+        }
+        catch (PlatformNotSupportedException) { return null; }
+    }
+
+    [System.Diagnostics.CodeAnalysis.Experimental("PISHARP_TUI001")]
+    public void SetSuspendSignalHandler(Action? handler)
+    {
+        suspendSignalHandler = handler;
+        UpdateSuspendSignalListener();
+    }
+
+    // Listen only while the TUI owns the terminal. After Stop(), a child (external editor, interactive command) owns it, and a
+    // listener would keep SIGTSTP from stopping the process. Only real changes touch the registration: disposing the last one
+    // restores the default action, so a dispose/create pair would let a SIGTSTP in between stop the process with the TUI running.
+    private void UpdateSuspendSignalListener()
+    {
+        var listen = ownsTerminal && suspendSignalHandler is not null;
+        if (listen == suspendSignalListening) return;
+        suspendSignalListening = listen;
+        if (listen) suspendSignalRegistration = SuspendSignalRegistrar(OnSuspendSignal);
+        else { suspendSignalRegistration?.Dispose(); suspendSignalRegistration = null; }
+    }
+
+    // Signals arrive on a runtime thread; the handler touches TUI state, so it runs on the loop like a Node signal listener.
+    private void OnSuspendSignal() => Loop.Post(() => { if (suspendSignalListening) suspendSignalHandler?.Invoke(); });
+
     private void QueryCellSize() { if (TerminalImage.GetCapabilities().Images != ImageProtocol.None) Terminal.Write("\u001b[16t"); }
 
     public void Stop(bool preserveScreen = false)
@@ -560,6 +612,10 @@ public abstract partial class TuiBase : Container, ITui
         Terminal.ShowCursor();
         Terminal.Stop();
         AfterTerminalStop(preserveScreen);
+        // Last, so a SIGTSTP during the restore above is caught (and dropped when the listener goes) instead of stopping the
+        // process with the terminal half restored.
+        ownsTerminal = false;
+        UpdateSuspendSignalListener();
     }
 
     private void MarkContentChanged() => Volatile.Write(ref contentChanged, 1);

@@ -805,6 +805,7 @@ internal static class MessageComponentCases
         public Action AddInputListener(Func<string, TuiInputListenerResult?> listener) => () => { };
         public Action OnTerminalColorSchemeChange(Action<TerminalColorScheme> listener) => () => { };
         public void SetTerminalColorSchemeNotifications(bool enabled) { }
+        public void SetSuspendSignalHandler(Action? handler) { }
         public Task<TerminalColors> QueryTerminalColors(int timeoutMs, Action<TerminalColors>? onLateReply = null) => Task.FromResult(new TerminalColors(null, null, null));
         public Action? OnDebug { get; set; }
         public void Invalidate() { }
