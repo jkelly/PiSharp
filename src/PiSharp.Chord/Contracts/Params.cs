@@ -1,4 +1,4 @@
-// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/chord/src/next/contracts/params.ts
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/chord/src/contracts/params.ts
 //
 // Params declarations: the policy for params fields and the closed object schema checked on every get. A params field is declared as a
 // Property, so an opt(...) field reaches the declaration-time refusal that upstream's RequiredFields type also gives; ParamSchema and
@@ -43,7 +43,9 @@ internal static partial class ContractsInternal
 
     /// <summary>Joins key parts with <c>|</c>, each escaped (<c>\\</c> and <c>|</c>), so two different part lists never join to one key.</summary>
     internal static string JoinKey(IEnumerable<string> parts) =>
-        string.Join("|", parts.Select(part => part.Replace("\\", "\\\\", StringComparison.Ordinal).Replace("|", "\\|", StringComparison.Ordinal)));
+        // Most parts have nothing to escape: no copy for them (1.6.0; the key is unchanged).
+        string.Join("|", parts.Select(part => part.AsSpan().IndexOfAny('\\', '|') < 0 ? part
+            : part.Replace("\\", "\\\\", StringComparison.Ordinal).Replace("|", "\\|", StringComparison.Ordinal)));
 
     private static bool IsParamSchema(JsonNode normal)
     {

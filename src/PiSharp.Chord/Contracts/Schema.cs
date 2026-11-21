@@ -1,6 +1,7 @@
-// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/chord/src/next/contracts/schema.ts
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/chord/src/contracts/schema.ts
 //
-// Schema helpers: Chord's short constructors over pi-schema's builders (plain JSON Schema), and method and keyed member declarations. The
+// Schema helpers: Chord's short constructors over pi-schema's builders (plain JSON Schema), and method, keyed member, event member and
+// queries member declarations (the last two came with 1.6.0: Schemas.Event and Schemas.Queries). The
 // helpers keep the shapes contracts were fingerprinted with: literals carry their `type`, `oneOf` is a union of literals, `map` a
 // pattern-property record. A schema is a JsonNode; the helpers build the objects pi-schema's builders build (packages/schema/src/
 // builders.ts: str, num, int, bool, nul, arr, union, obj, bytes, unknown and Optional, which PiSharp.Contracts.Schema does not port), with
@@ -102,6 +103,21 @@ public static class Schemas
 
     /// <summary>Declares documents keyed by addresses of <paramref name="host"/>.</summary>
     public static KeyedMember Keyed(HostKind host, JsonNode schema) => new(schema, host);
+
+    /// <summary>Declares a <c>queries</c> member of a local contract (upstream <c>queries(item, args)</c>, slice 14 §3.1): the named
+    /// queries other objects on the host may read, each with its argument schema (part of the fingerprint), whose rows are values of
+    /// <paramref name="item"/>. The handle of <c>self.Queries(...)</c> implements it. The queries keep the order given.</summary>
+    public static QueriesMember Queries(JsonNode item, params (string Name, JsonNode Args)[] queries)
+    {
+        var args = new OrderedDictionary<string, JsonNode?>(StringComparer.Ordinal);
+        foreach (var (name, schema) in queries ?? []) args[name] = schema;
+        return new QueriesMember(item, args);
+    }
+
+    /// <summary>Declares an event member of a local contract, as <see cref="Keyed(JsonNode)"/> marks a keyed member (upstream
+    /// <c>event(schema)</c>): JSON values of <paramref name="schema"/> the object emits, delivered once to the references bound to it,
+    /// never kept (a remote contract lists them under a variant's <see cref="VariantDeclaration.Events"/>).</summary>
+    public static EventDeclaration Event(JsonNode schema) => new(schema);
 
     /// <summary>Declares a method with neither arguments nor result: both sides are <c>null</c>.</summary>
     public static MethodDeclaration Method() => new(Nul(), Nul());
@@ -217,6 +233,35 @@ public sealed class KeyedMember
 
     /// <summary>The host kind of the keys, or null for string keys.</summary>
     public HostKind? KeyHost { get; }
+}
+
+/// <summary>A <c>queries</c> member's declaration (upstream <c>QueriesMember</c>, slice 14 §3.1): named queries over one of the object's
+/// tables, each with the schema of its arguments, whose rows are values of <see cref="Item"/>; only in local contracts.</summary>
+public sealed class QueriesMember
+{
+    internal QueriesMember(JsonNode item, OrderedDictionary<string, JsonNode?> args)
+    {
+        Item = item;
+        Declared = args;
+    }
+
+    /// <summary>The schema of each row.</summary>
+    public JsonNode Item { get; }
+
+    /// <summary>The argument schema of each named query, by query name, in the order declared.</summary>
+    public IReadOnlyDictionary<string, JsonNode?> Args => Declared;
+
+    internal OrderedDictionary<string, JsonNode?> Declared { get; }
+}
+
+/// <summary>An event member's declaration in a local contract's flat members (upstream <c>EventDeclaration</c>, decision "Events:
+/// fire-and-forget members"): the schema of the JSON values its object emits.</summary>
+public sealed class EventDeclaration
+{
+    internal EventDeclaration(JsonNode schema) => Schema = schema;
+
+    /// <summary>The schema of each emitted value.</summary>
+    public JsonNode Schema { get; }
 }
 
 internal static partial class ContractsInternal
