@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/core/tools/read.ts and core/tools/write.ts.
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/coding-agent/src/core/tools/read.ts and core/tools/write.ts.
 using System.Collections.Immutable;
 using System.Globalization;
 using System.Text;
@@ -16,7 +16,17 @@ public sealed class ReadWriteTools
     private static readonly Encoding Utf8 = new UTF8Encoding(false, true);
     // Source buffer.toString("utf-8"): malformed sequences become U+FFFD and a BOM is kept.
     private static readonly Encoding LenientUtf8 = new UTF8Encoding(false, false);
+    /// <summary>The note read stored in an image result before Pi 1.6.0. It is no longer written (#12131): a stored result is replayed
+    /// after a switch to a vision model, so the model gets the provider placeholder per request instead, and the result carries
+    /// <see cref="ImageUnsupportedByModelProperty"/> for renderers.</summary>
+    [Obsolete("Pi 1.6.0 read no longer stores this note; renderers read details.imageUnsupportedByModel.")]
     public const string NonVisionImageNote = "[Current model does not support images. The image will be omitted from this request.]";
+    /// <summary>Source ReadToolDetails.imageUnsupportedByModel: the id of the model that was selected when the image was read, if it
+    /// has no image input. Shown to the user only; the content keeps the image and no note about the model.</summary>
+    public const string ImageUnsupportedByModelProperty = "imageUnsupportedByModel";
+    /// <summary>Names the model in <see cref="ImageUnsupportedByModelProperty"/> when the host reports a model without image input
+    /// but no <see cref="ReadWriteToolOptions.CurrentModelId"/>.</summary>
+    public const string UnnamedModel = "The current model";
     private readonly IFileOperations _operations;
     private readonly PathResolver _paths;
     private readonly FileMutationQueue _mutations;
@@ -222,7 +232,19 @@ public sealed class ReadWriteTools
         return text;
     }
 
+    /// <summary>Source read execute: once the signal aborts, the call rejects with "Operation aborted", whatever the file operation
+    /// was doing and however it ends (#11956: an abort while the file is being opened is this result too, with the opened stream
+    /// closed and nothing read from it).</summary>
     private async ValueTask<ToolResult> ReadAsync(string target, Input input, CancellationToken token)
+    {
+        ToolResult result;
+        try { result = await ReadCoreAsync(target, input, token).ConfigureAwait(false); }
+        catch (Exception) when (token.IsCancellationRequested) { return Aborted(); }
+        return token.IsCancellationRequested ? Aborted() : result;
+        static ToolResult Aborted() => ToolResult.Error(ToolFailureKind.Canceled, "Operation aborted");
+    }
+
+    private async ValueTask<ToolResult> ReadCoreAsync(string target, Input input, CancellationToken token)
     {
         byte[] owned;
         try
@@ -232,6 +254,8 @@ public sealed class ReadWriteTools
                 (input.Limit is null || input.Limit >= 0 && input.Limit == Math.Truncate(input.Limit.Value)))
             {
                 await using var stream = await streaming.OpenReadAsync(target, token).ConfigureAwait(false);
+                // An abort that landed while the file was being opened stops here: the stream is closed without a read.
+                token.ThrowIfCancellationRequested();
                 if (!stream.CanRead) throw new IOException("Streaming adapter must return a readable stream.");
                 // Snapshot the opened file length. A stream reporting zero or no length is read until EOF.
                 long? length = null;
@@ -409,30 +433,36 @@ public sealed class ReadWriteTools
         return details.Value.ValueKind == JsonValueKind.Null ? result.WithProperty("details", null) : result;
     }
 
-    /// <summary>Source read image branch: processImage, the "Read image file" note with hints, and the non-vision note.</summary>
+    /// <summary>Source read image branch: processImage and the "Read image file" note with hints. A model without image input adds
+    /// no text (#12131): the result keeps the image, and details.imageUnsupportedByModel names the model for renderers.</summary>
     private async ValueTask<ToolResult> ReadImageAsync(byte[] bytes, string mimeType, CancellationToken token)
     {
         var processed = await Task.Run(() => ImageProcessor.Process(bytes, mimeType, _options.AutoResizeImages,
             _options.ImageResizeOptions, _options.ImageCodec), token).ConfigureAwait(false);
         token.ThrowIfCancellationRequested();
-        var nonVision = _options.CurrentModelSupportsImages?.Invoke() == false ? NonVisionImageNote : null;
-        string content;
+        string content; string? unsupportedBy = null;
         if (!processed.Ok)
         {
-            var note = $"Read image file [{mimeType}]\n{processed.Message}" + (nonVision is null ? "" : "\n" + nonVision);
+            var note = $"Read image file [{mimeType}]\n{processed.Message}";
             content = JsonSerializer.Serialize(new object[] { new { type = "text", text = note } }, OutputJson);
         }
         else
         {
-            var note = $"Read image file [{processed.MimeType}]" + (processed.Hints.IsEmpty ? "" : "\n" + string.Join("\n", processed.Hints)) +
-                (nonVision is null ? "" : "\n" + nonVision);
+            var note = $"Read image file [{processed.MimeType}]" + (processed.Hints.IsEmpty ? "" : "\n" + string.Join("\n", processed.Hints));
             content = JsonSerializer.Serialize(new object[]
             {
                 new { type = "text", text = note }, new { type = "image", data = processed.Data, mimeType = processed.MimeType }
             }, OutputJson);
+            // Source: ctx.model && !ctx.model.input.includes("image") => details = { imageUnsupportedByModel: ctx.model.id }.
+            if (_options.CurrentModelSupportsImages?.Invoke() == false)
+                unsupportedBy = _options.CurrentModelId?.Invoke() is { Length: > 0 } id ? id : UnnamedModel;
         }
         var value = JsonData.Parse(content);
-        return (new ToolResult([], JsonData.Null) { ContentValue = value, StructuredContent = ToReadOutput(value) }).WithProperty("details", null);
+        // Source read: details is undefined (absent from the result) for every other image read.
+        return unsupportedBy is null
+            ? (new ToolResult([], JsonData.Null) { ContentValue = value, StructuredContent = ToReadOutput(value) }).WithProperty("details", null)
+            : new ToolResult([], JsonData.Parse(JsonSerializer.Serialize(new Dictionary<string, string> { [ImageUnsupportedByModelProperty] = unsupportedBy }, OutputJson)))
+                { ContentValue = value, StructuredContent = ToReadOutput(value) };
     }
 
     private async ValueTask<ToolResult> WriteAsync(string target, Input input, CancellationToken token)
