@@ -6,14 +6,23 @@
 //   node tools/CompatibilityReport/sync-1.6.0-applicability.mjs            write the table, the Durable overlay and the candidate pointer
 //   node tools/CompatibilityReport/sync-1.6.0-applicability.mjs --check    regenerate in memory and fail when the files on disk differ
 //
+//   node tools/CompatibilityReport/sync-1.6.0-applicability.mjs --accepted-ledger <ledger> ...   accept-sync-1.6.0.mjs, with its arguments
+//
 // The generator writes a fresh pending snapshot. It refuses to overwrite a table that carries an acceptance record or a
 // status it did not write, unless --reset-pending is given.
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
+import { dispositions } from './sync-1.6.0-dispositions.mjs';
 
 const repo = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
+if (process.argv.includes('--accepted-ledger') || process.argv.includes('--ledger')) {
+  const { runAcceptanceCli } = await import('./accept-sync-1.6.0.mjs');
+  runAcceptanceCli();
+  process.exit(process.exitCode ?? 0);
+}
+if (process.argv.includes('--apply')) throw new Error('--apply requires --accepted-ledger and exact evidence hashes');
 const read = path => JSON.parse(readFileSync(resolve(repo, path), 'utf8'));
 const PENDING = 'implementation-pending-validation', NO_OP = 'no-op';
 
@@ -28,8 +37,8 @@ const SYNC = {
   report: id => `AI_DOCS/agent-reports/sync-1.6.0-${id}.md`,
 };
 
-// The work packages of AI_DOCS/sync-1.6.0.md. packages/chord stays one package until chord-discovery decomposes it;
-// its report is the discovery report.
+// The work packages of AI_DOCS/sync-1.6.0.md, with packages/chord split into the seven chord-* packages of
+// AI_DOCS/agent-reports/sync-1.6.0-chord-discovery.md section 4 (their plan is that report).
 const packages = {
   meta: { area: 'source lock, file inventory, applicability table, version pins, Node runtime pins, virtual modules, decision record', branch: 'sync/1.6.0-meta' },
   'ai-catalog': { area: 'exact 1.6.0 model catalog, default models, Qwen Token Plan providers and key variables', branch: 'sync/1.6.0-ai-catalog' },
@@ -41,10 +50,16 @@ const packages = {
   'cli-ui': { area: 'interactive components and interactive mode', branch: 'sync/1.6.0-cli-ui', dependsOn: ['tui', 'cli-session'] },
   'durable-core': { area: 'Durable harness: signals, parks, gates, hook tasks, record versions', branch: 'sync/1.6.0-durable-core' },
   'durable-edge': { area: 'code-mode namespaces, image fitting, durable tools, env listing, examples, hosts built on Durable', branch: 'sync/1.6.0-durable-edge', dependsOn: ['durable-core'] },
-  chord: { area: 'packages/chord, one package until chord-discovery decomposes it into chord-* packages', branch: '(set by chord-discovery)', report: 'chord-discovery' },
+  'chord-foundation': { area: 'Chord contracts, data, wire messages and codecs, channel fences, framed sources, telemetry schema rows', branch: 'sync/1.6.0-chord-foundation', chord: true },
+  'chord-edge': { area: 'Chord HTTP links, app kit sign-ins, plugins, surfaces, client and connection loop, sync, telemetry ingest admission', branch: 'sync/1.6.0-chord-edge', chord: true },
+  'chord-store': { area: 'Chord store: column sets, exists and joins, read plans, the read index and skips, open and live queries, settled and onCommitted', branch: 'sync/1.6.0-chord-store', chord: true, dependsOn: ['chord-foundation'] },
+  'chord-remote': { area: 'Chord remote layer: call windows by trust, events end to end, opened(incarnation), shared holds', branch: 'sync/1.6.0-chord-remote', chord: true, dependsOn: ['chord-foundation'] },
+  'chord-queries': { area: 'Chord named queries, query readers, read declarations, lists, tiling and the reusable park step', branch: 'sync/1.6.0-chord-queries', chord: true, dependsOn: ['chord-store', 'chord-remote'] },
+  'chord-admission': { area: 'Chord admission, route admission and the denied paths on both sides of a link', branch: 'sync/1.6.0-chord-admission', chord: true, dependsOn: ['chord-queries'] },
+  'chord-workers': { area: 'Chord worker exit, store and incarnation, worker admission, TerminalScope.On', branch: 'sync/1.6.0-chord-workers', chord: true, dependsOn: ['chord-store', 'chord-remote', 'chord-admission'] },
 };
-const workPackages = Object.fromEntries(Object.entries(packages).map(([id, { report, ...value }]) =>
-  [id, { ...value, reports: [SYNC.report(report ?? id)], plan: SYNC.plan, status: PENDING }]));
+const workPackages = Object.fromEntries(Object.entries(packages).map(([id, { chord, ...value }]) =>
+  [id, { ...value, reports: [SYNC.report(id)], plan: chord ? SYNC.report('chord-discovery') : SYNC.plan, status: PENDING }]));
 
 // Upstream tests follow the source they exercise; a test of several areas goes to the area whose change it covers.
 const aiCatalogTests = new Set(['fireworks-models.test.ts', 'generate-models-strict.test.ts', 'model-data-validation.test.ts',
@@ -58,7 +73,10 @@ const cliUiTests = new Set(['assistant-message.test.ts', 'auth-url-copy.test.ts'
 const durableEdgeTests = new Set(['codemode-describe.test.ts', 'codemode.test.ts', 'env-node-list-race.test.ts', 'image-fixtures.ts',
   'images-fit.test.ts', 'tools-images.test.ts', 'tools.test.ts']);
 
+// The reviewed module names the package for every packages/chord path and for the paths where a report moved the work.
 function owner(path) {
+  const reviewed = dispositions[path]?.workPackage;
+  if (reviewed) return reviewed;
   const match = /^packages\/([^/]+)\/(.*)/.exec(path);
   if (!match) return 'meta';
   const [, pkg, relative] = match;
@@ -84,14 +102,31 @@ function owner(path) {
       if (/^src\/(?:codemode|images|tools|env)\//.test(relative) || /^test\/examples\//.test(relative)) return 'durable-edge';
       if (/^test\//.test(relative)) return durableEdgeTests.has(relative.slice('test/'.length)) ? 'durable-edge' : 'durable-core';
       return 'durable-core';
-    case 'chord': return 'chord';
+    case 'chord': throw new Error(`${path}: every packages/chord path needs a reviewed chord-* package in sync-1.6.0-dispositions.mjs`);
     default: return 'meta'; // codemode, schema, telemetry and evals change only their changelog and manifest in this range.
   }
 }
 
-// The 1.5.2 no-op categories and reasons, without the reviewed per-file 1.5.2 entries. A no-op here is mechanical: the
-// path alone decides it. Anything that needs a source review stays pending with its owner.
+// Reviewed no-op categories (sync-1.6.0-dispositions.mjs), beside the mechanical 1.5.2 categories that mechanical() returns.
+const reviewedCategories = {
+  'typescript-only': 'Type-level, cast or barrel-export change with no emitted runtime behavior; the native public surface is the owning package\'s.',
+  'node-runtime-only': 'Behavior specific to the Node runtime or a JavaScript SDK, with no native counterpart.',
+  'no-native-delta': 'A comment, a removed piece or a refactor with no behavior change: nothing native to update.',
+  'version-only': 'Package version and sibling dependency versions only; the native version is Directory.Build.props VersionPrefix.',
+};
+const mechanicalCategories = new Set(['upstream-app', 'example-or-fixture', 'typescript-ambient', 'upstream-documentation', 'browser-dom-react',
+  'browser-indexeddb', 'javascript-terminal-sandbox', 'upstream-build-tooling', 'evals-version-only']);
+
+// A reviewed entry decides first: a reviewed no-op takes its category and reason, and any other reviewed finding keeps the
+// row applicable even where the path rule would call it a no-op. Otherwise the 1.5.2 no-op categories and reasons decide by
+// path alone (mechanical), and anything else stays pending with its owner.
 function disposition(path) {
+  const reviewed = dispositions[path];
+  if (reviewed?.finding === NO_OP) return [reviewed.category, reviewed.reason];
+  if (reviewed?.finding) return null;
+  return mechanical(path);
+}
+function mechanical(path) {
   if (path.startsWith('apps/')) return ['upstream-app', 'Upstream application product code/assets are not PiSharp products. Shared library behavior is tracked independently under packages/chord; this does not exclude the native Chord App library.'];
   // packages/durable/test/examples is assigned to durable-edge by the work plan, so it is not a mechanical no-op.
   if (/(?:^|\/)(?:examples|bench|benchmarks|fixtures)\//.test(path) && !path.startsWith('packages/durable/test/examples/')) return ['example-or-fixture', 'Upstream examples, benchmarks and fixture files are reference material, not shipped C# runtime source. Applicable contracts and authored/captured native evidence belong to the corresponding area; no fixture is relabeled or recaptured by this mapping.'];
@@ -106,16 +141,35 @@ function disposition(path) {
   return null;
 }
 
+// What the reports state about a row, carried beside its status. It is never a status: only root's acceptance moves a row.
+function review(path) {
+  const { workPackage, category, reason, ...rest } = dispositions[path] ?? {};
+  return rest.finding ? rest : null;
+}
+const FINDINGS = new Set(['ported', 'already-ported', 'not-in-report', 'pending-package', NO_OP]);
+
 function build() {
   const inventory = read(SYNC.inventory);
+  const paths = new Set(inventory.files.map(file => (file.after ?? file.before).path));
+  for (const [path, entry] of Object.entries(dispositions)) {
+    if (!paths.has(path)) throw new Error(`${path}: a reviewed disposition for a path this range did not change`);
+    if (entry.finding && !FINDINGS.has(entry.finding)) throw new Error(`${path}: unknown finding ${entry.finding}`);
+    for (const id of [entry.workPackage, ...(entry.owners ?? []), ...(entry.pendingParts ?? [])].filter(Boolean))
+      if (!workPackages[id]) throw new Error(`${path}: unknown work package ${id}`);
+    if (entry.finding === NO_OP && (!entry.reason || !(entry.category in reviewedCategories || mechanicalCategories.has(entry.category))))
+      throw new Error(`${path}: a reviewed no-op needs a known category and a reason`);
+  }
   const rows = inventory.files.map((file, index) => {
     const path = (file.after ?? file.before).path;
-    const id = owner(path), noOp = disposition(path);
+    const id = owner(path), noOp = disposition(path), reviewed = review(path);
+    // A file several packages changed names each of their reports.
+    const reports = [...new Set([...(reviewed?.owners ?? []), id].flatMap(name => workPackages[name].reports))];
     return {
       id: `${SYNC.rowPrefix}.file.${String(index + 1).padStart(4, '0')}`, upstream: [path], change: file.status,
-      workPackage: id, area: path.startsWith('apps/') ? 'apps' : /^packages\/([^/]+)\//.exec(path)?.[1] ?? 'root', reports: workPackages[id].reports,
+      workPackage: id, area: path.startsWith('apps/') ? 'apps' : /^packages\/([^/]+)\//.exec(path)?.[1] ?? 'root', reports,
       status: noOp ? NO_OP : PENDING,
       ...(noOp ? { category: noOp[0], reason: noOp[1] } : { reason: 'Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.' }),
+      ...(reviewed ? { review: reviewed } : {}),
       source: { before: file.before, after: file.after },
     };
   });
@@ -125,7 +179,11 @@ function build() {
     scope: 'Every changed file in the complete frozen local Git inventory, including root applications, all packages, deletions and renames. This is source applicability, not a claim that every contract is implemented or validated.',
     statusMeaning: { [PENDING]: 'Assigned applicable source work; implementation and integrated runtime acceptance remain with the owning work package and root.', [NO_OP]: 'No direct native runtime port for the explicit reason; related runtime contracts remain separately in scope.' },
     inventory: SYNC.inventory, preservedPrevious: SYNC.preservedPrevious,
-    workPackages, summary: { files: rows.length, byStatus: count(rows, 'status'), byWorkPackage: count(rows, 'workPackage'), noOpByCategory: count(rows.filter(row => row.status === NO_OP), 'category') }, rows,
+    reviewedCategories,
+    review: { source: 'tools/CompatibilityReport/sync-1.6.0-dispositions.mjs', meaning: 'What the work package reports state about a row: a finding, the packages that changed the file, deferred parts and notes. It is read from the reports, not from a test run, and changes no status.' },
+    workPackages, summary: { files: rows.length, byStatus: count(rows, 'status'), byWorkPackage: count(rows, 'workPackage'), noOpByCategory: count(rows.filter(row => row.status === NO_OP), 'category'),
+      pendingByFinding: count(rows.filter(row => row.status === PENDING).map(row => ({ finding: row.review?.finding ?? 'unreviewed' })), 'finding'),
+      withPendingParts: rows.filter(row => row.review?.pendingParts).length }, rows,
   };
 
   // The row-level Durable map stays historical v1.5.0 evidence. The overlay lists this range's changed Durable files and the
@@ -139,6 +197,8 @@ function build() {
   const nativePath = 'tools/DurablePortMap/sync-1.6.0-native-map.json';
   const native = existsSync(resolve(repo, nativePath)) ? read(nativePath).files : {};
   const placed = row => native[row.source.after?.path];
+  for (const path of Object.keys(native)) if (!rows.some(row => row.source.after?.path === path && path.startsWith('packages/durable/')))
+    throw new Error(`${nativePath}: ${path} is not a Durable file the range changed, so no overlay row would carry it`);
   const overlay = {
     schemaVersion: 1, status: PENDING, source: inventory.to, previous: inventory.from,
     preservedMap: SYNC.durable.preservedMap, preservedMapSha256: createHash('sha256').update(readFileSync(resolve(repo, SYNC.durable.preservedMap))).digest('hex'),
@@ -151,6 +211,16 @@ function build() {
   const map = read(SYNC.durable.map), current = map.currentImplementation ?? {};
   const candidate = { source: inventory.to, status: PENDING, overlay: SYNC.durable.overlay, preservedMap: SYNC.durable.preservedMap,
     note: `Top-level source pin, rows, status counts and notes remain historical v1.5.0 evidence. The candidate overlay carries the ${SYNC.version} source disposition and no completed-port assertion.` };
+  // The historical rows' notes are pinned v1.5.0 evidence (their bytes are the preserved map's). Where a note names native API
+  // that this sync removed, the candidate says so and points at the overlay row that carries the current location.
+  candidate.supersededNotes = [
+    { upstream: 'packages/durable/src/codemode/describe.ts', names: ['CodemodeNamespace', 'NamespaceOf'], current: SYNC.durable.overlay,
+      note: 'The 1.6.0 port removed CodemodeNamespace, its prefix and namespaceOf; namespacesOf is DurableCodemode.NamespacesOf. The overlay row carries the current location as nativeMapping.' },
+    { upstream: 'packages/durable/src/codemode/index.ts', names: ['CodemodeNamespace'], current: SYNC.durable.overlay,
+      note: 'CodemodeNamespace and CodemodeToolOptions.Namespaces were removed by the 1.6.0 port (durable-edge report, breaking native API changes). The overlay row is current.' },
+  ];
+  for (const { upstream } of candidate.supersededNotes) if (!prior.files.some(row => row.upstream === upstream) || !overlay.rows.some(row => row.upstream[0] === upstream))
+    throw new Error(`${upstream}: a superseded note names a row the map or the overlay does not have`);
   const earlier = [...(current.candidate && current.candidate.overlay !== SYNC.durable.overlay ? [current.candidate] : []), ...(current.previousCandidates ?? [])];
   map.currentImplementation = { ...current, candidate, previousCandidates: earlier };
   return { table, overlay, map };

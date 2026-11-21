@@ -135,6 +135,9 @@
       ],
       "status": "implementation-pending-validation",
       "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
+      "review": {
+        "finding": "ported"
+      },
       "source": {
         "before": {
           "path": "packages/durable/package.json",
@@ -169,6 +172,9 @@
       ],
       "status": "implementation-pending-validation",
       "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
+      "review": {
+        "finding": "ported"
+      },
       "source": {
         "before": {
           "path": "packages/durable/src/codemode/codemode.ts",
@@ -209,6 +215,9 @@
       ],
       "status": "implementation-pending-validation",
       "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
+      "review": {
+        "finding": "ported"
+      },
       "source": {
         "before": {
           "path": "packages/durable/src/codemode/describe.ts",
@@ -261,6 +270,9 @@
       ],
       "status": "implementation-pending-validation",
       "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
+      "review": {
+        "finding": "ported"
+      },
       "source": {
         "before": {
           "path": "packages/durable/src/codemode/index.ts",
@@ -299,8 +311,12 @@
       "reports": [
         "AI_DOCS/agent-reports/sync-1.6.0-durable-edge.md"
       ],
-      "status": "implementation-pending-validation",
-      "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
+      "status": "no-op",
+      "category": "no-native-delta",
+      "reason": "saveImages decodes through a shared fromBase64 helper: the same decode moved, no behavior change; Output.cs keeps Convert.FromBase64String (durable-edge).",
+      "review": {
+        "finding": "no-op"
+      },
       "source": {
         "before": {
           "path": "packages/durable/src/codemode/output.ts",
@@ -341,6 +357,9 @@
       ],
       "status": "implementation-pending-validation",
       "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
+      "review": {
+        "finding": "ported"
+      },
       "source": {
         "before": {
           "path": "packages/durable/src/env/node.ts",
@@ -393,6 +412,9 @@
       ],
       "status": "implementation-pending-validation",
       "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
+      "review": {
+        "finding": "ported"
+      },
       "source": {
         "before": {
           "path": "packages/durable/src/harness/agent.ts",
@@ -433,6 +455,9 @@
       ],
       "status": "implementation-pending-validation",
       "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
+      "review": {
+        "finding": "ported"
+      },
       "source": {
         "before": {
           "path": "packages/durable/src/harness/define.ts",
@@ -473,6 +498,9 @@
       ],
       "status": "implementation-pending-validation",
       "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
+      "review": {
+        "finding": "ported"
+      },
       "source": {
         "before": {
           "path": "packages/durable/src/harness/generation.ts",
@@ -513,6 +541,9 @@
       ],
       "status": "implementation-pending-validation",
       "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
+      "review": {
+        "finding": "ported"
+      },
       "source": {
         "before": {
           "path": "packages/durable/src/harness/harness.ts",
@@ -553,6 +584,9 @@
       ],
       "status": "implementation-pending-validation",
       "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
+      "review": {
+        "finding": "ported"
+      },
       "source": {
         "before": {
           "path": "packages/durable/src/harness/inbox.ts",
@@ -593,6 +627,9 @@
       ],
       "status": "implementation-pending-validation",
       "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
+      "review": {
+        "finding": "ported"
+      },
       "source": {
         "before": {
           "path": "packages/durable/src/harness/live.ts",
@@ -633,6 +670,9 @@
       ],
       "status": "implementation-pending-validation",
       "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
+      "review": {
+        "finding": "ported"
+      },
       "source": {
         "before": null,
         "after": {
@@ -670,6 +710,9 @@
       ],
       "status": "implementation-pending-validation",
       "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
+      "review": {
+        "finding": "ported"
+      },
       "source": {
         "before": {
           "path": "packages/durable/src/harness/provider.ts",
@@ -710,6 +753,9 @@
       ],
       "status": "implementation-pending-validation",
       "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
+      "review": {
+        "finding": "ported"
+      },
       "source": {
         "before": {
           "path": "packages/durable/src/harness/scheduler.ts",
@@ -750,6 +796,9 @@
       ],
       "status": "implementation-pending-validation",
       "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
+      "review": {
+        "finding": "ported"
+      },
       "source": {
         "before": {
           "path": "packages/durable/src/harness/submissions.ts",
@@ -790,6 +839,9 @@
       ],
       "status": "implementation-pending-validation",
       "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
+      "review": {
+        "finding": "ported"
+      },
       "source": {
         "before": {
           "path": "packages/durable/src/harness/task-graph.ts",
@@ -830,6 +882,9 @@
       ],
       "status": "implementation-pending-validation",
       "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
+      "review": {
+        "finding": "ported"
+      },
       "source": {
         "before": {
           "path": "packages/durable/src/harness/tool.ts",
@@ -870,6 +925,9 @@
       ],
       "status": "implementation-pending-validation",
       "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
+      "review": {
+        "finding": "ported"
+      },
       "source": {
         "before": {
           "path": "packages/durable/src/harness/types.ts",
@@ -910,6 +968,9 @@
       ],
       "status": "implementation-pending-validation",
       "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
+      "review": {
+        "finding": "ported"
+      },
       "source": {
         "before": {
           "path": "packages/durable/src/harness/util.ts",
@@ -950,6 +1011,9 @@
       ],
       "status": "implementation-pending-validation",
       "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
+      "review": {
+        "finding": "ported"
+      },
       "source": {
         "before": null,
         "after": {
@@ -984,8 +1048,12 @@
       "reports": [
         "AI_DOCS/agent-reports/sync-1.6.0-durable-core.md"
       ],
-      "status": "implementation-pending-validation",
-      "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
+      "status": "no-op",
+      "category": "typescript-only",
+      "reason": "Barrel exports only: C# has no barrel file and the new types are public in PiSharp.Durable (durable-core, durable-edge).",
+      "review": {
+        "finding": "no-op"
+      },
       "source": {
         "before": {
           "path": "packages/durable/src/index.ts",
@@ -1026,6 +1094,9 @@
       ],
       "status": "implementation-pending-validation",
       "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
+      "review": {
+        "finding": "ported"
+      },
       "source": {
         "before": {
           "path": "packages/durable/src/session/transaction.ts",
@@ -1066,6 +1137,9 @@
       ],
       "status": "implementation-pending-validation",
       "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
+      "review": {
+        "finding": "ported"
+      },
       "source": {
         "before": null,
         "after": {
@@ -1102,6 +1176,10 @@
       ],
       "status": "implementation-pending-validation",
       "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
+      "review": {
+        "finding": "ported",
+        "note": "The new conformance case did not run against SQL Server (no PISHARP_DURABLE_MSSQL_CONNECTION_STRING)."
+      },
       "source": {
         "before": {
           "path": "packages/durable/src/testing/storage-conformance.ts",
@@ -1142,6 +1220,9 @@
       ],
       "status": "implementation-pending-validation",
       "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
+      "review": {
+        "finding": "ported"
+      },
       "source": {
         "before": {
           "path": "packages/durable/src/tools/image-processor.ts",
@@ -1194,6 +1275,9 @@
       ],
       "status": "implementation-pending-validation",
       "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
+      "review": {
+        "finding": "ported"
+      },
       "source": {
         "before": {
           "path": "packages/durable/src/tools/index.ts",
@@ -1234,6 +1318,9 @@
       ],
       "status": "implementation-pending-validation",
       "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
+      "review": {
+        "finding": "ported"
+      },
       "source": {
         "before": {
           "path": "packages/durable/src/tools/read.ts",
@@ -1274,6 +1361,9 @@
       ],
       "status": "implementation-pending-validation",
       "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
+      "review": {
+        "finding": "ported"
+      },
       "source": {
         "before": {
           "path": "packages/durable/src/types.ts",
@@ -1314,6 +1404,9 @@
       ],
       "status": "implementation-pending-validation",
       "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
+      "review": {
+        "finding": "ported"
+      },
       "source": {
         "before": {
           "path": "packages/durable/test/codemode-describe.test.ts",
@@ -1362,6 +1455,9 @@
       ],
       "status": "implementation-pending-validation",
       "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
+      "review": {
+        "finding": "ported"
+      },
       "source": {
         "before": {
           "path": "packages/durable/test/codemode.test.ts",
@@ -1402,6 +1498,9 @@
       ],
       "status": "implementation-pending-validation",
       "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
+      "review": {
+        "finding": "ported"
+      },
       "source": {
         "before": null,
         "after": {
@@ -1430,10 +1529,19 @@
       "workPackage": "durable-edge",
       "area": "durable",
       "reports": [
+        "AI_DOCS/agent-reports/sync-1.6.0-durable-core.md",
         "AI_DOCS/agent-reports/sync-1.6.0-durable-edge.md"
       ],
       "status": "implementation-pending-validation",
       "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
+      "review": {
+        "finding": "ported",
+        "owners": [
+          "durable-core",
+          "durable-edge"
+        ],
+        "note": "durable-core made the edit (runEndTask to hookTask in ExamplesTestsAfterEdits.cs)."
+      },
       "source": {
         "before": {
           "path": "packages/durable/test/examples/32-tests-after-edits.ts",
@@ -1474,6 +1582,10 @@
       ],
       "status": "implementation-pending-validation",
       "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
+      "review": {
+        "finding": "ported",
+        "note": "Ported as a sample under samples/Durable.Examples; expected output is authored from source, not captured under Node (durable-edge)."
+      },
       "source": {
         "before": null,
         "after": {
@@ -1509,6 +1621,10 @@
       ],
       "status": "implementation-pending-validation",
       "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
+      "review": {
+        "finding": "ported",
+        "note": "Ported as a sample under samples/Durable.Examples; expected output is authored from source, not captured under Node (durable-edge)."
+      },
       "source": {
         "before": null,
         "after": {
@@ -1544,6 +1660,10 @@
       ],
       "status": "implementation-pending-validation",
       "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
+      "review": {
+        "finding": "ported",
+        "note": "Ported as a sample under samples/Durable.Examples; expected output is authored from source, not captured under Node (durable-edge)."
+      },
       "source": {
         "before": null,
         "after": {
@@ -1579,6 +1699,10 @@
       ],
       "status": "implementation-pending-validation",
       "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
+      "review": {
+        "finding": "ported",
+        "note": "Ported as a sample under samples/Durable.Examples; expected output is authored from source, not captured under Node (durable-edge)."
+      },
       "source": {
         "before": null,
         "after": {
@@ -1614,6 +1738,10 @@
       ],
       "status": "implementation-pending-validation",
       "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
+      "review": {
+        "finding": "ported",
+        "note": "Ported as a sample under samples/Durable.Examples; expected output is authored from source, not captured under Node (durable-edge)."
+      },
       "source": {
         "before": null,
         "after": {
@@ -1649,6 +1777,10 @@
       ],
       "status": "implementation-pending-validation",
       "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
+      "review": {
+        "finding": "ported",
+        "note": "Ported as a sample under samples/Durable.Examples; expected output is authored from source, not captured under Node (durable-edge)."
+      },
       "source": {
         "before": null,
         "after": {
@@ -1684,6 +1816,10 @@
       ],
       "status": "implementation-pending-validation",
       "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
+      "review": {
+        "finding": "ported",
+        "note": "Ported as a sample under samples/Durable.Examples; expected output is authored from source, not captured under Node (durable-edge)."
+      },
       "source": {
         "before": null,
         "after": {
@@ -1719,6 +1855,10 @@
       ],
       "status": "implementation-pending-validation",
       "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
+      "review": {
+        "finding": "ported",
+        "note": "Ported as a sample under samples/Durable.Examples; expected output is authored from source, not captured under Node (durable-edge)."
+      },
       "source": {
         "before": null,
         "after": {
@@ -1754,6 +1894,10 @@
       ],
       "status": "implementation-pending-validation",
       "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
+      "review": {
+        "finding": "ported",
+        "note": "Ported as a sample under samples/Durable.Examples; expected output is authored from source, not captured under Node (durable-edge)."
+      },
       "source": {
         "before": null,
         "after": {
@@ -1789,6 +1933,10 @@
       ],
       "status": "implementation-pending-validation",
       "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
+      "review": {
+        "finding": "ported",
+        "note": "Ported as a sample under samples/Durable.Examples; expected output is authored from source, not captured under Node (durable-edge)."
+      },
       "source": {
         "before": null,
         "after": {
@@ -1824,6 +1972,9 @@
       ],
       "status": "implementation-pending-validation",
       "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
+      "review": {
+        "finding": "ported"
+      },
       "source": {
         "before": {
           "path": "packages/durable/test/harness-after-run.test.ts",
@@ -1864,6 +2015,9 @@
       ],
       "status": "implementation-pending-validation",
       "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
+      "review": {
+        "finding": "ported"
+      },
       "source": {
         "before": null,
         "after": {
@@ -1896,6 +2050,9 @@
       ],
       "status": "implementation-pending-validation",
       "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
+      "review": {
+        "finding": "ported"
+      },
       "source": {
         "before": {
           "path": "packages/durable/test/harness-idle-scopes.test.ts",
@@ -1936,6 +2093,9 @@
       ],
       "status": "implementation-pending-validation",
       "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
+      "review": {
+        "finding": "ported"
+      },
       "source": {
         "before": {
           "path": "packages/durable/test/harness-input-entries.test.ts",
@@ -1976,6 +2136,9 @@
       ],
       "status": "implementation-pending-validation",
       "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
+      "review": {
+        "finding": "ported"
+      },
       "source": {
         "before": {
           "path": "packages/durable/test/harness-lifecycle.test.ts",
@@ -2016,6 +2179,9 @@
       ],
       "status": "implementation-pending-validation",
       "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
+      "review": {
+        "finding": "ported"
+      },
       "source": {
         "before": {
           "path": "packages/durable/test/harness-nested-tools.test.ts",
@@ -2056,6 +2222,9 @@
       ],
       "status": "implementation-pending-validation",
       "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
+      "review": {
+        "finding": "ported"
+      },
       "source": {
         "before": null,
         "after": {
@@ -2088,6 +2257,10 @@
       ],
       "status": "implementation-pending-validation",
       "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
+      "review": {
+        "finding": "ported",
+        "deferred": "One assertion is not ported: the NaN delivery inside \"answers not_found, invalid, ...\" (a JsonValue cannot hold NaN) (durable-core)."
+      },
       "source": {
         "before": null,
         "after": {
@@ -2120,6 +2293,9 @@
       ],
       "status": "implementation-pending-validation",
       "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
+      "review": {
+        "finding": "ported"
+      },
       "source": {
         "before": {
           "path": "packages/durable/test/harness-submissions.test.ts",
@@ -2160,6 +2336,9 @@
       ],
       "status": "implementation-pending-validation",
       "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
+      "review": {
+        "finding": "ported"
+      },
       "source": {
         "before": null,
         "after": {
@@ -2192,6 +2371,9 @@
       ],
       "status": "implementation-pending-validation",
       "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
+      "review": {
+        "finding": "ported"
+      },
       "source": {
         "before": {
           "path": "packages/durable/test/harness-tool-hooks.test.ts",
@@ -2232,6 +2414,9 @@
       ],
       "status": "implementation-pending-validation",
       "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
+      "review": {
+        "finding": "ported"
+      },
       "source": {
         "before": null,
         "after": {
@@ -2264,6 +2449,9 @@
       ],
       "status": "implementation-pending-validation",
       "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
+      "review": {
+        "finding": "ported"
+      },
       "source": {
         "before": {
           "path": "packages/durable/test/harness-tools.test.ts",
@@ -2304,6 +2492,9 @@
       ],
       "status": "implementation-pending-validation",
       "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
+      "review": {
+        "finding": "ported"
+      },
       "source": {
         "before": null,
         "after": {
@@ -2337,6 +2528,9 @@
       ],
       "status": "implementation-pending-validation",
       "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
+      "review": {
+        "finding": "ported"
+      },
       "source": {
         "before": null,
         "after": {
@@ -2369,6 +2563,9 @@
       ],
       "status": "implementation-pending-validation",
       "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
+      "review": {
+        "finding": "ported"
+      },
       "source": {
         "before": {
           "path": "packages/durable/test/spec-usage.test.ts",
@@ -2409,6 +2606,9 @@
       ],
       "status": "implementation-pending-validation",
       "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
+      "review": {
+        "finding": "ported"
+      },
       "source": {
         "before": {
           "path": "packages/durable/test/tools-images.test.ts",
@@ -2447,8 +2647,12 @@
       "reports": [
         "AI_DOCS/agent-reports/sync-1.6.0-durable-edge.md"
       ],
-      "status": "implementation-pending-validation",
-      "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
+      "status": "no-op",
+      "category": "typescript-only",
+      "reason": "A TypeScript cast (as ToolExecutionResult); no case changed (durable-edge).",
+      "review": {
+        "finding": "no-op"
+      },
       "source": {
         "before": {
           "path": "packages/durable/test/tools.test.ts",
