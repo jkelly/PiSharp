@@ -19,6 +19,9 @@ public sealed partial class RegistrationScope : IExtensionSessionCreationRegistr
     internal TaskCompletionSource? Idle { get; set; }
     internal TaskCompletionSource? Disposal { get; set; }
     internal object? QuiescenceIdentity { get; set; }
+    /// <summary>Set by <see cref="WithdrawRegistrations"/>: the extension runtime this owner belongs to was replaced (the runner's
+    /// staleMessage of Pi faac585884ae2c013a6b1400f3e9e77f10b34bac runner.ts for event-bus error reports, #11264).</summary>
+    internal bool Withdrawn { get; set; }
     internal TaskCompletionSource InitializerSettled { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly CancellationTokenSource lifetime = new();
     private IPiSharpExtension? extension;

@@ -193,6 +193,14 @@ export class ExtensionRuntime {
   }
 
   assertActive() { if (this.staleMessage) throw new Error(this.staleMessage); }
+  /** Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (#11264), runner.ts `runtime.reportError` and types.ts
+   *  `ExtensionRuntimeState.reportError`: an error thrown by a `pi.events` handler goes to the host's extension error listeners (the
+   *  chat in interactive mode, `extension_error` in RPC mode, `Extension error (...)` in print mode) instead of console.error. A
+   *  handler still running when its runtime was replaced or shut down must not report into the replacement: dropped once stale. */
+  reportError(error) {
+    if (this.staleMessage) return;
+    try { this.bridge.notify('extension.error', error); } catch { /* the host channel is gone: nothing can show the error */ }
+  }
   invalidate(text = STALE_MESSAGE) {
     if (!this.staleMessage) {
       this.staleMessage = text; this.eventBus.clear();
@@ -323,7 +331,13 @@ export class ExtensionRuntime {
         emit(channel, data) { assertActive(); eventBus.emit(channel, data); },
         on(channel, handler) {
           assertActive();
-          const unsubscribe = eventBus.on(channel, handler);
+          // Pi faac585884ae2c013a6b1400f3e9e77f10b34bac loader.ts (#11264): report a throwing handler like other extension errors.
+          // The event bus would print it with console.error, which draws over the interactive TUI.
+          const reportingHandler = async (data) => {
+            try { await handler(data); }
+            catch (error) { runtime.reportError({ extensionPath: extension.path, event: `events:${channel}`, error: message(error), stack: stack(error) }); }
+          };
+          const unsubscribe = eventBus.on(channel, reportingHandler);
           if (state === 'loading') loadingUnsubscribers.push(unsubscribe);
           return unsubscribe;
         },

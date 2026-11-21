@@ -94,6 +94,10 @@ internal sealed partial class NativeExtensionActivation : IAsyncDisposable, IPro
             uiPrompts ?? (IExtensionUiProvider)new UnavailableExtensionUiProvider(), sessionViews, facadeCapabilities);
         // pi.registerMcpServer(): registrations made while the extension loads are read when the session starts.
         if (mcpServers is not null) { registry.McpServerHost = mcpServers; mcpServers.OwnerPath = _ => preflight.Configuration.Package; }
+        // Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (#11264), runner.ts runtime.reportError: the extension's failed event-bus
+        // listener is reported through the session's extension diagnostics (event "events:<channel>"), not the console.
+        if (reportInputDiagnostic is not null)
+            registry.EventBusErrorReporter = (diagnostic, _) => ObserveEventBusReport(reportInputDiagnostic(diagnostic, CancellationToken.None));
         var loader = new PluginAssemblyLoader(new() { SnapshotParentDirectory = preflight.Configuration.SnapshotRoot,
             MaximumOwnedPackages = 1 });
         NativeExtensionRegistrationBridge? registrationBridge = null;

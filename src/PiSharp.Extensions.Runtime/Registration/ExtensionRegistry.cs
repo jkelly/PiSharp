@@ -400,6 +400,9 @@ public sealed partial class ExtensionRegistry : IAsyncDisposable
     {
         lock (gate)
         {
+            // Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (#11264), runner.ts runtime.reportError: the owner's runtime was replaced;
+            // listeners already admitted finish, but no longer report (ReportEventBusFailure).
+            scope.Withdrawn = true;
             var removed = false;
             foreach (var entry in scope.Staged.Entries.ToArray())
             {

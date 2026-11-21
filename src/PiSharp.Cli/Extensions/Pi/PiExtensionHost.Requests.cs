@@ -353,6 +353,16 @@ internal sealed partial class PiExtensionHost
                 return;
             }
             case "events.emit": DeliverFromNode(parameters); return;
+            case "extension.error":
+            {
+                // Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (#11264), runner.ts runtime.reportError -> emitError: an error thrown by
+                // a pi.events handler is reported like other extension errors, with event "events:<channel>". The Node runtime drops
+                // it when the runtime is stale (reload, shutdown), so what arrives here belongs to the current runtime.
+                string Text(string name, string fallback) => parameters.ValueKind == JsonValueKind.Object &&
+                    parameters.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.String ? value.GetString()! : fallback;
+                await ReportAsync(Text("extensionPath", "<unknown>"), Text("event", ""), Text("error", "")).ConfigureAwait(false);
+                return;
+            }
             case "oauth.event": OAuthEvent(parameters); return;
             case "component.event": ComponentEvent?.Invoke(parameters.GetProperty("id").GetString()!, parameters.Clone()); return;
             case "registrations.changed":
