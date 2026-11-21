@@ -1,4 +1,4 @@
-// Pi b4afdddf44e059c67ccf5097e5317d913521b470 (MIT): packages/chord/src/surfaces/client.ts.
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/chord/src/surfaces/client.ts.
 using PiSharp.Chord.Contracts;
 using PiSharp.Chord.Host;
 using PiSharp.Chord.Link;
@@ -24,10 +24,19 @@ public sealed class ClientOptions
     public IReadOnlyDictionary<string, object?> Modules { get; init; } = new Dictionary<string, object?>();
     public IReadOnlyList<PluginFacet> Core { get; init; } = [];
     public required Func<ISocketEvents, ILink> Open { get; init; }
+    /// <summary>The limits per part of what arrives from the server (default: an untrusted link's, 16 MiB on the wire).</summary>
+    public PartLimits? Limits { get; init; }
     public required Func<ScriptEntry, CancellationToken, Task<RegisteredScript>> FetchScript { get; init; }
+    /// <summary>The server's current base bundle hash, asked at each reconnect beside the next attempt (<c>null</c>: unknown, try again):
+    /// another one means this client is outdated.</summary>
     public required Func<CancellationToken, Task<string?>> ServerBase { get; init; }
+    /// <summary>This client's code is outdated: the app starts it over; the loop has stopped.</summary>
     public required Action Outdated { get; init; }
+    /// <summary>Asked at each reconnect, beside the next attempt; <c>false</c> stops the loop (a guest's ended share).</summary>
     public Func<Task<bool>>? CanRetry { get; init; }
+    /// <summary>Whether the client follows the scripts object (new sets applied, another base <c>Outdated</c>, the server's base asked at
+    /// each reconnect): yes by default; <c>false</c> for a static client (built offline and served elsewhere).</summary>
+    public bool Follow { get; init; } = true;
     public Action<ConnectionState>? OnConnection { get; init; }
     public IClientStyles? Styles { get; init; }
     public required ILoopEnvironment Environment { get; init; }
@@ -50,6 +59,7 @@ public sealed class Client : IAsyncDisposable
     private Action? cancelRetry;
     private double retryDelay;
     private IReference? held;
+    private Task following = Task.CompletedTask;
     private ConnectionLoop? loop;
     private bool outdated;
     public ChordHost Host { get; }
@@ -60,6 +70,8 @@ public sealed class Client : IAsyncDisposable
         RefreshAccepted(options.Initial);
     }
 
+    /// <summary>Starts a client: its host loaded with the initial scripts, its link kept, its plugins kept current from the scripts object
+    /// once the server answers. It completes before that: a client starts offline. A failure to follow is reported <c>update_failed</c>.</summary>
     public static async Task<Client> StartAsync(ClientOptions options, ChordContext? context = null)
     {
         ArgumentNullException.ThrowIfNull(options);
@@ -79,20 +91,24 @@ public sealed class Client : IAsyncDisposable
                 Open = events =>
                 {
                     var link = new SharedClose(options.Open(events));
-                    try { host.Connect(link, new LinkOptions { Principal = new() { ["kind"] = "server" } }, ChordContext.Background); }
+                    // A client's parent is the server; the principal only labels the link (a client serves no remote types).
+                    try { host.Connect(link, new LinkOptions { Principal = new() { ["kind"] = "server" }, Limits = options.Limits }, ChordContext.Background); }
                     catch { link.Close(); throw; }
                     return link;
                 },
-                OnState = state => { options.OnConnection?.Invoke(state); if (state == ConnectionState.Connected) client.Reconnected(); },
+                OnState = state => { options.OnConnection?.Invoke(state); if (options.Follow && state == ConnectionState.Connected) client.Reconnected(); },
                 CanRetry = async () =>
                 {
                     if (client.abort.IsCancellationRequested) return false;
-                    var serverBase = await options.ServerBase(client.abort.Token).ConfigureAwait(false);
+                    // A static client asks no base: it never learns it is outdated.
+                    var serverBase = options.Follow ? await options.ServerBase(client.abort.Token).ConfigureAwait(false) : null;
+                    // Stopped first, as Outdated promises: an attempt made meanwhile ends with it (MarkOutdated stops the loop).
                     if (serverBase is not null && serverBase != options.Base) { client.MarkOutdated(); return false; }
                     return options.CanRetry is null || await options.CanRetry().ConfigureAwait(false);
                 },
             });
-            await client.FollowAsync(context).ConfigureAwait(false);
+            // In the background: the scripts object is the server's, and a client starts (a page renders) without it, offline too.
+            if (options.Follow) client.following = client.FollowInBackgroundAsync(context);
             return client;
         }
         catch
@@ -103,12 +119,33 @@ public sealed class Client : IAsyncDisposable
         }
     }
 
+    private async Task FollowInBackgroundAsync(ChordContext context)
+    {
+        try { await FollowAsync(context).ConfigureAwait(false); }
+        catch (Exception error) { if (!abort.IsCancellationRequested) Report(options, new("update_failed", error)); }
+    }
+
     private async Task FollowAsync(ChordContext context)
     {
         var ctx = ChordContext.WithAbortSignal(abort.Token, context);
-        // Native member watches require a ready reference; await the initial binding before acquiring one.
-        held = await Host.GetAsync(options.Scripts, new(), ctx).ConfigureAwait(false);
-        var watch = await held.Member("set").WatchAsync(ctx).ConfigureAwait(false);
+        // Held, not got, as upstream holds the scripts object: a hold waits for the server however long it takes (a client starts
+        // offline and follows once a link opens), where a get gives up at the host's ready timeout.
+        var acquired = Host.Hold(options.Scripts, new(), ctx);
+        lock (gate)
+        {
+            // Stopped meanwhile: StopCoreAsync found nothing to release.
+            if (abort.IsCancellationRequested) { acquired.Release(); return; }
+            held = acquired;
+        }
+        // Native member watches require a bound reference; await the hold's live state before acquiring one. A hold that lost its
+        // binding between the two (the link dropped) waits for the next live state, as upstream's watch of a held member does.
+        IWatchHandle<System.Text.Json.Nodes.JsonNode?> watch;
+        while (true)
+        {
+            await LiveAsync(acquired, ctx).ConfigureAwait(false);
+            try { watch = await acquired.Member("set").WatchAsync(ctx).ConfigureAwait(false); break; }
+            catch (PiSharp.Chord.Data.ChordError) when (!abort.IsCancellationRequested && acquired.State.Value.Kind is "loading" or "failed") { }
+        }
         // Native watches expose their acquisition value separately; Start delivers subsequent frames only.
         // Queue that value before installing the listener, so a newer queued frame can never be overwritten by it.
         var initial = UpdateAsync(ScriptSet.FromJson(watch.Value), ctx);
@@ -122,6 +159,30 @@ public sealed class Client : IAsyncDisposable
         });
         await initial.ConfigureAwait(false);
     }
+
+    // Completes once `reference` is live; fails when it ends (released at stop) or the context is aborted.
+    private static async Task LiveAsync(IReference reference, ChordContext context)
+    {
+        var live = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var watch = await reference.State.WatchAsync(context).ConfigureAwait(false);
+        try
+        {
+            watch.Start((call, _) =>
+            {
+                if (call is NativeWatchValueCall<RefState> { Value.Kind: "live" }) live.TrySetResult();
+                return Task.CompletedTask;
+            });
+            // The acquisition value is no frame: a state reached before the listener was installed is read here.
+            if (reference.State.Value.Kind == "live") live.TrySetResult();
+            var first = await Task.WhenAny(live.Task, watch.Closed).ConfigureAwait(false);
+            if (!ReferenceEquals(first, live.Task) && !live.Task.IsCompletedSuccessfully) throw new OperationCanceledException("the scripts object was released before it was live");
+        }
+        finally { _ = watch.StopAsync(); }
+    }
+
+    /// <summary>Completes once the client has begun following the scripts object (the set shown then was applied or superseded), or at once
+    /// for a static client. PiSharp-only: upstream's tests poll.</summary>
+    internal Task Followed => following;
 
     /// <summary>Supplies a newly published full set. Older queued sets are superseded; committed sets remain adopted.</summary>
     public Task UpdateAsync(ScriptSet set, ChordContext? context = null)
@@ -260,8 +321,14 @@ public sealed class Client : IAsyncDisposable
     { lock (gate) return stopping ??= Task.Run(() => StopCoreAsync(context ?? ChordContext.Background)); }
     private async Task StopCoreAsync(ChordContext context)
     {
-        loop?.Stop(); abort.Cancel(); cancelRetry?.Invoke(); cancelRetry = null; held?.Release(); held = null;
-        await applying.ConfigureAwait(false);
+        loop?.Stop(); abort.Cancel();
+        IReference? holding;
+        lock (gate) { cancelRetry?.Invoke(); cancelRetry = null; holding = held; held = null; }
+        holding?.Release();
+        // The background follow ends with the abort (it reports nothing once stopped); its queued set is joined below.
+        await following.ConfigureAwait(false);
+        Task queued; lock (gate) queued = applying;
+        await queued.ConfigureAwait(false);
         await Host.CloseAsync(context).ConfigureAwait(false);
         abort.Dispose();
     }
