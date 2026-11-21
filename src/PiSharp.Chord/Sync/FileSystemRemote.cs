@@ -1,4 +1,4 @@
-// Pi b4afdddf44e059c67ccf5097e5317d913521b470 (MIT): packages/chord/src/sync/filesystem.ts.
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/chord/src/sync/filesystem.ts.
 using System.Globalization;
 using System.Runtime.CompilerServices;
 using System.Text;
@@ -156,8 +156,11 @@ public sealed class FileSystemSyncRemote(ISyncFileSystem fs, string root) : ISes
         var path = await PathAsync(sessionId, context, directory, name).ConfigureAwait(false);
         var probe = await fs.OpenBinaryReaderAsync(path, null, context).ConfigureAwait(false);
         if (probe.IsNotFound) return null;
-        // Do not retain a handle when the caller never starts consuming this body. Unlike upstream's eager handle,
-        // the lazy reader can fail if maintenance deletes the file between this probe and enumeration.
+        // Do not retain a handle when the caller never starts consuming this body. Upstream opens the file here and, from 1.6.0
+        // (`readerBody`), closes it at its end, on a failed read, or on the iterator's `return()`, also before the first read. Here the
+        // file is opened at the first read and closed when the enumerator is disposed (at its end, on a failed read, or early), so a
+        // body that is never read, or is returned before its first read, holds nothing. The lazy reader can fail if maintenance deletes
+        // the file between this probe and enumeration.
         await probe.Unwrap().CloseAsync(ChordContext.WithoutAbortSignal(context)).ConfigureAwait(false);
         return StreamFileAsync(path, context);
     }
