@@ -2,7 +2,7 @@
 // 1.6.0 here: a binding's event members (decision "Events: fire-and-forget members"), and what references sharing one wire hold need
 // (decision "References share one wire hold"): calls and retries name their binding, a binding joining a bound remote object records
 // the members it has not seen (Joined, Seen), and a retry alone moves it to a private object (Transfer). Named queries (QueryMember,
-// FollowInstance) and the denied state are chord-queries' and chord-admission's.
+// FollowInstance) are a partial of Binding in Host/NamedQuery.cs; the denied state is chord-admission's.
 using System.Collections.Immutable;
 using System.Text.Json.Nodes;
 using PiSharp.Chord.Contracts;
@@ -149,6 +149,8 @@ internal sealed partial class Binding : IReference, IHolder
         if (next.Kind == "live" && PendingKeys > 0) next = RefState.Loading;
         Move(next);
         RetargetEvents();
+        // The readers of its object's named queries read another live instance's (a restart's successor).
+        ToldOfInstance();
         Host.ChangedPresence();
     }
     // Its event members follow the instance it points at from the host's counter value now, when that is another instance than they
@@ -262,7 +264,7 @@ internal sealed partial class Binding : IReference, IHolder
         var taps = eventTaps; eventTaps = null; eventsAt = null; eventMembers = null; taps?.End();
         foreach (var member in members.Values) member.Release();
         foreach (var key in KeySources.Values.ToArray()) key.Release();
-        KeySources.Clear(); keyed.Clear();
+        KeySources.Clear(); keyed.Clear(); queryMembers = null; instanceFollowers = null; followedInstance = null;
         members.Clear(); source.Released(); Wake(); Changed?.Invoke(); Changed = null;
         target?.Unhold(this); Host.Forget(this); host = null; Dependent = null; AcquisitionContext = ChordContext.Background;
     }

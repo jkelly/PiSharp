@@ -1,4 +1,6 @@
-// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/chord/src/next/host/{host,facet,attempt,reference,ctx}.ts
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/chord/src/host/{host,facet,attempt,reference,ctx}.ts
+// 1.6.0 here: events and call windows (chord-remote), query_failed's Query and HostDeleteOptions (chord-store), named queries, their
+// readers and lists on ISelf, IStoreSelf and IReference (chord-queries). Admission is chord-admission's.
 using System.Text.Json.Nodes;
 using PiSharp.Chord.Contracts;
 using PiSharp.Chord.Data;
@@ -98,6 +100,10 @@ public interface IReference : IDisposable
     /// <summary>The event member <paramref name="name"/> (Pi 1.6.0, decision "Events: fire-and-forget members"): its listeners get what
     /// this reference receives while it is bound to an instance whose variant has the member; never an event emitted before it bound.</summary>
     IEventMember Event(string name) => throw new NotSupportedException("Event members are not available on this reference.");
+    /// <summary>The named queries of <c>queries</c> member <paramref name="name"/> by name (Pi 1.6.0, slice 14 §3.1): each reads its
+    /// provider's declaration while the provider is live (<c>self.LiveQuery</c>, <c>self.Count</c>, <c>self.List</c>, <c>PageAsync</c>).
+    /// Named queries are local: only a reference to an object of this host has them.</summary>
+    IReadOnlyDictionary<string, INamedQuery> QueriesMember(string name) => throw new NotSupportedException("Queries members are not available on this reference.");
     Task<object?> CallAsync(string name, object? arguments, ChordContext context);
     void Retry();
     void Release();
@@ -112,6 +118,23 @@ public interface ISelf
     /// published before it; never kept, never folded, dropped for a holder that cannot keep up. Emits are no transaction work; after the
     /// attempt's seal <c>Emit</c> throws <c>released</c>.</summary>
     IEventSource Events() => throw new NotSupportedException("Event sources are not available on this implementation.");
+    /// <summary>A named query read live (Pi 1.6.0, slice 14 §3): the first <paramref name="first"/> rows of <paramref name="query"/> for
+    /// <paramref name="args"/>, and whether a further row exists, as a JSON watchable of <c>{ "rows": [...], "more": bool }</c>.
+    /// <paramref name="args"/> is JSON (a <see cref="JsonNode"/>, null for JSON null) or a JSON watchable of the arguments (a derive, a
+    /// reference's member): the member shows the previous rows until the read for the new arguments has run. Opened once this object's
+    /// dependencies are live and before its natives; a commit that can change its rows runs it again in its step. Another object's query
+    /// is read through its reference (<c>self.Get(Store, new()).QueriesMember("member")["name"]</c>), the owner's own through what
+    /// <c>self.Queries</c> returned.</summary>
+    IWatchable<JsonNode?> LiveQuery(INamedQuery query, object? args, long first) => throw new NotSupportedException("Named queries are not available on this implementation.");
+    /// <summary>The exact number of rows of a named query for <paramref name="args"/>, live (slice 14 §3.1). Expensive: every run reads
+    /// every matching row, nothing caps it, and it runs again on every write to its tables except an update that assigns none of its
+    /// condition's columns. Count what a key or an index bounds.</summary>
+    IWatchable<JsonNode?> Count(INamedQuery query, object? args) => throw new NotSupportedException("Named queries are not available on this implementation.");
+    /// <summary>A list a screen loads more of (slice 14 §4): the rows of a named query in pages of <c>options.First</c> between fixed
+    /// bookmarks, so loaded rows stay live, <c>MoreAsync</c> sends only the new rows, and a row that moves leaves no gap and no duplicate.
+    /// <paramref name="name"/> is the list's within this object: its bookmarks survive a reload by it. One source,
+    /// <c>[(namedQuery, args)]</c>; the arguments may be a JSON watchable of them.</summary>
+    IListHandle List(string name, IReadOnlyList<(INamedQuery Query, object? Args)> sources, ListOptions options) => throw new NotSupportedException("Lists are not available on this implementation.");
     IWatchable<JsonNode?> Derive(IReadOnlyList<object> sources, Func<IReadOnlyList<object?>, JsonNode?> compute);
     IReference Get(Contract type, JsonObject parameters);
     IRegistryValue<V> Registry<C, V>(Registry<C, V> registry);
@@ -128,6 +151,13 @@ public interface IStoreSelf : ISelf
 {
     ITable Table(TableDefinition definition);
     IWatchable<JsonNode?> Query(ITable table, Query query, long limit) => throw new NotSupportedException("Live queries are not available on this implementation.");
+    /// <summary>Named queries over <paramref name="table"/>, a table this factory declared (Pi 1.6.0, slice 14 §3.1): one per entry of
+    /// <paramref name="builders"/>, each a pure function of its arguments returning a query of the table. What it returns implements a
+    /// <c>queries</c> member of the contract (the queries listed there; the others are private to this object and bring their argument
+    /// schema). <c>options.Map</c> turns a row (and a joined query's partner) into the item readers get, from the columns <c>Reads</c>
+    /// (and <c>PartnerReads</c>) list: a change of another column is no change of the item.</summary>
+    IReadOnlyDictionary<string, INamedQuery> Queries(ITable table, QueriesOptions options, IReadOnlyDictionary<string, QueryBuilder> builders) =>
+        throw new NotSupportedException("Named queries are not available on this implementation.");
     void Contribute<C, V>(Registry<C, V> registry, object? value);
 }
 public enum NativeCloseReason { End, Close, Reload }

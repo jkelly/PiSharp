@@ -157,6 +157,9 @@ internal sealed class RemoteObject : ITarget, IUpstream
             : new("loading", Instance: bound, Last: replica);
     }
     public IKeyedHandle KeyedMember(string member, long version) => throw HostErrors.InvalidMember(member);
+    /// <summary><c>queries</c> members are only in local contracts, as keyed ones (Pi 1.6.0, slice 14 §3.1).</summary>
+    public OwnQuery QueryMember(string member, string name) =>
+        throw DataInternal.Invalid("member", $"{Label} has no queries member \"{member}\": named queries are local");
     public bool Reaches(ITarget target, HashSet<ITarget> visited) => ReferenceEquals(this, target);
     /// <summary>
     /// <c>Retry()</c> from <paramref name="holder"/>, as a step of <paramref name="walk"/>: a failed object's provider is asked for an
