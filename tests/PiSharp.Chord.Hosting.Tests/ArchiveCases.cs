@@ -161,7 +161,7 @@ internal static class ArchiveCases
                 Executable = Environment.ProcessPath!, LockDirectory = Path.Combine(root, "locks"),
                 Plugins = (_, _) => throw new Exception("Idle archive unexpectedly started worker"),
                 Authorize = (_, _) => true, Principal = _ => new JsonObject { ["kind"] = "worker" },
-                OnError = (_, _) => { },
+                Store = store, OnError = (_, _) => { },
             }, ChordContext.Background);
             await host.LoadAsync([new("archive.workers", workers.Facet)], ChordContext.Background);
             var service = new AppArchiveService("archive-test", "1", layout, host,
