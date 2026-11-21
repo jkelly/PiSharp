@@ -1,4 +1,4 @@
-// Pi b4afdddf44e059c67ccf5097e5317d913521b470 (MIT): packages/mcp/src/oauth/sign-in.ts.
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/mcp/src/oauth/sign-in.ts.
 using System.Collections.Concurrent;
 using System.Text.Json;
 using PiSharp.Extensions.Mcp.Authentication;

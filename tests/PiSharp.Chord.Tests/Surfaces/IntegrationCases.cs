@@ -1,4 +1,4 @@
-// Pi b4afdddf44e059c67ccf5097e5317d913521b470 (MIT): packages/chord/src/surfaces/active-theme.ts, packages/chord/src/surfaces/active-language.ts, packages/chord/src/surfaces/page-state.ts.
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/chord/src/surfaces/active-theme.ts, packages/chord/src/surfaces/active-language.ts, packages/chord/src/surfaces/page-state.ts.
 // Authored native regression; not an upstream execution capture.
 // The two client cases follow packages/chord/src/surfaces/client.ts at faac585884ae2c013a6b1400f3e9e77f10b34bac (a client starts without
 // waiting for the scripts object).

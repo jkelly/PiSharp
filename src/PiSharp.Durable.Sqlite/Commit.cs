@@ -1,4 +1,4 @@
-// Pi b4afdddf44e059c67ccf5097e5317d913521b470 (MIT): packages/durable/src/storage/sqlite/commit.ts and statements.ts.
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/durable/src/storage/sqlite/commit.ts and statements.ts.
 // Bounded prefetch, sequential semantic checks, and per-table pending writes. Copies flush pending writes before reading.
 using System.Collections.Immutable;
 using System.Text;

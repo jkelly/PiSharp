@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "mode": "report-only",
-  "generatedBy": "node tools/CompatibilityReport/repin-sources.mjs --upstream <Pi repo> --from v1.5.2 --to v1.6.0",
+  "mode": "applied",
+  "generatedBy": "node tools/CompatibilityReport/repin-sources.mjs --upstream <Pi repo> --from v1.5.2 --to v1.6.0 --write",
   "decision": "docs/decisions/0015-pi-1.6.0-sync.md",
   "from": {
     "tag": "v1.5.2",
@@ -13,20 +13,20 @@
   },
   "rule": "A citation moves to the new commit only when every upstream path it names has the same git object id at both tags. The rest stay on the old commit until their area is re-ported, then move with the port.",
   "summary": {
-    "filesWithOldCommit": 227,
+    "filesWithOldCommit": 214,
     "citations": {
-      "repinned": 86,
-      "pending": 60,
-      "unparsed": 11,
+      "repinned": 85,
+      "pending": 37,
+      "unparsed": 13,
       "nonHeader": 8,
-      "excludedHistorical": 9282,
-      "releaseDocs": 7
+      "excludedHistorical": 9292,
+      "releaseDocs": 6
     },
     "files": {
-      "repinned": 86,
-      "pending": 60,
-      "historical": 63,
-      "releaseDocs": 4,
+      "repinned": 85,
+      "pending": 37,
+      "historical": 73,
+      "releaseDocs": 3,
       "nonHeader": 6
     },
     "pendingByArea": {
@@ -34,13 +34,17 @@
         "files": 4,
         "changeSize": 36
       },
-      "coding-agent-core": {
-        "files": 52,
-        "changeSize": 3560
+      "chord": {
+        "files": 24,
+        "changeSize": 1765
+      },
+      "coding-agent": {
+        "files": 8,
+        "changeSize": 593
       },
       "tui": {
-        "files": 4,
-        "changeSize": 527
+        "files": 1,
+        "changeSize": 170
       }
     }
   },
@@ -65,16 +69,7 @@
       ],
       "changeSize": 9,
       "applicabilityRows": [
-        "ai.anthropic-error-tool-result-images",
-        "ai.malformed-final-tool-arguments",
-        "ai.claude-disabled-thinking-off",
-        "ai.client-identity",
-        "ai.streaming-json-parser",
-        "ai.anthropic-system-hold-past-dropped",
-        "ai.anthropic-low-top-level-effort",
-        "ai.tool-call-args-incremental",
-        "ai.bedrock-strict-fallback",
-        "ai.openrouter-reported-cost"
+        "sync160.file.0790"
       ]
     },
     {
@@ -100,16 +95,7 @@
       ],
       "changeSize": 9,
       "applicabilityRows": [
-        "ai.anthropic-error-tool-result-images",
-        "ai.malformed-final-tool-arguments",
-        "ai.claude-disabled-thinking-off",
-        "ai.client-identity",
-        "ai.streaming-json-parser",
-        "ai.anthropic-system-hold-past-dropped",
-        "ai.anthropic-low-top-level-effort",
-        "ai.tool-call-args-incremental",
-        "ai.bedrock-strict-fallback",
-        "ai.openrouter-reported-cost"
+        "sync160.file.0790"
       ]
     },
     {
@@ -135,16 +121,7 @@
       ],
       "changeSize": 9,
       "applicabilityRows": [
-        "ai.anthropic-error-tool-result-images",
-        "ai.malformed-final-tool-arguments",
-        "ai.claude-disabled-thinking-off",
-        "ai.client-identity",
-        "ai.streaming-json-parser",
-        "ai.anthropic-system-hold-past-dropped",
-        "ai.anthropic-low-top-level-effort",
-        "ai.tool-call-args-incremental",
-        "ai.bedrock-strict-fallback",
-        "ai.openrouter-reported-cost"
+        "sync160.file.0790"
       ]
     },
     {
@@ -171,21 +148,12 @@
       ],
       "changeSize": 9,
       "applicabilityRows": [
-        "ai.anthropic-error-tool-result-images",
-        "ai.malformed-final-tool-arguments",
-        "ai.claude-disabled-thinking-off",
-        "ai.client-identity",
-        "ai.streaming-json-parser",
-        "ai.anthropic-system-hold-past-dropped",
-        "ai.anthropic-low-top-level-effort",
-        "ai.tool-call-args-incremental",
-        "ai.bedrock-strict-fallback",
-        "ai.openrouter-reported-cost"
+        "sync160.file.0790"
       ]
     },
     {
       "file": "tests/PiSharp.Chord.Tests/Remote/Remote152Cases.cs",
-      "area": "coding-agent-core",
+      "area": "chord",
       "citations": [
         {
           "line": 1,
@@ -214,64 +182,15 @@
         }
       ],
       "changeSize": 605,
-      "applicabilityRows": [],
-      "unmappedUpstream": [
-        "packages/chord/src/remote/consumer.ts",
-        "packages/chord/src/remote/provider.ts",
-        "packages/chord/src/remote/relay.ts"
-      ]
-    },
-    {
-      "file": "src/PiSharp.Chord/Store/LiveQuery.cs",
-      "area": "coding-agent-core",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/chord/src/store/live-query.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/chord/src/store/live-query.ts",
-          "status": "changed",
-          "linesChanged": 388
-        }
-      ],
-      "changeSize": 388,
-      "applicabilityRows": [],
-      "unmappedUpstream": [
-        "packages/chord/src/store/live-query.ts"
-      ]
-    },
-    {
-      "file": "tests/PiSharp.Chord.Tests/Store/LiveQueryCases.cs",
-      "area": "coding-agent-core",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/chord/src/store/live-query.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/chord/src/store/live-query.ts",
-          "status": "changed",
-          "linesChanged": 388
-        }
-      ],
-      "changeSize": 388,
-      "applicabilityRows": [],
-      "unmappedUpstream": [
-        "packages/chord/src/store/live-query.ts"
+      "applicabilityRows": [
+        "sync160.file.0926",
+        "sync160.file.0931",
+        "sync160.file.0932"
       ]
     },
     {
       "file": "src/PiSharp.Chord/Host/Tracing.cs",
-      "area": "coding-agent-core",
+      "area": "chord",
       "citations": [
         {
           "line": 1,
@@ -294,15 +213,14 @@
         }
       ],
       "changeSize": 259,
-      "applicabilityRows": [],
-      "unmappedUpstream": [
-        "packages/chord/src/telemetry.ts",
-        "packages/chord/src/host/host.ts"
+      "applicabilityRows": [
+        "sync160.file.0968",
+        "sync160.file.0870"
       ]
     },
     {
       "file": "tests/PiSharp.Chord.Hosting.Tests/WorkerSnapshotCases.cs",
-      "area": "coding-agent-core",
+      "area": "chord",
       "citations": [
         {
           "line": 1,
@@ -325,15 +243,14 @@
         }
       ],
       "changeSize": 144,
-      "applicabilityRows": [],
-      "unmappedUpstream": [
-        "packages/chord/src/node/workers/base.ts",
-        "packages/chord/src/node/workers/workers.ts"
+      "applicabilityRows": [
+        "sync160.file.0918",
+        "sync160.file.0920"
       ]
     },
     {
       "file": "tests/PiSharp.Chord.Tests/Contracts/HostKeyedCases.cs",
-      "area": "coding-agent-core",
+      "area": "chord",
       "citations": [
         {
           "line": 1,
@@ -353,45 +270,13 @@
         }
       ],
       "changeSize": 141,
-      "applicabilityRows": [],
-      "unmappedUpstream": [
-        "packages/chord/src/contracts/contract.ts"
-      ]
-    },
-    {
-      "file": "tests/PiSharp.Chord.Tests/Surfaces/ConnectionCases.cs",
-      "area": "coding-agent-core",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/chord/src/surfaces/connection.ts",
-            "packages/chord/src/surfaces/client.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/chord/src/surfaces/connection.ts",
-          "status": "changed",
-          "linesChanged": 66
-        },
-        {
-          "path": "packages/chord/src/surfaces/client.ts",
-          "status": "changed",
-          "linesChanged": 67
-        }
-      ],
-      "changeSize": 133,
-      "applicabilityRows": [],
-      "unmappedUpstream": [
-        "packages/chord/src/surfaces/connection.ts",
-        "packages/chord/src/surfaces/client.ts"
+      "applicabilityRows": [
+        "sync160.file.0849"
       ]
     },
     {
       "file": "tests/PiSharp.Chord.Tests/Host/HostDataTelemetryCases.cs",
-      "area": "coding-agent-core",
+      "area": "chord",
       "citations": [
         {
           "line": 1,
@@ -414,15 +299,14 @@
         }
       ],
       "changeSize": 99,
-      "applicabilityRows": [],
-      "unmappedUpstream": [
-        "packages/chord/src/host/host-data.ts",
-        "packages/chord/src/telemetry.ts"
+      "applicabilityRows": [
+        "sync160.file.0869",
+        "sync160.file.0968"
       ]
     },
     {
       "file": "tests/PiSharp.Chord.Tests/Sync/SessionCases.cs",
-      "area": "coding-agent-core",
+      "area": "chord",
       "citations": [
         {
           "line": 1,
@@ -448,19 +332,519 @@
         }
       ],
       "changeSize": 88,
-      "applicabilityRows": [],
-      "unmappedUpstream": [
-        "packages/chord/src/sync/client.ts",
-        "packages/chord/src/sync/remote.ts"
+      "applicabilityRows": [
+        "sync160.file.0963",
+        "sync160.file.0966"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Chord/Sync/FlushScheduler.cs",
+      "area": "chord",
+      "citations": [
+        {
+          "line": 1,
+          "changed": [
+            "packages/chord/src/sync/client.ts"
+          ]
+        }
+      ],
+      "upstream": [
+        {
+          "path": "packages/chord/src/sync/client.ts",
+          "status": "changed",
+          "linesChanged": 66
+        }
+      ],
+      "changeSize": 66,
+      "applicabilityRows": [
+        "sync160.file.0963"
+      ]
+    },
+    {
+      "file": "tests/PiSharp.Chord.Tests/Sync/SchedulerCases.cs",
+      "area": "chord",
+      "citations": [
+        {
+          "line": 1,
+          "changed": [
+            "packages/chord/src/sync/client.ts"
+          ]
+        }
+      ],
+      "upstream": [
+        {
+          "path": "packages/chord/src/sync/client.ts",
+          "status": "changed",
+          "linesChanged": 66
+        }
+      ],
+      "changeSize": 66,
+      "applicabilityRows": [
+        "sync160.file.0963"
+      ]
+    },
+    {
+      "file": "tests/PiSharp.Chord.Tests/Telemetry152Cases.cs",
+      "area": "chord",
+      "citations": [
+        {
+          "line": 1,
+          "changed": [
+            "packages/chord/src/telemetry.ts"
+          ]
+        }
+      ],
+      "upstream": [
+        {
+          "path": "packages/chord/src/telemetry.ts",
+          "status": "changed",
+          "linesChanged": 53
+        }
+      ],
+      "changeSize": 53,
+      "applicabilityRows": [
+        "sync160.file.0968"
+      ]
+    },
+    {
+      "file": "tests/PiSharp.Chord.Tests/Sync/FileCases.cs",
+      "area": "chord",
+      "citations": [
+        {
+          "line": 1,
+          "changed": [
+            "packages/chord/src/sync/filesystem.ts"
+          ],
+          "unchanged": [
+            "packages/chord/src/sync/files.ts"
+          ]
+        }
+      ],
+      "upstream": [
+        {
+          "path": "packages/chord/src/sync/filesystem.ts",
+          "status": "changed",
+          "linesChanged": 48
+        }
+      ],
+      "changeSize": 48,
+      "applicabilityRows": [
+        "sync160.file.0964"
+      ]
+    },
+    {
+      "file": "tests/PiSharp.Chord.Tests/Host/HostDataCases.cs",
+      "area": "chord",
+      "citations": [
+        {
+          "line": 1,
+          "changed": [
+            "packages/chord/src/host/host-data.ts"
+          ]
+        }
+      ],
+      "upstream": [
+        {
+          "path": "packages/chord/src/host/host-data.ts",
+          "status": "changed",
+          "linesChanged": 46
+        }
+      ],
+      "changeSize": 46,
+      "applicabilityRows": [
+        "sync160.file.0869"
+      ]
+    },
+    {
+      "file": "tests/PiSharp.Chord.Tests/Store/HostDataCases.cs",
+      "area": "chord",
+      "citations": [
+        {
+          "line": 1,
+          "changed": [
+            "packages/chord/src/store/host-data.ts"
+          ]
+        }
+      ],
+      "upstream": [
+        {
+          "path": "packages/chord/src/store/host-data.ts",
+          "status": "changed",
+          "linesChanged": 32
+        }
+      ],
+      "changeSize": 32,
+      "applicabilityRows": [
+        "sync160.file.0942"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Chord.Hosting/App/Archive.cs",
+      "area": "chord",
+      "citations": [
+        {
+          "line": 1,
+          "changed": [
+            "packages/chord/src/node/app/app.ts"
+          ],
+          "unchanged": [
+            "packages/chord/src/node/app/archive.ts"
+          ]
+        }
+      ],
+      "upstream": [
+        {
+          "path": "packages/chord/src/node/app/app.ts",
+          "status": "changed",
+          "linesChanged": 28
+        }
+      ],
+      "changeSize": 28,
+      "applicabilityRows": [
+        "sync160.file.0894"
+      ]
+    },
+    {
+      "file": "tests/PiSharp.Chord.Hosting.Tests/AppStartTests.cs",
+      "area": "chord",
+      "citations": [
+        {
+          "line": 1,
+          "changed": [
+            "packages/chord/src/node/app/app.ts"
+          ],
+          "unchanged": [
+            "packages/chord/src/node/app/worker.ts"
+          ]
+        }
+      ],
+      "upstream": [
+        {
+          "path": "packages/chord/src/node/app/app.ts",
+          "status": "changed",
+          "linesChanged": 28
+        }
+      ],
+      "changeSize": 28,
+      "applicabilityRows": [
+        "sync160.file.0894"
+      ]
+    },
+    {
+      "file": "tests/PiSharp.Chord.Hosting.Tests/Http152Cases.cs",
+      "area": "chord",
+      "citations": [
+        {
+          "line": 1,
+          "changed": [
+            "packages/chord/src/node/http/http.ts"
+          ]
+        }
+      ],
+      "upstream": [
+        {
+          "path": "packages/chord/src/node/http/http.ts",
+          "status": "changed",
+          "linesChanged": 11
+        }
+      ],
+      "changeSize": 11,
+      "applicabilityRows": [
+        "sync160.file.0905"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Chord.Hosting/Surfaces/SurfaceBuild.cs",
+      "area": "chord",
+      "citations": [
+        {
+          "line": 1,
+          "changed": [
+            "packages/chord/src/node/surfaces/surface-build.ts"
+          ]
+        }
+      ],
+      "upstream": [
+        {
+          "path": "packages/chord/src/node/surfaces/surface-build.ts",
+          "status": "changed",
+          "linesChanged": 10
+        }
+      ],
+      "changeSize": 10,
+      "applicabilityRows": [
+        "sync160.file.0914"
+      ]
+    },
+    {
+      "file": "tests/PiSharp.Chord.Hosting.Tests/SurfacePublicationTests.cs",
+      "area": "chord",
+      "citations": [
+        {
+          "line": 1,
+          "changed": [
+            "packages/chord/src/node/surfaces/surface-build.ts"
+          ],
+          "unchanged": [
+            "packages/chord/src/node/surfaces/published.ts"
+          ]
+        }
+      ],
+      "upstream": [
+        {
+          "path": "packages/chord/src/node/surfaces/surface-build.ts",
+          "status": "changed",
+          "linesChanged": 10
+        }
+      ],
+      "changeSize": 10,
+      "applicabilityRows": [
+        "sync160.file.0914"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Chord.Hosting/Plugins/PluginInstaller.cs",
+      "area": "chord",
+      "citations": [
+        {
+          "line": 1,
+          "changed": [
+            "packages/chord/src/node/plugins/install.ts"
+          ]
+        }
+      ],
+      "upstream": [
+        {
+          "path": "packages/chord/src/node/plugins/install.ts",
+          "status": "changed",
+          "linesChanged": 9
+        }
+      ],
+      "changeSize": 9,
+      "applicabilityRows": [
+        "sync160.file.0908"
+      ]
+    },
+    {
+      "file": "tests/PiSharp.Chord.Hosting.Tests/PluginDiscoveryTests.cs",
+      "area": "chord",
+      "citations": [
+        {
+          "line": 1,
+          "changed": [
+            "packages/chord/src/node/plugins/install.ts"
+          ],
+          "unchanged": [
+            "packages/chord/src/node/plugins/discover.ts",
+            "packages/chord/src/node/plugins/testing.ts"
+          ]
+        }
+      ],
+      "upstream": [
+        {
+          "path": "packages/chord/src/node/plugins/install.ts",
+          "status": "changed",
+          "linesChanged": 9
+        }
+      ],
+      "changeSize": 9,
+      "applicabilityRows": [
+        "sync160.file.0908"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Chord.Hosting/Workers/WorkerBase.cs",
+      "area": "chord",
+      "citations": [
+        {
+          "line": 1,
+          "changed": [
+            "packages/chord/src/node/workers/base.ts"
+          ]
+        }
+      ],
+      "upstream": [
+        {
+          "path": "packages/chord/src/node/workers/base.ts",
+          "status": "changed",
+          "linesChanged": 4
+        }
+      ],
+      "changeSize": 4,
+      "applicabilityRows": [
+        "sync160.file.0918"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Chord.Hosting/Surfaces/PublishedScripts.cs",
+      "area": "chord",
+      "citations": [
+        {
+          "line": 1,
+          "changed": [
+            "packages/chord/src/node/surfaces/served.ts"
+          ],
+          "unchanged": [
+            "packages/chord/src/node/surfaces/published.ts"
+          ]
+        }
+      ],
+      "upstream": [
+        {
+          "path": "packages/chord/src/node/surfaces/served.ts",
+          "status": "changed",
+          "linesChanged": 3
+        }
+      ],
+      "changeSize": 3,
+      "applicabilityRows": [
+        "sync160.file.0913"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Chord.Hosting/App/Layout.cs",
+      "area": "chord",
+      "citations": [
+        {
+          "line": 1,
+          "changed": [
+            "packages/chord/src/node/app/layout.ts"
+          ]
+        }
+      ],
+      "upstream": [
+        {
+          "path": "packages/chord/src/node/app/layout.ts",
+          "status": "changed",
+          "linesChanged": 2
+        }
+      ],
+      "changeSize": 2,
+      "applicabilityRows": [
+        "sync160.file.0900"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Chord/ChordNext.cs",
+      "area": "chord",
+      "citations": [
+        {
+          "line": 1,
+          "changed": [
+            "packages/chord/src/index.ts"
+          ]
+        }
+      ],
+      "upstream": [
+        {
+          "path": "packages/chord/src/index.ts",
+          "status": "changed",
+          "linesChanged": 2
+        }
+      ],
+      "changeSize": 2,
+      "applicabilityRows": [
+        "sync160.file.0886"
+      ]
+    },
+    {
+      "file": "tests/PiSharp.Chord.Hosting.Tests/AppLayoutTests.cs",
+      "area": "chord",
+      "citations": [
+        {
+          "line": 1,
+          "changed": [
+            "packages/chord/src/node/app/layout.ts"
+          ],
+          "unchanged": [
+            "packages/chord/src/node/app/secrets.ts"
+          ]
+        }
+      ],
+      "upstream": [
+        {
+          "path": "packages/chord/src/node/app/layout.ts",
+          "status": "changed",
+          "linesChanged": 2
+        }
+      ],
+      "changeSize": 2,
+      "applicabilityRows": [
+        "sync160.file.0900"
+      ]
+    },
+    {
+      "file": "tests/PiSharp.InteractiveParity.Tests/Sync152SessionCases.cs",
+      "area": "coding-agent",
+      "citations": [
+        {
+          "line": 1,
+          "changed": [
+            "packages/coding-agent/src/modes/interactive/interactive-mode.ts"
+          ]
+        }
+      ],
+      "upstream": [
+        {
+          "path": "packages/coding-agent/src/modes/interactive/interactive-mode.ts",
+          "status": "changed",
+          "linesChanged": 119
+        }
+      ],
+      "changeSize": 119,
+      "applicabilityRows": [
+        "sync160.file.1139"
+      ]
+    },
+    {
+      "file": "tests/PiSharp.InteractiveParity.Tests/Sync152SmallUiCases.cs",
+      "area": "coding-agent",
+      "citations": [
+        {
+          "line": 1,
+          "changed": [
+            "packages/coding-agent/src/modes/interactive/interactive-mode.ts"
+          ]
+        }
+      ],
+      "upstream": [
+        {
+          "path": "packages/coding-agent/src/modes/interactive/interactive-mode.ts",
+          "status": "changed",
+          "linesChanged": 119
+        }
+      ],
+      "changeSize": 119,
+      "applicabilityRows": [
+        "sync160.file.1139"
+      ]
+    },
+    {
+      "file": "tests/PiSharp.InteractiveParity.Tests/Sync152UiFlowCases.cs",
+      "area": "coding-agent",
+      "citations": [
+        {
+          "line": 1,
+          "changed": [
+            "packages/coding-agent/src/modes/interactive/interactive-mode.ts"
+          ]
+        }
+      ],
+      "upstream": [
+        {
+          "path": "packages/coding-agent/src/modes/interactive/interactive-mode.ts",
+          "status": "changed",
+          "linesChanged": 119
+        }
+      ],
+      "changeSize": 119,
+      "applicabilityRows": [
+        "sync160.file.1139"
       ]
     },
     {
       "file": "tests/PiSharp.ExtensionParity.Tests/Sync152PackageCases.cs",
-      "area": "coding-agent-core",
-      "areas": [
-        "coding-agent-core",
-        "coding-agent-cli"
-      ],
+      "area": "coding-agent",
       "citations": [
         {
           "line": 1,
@@ -484,334 +868,13 @@
       ],
       "changeSize": 82,
       "applicabilityRows": [
-        "core.npm-prefix-realpath",
-        "core.temporary-extension-refresh",
-        "core.windows-path-casing",
-        "core.git-clean-failure-continues",
-        "core.npm-update-unchanged-warning",
-        "core.package-install-failure-startup",
-        "cli.extension-changelogs",
-        "cli.package-npm-no-audit-fund",
-        "cli.managed-install-marker-bom",
-        "cli.self-update-command",
-        "cli.managed-npm-ci-age-gate"
-      ]
-    },
-    {
-      "file": "src/PiSharp.Chord/Surfaces/Client.cs",
-      "area": "coding-agent-core",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/chord/src/surfaces/client.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/chord/src/surfaces/client.ts",
-          "status": "changed",
-          "linesChanged": 67
-        }
-      ],
-      "changeSize": 67,
-      "applicabilityRows": [],
-      "unmappedUpstream": [
-        "packages/chord/src/surfaces/client.ts"
-      ]
-    },
-    {
-      "file": "src/PiSharp.Chord/Surfaces/Connection.cs",
-      "area": "coding-agent-core",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/chord/src/surfaces/connection.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/chord/src/surfaces/connection.ts",
-          "status": "changed",
-          "linesChanged": 66
-        }
-      ],
-      "changeSize": 66,
-      "applicabilityRows": [],
-      "unmappedUpstream": [
-        "packages/chord/src/surfaces/connection.ts"
-      ]
-    },
-    {
-      "file": "src/PiSharp.Chord/Sync/FlushScheduler.cs",
-      "area": "coding-agent-core",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/chord/src/sync/client.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/chord/src/sync/client.ts",
-          "status": "changed",
-          "linesChanged": 66
-        }
-      ],
-      "changeSize": 66,
-      "applicabilityRows": [],
-      "unmappedUpstream": [
-        "packages/chord/src/sync/client.ts"
-      ]
-    },
-    {
-      "file": "src/PiSharp.Chord/Sync/SessionSync.cs",
-      "area": "coding-agent-core",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/chord/src/sync/client.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/chord/src/sync/client.ts",
-          "status": "changed",
-          "linesChanged": 66
-        }
-      ],
-      "changeSize": 66,
-      "applicabilityRows": [],
-      "unmappedUpstream": [
-        "packages/chord/src/sync/client.ts"
-      ]
-    },
-    {
-      "file": "tests/PiSharp.Chord.Tests/Sync/SchedulerCases.cs",
-      "area": "coding-agent-core",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/chord/src/sync/client.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/chord/src/sync/client.ts",
-          "status": "changed",
-          "linesChanged": 66
-        }
-      ],
-      "changeSize": 66,
-      "applicabilityRows": [],
-      "unmappedUpstream": [
-        "packages/chord/src/sync/client.ts"
-      ]
-    },
-    {
-      "file": "tests/PiSharp.Chord.Hosting.Tests/AppAuthRouteTests.cs",
-      "area": "coding-agent-core",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/chord/src/node/app/owner.ts",
-            "packages/chord/src/node/app/pairing.ts",
-            "packages/chord/src/node/app/invite.ts",
-            "packages/chord/src/node/app/ephemeral.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/chord/src/node/app/owner.ts",
-          "status": "changed",
-          "linesChanged": 28
-        },
-        {
-          "path": "packages/chord/src/node/app/pairing.ts",
-          "status": "changed",
-          "linesChanged": 12
-        },
-        {
-          "path": "packages/chord/src/node/app/invite.ts",
-          "status": "changed",
-          "linesChanged": 10
-        },
-        {
-          "path": "packages/chord/src/node/app/ephemeral.ts",
-          "status": "changed",
-          "linesChanged": 12
-        }
-      ],
-      "changeSize": 62,
-      "applicabilityRows": [],
-      "unmappedUpstream": [
-        "packages/chord/src/node/app/owner.ts",
-        "packages/chord/src/node/app/pairing.ts",
-        "packages/chord/src/node/app/invite.ts",
-        "packages/chord/src/node/app/ephemeral.ts"
-      ]
-    },
-    {
-      "file": "src/PiSharp.Chord/Telemetry.cs",
-      "area": "coding-agent-core",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/chord/src/telemetry.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/chord/src/telemetry.ts",
-          "status": "changed",
-          "linesChanged": 53
-        }
-      ],
-      "changeSize": 53,
-      "applicabilityRows": [],
-      "unmappedUpstream": [
-        "packages/chord/src/telemetry.ts"
-      ]
-    },
-    {
-      "file": "tests/PiSharp.Chord.Tests/Telemetry152Cases.cs",
-      "area": "coding-agent-core",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/chord/src/telemetry.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/chord/src/telemetry.ts",
-          "status": "changed",
-          "linesChanged": 53
-        }
-      ],
-      "changeSize": 53,
-      "applicabilityRows": [],
-      "unmappedUpstream": [
-        "packages/chord/src/telemetry.ts"
-      ]
-    },
-    {
-      "file": "src/PiSharp.Chord/Sync/FileSystemRemote.cs",
-      "area": "coding-agent-core",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/chord/src/sync/filesystem.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/chord/src/sync/filesystem.ts",
-          "status": "changed",
-          "linesChanged": 48
-        }
-      ],
-      "changeSize": 48,
-      "applicabilityRows": [],
-      "unmappedUpstream": [
-        "packages/chord/src/sync/filesystem.ts"
-      ]
-    },
-    {
-      "file": "tests/PiSharp.Chord.Tests/Sync/FileCases.cs",
-      "area": "coding-agent-core",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/chord/src/sync/filesystem.ts"
-          ],
-          "unchanged": [
-            "packages/chord/src/sync/files.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/chord/src/sync/filesystem.ts",
-          "status": "changed",
-          "linesChanged": 48
-        }
-      ],
-      "changeSize": 48,
-      "applicabilityRows": [],
-      "unmappedUpstream": [
-        "packages/chord/src/sync/filesystem.ts"
-      ]
-    },
-    {
-      "file": "src/PiSharp.Chord/Host/HostData.cs",
-      "area": "coding-agent-core",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/chord/src/host/host-data.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/chord/src/host/host-data.ts",
-          "status": "changed",
-          "linesChanged": 46
-        }
-      ],
-      "changeSize": 46,
-      "applicabilityRows": [],
-      "unmappedUpstream": [
-        "packages/chord/src/host/host-data.ts"
-      ]
-    },
-    {
-      "file": "tests/PiSharp.Chord.Tests/Host/HostDataCases.cs",
-      "area": "coding-agent-core",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/chord/src/host/host-data.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/chord/src/host/host-data.ts",
-          "status": "changed",
-          "linesChanged": 46
-        }
-      ],
-      "changeSize": 46,
-      "applicabilityRows": [],
-      "unmappedUpstream": [
-        "packages/chord/src/host/host-data.ts"
+        "sync160.file.1112",
+        "sync160.file.1144"
       ]
     },
     {
       "file": "src/PiSharp.Cli/Extensions/PromptImageNormalizer.cs",
-      "area": "coding-agent-core",
+      "area": "coding-agent",
       "citations": [
         {
           "line": 1,
@@ -829,16 +892,12 @@
       ],
       "changeSize": 41,
       "applicabilityRows": [
-        "core.resume-active-tools",
-        "core.extension-tools-active-on-resume",
-        "core.recovery-omits-tool-results",
-        "core.summary-auth-runtime",
-        "core.active-tools-keep-order"
+        "sync160.file.1103"
       ]
     },
     {
       "file": "src/PiSharp.CodingAgent/PersistentAgentSession.InputNormalization.cs",
-      "area": "coding-agent-core",
+      "area": "coding-agent",
       "citations": [
         {
           "line": 1,
@@ -856,16 +915,12 @@
       ],
       "changeSize": 41,
       "applicabilityRows": [
-        "core.resume-active-tools",
-        "core.extension-tools-active-on-resume",
-        "core.recovery-omits-tool-results",
-        "core.summary-auth-runtime",
-        "core.active-tools-keep-order"
+        "sync160.file.1103"
       ]
     },
     {
       "file": "tests/PiSharp.CodingAgent.Tests/QueuedImageNormalizationTests.cs",
-      "area": "coding-agent-core",
+      "area": "coding-agent",
       "citations": [
         {
           "line": 1,
@@ -883,91 +938,12 @@
       ],
       "changeSize": 41,
       "applicabilityRows": [
-        "core.resume-active-tools",
-        "core.extension-tools-active-on-resume",
-        "core.recovery-omits-tool-results",
-        "core.summary-auth-runtime",
-        "core.active-tools-keep-order"
-      ]
-    },
-    {
-      "file": "src/PiSharp.Chord.Hosting/Terminal/TerminalScope.cs",
-      "area": "coding-agent-core",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/chord/src/tui/scope.ts"
-          ],
-          "unchanged": [
-            "packages/chord/src/tui/theme.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/chord/src/tui/scope.ts",
-          "status": "changed",
-          "linesChanged": 40
-        }
-      ],
-      "changeSize": 40,
-      "applicabilityRows": [],
-      "unmappedUpstream": [
-        "packages/chord/src/tui/scope.ts"
-      ]
-    },
-    {
-      "file": "src/PiSharp.Chord/Store/HostData.cs",
-      "area": "coding-agent-core",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/chord/src/store/host-data.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/chord/src/store/host-data.ts",
-          "status": "changed",
-          "linesChanged": 32
-        }
-      ],
-      "changeSize": 32,
-      "applicabilityRows": [],
-      "unmappedUpstream": [
-        "packages/chord/src/store/host-data.ts"
-      ]
-    },
-    {
-      "file": "tests/PiSharp.Chord.Tests/Store/HostDataCases.cs",
-      "area": "coding-agent-core",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/chord/src/store/host-data.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/chord/src/store/host-data.ts",
-          "status": "changed",
-          "linesChanged": 32
-        }
-      ],
-      "changeSize": 32,
-      "applicabilityRows": [],
-      "unmappedUpstream": [
-        "packages/chord/src/store/host-data.ts"
+        "sync160.file.1103"
       ]
     },
     {
       "file": "tests/PiSharp.Tools.Tests/Sync152ToolsCases.cs",
-      "area": "coding-agent-core",
+      "area": "coding-agent",
       "citations": [
         {
           "line": 1,
@@ -988,587 +964,7 @@
       ],
       "changeSize": 31,
       "applicabilityRows": [
-        "core.agent-tool-json-schema"
-      ]
-    },
-    {
-      "file": "src/PiSharp.Chord.Hosting/App/App.cs",
-      "area": "coding-agent-core",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/chord/src/node/app/app.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/chord/src/node/app/app.ts",
-          "status": "changed",
-          "linesChanged": 28
-        }
-      ],
-      "changeSize": 28,
-      "applicabilityRows": [],
-      "unmappedUpstream": [
-        "packages/chord/src/node/app/app.ts"
-      ]
-    },
-    {
-      "file": "src/PiSharp.Chord.Hosting/App/AppOptions.cs",
-      "area": "coding-agent-core",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/chord/src/node/app/app.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/chord/src/node/app/app.ts",
-          "status": "changed",
-          "linesChanged": 28
-        }
-      ],
-      "changeSize": 28,
-      "applicabilityRows": [],
-      "unmappedUpstream": [
-        "packages/chord/src/node/app/app.ts"
-      ]
-    },
-    {
-      "file": "src/PiSharp.Chord.Hosting/App/Archive.cs",
-      "area": "coding-agent-core",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/chord/src/node/app/app.ts"
-          ],
-          "unchanged": [
-            "packages/chord/src/node/app/archive.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/chord/src/node/app/app.ts",
-          "status": "changed",
-          "linesChanged": 28
-        }
-      ],
-      "changeSize": 28,
-      "applicabilityRows": [],
-      "unmappedUpstream": [
-        "packages/chord/src/node/app/app.ts"
-      ]
-    },
-    {
-      "file": "src/PiSharp.Chord.Hosting/App/Owner.cs",
-      "area": "coding-agent-core",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/chord/src/node/app/owner.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/chord/src/node/app/owner.ts",
-          "status": "changed",
-          "linesChanged": 28
-        }
-      ],
-      "changeSize": 28,
-      "applicabilityRows": [],
-      "unmappedUpstream": [
-        "packages/chord/src/node/app/owner.ts"
-      ]
-    },
-    {
-      "file": "tests/PiSharp.Chord.Hosting.Tests/AppStartTests.cs",
-      "area": "coding-agent-core",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/chord/src/node/app/app.ts"
-          ],
-          "unchanged": [
-            "packages/chord/src/node/app/worker.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/chord/src/node/app/app.ts",
-          "status": "changed",
-          "linesChanged": 28
-        }
-      ],
-      "changeSize": 28,
-      "applicabilityRows": [],
-      "unmappedUpstream": [
-        "packages/chord/src/node/app/app.ts"
-      ]
-    },
-    {
-      "file": "src/PiSharp.Chord/Sync/Remote.cs",
-      "area": "coding-agent-core",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/chord/src/sync/remote.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/chord/src/sync/remote.ts",
-          "status": "changed",
-          "linesChanged": 22
-        }
-      ],
-      "changeSize": 22,
-      "applicabilityRows": [],
-      "unmappedUpstream": [
-        "packages/chord/src/sync/remote.ts"
-      ]
-    },
-    {
-      "file": "src/PiSharp.Chord/TelemetryIngest/Facet.cs",
-      "area": "coding-agent-core",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/chord/src/telemetry-ingest/facet.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/chord/src/telemetry-ingest/facet.ts",
-          "status": "changed",
-          "linesChanged": 15
-        }
-      ],
-      "changeSize": 15,
-      "applicabilityRows": [],
-      "unmappedUpstream": [
-        "packages/chord/src/telemetry-ingest/facet.ts"
-      ]
-    },
-    {
-      "file": "tests/PiSharp.Chord.Tests/TelemetryIngestCases.cs",
-      "area": "coding-agent-core",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/chord/src/telemetry-ingest/facet.ts"
-          ],
-          "unchanged": [
-            "packages/chord/src/telemetry-ingest/recorder.ts",
-            "packages/chord/src/telemetry-ingest/sender.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/chord/src/telemetry-ingest/facet.ts",
-          "status": "changed",
-          "linesChanged": 15
-        }
-      ],
-      "changeSize": 15,
-      "applicabilityRows": [],
-      "unmappedUpstream": [
-        "packages/chord/src/telemetry-ingest/facet.ts"
-      ]
-    },
-    {
-      "file": "src/PiSharp.Chord.Hosting/App/EphemeralLogin.cs",
-      "area": "coding-agent-core",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/chord/src/node/app/ephemeral.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/chord/src/node/app/ephemeral.ts",
-          "status": "changed",
-          "linesChanged": 12
-        }
-      ],
-      "changeSize": 12,
-      "applicabilityRows": [],
-      "unmappedUpstream": [
-        "packages/chord/src/node/app/ephemeral.ts"
-      ]
-    },
-    {
-      "file": "src/PiSharp.Chord.Hosting/App/Pairing.cs",
-      "area": "coding-agent-core",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/chord/src/node/app/pairing.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/chord/src/node/app/pairing.ts",
-          "status": "changed",
-          "linesChanged": 12
-        }
-      ],
-      "changeSize": 12,
-      "applicabilityRows": [],
-      "unmappedUpstream": [
-        "packages/chord/src/node/app/pairing.ts"
-      ]
-    },
-    {
-      "file": "tests/PiSharp.Chord.Hosting.Tests/Http152Cases.cs",
-      "area": "coding-agent-core",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/chord/src/node/http/http.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/chord/src/node/http/http.ts",
-          "status": "changed",
-          "linesChanged": 11
-        }
-      ],
-      "changeSize": 11,
-      "applicabilityRows": [],
-      "unmappedUpstream": [
-        "packages/chord/src/node/http/http.ts"
-      ]
-    },
-    {
-      "file": "src/PiSharp.Chord.Hosting/App/Invite.cs",
-      "area": "coding-agent-core",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/chord/src/node/app/invite.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/chord/src/node/app/invite.ts",
-          "status": "changed",
-          "linesChanged": 10
-        }
-      ],
-      "changeSize": 10,
-      "applicabilityRows": [],
-      "unmappedUpstream": [
-        "packages/chord/src/node/app/invite.ts"
-      ]
-    },
-    {
-      "file": "src/PiSharp.Chord.Hosting/Surfaces/SurfaceBuild.cs",
-      "area": "coding-agent-core",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/chord/src/node/surfaces/surface-build.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/chord/src/node/surfaces/surface-build.ts",
-          "status": "changed",
-          "linesChanged": 10
-        }
-      ],
-      "changeSize": 10,
-      "applicabilityRows": [],
-      "unmappedUpstream": [
-        "packages/chord/src/node/surfaces/surface-build.ts"
-      ]
-    },
-    {
-      "file": "tests/PiSharp.Chord.Hosting.Tests/SurfacePublicationTests.cs",
-      "area": "coding-agent-core",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/chord/src/node/surfaces/surface-build.ts"
-          ],
-          "unchanged": [
-            "packages/chord/src/node/surfaces/published.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/chord/src/node/surfaces/surface-build.ts",
-          "status": "changed",
-          "linesChanged": 10
-        }
-      ],
-      "changeSize": 10,
-      "applicabilityRows": [],
-      "unmappedUpstream": [
-        "packages/chord/src/node/surfaces/surface-build.ts"
-      ]
-    },
-    {
-      "file": "src/PiSharp.Chord.Hosting/Plugins/PluginInstaller.cs",
-      "area": "coding-agent-core",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/chord/src/node/plugins/install.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/chord/src/node/plugins/install.ts",
-          "status": "changed",
-          "linesChanged": 9
-        }
-      ],
-      "changeSize": 9,
-      "applicabilityRows": [],
-      "unmappedUpstream": [
-        "packages/chord/src/node/plugins/install.ts"
-      ]
-    },
-    {
-      "file": "tests/PiSharp.Chord.Hosting.Tests/PluginDiscoveryTests.cs",
-      "area": "coding-agent-core",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/chord/src/node/plugins/install.ts"
-          ],
-          "unchanged": [
-            "packages/chord/src/node/plugins/discover.ts",
-            "packages/chord/src/node/plugins/testing.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/chord/src/node/plugins/install.ts",
-          "status": "changed",
-          "linesChanged": 9
-        }
-      ],
-      "changeSize": 9,
-      "applicabilityRows": [],
-      "unmappedUpstream": [
-        "packages/chord/src/node/plugins/install.ts"
-      ]
-    },
-    {
-      "file": "src/PiSharp.Chord.Hosting/Workers/WorkerBase.cs",
-      "area": "coding-agent-core",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/chord/src/node/workers/base.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/chord/src/node/workers/base.ts",
-          "status": "changed",
-          "linesChanged": 4
-        }
-      ],
-      "changeSize": 4,
-      "applicabilityRows": [],
-      "unmappedUpstream": [
-        "packages/chord/src/node/workers/base.ts"
-      ]
-    },
-    {
-      "file": "src/PiSharp.Chord.Hosting/Surfaces/PublishedScripts.cs",
-      "area": "coding-agent-core",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/chord/src/node/surfaces/served.ts"
-          ],
-          "unchanged": [
-            "packages/chord/src/node/surfaces/published.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/chord/src/node/surfaces/served.ts",
-          "status": "changed",
-          "linesChanged": 3
-        }
-      ],
-      "changeSize": 3,
-      "applicabilityRows": [],
-      "unmappedUpstream": [
-        "packages/chord/src/node/surfaces/served.ts"
-      ]
-    },
-    {
-      "file": "src/PiSharp.Chord.Hosting/App/Layout.cs",
-      "area": "coding-agent-core",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/chord/src/node/app/layout.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/chord/src/node/app/layout.ts",
-          "status": "changed",
-          "linesChanged": 2
-        }
-      ],
-      "changeSize": 2,
-      "applicabilityRows": [],
-      "unmappedUpstream": [
-        "packages/chord/src/node/app/layout.ts"
-      ]
-    },
-    {
-      "file": "src/PiSharp.Chord/ChordNext.cs",
-      "area": "coding-agent-core",
-      "areas": [
-        "durable",
-        "chord"
-      ],
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/chord/src/index.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/chord/src/index.ts",
-          "status": "changed",
-          "linesChanged": 2
-        }
-      ],
-      "changeSize": 2,
-      "applicabilityRows": [
-        "durable.watch-handles",
-        "chord.watch-handle",
-        "chord.contracts",
-        "chord.hosts-facets-principals"
-      ]
-    },
-    {
-      "file": "tests/PiSharp.Chord.Hosting.Tests/AppLayoutTests.cs",
-      "area": "coding-agent-core",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/chord/src/node/app/layout.ts"
-          ],
-          "unchanged": [
-            "packages/chord/src/node/app/secrets.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/chord/src/node/app/layout.ts",
-          "status": "changed",
-          "linesChanged": 2
-        }
-      ],
-      "changeSize": 2,
-      "applicabilityRows": [],
-      "unmappedUpstream": [
-        "packages/chord/src/node/app/layout.ts"
-      ]
-    },
-    {
-      "file": "src/PiSharp.Chord.Hosting/App/EphemeralSessions.cs",
-      "area": "coding-agent-core",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/chord/src/node/app/ephemeral-sessions.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/chord/src/node/app/ephemeral-sessions.ts",
-          "status": "deleted"
-        }
-      ],
-      "changeSize": 0,
-      "applicabilityRows": [],
-      "unmappedUpstream": [
-        "packages/chord/src/node/app/ephemeral-sessions.ts"
-      ]
-    },
-    {
-      "file": "src/PiSharp.Chord.Hosting/App/Sessions.cs",
-      "area": "coding-agent-core",
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/chord/src/node/app/sessions.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/chord/src/node/app/sessions.ts",
-          "status": "renamed",
-          "renamedTo": "packages/chord/src/node/app/sign-ins.ts"
-        }
-      ],
-      "changeSize": 0,
-      "applicabilityRows": [],
-      "unmappedUpstream": [
-        "packages/chord/src/node/app/sessions.ts"
+        "sync160.file.1119"
       ]
     },
     {
@@ -1606,132 +1002,9 @@
       ],
       "changeSize": 170,
       "applicabilityRows": [
-        "tui.unclosed-display-math",
-        "tui.cjk-emphasis",
-        "tui.display-math-raw-fallback",
-        "tui.markdown-block-reuse",
-        "tui.bare-url-cjk-punctuation",
-        "tui.nested-blockquote-linear",
-        "tui.replace-control-characters",
-        "tui.set-title-control-chars",
-        "tui.wrap-styled-word-boundary",
-        "tui.rex-terminal",
-        "tui.orca-kitty-images",
-        "tui.kitty-image-crop-boxed"
-      ]
-    },
-    {
-      "file": "tests/PiSharp.InteractiveParity.Tests/Sync152SessionCases.cs",
-      "area": "tui",
-      "areas": [
-        "coding-agent-core",
-        "coding-agent-cli"
-      ],
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/coding-agent/src/modes/interactive/interactive-mode.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/coding-agent/src/modes/interactive/interactive-mode.ts",
-          "status": "changed",
-          "linesChanged": 119
-        }
-      ],
-      "changeSize": 119,
-      "applicabilityRows": [
-        "core.markdown-transform-entry-meta",
-        "core.custom-ui-blocked-status",
-        "core.windows-path-casing",
-        "cli.session-share-destination",
-        "cli.custom-overlay-own-handle",
-        "cli.concurrent-extension-dialogs",
-        "cli.extension-changelogs",
-        "cli.home-tilde-anchored",
-        "cli.external-editor-failures",
-        "cli.skill-warnings-label",
-        "cli.model-scope-fullscreen-header",
-        "cli.editor-swap-keeps-dialog"
-      ]
-    },
-    {
-      "file": "tests/PiSharp.InteractiveParity.Tests/Sync152SmallUiCases.cs",
-      "area": "tui",
-      "areas": [
-        "coding-agent-core",
-        "coding-agent-cli"
-      ],
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/coding-agent/src/modes/interactive/interactive-mode.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/coding-agent/src/modes/interactive/interactive-mode.ts",
-          "status": "changed",
-          "linesChanged": 119
-        }
-      ],
-      "changeSize": 119,
-      "applicabilityRows": [
-        "core.markdown-transform-entry-meta",
-        "core.custom-ui-blocked-status",
-        "core.windows-path-casing",
-        "cli.session-share-destination",
-        "cli.custom-overlay-own-handle",
-        "cli.concurrent-extension-dialogs",
-        "cli.extension-changelogs",
-        "cli.home-tilde-anchored",
-        "cli.external-editor-failures",
-        "cli.skill-warnings-label",
-        "cli.model-scope-fullscreen-header",
-        "cli.editor-swap-keeps-dialog"
-      ]
-    },
-    {
-      "file": "tests/PiSharp.InteractiveParity.Tests/Sync152UiFlowCases.cs",
-      "area": "tui",
-      "areas": [
-        "coding-agent-core",
-        "coding-agent-cli"
-      ],
-      "citations": [
-        {
-          "line": 1,
-          "changed": [
-            "packages/coding-agent/src/modes/interactive/interactive-mode.ts"
-          ]
-        }
-      ],
-      "upstream": [
-        {
-          "path": "packages/coding-agent/src/modes/interactive/interactive-mode.ts",
-          "status": "changed",
-          "linesChanged": 119
-        }
-      ],
-      "changeSize": 119,
-      "applicabilityRows": [
-        "core.markdown-transform-entry-meta",
-        "core.custom-ui-blocked-status",
-        "core.windows-path-casing",
-        "cli.session-share-destination",
-        "cli.custom-overlay-own-handle",
-        "cli.concurrent-extension-dialogs",
-        "cli.extension-changelogs",
-        "cli.home-tilde-anchored",
-        "cli.external-editor-failures",
-        "cli.skill-warnings-label",
-        "cli.model-scope-fullscreen-header",
-        "cli.editor-swap-keeps-dialog"
+        "sync160.file.1280",
+        "sync160.file.1289",
+        "sync160.file.1286"
       ]
     }
   ],
@@ -1787,18 +1060,28 @@
     },
     {
       "file": "tests/PiSharp.Models.Tests/Sync152CatalogCases.cs",
-      "line": 35,
-      "text": "Equal(\"b4afdddf44e059c67ccf5097e5317d913521b470\", ReviewedModelCatalog.UpstreamCommit, \"effective source provenance\");"
+      "line": 40,
+      "text": "Equal(\"b4afdddf44e059c67ccf5097e5317d913521b470\", release.SourceCommit, \"1.5.2 source provenance\");"
+    },
+    {
+      "file": "tests/PiSharp.Models.Tests/Sync160CatalogCases.cs",
+      "line": 133,
+      "text": "Equal(\"b4afdddf44e059c67ccf5097e5317d913521b470\", preserved.SourceCommit, \"preserved release source\");"
     },
     {
       "file": "tests/PiSharp.Schema.Tests/Sync152Cases.cs",
       "line": 5,
       "text": "// Authored native equivalents of Pi b4afdddf44e059c67ccf5097e5317d913521b470 schema tests."
+    },
+    {
+      "file": "website/src/pages/parity.astro",
+      "line": 47,
+      "text": "<p class=\"ps-muted\">The source of this release is <a href=\"https://github.com/earendil-works/pi/tree/b4afdddf44e059c67ccf5097e5317d913521b470\">b4afdddf</a>. The exact-tag release workflow validates so"
     }
   ],
   "nonHeaderCitations": [
     {
-      "file": "src/PiSharp.AI/Catalogs/CurrentModelCatalog.cs",
+      "file": "src/PiSharp.AI/Catalogs/ReleasedModelCatalog.cs",
       "area": "ai",
       "kind": "ai",
       "occurrences": 2,
@@ -1854,11 +1137,6 @@
     {
       "file": "THIRD-PARTY-NOTICES.md",
       "occurrences": 2,
-      "reason": "status and notice pages name the published and candidate baselines; root updates them at the 1.6.0 closeout"
-    },
-    {
-      "file": "website/src/data/parity.json",
-      "occurrences": 1,
       "reason": "status and notice pages name the published and candidate baselines; root updates them at the 1.6.0 closeout"
     }
   ],
@@ -2054,6 +1332,46 @@
       "reason": "work plans, agent reports and release records name the commit each piece of work was done against"
     },
     {
+      "file": "AI_DOCS/agent-reports/sync-1.6.0-ai-catalog.md",
+      "occurrences": 1,
+      "reason": "work plans, agent reports and release records name the commit each piece of work was done against"
+    },
+    {
+      "file": "AI_DOCS/agent-reports/sync-1.6.0-chord-discovery.md",
+      "occurrences": 1,
+      "reason": "work plans, agent reports and release records name the commit each piece of work was done against"
+    },
+    {
+      "file": "AI_DOCS/agent-reports/sync-1.6.0-chord-edge.md",
+      "occurrences": 1,
+      "reason": "work plans, agent reports and release records name the commit each piece of work was done against"
+    },
+    {
+      "file": "AI_DOCS/agent-reports/sync-1.6.0-chord-foundation.md",
+      "occurrences": 1,
+      "reason": "work plans, agent reports and release records name the commit each piece of work was done against"
+    },
+    {
+      "file": "AI_DOCS/agent-reports/sync-1.6.0-cli-session.md",
+      "occurrences": 1,
+      "reason": "work plans, agent reports and release records name the commit each piece of work was done against"
+    },
+    {
+      "file": "AI_DOCS/agent-reports/sync-1.6.0-cli-ui.md",
+      "occurrences": 1,
+      "reason": "work plans, agent reports and release records name the commit each piece of work was done against"
+    },
+    {
+      "file": "AI_DOCS/agent-reports/sync-1.6.0-durable-core.md",
+      "occurrences": 1,
+      "reason": "work plans, agent reports and release records name the commit each piece of work was done against"
+    },
+    {
+      "file": "AI_DOCS/agent-reports/sync-1.6.0-durable-edge.md",
+      "occurrences": 1,
+      "reason": "work plans, agent reports and release records name the commit each piece of work was done against"
+    },
+    {
       "file": "AI_DOCS/sync-1.5.2.md",
       "occurrences": 1,
       "reason": "work plans, agent reports and release records name the commit each piece of work was done against"
@@ -2129,6 +1447,11 @@
       "reason": "the preserved v1.5.2 target lock"
     },
     {
+      "file": "docs/compatibility/baseline.md",
+      "occurrences": 1,
+      "reason": "describes the previous target"
+    },
+    {
       "file": "docs/decisions/0014-pi-1.5.2-sync.md",
       "occurrences": 1,
       "reason": "the v1.5.2 sync decision"
@@ -2140,6 +1463,11 @@
     },
     {
       "file": "docs/release-notes/1.5.2.md",
+      "occurrences": 1,
+      "reason": "release notes record what each release was built from"
+    },
+    {
+      "file": "docs/release-notes/1.6.0.md",
       "occurrences": 1,
       "reason": "release notes record what each release was built from"
     },
@@ -2349,13 +1677,6 @@
       "citations": 1,
       "upstream": [
         "packages/chord/src/node/tui/pipe.ts"
-      ]
-    },
-    {
-      "file": "src/PiSharp.Chord.Hosting/Terminal/TerminalRuntime.cs",
-      "citations": 1,
-      "upstream": [
-        "packages/chord/src/tui/runtime.ts"
       ]
     },
     {
