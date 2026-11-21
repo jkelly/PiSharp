@@ -51,8 +51,13 @@ public sealed class ScriptedModels : IDurableModels
     /// <summary>Text and tool-calling answers.</summary>
     public ScriptedModels(params ScriptedReply[] replies) => this.replies = new(replies);
 
-    /// <summary>The scripted model.</summary>
-    public DurableModel Model { get; } = new()
+    private int callCount;
+
+    /// <summary>Requests answered so far (upstream <c>faux.state.callCount</c>).</summary>
+    public int CallCount => Volatile.Read(ref callCount);
+
+    /// <summary>The scripted model; a host sets its own to give it input limits (upstream <c>fauxProvider({ models: [...] })</c>).</summary>
+    public DurableModel Model { get; init; } = new()
     {
         Id = "faux-1", Name = "Faux Model", Api = "faux", Provider = "faux", BaseUrl = "http://localhost:0", Input = ["text", "image"],
         ContextWindow = 128000, MaxTokens = 16384,
@@ -70,6 +75,7 @@ public sealed class ScriptedModels : IDurableModels
         [EnumeratorCancellation] CancellationToken cancellationToken)
     {
         await Task.Yield();
+        Interlocked.Increment(ref callCount);
         var timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
         var partial = new AssistantMessage(model.Api, model.Provider, model.Id, timestamp, [], TokenUsage.Zero, StopReason.Pending);
         if (!replies.TryDequeue(out var reply))

@@ -42,5 +42,40 @@ internal static partial class Program
             }
             Check(upstream.Contains("packages/durable/docs/spec.md") is false && upstream.Count > 150, "the map lists upstream sources and tests");
         }),
+
+        // Pi v1.6.0 sync: the row-level map stays v1.5.0 evidence, so the files the range added have no row there. Their native locations
+        // are tools/DurablePortMap/sync-1.6.0-native-map.json, which the overlay's generator copies into each row as nativeMapping.
+        Case("setup.sync160-native-map-names-the-new-durable-files", () =>
+        {
+            var repository = RepositoryRoot();
+            using var native = JsonDocument.Parse(File.ReadAllText(Path.Combine(repository, "tools", "DurablePortMap", "sync-1.6.0-native-map.json")));
+            using var overlay = JsonDocument.Parse(File.ReadAllText(Path.Combine(repository, "compatibility", "durable-sync-1.6.0-overlay.json")));
+            Equal(DurableUpstream.Commit, native.RootElement.GetProperty("source").GetProperty("commit").GetString(), "the native map's commit");
+            var files = native.RootElement.GetProperty("files");
+            var listed = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var entry in files.EnumerateObject())
+            {
+                listed.Add(entry.Name);
+                var paths = new List<string>();
+                foreach (var key in new[] { "pisharp", "tests" })
+                    if (entry.Value.TryGetProperty(key, out var list)) paths.AddRange(list.EnumerateArray().Select(item => item.GetString()!));
+                Check(paths.Count > 0, entry.Name + " names no native location");
+                foreach (var path in paths) Check(File.Exists(Path.Combine(repository, path)), entry.Name + " names a missing file " + path);
+            }
+            var rows = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var row in overlay.RootElement.GetProperty("rows").EnumerateArray())
+            {
+                var upstream = row.GetProperty("upstream")[0].GetString()!;
+                rows.Add(upstream);
+                var mapped = row.TryGetProperty("nativeMapping", out var mapping);
+                Equal(listed.Contains(upstream), mapped, upstream + ": the overlay row carries the native map's entry");
+                if (mapped) Equal(files.GetProperty(upstream).GetRawText().Replace(" ", "").Replace("\n", ""),
+                    mapping.GetRawText().Replace(" ", "").Replace("\n", ""), upstream + ": the same entry");
+                // Every Durable source, test or example the range added has a native location.
+                if (row.GetProperty("change").GetString() == "A" && upstream.StartsWith("packages/durable/", StringComparison.Ordinal) && upstream.EndsWith(".ts", StringComparison.Ordinal))
+                    Check(mapped, upstream + " was added in v1.6.0 and has no native location");
+            }
+            foreach (var upstream in listed) Check(rows.Contains(upstream), upstream + " is not a file the v1.6.0 range changed");
+        }),
     ];
 }

@@ -289,7 +289,15 @@ public sealed record TaskNodeState
     public string? Phase { get; init; }
     public IReadOnlyList<long>? On { get; init; }
     public string? Policy { get; init; }
+    /// <summary>A sleeping task's deadline on the Harness clock, in milliseconds; absent when it sleeps for signals only (Pi v1.6.0, where
+    /// <c>until</c> became optional).</summary>
+    public double? Until { get; init; }
+    /// <summary>The signal keys a sleeping task waits for (Pi v1.6.0); absent when it sleeps until a time only.</summary>
+    public IReadOnlyList<TaskSignalKey>? Signals { get; init; }
 }
+
+/// <summary>One signal key a sleeping task waits for: the signal's name and the key of the wait (pi-durable <c>SignalKey</c>).</summary>
+public sealed record TaskSignalKey(string Signal, string Key);
 
 /// <summary>A live task of a session (durable-pi <c>TaskNode</c>).</summary>
 public sealed record TaskNode

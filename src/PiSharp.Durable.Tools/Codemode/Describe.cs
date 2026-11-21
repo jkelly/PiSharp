@@ -1,9 +1,12 @@
-// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/src/codemode/describe.ts.
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/durable/src/codemode/describe.ts.
 // - renderToolSample and toCodemodeIdentifier are PiSharp.Codemode's CodemodeDeclarations.RenderToolSample and
 //   CodemodeIdentifier.ToIdentifier (ports of pi-codemode's declarations.ts and identifier.ts); a tool's declaration is a CodemodeTool whose
 //   schemas are the registration's JSON.
 // - `localeCompare` of namespace names is StringComparer.InvariantCulture (ICU collation, as main's coding-agent code mode orders them);
 //   Array.prototype.sort and OrderBy are both stable. `trim()` is the durable core's Js.Trim.
+// - Pi v1.6.0: namespaces come from the extensions (Extension.Namespace, a ToolNamespace), not from name prefixes. CodemodeNamespace, its
+//   Prefix, NamespaceOf(name, namespaces) and CodemodeToolOptions.Namespaces are gone with no fallback, as upstream; namespacesOf() is
+//   DurableCodemode.NamespacesOf and declaredNamespaces() is CodemodeDescribe.DeclaredNamespaces.
 using System.Collections.Immutable;
 using PiSharp.Codemode;
 using PiSharp.Contracts;
@@ -12,19 +15,13 @@ using PiSharp.Durable.Internal.PiAi.Validation;
 
 namespace PiSharp.Durable.Tools;
 
-/// <summary>A group of tools named by a common prefix, such as an MCP server's <c>mcp__github__</c> (upstream <c>CodemodeNamespace</c>).
-/// Tool names starting with <see cref="Prefix"/> belong to the namespace; the longest matching prefix wins.</summary>
-public sealed record CodemodeNamespace(string Name, string Prefix)
-{
-    public string? Description { get; init; }
-    public string? Instructions { get; init; }
-}
-
 /// <summary>
 /// What the model reads about code mode, copied from the coding agent's code mode (upstream <c>describe.ts</c>): the tool's fixed description
 /// (the script environment and its globals), and the <c>codemode</c> prompt section, which lists the tools scripts can call as TypeScript
-/// declarations, grouped by namespace and limited to a token budget. Tools that do not fit are found with <c>searchTools()</c>. The section
-/// renders from the conversation's callable tools, so it changes with them; the tool's description never does.
+/// declarations, grouped by the namespaces their extensions declare and limited to a token budget. Tools that do not fit, and deferred
+/// tools, are found with <c>searchTools()</c>. Every selected extension's namespace is listed (with its description) whether or not it has
+/// tools yet, so the section stays the same when an extension's deferred tools come and go (an MCP server connecting); the tool's description
+/// never changes.
 /// </summary>
 internal static class CodemodeDescribe
 {
@@ -71,14 +68,30 @@ internal static class CodemodeDescribe
     /// <summary><c>toolSample</c> of a tool: its description and TypeScript declaration (upstream <c>sampleOf</c>).</summary>
     public static string SampleOf(ToolRegistration tool) => CodemodeDeclarations.RenderToolSample(DeclarationOf(tool));
 
-    /// <summary>The namespace of a tool: the one with the longest prefix its name starts with (upstream <c>namespaceOf</c>).</summary>
-    public static CodemodeNamespace? NamespaceOf(string name, IReadOnlyList<CodemodeNamespace> namespaces)
+    /// <summary>The namespace of each tool the extensions bring, by tool name: its extension's <see cref="Extension.Namespace"/> (upstream
+    /// <c>namespacesOf</c>). A tool several extensions name belongs to the first one's (with none when the first declares none).</summary>
+    public static IReadOnlyDictionary<string, ToolNamespace> NamespacesOf(IEnumerable<Extension> extensions)
     {
-        CodemodeNamespace? found = null;
-        foreach (var candidate in namespaces)
-            if (name.StartsWith(candidate.Prefix, StringComparison.Ordinal) && (found is null || candidate.Prefix.Length > found.Prefix.Length))
-                found = candidate;
-        return found;
+        var namespaces = new Dictionary<string, ToolNamespace>(StringComparer.Ordinal);
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var extension in extensions)
+            foreach (var tool in extension.Tools ?? [])
+            {
+                if (!seen.Add(tool.Name)) continue;
+                if (extension.Namespace is { } found) namespaces[tool.Name] = found;
+            }
+        return namespaces;
+    }
+
+    /// <summary>The namespaces the extensions declare, by name (the first declaration of a name wins), sorted by name (upstream
+    /// <c>declaredNamespaces</c>).</summary>
+    public static IReadOnlyList<ToolNamespace> DeclaredNamespaces(IEnumerable<Extension> extensions)
+    {
+        var byName = new List<ToolNamespace>();
+        var names = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var extension in extensions)
+            if (extension.Namespace is { } found && names.Add(found.Name)) byName.Add(found);
+        return [.. byName.OrderBy(found => found.Name, StringComparer.InvariantCulture)];
     }
 
     /// <summary><c>### `id` (`raw name`)</c> followed by the tool's description and declaration.</summary>
@@ -90,7 +103,7 @@ internal static class CodemodeDescribe
     }
 
     private sealed record CatalogEntry(string Name, string Section, int Cost);
-    private sealed record CatalogGroup(CodemodeNamespace? Namespace, List<CatalogEntry> Entries);
+    private sealed record CatalogGroup(ToolNamespace? Namespace, List<CatalogEntry> Entries);
 
     /// <summary>
     /// Pick the tool sections that fit the budget: in each round every group (tools without a namespace first, then namespaces by name) places
@@ -119,46 +132,33 @@ internal static class CodemodeDescribe
     }
 
     /// <summary>
-    /// The <c>codemode</c> section: the tools scripts can call, grouped by namespace, with their declarations as far as the budget allows
-    /// (upstream <c>codemodeSection</c>). Null without callable tools.
+    /// The <c>codemode</c> section: the tools scripts can call (ungrouped ones first), then every namespace the selected
+    /// <paramref name="extensions"/> declare, by name, as <c>## &lt;name&gt;</c> and its description, each followed by its tools' declarations
+    /// as far as the budget allows (upstream <c>codemodeSection</c>). Headers carry no counts, so the text changes only with the declared
+    /// tools. Null without callable tools and namespaces.
     /// </summary>
-    public static string? Section(IReadOnlyList<ToolRegistration> tools, IReadOnlyList<CodemodeNamespace> namespaces, int budget)
+    public static string? Section(IReadOnlyList<ToolRegistration> tools, IReadOnlyList<Extension> extensions, int budget)
     {
-        if (tools.Count == 0) return null;
-        var groups = new List<(string Key, CatalogGroup Group)> { ("", new CatalogGroup(null, [])) };
+        var namespaces = DeclaredNamespaces(extensions);
+        if (tools.Count == 0 && namespaces.Count == 0) return null;
+        var toolNamespaces = NamespacesOf(extensions);
+        var ungrouped = new CatalogGroup(null, []);
+        var groups = namespaces.ToDictionary(found => found.Name, found => new CatalogGroup(found, []), StringComparer.Ordinal);
         foreach (var tool in tools)
         {
-            var found = NamespaceOf(tool.Name, namespaces);
-            var key = found is not null ? $"ns:{found.Name}" : "";
-            var index = groups.FindIndex(entry => entry.Key == key);
-            if (index < 0)
-            {
-                groups.Add((key, new CatalogGroup(found, [])));
-                index = groups.Count - 1;
-            }
+            var group = toolNamespaces.TryGetValue(tool.Name, out var found) ? groups[found.Name] : ungrouped;
             var section = RenderToolSection(tool);
-            groups[index].Group.Entries.Add(new CatalogEntry(tool.Name, section, (int)Math.Ceiling(section.Length / (double)CharsPerToken)));
+            group.Entries.Add(new CatalogEntry(tool.Name, section, (int)Math.Ceiling(section.Length / (double)CharsPerToken)));
         }
-        var ordered = groups.Select(entry => entry.Group).OrderBy(group => group.Namespace is null ? 0 : 1)
-            .ThenBy(group => group.Namespace?.Name, StringComparer.InvariantCulture).ToList();
+        List<CatalogGroup> ordered = [ungrouped, .. namespaces.Select(found => groups[found.Name])];
         var shown = SelectCatalog(ordered, budget);
 
         var toolSections = new List<string> { "Tools scripts can call (`await tools.<name>(args)`):" };
+        if (shown.Count < tools.Count) toolSections.Add("Some tools are not listed: find them with `searchTools()`.");
         foreach (var group in ordered)
         {
-            if (group.Entries.Count == 0) continue;
-            var visible = group.Entries.Where(entry => shown.Contains(entry.Name)).ToList();
-            if (group.Namespace is { } found)
-            {
-                var listing = visible.Count == group.Entries.Count ? "" : visible.Count == 0 ? " (tools not listed)" : " (some tools not listed)";
-                var description = found.Description is null ? null : JsString.Trim(found.Description);
-                toolSections.Add($"## {found.Name}{listing}{(string.IsNullOrEmpty(description) ? "" : "\n" + description)}");
-            }
-            else if (visible.Count < group.Entries.Count)
-            {
-                toolSections.Add("Some tools are not listed: find them with `searchTools()`.");
-            }
-            toolSections.AddRange(visible.Select(entry => entry.Section));
+            if (group.Namespace is { } found) toolSections.Add($"## {found.Name}\n{JsString.Trim(found.Description)}");
+            toolSections.AddRange(group.Entries.Where(entry => shown.Contains(entry.Name)).Select(entry => entry.Section));
         }
         return string.Join("\n\n", toolSections);
     }

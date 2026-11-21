@@ -134,13 +134,18 @@ function build() {
   const historical = new Map(prior.files.map(row => [row.upstream, { upstream: row.upstream, pisharp: row.pisharp, status: row.status, blobSha1: row.blobSha1 }]));
   for (const row of previousOverlay.rows) if (row.historicalMapping && row.source.after) historical.set(row.source.after.path, row.historicalMapping);
   const mapped = row => historical.get(row.source.before?.path) ?? historical.get(row.source.after?.path);
+  // Where this sync put the native counterpart of a file the range added, or of one whose port spans more than the historical
+  // location (tools/DurablePortMap data, written by the Durable work packages). A location, not a completed-port assertion.
+  const nativePath = 'tools/DurablePortMap/sync-1.6.0-native-map.json';
+  const native = existsSync(resolve(repo, nativePath)) ? read(nativePath).files : {};
+  const placed = row => native[row.source.after?.path];
   const overlay = {
     schemaVersion: 1, status: PENDING, source: inventory.to, previous: inventory.from,
     preservedMap: SYNC.durable.preservedMap, preservedMapSha256: createHash('sha256').update(readFileSync(resolve(repo, SYNC.durable.preservedMap))).digest('hex'),
     previousOverlay: SYNC.durable.previousOverlay, applicability: SYNC.table,
     scope: `Current changed Durable files and changed Chord files referenced by the historical Durable map or the previous overlay. Previous mapped locations are preserved as historical references, not assertions of completed ${SYNC.version} ports.`,
     rows: rows.filter(row => row.upstream[0].startsWith('packages/durable/') || mapped(row))
-      .map(row => { const old = mapped(row); return { ...row, ...(old ? { historicalMapping: old } : {}) }; }),
+      .map(row => { const old = mapped(row), now = placed(row); return { ...row, ...(old ? { historicalMapping: old } : {}), ...(now ? { nativeMapping: now } : {}) }; }),
   };
 
   const map = read(SYNC.durable.map), current = map.currentImplementation ?? {};

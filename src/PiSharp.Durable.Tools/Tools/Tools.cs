@@ -1,4 +1,4 @@
-// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/src/tools/index.ts
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/durable/src/tools/index.ts
 // Upstream's createXTool functions are CodingTools.CreateXTool; createCodingTools is CodingTools.CreateCodingTools and its CodingTools
 // extension is CodingTools.Extension. Each call creates a new registration, as upstream's factories do. None sets `replay`, so every coding
 // tool keeps the default, unsafe: a call interrupted by a crash or close is answered as interrupted instead of rerun.
@@ -15,6 +15,10 @@ public static class CodingTools
 
     /// <summary>Upstream <c>DEFAULT_IMAGE_LIMITS</c>: the image limits <c>read</c> keeps unless the conversation's model sets its own.</summary>
     public static ImageLimits DefaultImageLimits => ImageLimits.Default;
+
+    /// <summary>Upstream <c>imageLimits(model)</c> (Pi v1.6.0): the limits of images sent to <paramref name="model"/>, resolved as <c>read</c>
+    /// resolves them: its <c>inputLimits.images.resize</c>, each absent one <see cref="DefaultImageLimits"/>'s.</summary>
+    public static ImageLimits ImageLimitsOf(DurableModel? model) => ImageLimits.Of(model);
 
     /// <summary>
     /// The <c>coding-tools</c> extension: <c>read</c>, <c>write</c>, <c>edit</c>, and <c>bash</c>; nothing installs it automatically.

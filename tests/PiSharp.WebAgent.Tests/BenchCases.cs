@@ -499,6 +499,30 @@ internal static partial class Program
             Check(BenchSchema.NormalizeTool(new BenchTool { Name = "read", Builtin = true, Strict = true }) is { Strict: true, Builtin: true }, "a built-in may still be sent strict");
         }),
 
+        // Pi 1.6.0 (#12049): a schema node without a type is not strict-safe; a bare enum and an anyOf count as typed, a bare const does not.
+        Case("bench.strict.lists-a-schema-node-without-a-type", () =>
+        {
+            var problems = BenchStrict.Problems(JsonNode.Parse("""
+                {"type":"object","additionalProperties":false,"required":["free","choice","fixed","union","list","ref","typed"],"properties":{
+                  "free":{"description":"anything"},
+                  "choice":{"enum":["a","b"]},
+                  "fixed":{"const":"x"},
+                  "union":{"anyOf":[{"type":"string"},{"description":"untyped variant"}]},
+                  "list":{"type":"array","items":{}},
+                  "ref":{"$ref":"#/$defs/name"},
+                  "typed":{"type":["string","null"]}},
+                 "$defs":{"name":{"type":"string"},"loose":{"title":"no type"}}}
+                """)!.AsObject());
+            const string rule = ": add a \"type\" (strict mode rejects a schema without one";
+            Equal("parameters/properties/free|parameters/properties/fixed|parameters/properties/union/anyOf/1|parameters/properties/list/items|parameters/$defs/loose",
+                string.Join("|", problems.Select(problem => problem[..problem.IndexOf(':')])), "the untyped nodes, in the walk's order: " + string.Join(" | ", problems));
+            Check(problems.All(problem => problem.Contains(rule, StringComparison.Ordinal)), "each says what strict mode asks: " + string.Join(" | ", problems));
+            // An untyped root is listed too, beside the rules every root has.
+            var rootless = BenchStrict.Problems(JsonNode.Parse("""{"properties":{"a":{"type":"string"}},"required":["a"],"additionalProperties":false}""")!.AsObject());
+            Check(rootless is [var only] && only.StartsWith("parameters" + rule, StringComparison.Ordinal), "an untyped root: " + string.Join(" | ", rootless));
+            Equal(0, BenchStrict.Problems(BenchLookup().Parameters).Count, "a typed schema still fits");
+        }),
+
         Case("bench.strict.page-says-what-the-model-does-and-faux-accepts-it", async () =>
         {
             await using var app = await WebAgentApp.StartAsync("bench-strict-page");

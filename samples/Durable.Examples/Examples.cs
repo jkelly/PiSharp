@@ -6,8 +6,12 @@
 // 23-child-tasks.ts is in ExamplesChildTasks.cs; 24-compaction.ts is in ExamplesCompaction.cs; 30-reload-and-restart.ts is in
 // ExamplesReload.cs; 31-transcript.ts is in ExamplesTranscript.cs; 32-tests-after-edits.ts is in ExamplesTestsAfterEdits.cs;
 // 33-turn-limit-and-continue.ts is in ExamplesTurnLimitAndContinue.cs; 34-submit-in-commit.ts is in ExamplesSubmitInCommit.cs).
-// 35-durable-on-the-store.ts, 36-durable-views.ts and 37-harness-registry.ts run a Chord host (createHost, defineFacet), which phase 6 of
-// the v1.5.0 sync ports; they are not here yet.
+// 35-durable-on-the-store.ts, 36-durable-views.ts and 37-harness-registry.ts run a Chord host (createHost, defineFacet); they are in
+// samples/Durable.Chord.Examples.
+// Pi v1.6.0 sync (faac585884ae2c013a6b1400f3e9e77f10b34bac): 38-signals.ts and 39-ask-a-person.ts are in ExamplesSignals.cs;
+// 40-tool-waits-for-webhook.ts, 41-tool-polls.ts, 42-parallel-children.ts and 43-subagent-waits.ts are in ExamplesToolParks.cs;
+// 44-approval-gate.ts, 45-review-on-yield.ts and 46-after-tools-terminate.ts are in ExamplesGates.cs; 47-fit-images.ts is in
+// ExamplesFitImages.cs. 32-tests-after-edits.ts uses hookTask (Define.HookTask), RunEndTask's new name.
 // Each example prints what upstream's console.log prints, as JSON. Upstream runs every example on a fresh MemoryStorage; here each one
 // can also run on its own JSONL directory or SQLite file, and then the storage is reopened in a new Session and read back (milestone M0
 // of decision 0005: the examples survive close and reopen).
@@ -34,7 +38,8 @@ public enum ExampleStorage
     Sqlite,
 }
 
-/// <summary>Upstream durable examples 00-34 of Pi v1.5.0, by their v1.5.0 names (35-37 need the Chord host of phase 6).</summary>
+/// <summary>Upstream durable examples 00-34 and 38-47 of Pi v1.6.0, by their upstream names (35-37, which run a Chord host, are in
+/// samples/Durable.Chord.Examples).</summary>
 public static partial class Examples
 {
     // Every Session call takes a context, which is used for cancellation. Background means "never cancel".
@@ -86,6 +91,16 @@ public static partial class Examples
         ("32-tests-after-edits", TestsAfterEditsAsync),
         ("33-turn-limit-and-continue", TurnLimitAndContinueAsync),
         ("34-submit-in-commit", SubmitInCommitAsync),
+        ("38-signals", SignalsAsync),
+        ("39-ask-a-person", AskAPersonAsync),
+        ("40-tool-waits-for-webhook", ToolWaitsForWebhookAsync),
+        ("41-tool-polls", ToolPollsAsync),
+        ("42-parallel-children", ParallelChildrenAsync),
+        ("43-subagent-waits", SubagentWaitsAsync),
+        ("44-approval-gate", ApprovalGateAsync),
+        ("45-review-on-yield", ReviewOnYieldAsync),
+        ("46-after-tools-terminate", AfterToolsTerminateAsync),
+        ("47-fit-images", FitImagesExampleAsync),
     ];
 
     /// <summary>The example names, in order.</summary>

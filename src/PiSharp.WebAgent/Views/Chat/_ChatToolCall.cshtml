@@ -16,6 +16,8 @@
     var stopped = stored?.Code == "aborted";
     var denied = call.Status == ToolStatus.Error && (call.Result ?? "").StartsWith("The user denied", StringComparison.Ordinal);
     var running = call.Status is ToolStatus.Running or ToolStatus.Pending && !waitsForYou;
+    // Pi Durable 1.6.0: a parked call holds no process; it runs again at its deadline, a signal, or the end of the tasks it waits for.
+    var parked = call.Status is ToolStatus.Sleeping or ToolStatus.Waiting && !waitsForYou;
     var cardClass = call.Status switch
     {
         ToolStatus.Error when restarted || stopped => "",
@@ -33,6 +35,8 @@
     {<span class="ps-chip" title="A restart cut this call off. PiSharp never runs a tool again by itself.">@(stored!.Code == "abandoned" ? "Not started after restart" : "Not re-run after restart")</span>}
     else if (waitsForYou)
     {<span class="ps-chip"><span class="status-dot waiting" aria-hidden="true"></span>@(approval is not null ? "waiting for approval" : "waiting for you")</span>}
+    else if (parked)
+    {<span class="ps-chip" title="This call is parked: it holds no process and runs again when what it waits for arrives."><i class="bi bi-pause-fill" aria-hidden="true"></i>@(call.Status == ToolStatus.Sleeping ? "sleeping" : "waiting")</span>}
     else if (running)
     {<span class="ps-chip"><span class="spinner-border spinner-border-sm chip-spinner" aria-hidden="true"></span>@(call.Status == ToolStatus.Pending ? "pending" : "running")</span>}
     else if (denied)
