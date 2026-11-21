@@ -14,6 +14,22 @@
 // - `/closed/.test(String(error))` tests the exception's message.
 // Pi v1.5.0 sync (area watches, 92ab53602): the state getters are gone, so "publishes no frame to watches ..." (renamed with them), the
 // cancelled-acquisition case, the close-gate tables and the read-only viewer case use the watches alone, and a close ends a watch Ended.
+// Pi v1.6.0 sync (faac585884ae2c013a6b1400f3e9e77f10b34bac): added the three "Harness close" cases of #11676, "cleans up provider session
+// resources after running tasks join", "... when the Harness fails" and "does not clean up provider session resources owned by another
+// Harness", with their helper providerResources() (ProviderResources). Their adaptations:
+// - pi-ai's registerSessionResourceCleanup is PiSharp.AI.SessionResources.RegisterCleanup, and the faux factory's `options.sessionId` is
+//   FauxRequest.Options.SessionId (ChatSupport.cs).
+// - The cleanup registry is process-wide. vitest loads each test file's modules afresh, so upstream's registry holds this file's cleanups
+//   alone and only its Harnesses call them; this suite runs every group in one process.
+//   So ProviderResources records a cleanup of a named session only for a session ID its own case allocated (a cleanup without an ID
+//   still takes its live set, as upstream's does), and each case unregisters in a finally too, so a failed assertion leaves no cleanup
+//   registered behind it. Upstream's `live` Set and `cleaned` array are read as copies taken under the helper's lock, as a close runs
+//   the cleanup on another thread.
+// - `new Set(cleaned)` with `toHaveLength(n)` is SameSet with a count check; MemoryStorage is the group's fresh storage, so the three
+//   cases also run on JSONL and SQLite.
+// - "... when the Harness fails" waits for the conversation to be idle before it fails the next commit: the run's last commits follow
+//   the answer that settled the input, and here they race the note's commit for the injected failure. `rejects.toBe(failure)` is a
+//   reference check of the caught exception.
 using System.Reflection;
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
@@ -88,6 +104,80 @@ internal static class LifecycleTests
 
     /// <summary>Upstream <c>unloadDocuments(harness)</c>: drops the loaded trackers, so the next acquisition reads Storage on the line.</summary>
     private static Task UnloadDocuments(IHarness harness) => ((DurableHarness)harness).UnloadDocumentsAsync();
+
+    /// <summary>
+    /// Upstream <c>providerResources()</c>: provider resources by session ID. A faux response from <see cref="Answer"/> allocates the
+    /// request's session, and a cleanup registered with pi-ai (<see cref="PiSharp.AI.SessionResources"/>) records what it was asked to clean
+    /// up. The registry is process-wide, so a cleanup of a named session is recorded only for a session this instance allocated.
+    /// </summary>
+    private sealed class ProviderResources
+    {
+        private readonly Lock gate = new();
+        private readonly HashSet<string> allocated = new(StringComparer.Ordinal);
+        private readonly HashSet<string> live = new(StringComparer.Ordinal);
+        private readonly List<string> cleaned = [];
+        private readonly Action unregister;
+
+        public ProviderResources() => unregister = PiSharp.AI.SessionResources.RegisterCleanup(Clean);
+
+        /// <summary>The sessions allocated and not cleaned up (upstream <c>live</c>), as a copy.</summary>
+        public HashSet<string> Live
+        {
+            get { lock (gate) return new HashSet<string>(live, StringComparer.Ordinal); }
+        }
+
+        /// <summary>Every cleanup of one of this instance's sessions, in order (upstream <c>cleaned</c>), as a copy.</summary>
+        public List<string> Cleaned
+        {
+            get { lock (gate) return [.. cleaned]; }
+        }
+
+        /// <summary>A faux response that allocates the request's session and answers <paramref name="text"/> (upstream <c>answer</c>).</summary>
+        public FauxStep Answer(string text) => FauxStep.From(request =>
+        {
+            Allocate(request.Options?.SessionId);
+            return FauxAssistantMessage(text);
+        });
+
+        /// <summary>Removes the cleanup from pi-ai's registry (upstream <c>unregister</c>); a second call does nothing.</summary>
+        public void Unregister() => unregister();
+
+        private void Allocate(string? sessionId)
+        {
+            if (sessionId is null) throw new InvalidOperationException("Provider request has no session ID");
+            lock (gate)
+            {
+                allocated.Add(sessionId);
+                live.Add(sessionId);
+            }
+        }
+
+        private void Clean(string? sessionId)
+        {
+            lock (gate)
+            {
+                var targets = new List<string>();
+                if (sessionId is null) targets.AddRange(live);
+                // Another case's Harness, closing in this process, names its own sessions: not this instance's to record.
+                else if (allocated.Contains(sessionId)) targets.Add(sessionId);
+                cleaned.AddRange(targets);
+                foreach (var target in targets) live.Remove(target);
+            }
+        }
+    }
+
+    /// <summary>The provider session ID of <paramref name="conversation"/> (upstream
+    /// <c>(await harness.snapshot(ProviderDoc, id, context))!.sessionId</c>).</summary>
+    private static async Task<string> ProviderSessionId(IHarness harness, IConversation conversation) =>
+        S((await harness.SnapshotAsync(ProviderIdentity.ProviderDoc, conversation.Id, Context))!["sessionId"]);
+
+    /// <summary><c>expect(new Set(actual)).toEqual(new Set(expected))</c>.</summary>
+    private static void SameSet(IEnumerable<string> expected, IEnumerable<string> actual, string what)
+    {
+        var (wanted, found) = (expected.ToList(), actual.ToList());
+        Check(new HashSet<string>(wanted, StringComparer.Ordinal).SetEquals(found),
+            $"{what}: expected the set [{string.Join(", ", wanted)}], actual [{string.Join(", ", found)}]");
+    }
 
     /// <summary>Upstream <c>storageOpen(storage)</c>: whether a raw Storage read still succeeds, as code of a joined invocation relies on.</summary>
     private static async Task<bool> StorageOpen(IStorage storage)
@@ -276,6 +366,122 @@ internal static class LifecycleTests
                 await closing;
                 Equal(true, readAfterRelease, $"{where}: read after release");
                 Check(!await StorageOpen(storage), $"{where}: storage closed");
+            }
+        });
+
+        // Regression coverage for #11676.
+        yield return Case(prefix + "cleans-up-provider-session-resources-after-running-tasks-join", async () =>
+        {
+            var resources = new ProviderResources();
+            try
+            {
+                var setup = Setup();
+                setup.Faux.SetResponses(resources.Answer("ok"));
+                var reached = new HarnessTests.Deferred();
+                var gate = new HarnessTests.Deferred();
+                var stubborn = OneStep("test.provider-cleanup-order", async () =>
+                {
+                    reached.Resolve();
+                    await gate.Task;
+                });
+                AddTask(setup.Registry, stubborn);
+                var (harness, root) = await OpenChat(await fresh(), setup);
+                var sessionId = await ProviderSessionId(harness, root);
+                await (await root.SubmitAsync(SubmissionDraft.Input("allocate"), Context)).WaitAsync(Context);
+                await Start(root, stubborn);
+                harness.Resume();
+                await reached.Task;
+                var closing = harness.CloseAsync(Context);
+                var closedBeforeJoin = await Settled(closing);
+                Check(!closedBeforeJoin, "close waits for the running task");
+                Seq([], resources.Cleaned, "cleaned before the join");
+                SameSet([sessionId], resources.Live, "live before the join");
+                gate.Resolve();
+                await closing;
+                resources.Unregister();
+                Seq([sessionId], resources.Cleaned, "cleaned");
+                SameSet([], resources.Live, "live");
+            }
+            finally
+            {
+                resources.Unregister();
+            }
+        });
+
+        yield return Case(prefix + "cleans-up-provider-session-resources-when-the-harness-fails", async () =>
+        {
+            var resources = new ProviderResources();
+            try
+            {
+                var setup = Setup();
+                setup.Faux.SetResponses(resources.Answer("ok"));
+                var storage = new ControlledStorage(await fresh());
+                var (harness, root) = await OpenChat(storage, setup);
+                var sessionId = await ProviderSessionId(harness, root);
+                await (await root.SubmitAsync(SubmissionDraft.Input("allocate"), Context)).WaitAsync(Context);
+                // The run still commits its end after the answer that settled the input, on another thread here: once the conversation
+                // is idle, the next commit is the note's, as it is upstream.
+                await root.WaitForIdleAsync(Context);
+                var failure = new InvalidOperationException("disk gone");
+                storage.FailNextCommit(failure);
+                Exception? rejected = null;
+                try
+                {
+                    await root.CommitAsync(tx => tx.AppendEntryAsync(root.Id, new EntryDraft { Kind = "note" }), Context);
+                }
+                catch (Exception error)
+                {
+                    rejected = error;
+                }
+                Same(failure, rejected, "the commit rejects with the storage failure");
+                var closed = await harness.Closed;
+                resources.Unregister();
+                Equal(SessionEnd.Failed(failure), closed, "closed");
+                Seq([sessionId], resources.Cleaned, "cleaned");
+                SameSet([], resources.Live, "live");
+            }
+            finally
+            {
+                resources.Unregister();
+            }
+        });
+
+        yield return Case(prefix + "does-not-clean-up-provider-session-resources-owned-by-another-harness", async () =>
+        {
+            var resources = new ProviderResources();
+            try
+            {
+                var firstSetup = Setup();
+                var secondSetup = Setup();
+                firstSetup.Faux.SetResponses(resources.Answer("first root"), resources.Answer("first child"));
+                secondSetup.Faux.SetResponses(resources.Answer("second"));
+                var first = await OpenChat(await fresh(), firstSetup);
+                var firstChild = await first.Harness.CreateConversationAsync(
+                    new ConversationCreateOptions(ConversationOwnership.Ownerless) { Agent = new AgentChange { Model = new ModelRef("faux", "faux-1") } },
+                    Context);
+                var second = await OpenChat(await fresh(), secondSetup);
+                var firstId = await ProviderSessionId(first.Harness, first.Root);
+                var firstChildId = await ProviderSessionId(first.Harness, firstChild);
+                var secondId = await ProviderSessionId(second.Harness, second.Root);
+                await (await first.Root.SubmitAsync(SubmissionDraft.Input("allocate first root"), Context)).WaitAsync(Context);
+                await (await firstChild.SubmitAsync(SubmissionDraft.Input("allocate first child"), Context)).WaitAsync(Context);
+                await (await second.Root.SubmitAsync(SubmissionDraft.Input("allocate second"), Context)).WaitAsync(Context);
+                await first.Harness.CloseAsync(Context);
+                var cleanedAfterFirst = resources.Cleaned;
+                var liveAfterFirst = resources.Live;
+                await second.Harness.CloseAsync(Context);
+                resources.Unregister();
+                SameSet([firstId, firstChildId], cleanedAfterFirst, "cleaned after the first close");
+                Equal(2, cleanedAfterFirst.Count, "cleanups after the first close");
+                SameSet([secondId], liveAfterFirst, "live after the first close");
+                var cleaned = resources.Cleaned;
+                SameSet([firstId, firstChildId, secondId], cleaned, "cleaned");
+                Equal(3, cleaned.Count, "cleanups");
+                SameSet([], resources.Live, "live");
+            }
+            finally
+            {
+                resources.Unregister();
             }
         });
 

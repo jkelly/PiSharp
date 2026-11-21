@@ -15,6 +15,15 @@
 // Pi v1.5.0 sync (area publication-caches, e5c6182ba): "resumes a wait only once observeCommits() observers saw the commit that settled it"
 // runs on LateResolvingStorage (SessionSupport.cs) over the group's storage; `new Set<SubmissionId>()` is a ConcurrentDictionary, as the
 // observer runs on the publishing thread.
+// Pi v1.6.0 sync (faac585884ae2c013a6b1400f3e9e77f10b34bac): added "reports no unhandled rejection for a wait cancelled before its result
+// is delivered" (#11963, #11820). Its adaptations:
+// - `class SlowPublications extends ControlledStorage { publishing() }` is SlowPublications, a ControlledStorage that implements
+//   IStorage.Publishing itself (ControlledStorage leaves it to the interface's default, as upstream's has none): the same hook, with
+//   setTimeout(publish, 20) as a 20 ms Task.Delay whose continuation publishes on the thread pool. It runs over the group's storage.
+// - process.on("unhandledRejection") is TaskScheduler.UnobservedTaskException, which the finalizer of a faulted task nobody observed
+//   raises: the case forces a full collection before it reads what was raised. The process runs every group, so the handler also hears
+//   what earlier cases left behind; the case counts only the exceptions that are, or wrap, the reason it cancelled the wait with (the
+//   same instance: other cases cancel with the text "stop waiting" too).
 using System.Collections.Immutable;
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
@@ -175,6 +184,52 @@ internal static class SubmissionsTests
             await RejectsAsync(() => pending, "Harness is closed", "pending wait");
         });
 
+        // #11963, #11820: the wait's task is handed out only after earlier outcomes on the line are delivered.
+        yield return Case(prefix + "reports-no-unhandled-rejection-for-a-wait-cancelled-before-its-result-is-delivered", async () =>
+        {
+            var unhandled = new SyncList<AggregateException>();
+            EventHandler<UnobservedTaskExceptionEventArgs> onUnhandled = (_, args) => unhandled.Add(args.Exception);
+            TaskScheduler.UnobservedTaskException += onUnhandled;
+            try
+            {
+                var setup = Setup();
+                setup.Faux.SetResponses(Unanswered().Step);
+                var storage = new SlowPublications(fresh());
+                var (harness, root) = await OpenChat(storage, setup);
+                var submission = await Submit(root, "hi");
+                storage.Slow = true;
+                var write = Write(root, new EntryDraft { Kind = "note", Data = O("""{"text":"x"}""") });
+                var controller = Context.WithCancel();
+                var reason = new InvalidOperationException("stop waiting");
+                controller.Cancel(reason);
+                var waiting = RejectsAsync(() => submission.WaitAsync(controller.Context), "stop waiting", "cancelled wait");
+                await write;
+                await waiting;
+                storage.Slow = false;
+                await harness.CloseAsync(Context);
+                await Flush();
+                // A faulted task nobody observed reports itself from its finalizer.
+                GC.Collect();
+                GC.WaitForPendingFinalizers();
+                GC.Collect();
+                Seq([], unhandled.Snapshot().Where(error => Carries(error, reason)).Select(error => error.ToString()), "unhandled");
+            }
+            finally
+            {
+                TaskScheduler.UnobservedTaskException -= onUnhandled;
+            }
+
+            // Whether error is, or wraps at any depth, the cancellation's reason.
+            static bool Carries(Exception? error, Exception reason)
+            {
+                if (error is null) return false;
+                if (ReferenceEquals(error, reason)) return true;
+                return error is AggregateException aggregate
+                    ? aggregate.InnerExceptions.Any(inner => Carries(inner, reason))
+                    : Carries(error.InnerException, reason);
+            }
+        });
+
         yield return Case(prefix + "rejects-a-wait-whose-submission-read-spans-the-start-of-close", async () =>
         {
             var controlled = Controlled();
@@ -312,6 +367,21 @@ internal static class SubmissionsTests
             Equal(true, settled.ContainsKey(submission.Id), "settled before the wait resumed");
             await harness.CloseAsync(Context);
         });
+    }
+
+    /// <summary>
+    /// Publishes each commit 20 ms late while <see cref="Slow"/> is set (upstream <c>SlowPublications</c>, whose <c>publishing</c> defers
+    /// <c>publish</c> with <c>setTimeout</c>): the commit is stored at once, and the outcomes on the line behind it wait for its publication.
+    /// </summary>
+    private sealed class SlowPublications(IStorage inner) : ControlledStorage(inner), IStorage
+    {
+        public volatile bool Slow;
+
+        void IStorage.Publishing(Action publish, DurableContext context)
+        {
+            if (Slow) _ = Task.Delay(20).ContinueWith(_ => publish(), CancellationToken.None, TaskContinuationOptions.None, TaskScheduler.Default);
+            else publish();
+        }
     }
 
     /// <summary>Holds the first submission read after <see cref="Hold"/> is set until <see cref="Release"/> (upstream <c>HeldReads</c>).</summary>
