@@ -1,4 +1,4 @@
-// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/tui/src/tui-alt-screen.ts.
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/tui/src/tui-alt-screen.ts.
 using System.Diagnostics;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -950,8 +950,10 @@ public sealed partial class TuiAltScreen : TuiBase, IViewportTui
         if (fullRedraw)
         {
             fullRedrawCount++;
-            buffer.Append(imageProtocol == ImageProtocol.Kitty && hadUploaded ? TerminalImage.DeleteAllKittyPlacements() : imageProtocol == ImageProtocol.Kitty ? TerminalImage.DeleteAllKittyImages() : "");
-            buffer.Append("\u001b[2J");
+            // Kitty frees image data without placements on ED 2, which would break placement-only reuse. Every row is cleared
+            // with EL 2 below, so keep the uploads and skip the screen clear.
+            if (imageProtocol == ImageProtocol.Kitty && hadUploaded) buffer.Append(TerminalImage.DeleteAllKittyPlacements());
+            else buffer.Append(imageProtocol == ImageProtocol.Kitty ? TerminalImage.DeleteAllKittyImages() : "").Append("\u001b[2J");
         }
         else if (imagesRedraw)
         {
