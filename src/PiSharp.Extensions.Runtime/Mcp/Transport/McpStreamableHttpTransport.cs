@@ -354,11 +354,20 @@ public sealed class McpStreamableHttpTransport : IMcpWireTransport
                 bool ownerStopping; lock (host.gate) ownerStopping = host.stopping;
                 // Only this outstanding GET read, stopped by this response owner, can acknowledge
                 // the observed Windows operation-aborted shape. No unrelated IO or sibling fault.
-                if (stopped && ownerStopping && token.IsCancellationRequested && original.IsFaulted &&
+                // Close cancels the lifetime synchronously but the linked GET token only from a
+                // thread-pool callback, so the body disposal can abort the read in between.
+                var lifetimeCanceled = host.operations.Lifetime.IsCancellationRequested;
+                if (stopped && ownerStopping && (token.IsCancellationRequested || lifetimeCanceled) && original.IsFaulted &&
                     original.Exception!.InnerExceptions.Count == 1 && error is IOException { InnerException: SocketException socket } &&
                     socket.NativeErrorCode == 995 && socket.SocketErrorCode == SocketError.OperationAborted)
                 {
                     lock (host.gate) host.ownedReadAborts.Add(new(original, error));
+                    // Callers end the GET by observing this token; wait for the linked callback.
+                    if (!token.IsCancellationRequested)
+                    {
+                        var canceled = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+                        using (token.Register(() => canceled.TrySetResult())) await canceled.Task.ConfigureAwait(false);
+                    }
                     return 0;
                 }
                 if (original.IsCanceled && token.IsCancellationRequested && error is OperationCanceledException cancellation && cancellation.CancellationToken == token) throw;

@@ -27,6 +27,7 @@ internal static class McpHttpOriginalOwnershipTests
         (Prefix + "notification-single-oce-sync-evidence", () => NotificationEvidence("oce", true)),
         (Prefix + "notification-duplicate-task-entries-evidence", () => NotificationEvidence("entries", false)),
         (Prefix + "owned-get-995-abort-retains-original-without-disconnect", () => GetAbort("owned")),
+        (Prefix + "owned-get-995-abort-before-linked-token-cancellation", () => GetAbort("late")),
         (Prefix + "nonstop-get-995-remains-original-failure", () => GetAbort("nonstop")),
         (Prefix + "unrelated-get-io-during-close-remains-failure", () => GetAbort("unrelated")),
         (Prefix + "faulted-get-oce-during-close-remains-failure", () => GetAbort("oce")),
@@ -188,9 +189,22 @@ internal static class McpHttpOriginalOwnershipTests
         public override ValueTask DisposeAsync()
         { DisposeEntered.TrySetResult(); return cleanup is null ? ValueTask.CompletedTask : ValueTask.FromException(cleanup); }
     }
-    private sealed class HttpOperation(HttpResponseMessage response) : IMcpAdmittedHttpRequestOperation
+    private sealed class HttpOperation(HttpResponseMessage response, Action<CancellationToken>? sent = null) : IMcpAdmittedHttpRequestOperation
     {
-        public ValueTask<HttpResponseMessage> SendAsync(CancellationToken token) => ValueTask.FromResult(response);
+        public ValueTask<HttpResponseMessage> SendAsync(CancellationToken token) { sent?.Invoke(token); return ValueTask.FromResult(response); }
+        public Task StopAsync() => Task.CompletedTask;
+    }
+    // Held until its operation token is canceled. Lifetime cancellation callbacks run in LIFO order,
+    // so this later-linked request's callback runs before the GET's linked token is canceled.
+    private sealed class HeldOperation(Action canceling) : IMcpAdmittedHttpRequestOperation
+    {
+        internal readonly TaskCompletionSource Entered = Gate();
+        private readonly TaskCompletionSource<HttpResponseMessage> response = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public ValueTask<HttpResponseMessage> SendAsync(CancellationToken token)
+        {
+            token.Register(() => { canceling(); response.TrySetCanceled(token); });
+            Entered.TrySetResult(); return new(response.Task);
+        }
         public Task StopAsync() => Task.CompletedTask;
     }
     private static async Task GetAbort(string kind)
@@ -199,24 +213,41 @@ internal static class McpHttpOriginalOwnershipTests
         var body = new Body(cleanup); var disconnected = Gate(); Exception? reported = null; var requests = new List<string>();
         Exception read = kind is "unrelated" or "both" ? new IOException("unrelated IO during stop") : kind == "oce" ?
             new OperationCanceledException("faulted body OCE") : new IOException("native owner abort", new SocketException(995));
-        var wire = new McpStreamableHttpTransport(new(new Uri("http://fixture.invalid/mcp"), ImmutableDictionary<string, string>.Empty, new(true, false)),
+        McpStreamableHttpTransport wire = null!; CancellationToken getToken = default; bool? beforeGetToken = null, classifiedBeforeGetToken = null;
+        // "late" faults the stopped read from a lifetime callback that runs before the GET's linked
+        // token callback, and holds that callback until the transport has classified the fault.
+        var held = new HeldOperation(() =>
+        {
+            beforeGetToken = !getToken.IsCancellationRequested;
+            if (!body.DisposeEntered.Task.Wait(TimeSpan.FromSeconds(10))) return;
+            body.ReadOriginal.TrySetException(read);
+            SpinWait.SpinUntil(() => wire.OwnedReadAborts.Count != 0 || disconnected.Task.IsCompleted, TimeSpan.FromSeconds(10));
+            classifiedBeforeGetToken = !getToken.IsCancellationRequested;
+        });
+        wire = new McpStreamableHttpTransport(new(new Uri("http://fixture.invalid/mcp"), ImmutableDictionary<string, string>.Empty, new(true, false)),
             (McpAdmittedHttpRequestFactory)(request =>
             {
                 requests.Add(request.Method.Method);
-                return new HttpOperation(request.Method == HttpMethod.Get
-                    ? new HttpResponseMessage(HttpStatusCode.OK) { Content = new StreamContent(body) { Headers = { ContentType = new("text/event-stream") } } }
-                    : new HttpResponseMessage(HttpStatusCode.Accepted));
+                if (request.Method == HttpMethod.Post && requests.Count > 2) return held;
+                return request.Method == HttpMethod.Get
+                    ? new HttpOperation(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StreamContent(body) { Headers = { ContentType = new("text/event-stream") } } }, token => getToken = token)
+                    : new HttpOperation(new HttpResponseMessage(HttpStatusCode.Accepted));
             }));
-        Task? close = null;
+        Task? close = null, heldSend = null;
         try
         {
             await wire.StartAsync(new(_ => ValueTask.CompletedTask, error => { reported = error; disconnected.TrySetResult(); }), default);
             await wire.SendAsync(JsonData.Parse("{\"jsonrpc\":\"2.0\",\"method\":\"notifications/initialized\"}"), default);
             await body.ReadEntered.Task;
             if (kind == "nonstop") { body.ReadOriginal.SetException(read); await disconnected.Task; }
+            if (kind == "late")
+            {
+                heldSend = wire.SendAsync(JsonData.Parse("{\"jsonrpc\":\"2.0\",\"method\":\"notifications/held\"}"), default);
+                await held.Entered.Task;
+            }
             close = wire.CloseAsync(); await body.DisposeEntered.Task;
-            if (kind != "nonstop") { Check(!close.IsCompleted); body.ReadOriginal.SetException(read); }
-            if (kind == "owned")
+            if (kind is not ("nonstop" or "late")) { Check(!close.IsCompleted); body.ReadOriginal.SetException(read); }
+            if (kind is "owned" or "late")
             {
                 await close; Check(reported is null && wire.OwnedReadAborts.Count == 1);
             }
@@ -227,10 +258,20 @@ internal static class McpHttpOriginalOwnershipTests
                 if (kind == "both") Check(Walk(failure).Contains(read));
                 if (kind != "cleanup") Check(wire.OwnedReadAborts.Count == 0);
             }
-            if (kind is "owned" or "cleanup")
+            if (kind is "owned" or "cleanup" or "late")
                 Check(wire.OwnedReadAborts.Count == 1 && ReferenceEquals(wire.OwnedReadAborts[0].Original, body.ReadOriginal.Task) && ReferenceEquals(wire.OwnedReadAborts[0].Cause, read));
-            Check(ReferenceEquals(close, wire.CloseAsync()) && requests.SequenceEqual(new[] { "POST", "GET" }));
+            if (kind == "late")
+            {
+                Check(beforeGetToken == true && classifiedBeforeGetToken == true && getToken.IsCancellationRequested);
+                await Failure(heldSend!);
+            }
+            Check(ReferenceEquals(close, wire.CloseAsync()) && requests.SequenceEqual(kind == "late" ? new[] { "POST", "GET", "POST" } : new[] { "POST", "GET" }));
         }
-        finally { body.ReadOriginal.TrySetException(read); if (close is not null) await Observe(close); else await Observe(wire.CloseAsync()); }
+        finally
+        {
+            body.ReadOriginal.TrySetException(read);
+            if (close is not null) await Observe(close); else await Observe(wire.CloseAsync());
+            if (heldSend is not null) await Observe(heldSend);
+        }
     }
 }
