@@ -38,7 +38,7 @@ const assessedOn = new Date(`${parity.assessedOn}T00:00:00Z`).toLocaleDateString
 
 	<section class="ps-section candidate">
 		<h2 class="ps-h2">Unreleased source candidate: Pi {versions.target}</h2>
-		<p class="ps-muted">The source target is <a href={versions.targetUrl}>{versions.targetCommit.slice(0, 8)}</a>. Applicable work is pending integrated validation; a source pin does not establish parity. Each work package recorded its own local suite results, with explicit suite and platform limitations. Nothing of the candidate is published: the latest PiSharp release remains {versions.pisharp}, on Pi {versions.baseline}.</p>
+		<p class="ps-muted">The source target is <a href={versions.targetUrl}>{versions.targetCommit.slice(0, 8)}</a>. Local source validation is recorded with explicit suite and platform limitations; it does not establish complete parity. Nothing of the candidate is published: the latest PiSharp release remains {versions.pisharp}, on Pi {versions.baseline}.</p>
 		<p class="ps-muted"><a href="https://github.com/jkelly/PiSharp/blob/main/compatibility/sync-1.6.0-applicability.json">Review the complete source applicability map</a> and <a href="https://github.com/jkelly/PiSharp/blob/main/docs/release-notes/1.6.0.md">unreleased candidate notes</a>. Earlier assessment counts, captures and qualification records are preserved below.</p>
 	</section>
 

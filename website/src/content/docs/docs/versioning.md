@@ -19,7 +19,7 @@ C#-only fixes that don't change the Pi baseline add a fourth number.
 | `1.5.0` | Synced to Pi 1.5.0. Pi 1.3.0 and 1.4.0 had no PiSharp release; their changes are in 1.5.0 |
 | `1.5.0.1` | Patch on Pi 1.5.0: reviewed gap corrections, Chord/hosting, Durable.Store, remote environments and evaluation tooling |
 | `1.5.2` | Synced to Pi 1.5.2, including 1.5.1; source, hosted and package validation retain explicit limitations |
-| `1.6.0` (unreleased source candidate) | Targets Pi 1.6.0; integrated validation remains pending |
+| `1.6.0` (unreleased source candidate) | Targets Pi 1.6.0; local source validation is recorded with explicit limitations |
 
 Bumping the third number instead (`0.99.2`) would claim to match a Pi release that PiSharp doesn't match. NuGet and .NET both order four-part versions correctly, so `0.99.1.2` sorts after `0.99.1` and before `1.1.0`.
 

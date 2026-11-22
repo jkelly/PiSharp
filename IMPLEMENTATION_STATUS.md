@@ -1,8 +1,8 @@
 # Current source candidate: Pi 1.6.0
 
-The source candidate targets Pi v1.6.0 and Pi Durable 1.6.0 (`faac585884ae2c013a6b1400f3e9e77f10b34bac`). The published release remains **PiSharp 1.5.2**, on Pi v1.5.2. Applicable candidate work is **implementation-pending-validation**; the coordinator records integrated validation. Each work package ran its own area's suites locally, mostly on Windows only. This section does not replace or extend any historical acceptance below.
+The source candidate targets Pi v1.6.0 and Pi Durable 1.6.0 (`faac585884ae2c013a6b1400f3e9e77f10b34bac`). The published release remains **PiSharp 1.5.2**, on Pi v1.5.2. Applicable candidate work is **tested-with-limitations** in local source validation: the [acceptance record](compatibility/sync-1.6.0-acceptance.json) accepts full runs of 66 required suites on the integrated source, on Windows only, with the limitations it lists. This section does not replace or extend any historical acceptance below.
 
-- [Complete source applicability](compatibility/sync-1.6.0-applicability.json): all 1,311 changed upstream files have an owner or an explicit no-op reason (446 pending validation, 865 no-op by path).
+- [Complete source applicability](compatibility/sync-1.6.0-applicability.json): all 1,311 changed upstream files have an owner or an explicit no-op reason (96 tested, 299 tested-with-limitations, 916 no-op).
 - [Unreleased candidate notes](docs/release-notes/1.6.0.md), with the breaking changes, what was not verified and the known limitations, and [decision 0015](docs/decisions/0015-pi-1.6.0-sync.md).
 - [Durable candidate overlay](compatibility/durable-sync-1.6.0-overlay.json), with the [1.5.2 overlay](compatibility/durable-sync-1.5.2-overlay.json) and the exact [v1.5.0 map](compatibility/durable-port-map.v1.5.0.json) preserved.
 - [Work plan](AI_DOCS/sync-1.6.0.md) and area reports (`AI_DOCS/agent-reports/sync-1.6.0-*.md`). Root owns integrated validation and final status changes.
@@ -10,7 +10,7 @@ The source candidate targets Pi v1.6.0 and Pi Durable 1.6.0 (`faac585884ae2c013a
 
 Open at the time of writing, from the reports:
 
-- Not run: Linux and macOS for most packages, the SQL Server-backed Durable groups, the two browser test projects, real `SIGTSTP` delivery, the provider suites that need captured fixtures, and the PowerShell packaging and release scripts.
+- Not run: Linux and macOS for most packages, eleven fixture-replay suites, the SQL Server-backed Durable groups, the two browser test projects, real `SIGTSTP` delivery, the provider suites that need captured fixtures, and the PowerShell packaging and release scripts.
 - No Durable host delivers a signal, and none installs image fitting.
 - Connection failures on the Completions, Anthropic, Google and Mistral transports are still not retried.
 - Native `pi.exec` reads 137 on Linux and macOS where Pi reads 143. The explicit-policy find profile is not updated.
