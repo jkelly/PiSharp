@@ -1,0 +1,806 @@
+---
+import SitePage from '../components/SitePage.astro';
+import { links } from '../data/site';
+import {
+	allSamples,
+	sampleCategories,
+	samplePatterns,
+	sampleRuntimes,
+	sampleStats,
+} from '../data/samples';
+
+const walkthroughs = [
+	{
+		title: 'Approval task agent',
+		meta: 'PiSharp.Agent · #05',
+		blurb: 'Write-gated task persistence with RequiresApproval and --approve.',
+		href: '/docs/samples/persistent-task-manager/',
+	},
+	{
+		title: 'Incident timeline builder',
+		meta: 'PiSharp.Agent · #45',
+		blurb: 'UTC normalization, deduplication, preserved contradictions and stale-state guards.',
+		href: '/docs/samples/incident-timeline-builder/',
+	},
+	{
+		title: 'Vision receipts & media studio',
+		meta: 'PiSharp.Agent + AI · #16 & #27',
+		blurb: 'Multimodal image input, integer-cent invariants and opt-in image generation.',
+		href: '/docs/samples/multimodal-receipt-and-studio/',
+	},
+	{
+		title: 'Hybrid orders workflow & team',
+		meta: 'PiSharp.CustomAgents',
+		blurb: '7-step C#, typed prompt, JS, Roslyn and agent workflow with --crash-in resume.',
+		href: '/docs/samples/hybrid-orders-workflow/',
+	},
+	{
+		title: 'Parallel research team',
+		meta: 'PiSharp.CustomAgents',
+		blurb: 'Fan-out subagents combining X search and web search with per-topic SQLite resume.',
+		href: '/docs/samples/parallel-research-team/',
+	},
+	{
+		title: 'Durable (00–47), Chord & C# extensions',
+		meta: 'Durable · Chord · Extensions',
+		blurb: 'Indexed guide to 48 micro-examples (including 1.6.0 signals/gates) and branch-aware extensions.',
+		href: '/docs/samples/durable-and-extensions/',
+	},
+];
+
+const serializedSamples = JSON.stringify(allSamples).replace(/</g, '\\u003c');
+---
+
+<SitePage title="Samples" description="Browse and run all 117 PiSharp samples: 62 practical agents, 48 Durable and Chord examples, custom-agent teams, and native C# extensions.">
+	<div class="ps-pagehead">
+		<h1 class="ps-h1">Try real agents, tools and workflows</h1>
+		<p class="ps-lede">
+			Every sample runs locally on .NET 10 without API keys by default — exercising the real PiSharp agent loop, tool scheduler, or durable harness on fixture data. Switch to <code>--live</code> or <code>--provider</code> whenever you want a live model.
+		</p>
+		<div class="ps-actions">
+			<a href="/docs/samples/overview/" class="ps-button">How the samples work</a>
+			<a href="/docs/patterns/" class="ps-button ps-ghost">Workflow patterns</a>
+			<a href={links.allSamples} class="ps-button ps-ghost">Browse on GitHub</a>
+		</div>
+	</div>
+
+	<section class="stats-strip" aria-label="Sample counts">
+		<div class="ps-card stat">
+			<span class="ps-fine">Practical agents</span>
+			<strong>{sampleStats.practicalAgents}</strong>
+			<span class="ps-mono ps-fine">samples/agents/01–62</span>
+		</div>
+		<div class="ps-card stat">
+			<span class="ps-fine">Durable &amp; Chord</span>
+			<strong>{sampleStats.durableAndChordExamples}</strong>
+			<span class="ps-mono ps-fine">Examples 00–37 &amp; 38–47</span>
+		</div>
+		<div class="ps-card stat">
+			<span class="ps-fine">Full apps &amp; teams</span>
+			<strong>{sampleStats.customAgentApps + sampleStats.durableApps}</strong>
+			<span class="ps-mono ps-fine">CustomAgents &amp; Durable</span>
+		</div>
+		<div class="ps-card stat">
+			<span class="ps-fine">Extensions &amp; plugins</span>
+			<strong>{sampleStats.extensionAndPluginSamples}</strong>
+			<span class="ps-mono ps-fine">C# &amp; Chord native</span>
+		</div>
+	</section>
+
+	<section class="ps-section">
+		<div class="sec-head">
+			<h2 class="ps-h2">Flagship walkthroughs</h2>
+			<p class="ps-muted">Annotated guides covering one complete example per major agent archetype.</p>
+		</div>
+		<div class="ps-grid walkthrough-grid">
+			{walkthroughs.map((w) => (
+				<a class="ps-card wcard" href={w.href}>
+					<span class="ps-fine ps-mono">{w.meta}</span>
+					<h3 class="ps-h3">{w.title}</h3>
+					<p class="ps-muted">{w.blurb}</p>
+				</a>
+			))}
+		</div>
+	</section>
+
+	<section class="ps-section" id="explorer">
+		<div class="sec-head">
+			<h2 class="ps-h2">Sample explorer</h2>
+			<p class="ps-muted">
+				Filter all {sampleStats.totalRunnableSamples} runnable samples ({sampleStats.totalCards} entries below) by runtime, category, workflow pattern or tool name. Click any card to inspect commands and tools.
+			</p>
+		</div>
+
+		<div class="ps-card controls">
+			<div class="search-row">
+				<label class="sr-only" for="sample-search">Search samples</label>
+				<input
+					id="sample-search"
+					type="search"
+					class="search-input"
+					placeholder="Search by title, number, tool or pattern (e.g. approval, crash, receipt, NuGet, timeline)..."
+					autocomplete="off"
+				/>
+				<label class="sr-only" for="category-select">Category</label>
+				<select id="category-select" class="cat-select" aria-label="Filter by category">
+					<option value="all">All categories</option>
+					{sampleCategories.map((c) => <option value={c}>{c}</option>)}
+				</select>
+				<button type="button" id="reset-filters" class="ps-toggle reset-btn" hidden>Reset</button>
+			</div>
+
+			<div class="filter-row" role="group" aria-label="Filter by runtime">
+				<span class="ps-fine filter-label">Runtime</span>
+				<button type="button" class="ps-toggle chip-btn" data-rt="all" aria-pressed="true">All</button>
+				{sampleRuntimes.map((rt) => (
+					<button type="button" class="ps-toggle chip-btn" data-rt={rt} aria-pressed="false">{rt}</button>
+				))}
+			</div>
+
+			<div class="filter-row" role="group" aria-label="Filter by workflow pattern">
+				<span class="ps-fine filter-label">Pattern</span>
+				<button type="button" class="ps-toggle chip-btn" data-pat="all" aria-pressed="true">Any</button>
+				{samplePatterns.map((pat) => (
+					<button type="button" class="ps-toggle chip-btn" data-pat={pat} aria-pressed="false">{pat}</button>
+				))}
+			</div>
+
+			<p class="ps-fine count-line" id="result-count" role="status">
+				Showing {allSamples.length} entries ({sampleStats.totalRunnableSamples} runnable samples)
+			</p>
+		</div>
+
+		<div class="explorer-layout">
+			<div class="cards-col" id="sample-cards">
+				{allSamples.map((s, idx) => (
+					<button
+						type="button"
+						class="sample-card"
+						data-sample-id={s.id}
+						data-runtime={s.runtime}
+						data-category={s.category}
+						data-patterns={s.patterns.join('|')}
+						data-search={`${s.id} ${s.badgeLabel} ${s.title} ${s.runtime} ${s.category} ${s.summary} ${s.tools.join(' ')} ${s.patterns.join(' ')}`.toLowerCase()}
+						aria-pressed={idx === 0 ? 'true' : 'false'}
+					>
+						<div class="card-top">
+							<span class="ps-mono ps-fine">{s.badgeLabel} · {s.runtime}</span>
+							<div class="card-chips">
+								{s.unreleased160 && <span class="ps-chip" data-tone="planned">1.6.0 candidate</span>}
+								{s.experimental && !s.unreleased160 && <span class="ps-chip" data-tone="experimental">Experimental</span>}
+								{s.requiresApproval && <span class="ps-chip" data-tone="partial">Approval gate</span>}
+								{s.walkthroughUrl && <span class="ps-chip" data-tone="ported">Walkthrough</span>}
+							</div>
+						</div>
+						<strong class="card-title">{s.title}</strong>
+						<p class="card-summary">{s.summary}</p>
+						<div class="card-tools">
+							{s.tools.slice(0, 3).map((tool) => <code class="tool-tag">{tool}</code>)}
+							{s.tools.length > 3 && <span class="ps-fine">+{s.tools.length - 3} more</span>}
+						</div>
+					</button>
+				))}
+				<p class="ps-muted empty-msg" id="empty-state" hidden>No samples matched those filters. Clear the search or click Reset.</p>
+			</div>
+
+			<aside class="ps-card inspector" id="sample-inspector" aria-label="Selected sample details">
+				<div class="insp-head">
+					<div>
+						<div class="ps-mono ps-fine" id="insp-path"></div>
+						<h3 class="ps-h2 insp-title" id="insp-title"></h3>
+					</div>
+				</div>
+				<div class="insp-badges" id="insp-badges"></div>
+				<p class="ps-muted" id="insp-summary"></p>
+
+				<div class="insp-block">
+					<h4 class="ps-h3">Tools &amp; building blocks</h4>
+					<div class="insp-tools" id="insp-tools"></div>
+				</div>
+
+				<div class="insp-block">
+					<div class="cmd-head">
+						<h4 class="ps-h3">Run locally</h4>
+						<div class="cmd-tabs" role="tablist" aria-label="Command mode" id="cmd-tabs"></div>
+					</div>
+					<div class="ps-term cmd-box">
+						<pre class="ps-termbody cmd-pre" id="insp-cmd"></pre>
+					</div>
+					<div class="cmd-actions">
+						<button type="button" class="ps-toggle copy-btn" id="copy-cmd-btn">Copy command</button>
+						<span class="ps-fine" id="copy-cmd-status" role="status"></span>
+					</div>
+				</div>
+
+				<div class="insp-block">
+					<h4 class="ps-h3">Workflow patterns</h4>
+					<div class="insp-badges" id="insp-patterns"></div>
+				</div>
+
+				<div class="ps-actions insp-links" id="insp-links"></div>
+			</aside>
+		</div>
+	</section>
+
+	<section class="ps-section">
+		<div class="ps-card closing-bar">
+			<div>
+				<h2 class="ps-h2">Run the entire 62-agent suite in one command</h2>
+				<p class="ps-muted">
+					Build <code>samples/agents/PiSharp.Samples.slnx</code> and run every fixture demo and self-test offline with <code>pwsh -File samples/agents/scripts/run-all.ps1</code>. Use <code>-Examples 5,16,45</code> to run a subset.
+				</p>
+			</div>
+			<a href="/docs/samples/overview/" class="ps-button">Read the sample guide</a>
+		</div>
+	</section>
+</SitePage>
+
+<script id="samples-payload" type="application/json" set:html={serializedSamples}></script>
+
+<script>
+	interface SampleData {
+		id: string;
+		badgeLabel: string;
+		title: string;
+		runtime: string;
+		category: string;
+		patterns: string[];
+		tools: string[];
+		summary: string;
+		requiresApproval?: boolean;
+		experimental?: boolean;
+		unreleased160?: boolean;
+		demoCommand: string;
+		approveCommand?: string;
+		liveCommand?: string;
+		selfTestCommand?: string;
+		repoPath: string;
+		walkthroughUrl?: string;
+		exampleCount?: number;
+	}
+
+	const payloadEl = document.getElementById('samples-payload');
+	const samples: SampleData[] = payloadEl ? JSON.parse(payloadEl.textContent ?? '[]') : [];
+	const byId = new Map(samples.map((s) => [s.id, s]));
+
+	const searchInput = document.getElementById('sample-search') as HTMLInputElement | null;
+	const categorySelect = document.getElementById('category-select') as HTMLSelectElement | null;
+	const resetBtn = document.getElementById('reset-filters') as HTMLButtonElement | null;
+	const countEl = document.getElementById('result-count');
+	const emptyEl = document.getElementById('empty-state');
+	const rtButtons = Array.from(document.querySelectorAll<HTMLButtonElement>('[data-rt]'));
+	const patButtons = Array.from(document.querySelectorAll<HTMLButtonElement>('[data-pat]'));
+	const cards = Array.from(document.querySelectorAll<HTMLButtonElement>('.sample-card'));
+
+	const inspPath = document.getElementById('insp-path');
+	const inspTitle = document.getElementById('insp-title');
+	const inspBadges = document.getElementById('insp-badges');
+	const inspSummary = document.getElementById('insp-summary');
+	const inspTools = document.getElementById('insp-tools');
+	const inspPatterns = document.getElementById('insp-patterns');
+	const inspLinks = document.getElementById('insp-links');
+	const cmdTabs = document.getElementById('cmd-tabs');
+	const inspCmd = document.getElementById('insp-cmd');
+	const copyBtn = document.getElementById('copy-cmd-btn');
+	const copyStatus = document.getElementById('copy-cmd-status');
+
+	let activeRt = 'all';
+	let activePat = 'all';
+	let activeCat = 'all';
+	let selectedId = samples[0]?.id ?? '';
+	let currentCommandText = '';
+
+	function setText(el: HTMLElement | null, value: string) {
+		if (el) el.textContent = value;
+	}
+
+	function makeChip(label: string, tone?: string): HTMLSpanElement {
+		const span = document.createElement('span');
+		span.className = 'ps-chip';
+		if (tone) span.dataset.tone = tone;
+		span.textContent = label;
+		return span;
+	}
+
+	function renderCommandTabs(sample: SampleData) {
+		if (!cmdTabs || !inspCmd) return;
+		const modes: { label: string; cmd: string }[] = [{ label: 'Offline demo', cmd: sample.demoCommand }];
+		if (sample.approveCommand) {
+			modes.push({
+				label: sample.id === 'CustomAgents.Examples' ? 'Crash & resume' : 'With --approve',
+				cmd: sample.approveCommand,
+			});
+		}
+		if (sample.liveCommand) modes.push({ label: 'Live model', cmd: sample.liveCommand });
+		if (sample.selfTestCommand) modes.push({ label: 'Self-test', cmd: sample.selfTestCommand });
+
+		cmdTabs.replaceChildren();
+		const activate = (index: number) => {
+			currentCommandText = modes[index].cmd;
+			inspCmd.textContent = `$ ${currentCommandText}`;
+			Array.from(cmdTabs.children).forEach((child, i) => {
+				child.setAttribute('aria-selected', String(i === index));
+			});
+			if (copyStatus) copyStatus.textContent = '';
+		};
+
+		modes.forEach((m, i) => {
+			const btn = document.createElement('button');
+			btn.type = 'button';
+			btn.role = 'tab';
+			btn.className = 'ps-toggle cmd-tab';
+			btn.textContent = m.label;
+			btn.setAttribute('aria-selected', String(i === 0));
+			btn.addEventListener('click', () => activate(i));
+			cmdTabs.appendChild(btn);
+		});
+		activate(0);
+	}
+
+	function renderInspector(id: string) {
+		const sample = byId.get(id);
+		if (!sample) return;
+		selectedId = id;
+
+		for (const card of cards) {
+			card.setAttribute('aria-pressed', String(card.dataset.sampleId === id));
+		}
+
+		setText(inspPath, `${sample.repoPath} · ${sample.category}`);
+		setText(inspTitle, sample.title);
+		setText(inspSummary, sample.summary);
+
+		if (inspBadges) {
+			inspBadges.replaceChildren();
+			inspBadges.appendChild(makeChip(sample.runtime));
+			inspBadges.appendChild(makeChip('Offline-ready', 'ported'));
+			if (sample.requiresApproval) inspBadges.appendChild(makeChip('Approval gate', 'partial'));
+			if (sample.experimental) inspBadges.appendChild(makeChip('Experimental', 'experimental'));
+			if (sample.unreleased160) inspBadges.appendChild(makeChip('1.6.0 source candidate', 'planned'));
+		}
+
+		if (inspTools) {
+			inspTools.replaceChildren();
+			for (const t of sample.tools) {
+				const code = document.createElement('code');
+				code.className = 'tool-tag';
+				code.textContent = t;
+				inspTools.appendChild(code);
+			}
+		}
+
+		if (inspPatterns) {
+			inspPatterns.replaceChildren();
+			for (const p of sample.patterns) {
+				const btn = document.createElement('button');
+				btn.type = 'button';
+				btn.className = 'ps-chip pattern-jump';
+				btn.textContent = p;
+				btn.title = `Filter samples by ${p}`;
+				btn.addEventListener('click', () => {
+					activePat = p;
+					applyFilters();
+				});
+				inspPatterns.appendChild(btn);
+			}
+		}
+
+		renderCommandTabs(sample);
+
+		if (inspLinks) {
+			inspLinks.replaceChildren();
+			if (sample.walkthroughUrl) {
+				const a = document.createElement('a');
+				a.href = sample.walkthroughUrl;
+				a.className = 'ps-button';
+				a.textContent = 'Read walkthrough';
+				inspLinks.appendChild(a);
+			}
+			const gh = document.createElement('a');
+			gh.href = `https://github.com/jkelly/PiSharp/tree/main/${sample.repoPath}`;
+			gh.className = sample.walkthroughUrl ? 'ps-button ps-ghost' : 'ps-button';
+			gh.textContent = 'View source on GitHub';
+			inspLinks.appendChild(gh);
+		}
+	}
+
+	function syncUrl() {
+		const params = new URLSearchParams();
+		if (activeRt !== 'all') params.set('runtime', activeRt);
+		if (activePat !== 'all') params.set('pattern', activePat);
+		if (activeCat !== 'all') params.set('category', activeCat);
+		const q = searchInput?.value.trim() ?? '';
+		if (q) params.set('q', q);
+		const qs = params.toString();
+		const target = qs ? `${window.location.pathname}?${qs}` : window.location.pathname;
+		window.history.replaceState(null, '', target);
+	}
+
+	function applyFilters(updateUrl = true) {
+		const q = (searchInput?.value ?? '').trim().toLowerCase();
+		let visibleCards = 0;
+		let visibleExamples = 0;
+		let selectedVisible = false;
+		let firstVisibleId = '';
+
+		for (const btn of rtButtons) btn.setAttribute('aria-pressed', String(btn.dataset.rt === activeRt));
+		for (const btn of patButtons) btn.setAttribute('aria-pressed', String(btn.dataset.pat === activePat));
+		if (categorySelect && categorySelect.value !== activeCat) categorySelect.value = activeCat;
+
+		for (const card of cards) {
+			const matchRt = activeRt === 'all' || card.dataset.runtime === activeRt;
+			const matchCat = activeCat === 'all' || card.dataset.category === activeCat;
+			const pats = (card.dataset.patterns ?? '').split('|');
+			const matchPat = activePat === 'all' || pats.includes(activePat);
+			const matchQ = !q || (card.dataset.search ?? '').includes(q);
+			const show = matchRt && matchCat && matchPat && matchQ;
+			card.hidden = !show;
+			if (show) {
+				visibleCards++;
+				const id = card.dataset.sampleId ?? '';
+				visibleExamples += byId.get(id)?.exampleCount ?? 1;
+				if (!firstVisibleId) firstVisibleId = id;
+				if (id === selectedId) selectedVisible = true;
+			}
+		}
+
+		if (emptyEl) emptyEl.hidden = visibleCards > 0;
+		if (countEl) {
+			countEl.textContent =
+				visibleCards === samples.length
+					? `Showing all ${visibleCards} entries (${visibleExamples} runnable samples)`
+					: `Showing ${visibleCards} matching ${visibleCards === 1 ? 'entry' : 'entries'} (${visibleExamples} runnable ${visibleExamples === 1 ? 'sample' : 'samples'})`;
+		}
+		if (resetBtn) {
+			resetBtn.hidden = activeRt === 'all' && activePat === 'all' && activeCat === 'all' && !q;
+		}
+		if (!selectedVisible && firstVisibleId) {
+			renderInspector(firstVisibleId);
+		}
+		if (updateUrl) syncUrl();
+	}
+
+	// Read initial query parameters for deep-linking from docs pages
+	const initial = new URLSearchParams(window.location.search);
+	if (initial.get('runtime') && rtButtons.some((b) => b.dataset.rt === initial.get('runtime'))) {
+		activeRt = initial.get('runtime')!;
+	}
+	if (initial.get('pattern') && patButtons.some((b) => b.dataset.pat === initial.get('pattern'))) {
+		activePat = initial.get('pattern')!;
+	}
+	if (initial.get('category') && categorySelect) {
+		const cat = initial.get('category')!;
+		if (Array.from(categorySelect.options).some((o) => o.value === cat)) activeCat = cat;
+	}
+	if (initial.get('q') && searchInput) searchInput.value = initial.get('q')!;
+
+	for (const btn of rtButtons) {
+		btn.addEventListener('click', () => {
+			activeRt = btn.dataset.rt ?? 'all';
+			applyFilters();
+		});
+	}
+	for (const btn of patButtons) {
+		btn.addEventListener('click', () => {
+			activePat = btn.dataset.pat ?? 'all';
+			applyFilters();
+		});
+	}
+	categorySelect?.addEventListener('change', () => {
+		activeCat = categorySelect.value;
+		applyFilters();
+	});
+	searchInput?.addEventListener('input', () => applyFilters());
+	resetBtn?.addEventListener('click', () => {
+		activeRt = 'all';
+		activePat = 'all';
+		activeCat = 'all';
+		if (searchInput) searchInput.value = '';
+		applyFilters();
+	});
+	for (const card of cards) {
+		card.addEventListener('click', () => {
+			const id = card.dataset.sampleId;
+			if (id) renderInspector(id);
+		});
+	}
+	copyBtn?.addEventListener('click', async () => {
+		try {
+			await navigator.clipboard.writeText(currentCommandText);
+			if (copyStatus) copyStatus.textContent = 'Copied.';
+		} catch {
+			if (copyStatus) copyStatus.textContent = 'Select and copy the command above.';
+		}
+		setTimeout(() => {
+			if (copyStatus) copyStatus.textContent = '';
+		}, 1800);
+	});
+
+	renderInspector(selectedId);
+	applyFilters(false);
+</script>
+
+<style>
+	.sr-only {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		overflow: hidden;
+		clip: rect(0, 0, 0, 0);
+		white-space: nowrap;
+	}
+	.stats-strip {
+		display: grid;
+		grid-template-columns: repeat(4, minmax(0, 1fr));
+		gap: 0.9rem;
+		margin-bottom: 4rem;
+	}
+	.stat {
+		display: flex;
+		flex-direction: column;
+		gap: 0.25rem;
+		padding: 1.2rem 1.35rem;
+	}
+	.stat strong {
+		font-size: 1.9rem;
+		line-height: 1.1;
+		color: var(--sl-color-white);
+		font-weight: 600;
+		font-variant-numeric: tabular-nums;
+	}
+	.sec-head {
+		margin-bottom: 1.35rem;
+	}
+	.sec-head p {
+		max-width: 46rem;
+	}
+	.walkthrough-grid {
+		grid-template-columns: repeat(3, minmax(0, 1fr));
+	}
+	.wcard {
+		display: flex;
+		flex-direction: column;
+		gap: 0.35rem;
+		padding: 1.35rem 1.45rem;
+	}
+	.wcard p {
+		font-size: 0.9rem;
+		margin: 0;
+	}
+	.controls {
+		display: flex;
+		flex-direction: column;
+		gap: 0.85rem;
+		margin-bottom: 1.5rem;
+		padding: 1.25rem 1.4rem;
+	}
+	.search-row {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.6rem;
+		align-items: center;
+	}
+	.search-input,
+	.cat-select {
+		font: inherit;
+		font-size: 0.9375rem;
+		color: var(--sl-color-white);
+		background: var(--sl-color-black);
+		border: 1px solid var(--sl-color-gray-5);
+		border-radius: 999px;
+		padding: 0.55rem 1rem;
+		min-height: 44px;
+	}
+	.search-input {
+		flex: 1 1 18rem;
+		min-width: 0;
+	}
+	.cat-select {
+		flex: 0 1 16rem;
+		cursor: pointer;
+	}
+	.reset-btn {
+		padding: 0.45rem 0.95rem;
+		font-size: 0.875rem;
+	}
+	.filter-row {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 0.4rem;
+	}
+	.filter-label {
+		min-width: 4rem;
+	}
+	.chip-btn {
+		min-height: 34px;
+		padding: 0.3rem 0.78rem;
+		font-size: 0.8438rem;
+	}
+	.count-line {
+		margin: 0;
+	}
+	.explorer-layout {
+		display: grid;
+		grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+		gap: 1.25rem;
+		align-items: start;
+	}
+	.cards-col {
+		display: grid;
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+		gap: 0.85rem;
+	}
+	.sample-card {
+		font: inherit;
+		text-align: start;
+		background: var(--ps-surface);
+		color: var(--sl-color-gray-1);
+		border: 1px solid transparent;
+		border-radius: 14px;
+		padding: 1.1rem 1.2rem;
+		display: flex;
+		flex-direction: column;
+		gap: 0.45rem;
+		cursor: pointer;
+	}
+	.sample-card:hover {
+		background: var(--ps-raised);
+	}
+	.sample-card[aria-pressed='true'] {
+		border-color: var(--sl-color-white);
+		background: var(--ps-raised);
+	}
+	.card-top {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		justify-content: space-between;
+		gap: 0.35rem;
+	}
+	.card-chips {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.3rem;
+	}
+	.card-title {
+		font-size: 0.9688rem;
+		line-height: 1.3;
+		color: var(--sl-color-white);
+		font-weight: 600;
+	}
+	.card-summary {
+		font-size: 0.865rem;
+		line-height: 1.48;
+		color: var(--sl-color-gray-3);
+		margin: 0;
+		flex: 1 1 auto;
+	}
+	.card-tools,
+	.insp-tools {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 0.35rem;
+	}
+	.tool-tag {
+		font-size: 0.78rem;
+		padding: 0.12rem 0.45rem;
+		background: var(--sl-color-black);
+		color: var(--sl-color-gray-2);
+		border-radius: 6px;
+	}
+	.empty-msg {
+		grid-column: 1 / -1;
+		padding: 1.5rem 0;
+	}
+	.inspector {
+		position: sticky;
+		top: 4.5rem;
+		display: flex;
+		flex-direction: column;
+		gap: 1rem;
+		padding: 1.45rem 1.55rem;
+	}
+	.insp-title {
+		margin: 0.2rem 0 0;
+		font-size: 1.3rem;
+	}
+	.insp-badges {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.4rem;
+	}
+	.insp-block {
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+	}
+	.insp-block h4 {
+		margin: 0;
+		font-size: 0.9rem;
+	}
+	.cmd-head {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		justify-content: space-between;
+		gap: 0.5rem;
+	}
+	.cmd-tabs {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.3rem;
+	}
+	.cmd-tab {
+		min-height: 30px;
+		padding: 0.2rem 0.65rem;
+		font-size: 0.78rem;
+	}
+	.cmd-box {
+		border-radius: 10px;
+	}
+	.cmd-pre {
+		white-space: pre-wrap;
+		word-break: break-word;
+		font-size: 0.8125rem;
+		line-height: 1.55;
+		padding: 0.9rem 1rem;
+	}
+	.cmd-actions {
+		display: flex;
+		align-items: center;
+		gap: 0.75rem;
+	}
+	.copy-btn {
+		min-height: 34px;
+		padding: 0.3rem 0.85rem;
+		font-size: 0.8438rem;
+	}
+	.pattern-jump {
+		border: 0;
+		cursor: pointer;
+		font: inherit;
+		font-size: 0.8125rem;
+	}
+	.pattern-jump:hover {
+		background: var(--sl-color-black);
+		color: var(--sl-color-white);
+	}
+	.insp-links {
+		padding-top: 0.25rem;
+	}
+	.closing-bar {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		justify-content: space-between;
+		gap: 1.25rem 2rem;
+		padding: 1.8rem 2rem;
+	}
+	.closing-bar > div {
+		flex: 1 1 24rem;
+		max-width: 42rem;
+	}
+	@media (max-width: 64rem) {
+		.explorer-layout {
+			grid-template-columns: minmax(0, 1fr);
+		}
+		.inspector {
+			position: static;
+			order: -1;
+		}
+		.walkthrough-grid {
+			grid-template-columns: repeat(2, minmax(0, 1fr));
+		}
+	}
+	@media (max-width: 44rem) {
+		.stats-strip {
+			grid-template-columns: repeat(2, minmax(0, 1fr));
+		}
+		.cards-col,
+		.walkthrough-grid {
+			grid-template-columns: minmax(0, 1fr);
+		}
+	}
+</style>

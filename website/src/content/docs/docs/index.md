@@ -43,6 +43,9 @@ The [1.5.0.1 release](/docs/guides/gap-updates/) adds Chord/hosting, Durable.Sto
 
 ## Where to go next
 
+- [How PiSharp works](/docs/how-it-works/overview/): how the agent loop, tools, sessions, durable harness, workflows and teams fit together.
+- [Agent workflow patterns](/docs/patterns/): recipes for approvals, tool errors, steering, crash recovery, compaction, fan-out and testing.
+- [Samples explorer](/samples/): browse and run all 115+ offline-ready agents, durable examples, workflows and extensions, or start with a [curated walkthrough](/docs/samples/overview/).
 - [Quickstart](/docs/quickstart/): install PiSharp with `dotnet tool install -g PiSharp.Cli` and run it.
 - [Coming from Pi](/docs/coming-from-pi/): what carries over and what's different.
 - [Command line](/docs/reference/cli/), [Settings](/docs/reference/settings/) and [Files and locations](/docs/reference/configuration/).
