@@ -163,8 +163,9 @@ internal static partial class Program
             var frames = await A6Values(doc, "text");
             var writing = A6Rejected(A6Write(doc, "x"));
             await w.Set("read");
-            // In the flush of the change: sealed, and loading with the last value readable.
-            Equal("loading", doc.State.Value.Kind, "loading in the flush of the change");
+            // In the flush of the change: sealed, and loading with the last value readable. The host's dispatcher runs on its own
+            // thread and can already have rebuilt the reader when this reads the state, so the loading step is asserted from the
+            // recorded states below ("loading,live"), not sampled here. The text is "t" on both instances.
             Equal("\"t\"", A6Read(doc, "text"), "the last value readable");
             Equal("unavailable: test.doc(a): its admission changed", await writing, "the running call");
             await A6Delivered(w.Host);

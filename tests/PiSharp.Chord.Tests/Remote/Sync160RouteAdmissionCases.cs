@@ -259,7 +259,10 @@ internal static partial class Program
         {
             await using var r = await R6Gated();
             var notes = r.Tab.Hold(PlacedNotes, new() { ["session"] = "S1" }, A6Ctx);
-            Equal("loading", notes.State.Value.Kind, "loading at first");
+            // Loading at first, unless the hosts' dispatchers already delivered the denial (they run on their own threads; a slow
+            // runner can read the state after it). Never live: nothing is resolved before the first allow.
+            Check(notes.State.Value.Kind is "loading" || A6Cause(notes.State.Value) == "failed denied forbidden: no access",
+                $"loading at first, or already denied: {notes.State.Value.Kind}");
             await A6Delivered(r.Hosts);
             Equal("failed denied forbidden: no access", A6Cause(notes.State.Value), "denied");
             Equal("forbidden: no access", await R6Told(r.Tab.GetAsync(PlacedNotes, new() { ["session"] = "S1" }, A6Ctx)), "a getter rejects");

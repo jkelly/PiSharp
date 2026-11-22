@@ -183,6 +183,15 @@ internal static class Sync160WorkerCases
         }
     }
 
+    // Layout.OpenStoreAsync refuses app data paths through symbolic links, and the macOS temporary directory is under /var, a link
+    // to /private/var. The store cases use the working directory, as the other store tests of this project do.
+    private static string StoreRoot()
+    {
+        var root = Path.GetFullPath(Path.Combine(Environment.CurrentDirectory, "artifacts", "chord-w160-store", Guid.NewGuid().ToString("N")));
+        Directory.CreateDirectory(root);
+        return root;
+    }
+
     private static async Task<Fleet> FleetAsync(IStore? store = null, RouteAdmit? admit = null, IReadOnlyList<PluginFacet>? facets = null,
         Action<Exception>? onError = null, Action<Fleet>? configure = null)
     {
@@ -267,7 +276,7 @@ internal static class Sync160WorkerCases
     // the worker and nothing starts".
     public static async Task QueuedCommitLandsBeforeTheExitIsPublished()
     {
-        var root = Path.Combine(Path.GetTempPath(), "chord-w160-store-" + Guid.NewGuid().ToString("N")); Directory.CreateDirectory(root);
+        var root = StoreRoot();
         var store = (ChordStore)await Layout.OpenStoreAsync(Path.Combine(root, "store.sqlite"), Context);
         try
         {
@@ -308,7 +317,7 @@ internal static class Sync160WorkerCases
     // workers.test.ts "a stop resolves once the exit was published, after the commits its worker queued".
     public static async Task StopResolvesAfterTheExitWasPublished()
     {
-        var root = Path.Combine(Path.GetTempPath(), "chord-w160-store-" + Guid.NewGuid().ToString("N")); Directory.CreateDirectory(root);
+        var root = StoreRoot();
         var store = (ChordStore)await Layout.OpenStoreAsync(Path.Combine(root, "store.sqlite"), Context);
         try
         {

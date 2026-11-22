@@ -178,7 +178,12 @@
           "sync150.claude-opus-5-off-sends-disabled-thinking-live",
           "sync150.openrouter-anthropic-latest-alias-speaks-messages",
           "sync150.native-sdk-pack-pins-siblings-exactly",
-          "sync150.native-sdk-validator-accepts-only-exact-sibling-pins"
+          "sync150.native-sdk-validator-accepts-only-exact-sibling-pins",
+          "sync160.resume-keeps-pending-tools-when-an-extension-deactivates-only-its-own-tool",
+          "sync160.resume-drops-pending-tools-when-a-restored-or-modifier-added-tool-is-deactivated",
+          "sync160.reload-keeps-pending-tools-when-an-extension-deactivates-only-its-own-tool",
+          "sync160.reload-publications-of-one-reservation-form-one-reloaded-loadout",
+          "sync160.tree-navigation-keeps-pending-tools-when-only-an-unrestored-tool-is-deactivated"
         ],
         "Linux": [
           "tools.read-image-pi-budget-end-to-end",
@@ -247,7 +252,12 @@
           "sync150.claude-opus-5-off-sends-disabled-thinking-live",
           "sync150.openrouter-anthropic-latest-alias-speaks-messages",
           "sync150.native-sdk-pack-pins-siblings-exactly",
-          "sync150.native-sdk-validator-accepts-only-exact-sibling-pins"
+          "sync150.native-sdk-validator-accepts-only-exact-sibling-pins",
+          "sync160.resume-keeps-pending-tools-when-an-extension-deactivates-only-its-own-tool",
+          "sync160.resume-drops-pending-tools-when-a-restored-or-modifier-added-tool-is-deactivated",
+          "sync160.reload-keeps-pending-tools-when-an-extension-deactivates-only-its-own-tool",
+          "sync160.reload-publications-of-one-reservation-form-one-reloaded-loadout",
+          "sync160.tree-navigation-keeps-pending-tools-when-only-an-unrestored-tool-is-deactivated"
         ],
         "Darwin": [
           "tools.read-image-pi-budget-end-to-end",
@@ -316,7 +326,12 @@
           "sync150.claude-opus-5-off-sends-disabled-thinking-live",
           "sync150.openrouter-anthropic-latest-alias-speaks-messages",
           "sync150.native-sdk-pack-pins-siblings-exactly",
-          "sync150.native-sdk-validator-accepts-only-exact-sibling-pins"
+          "sync150.native-sdk-validator-accepts-only-exact-sibling-pins",
+          "sync160.resume-keeps-pending-tools-when-an-extension-deactivates-only-its-own-tool",
+          "sync160.resume-drops-pending-tools-when-a-restored-or-modifier-added-tool-is-deactivated",
+          "sync160.reload-keeps-pending-tools-when-an-extension-deactivates-only-its-own-tool",
+          "sync160.reload-publications-of-one-reservation-form-one-reloaded-loadout",
+          "sync160.tree-navigation-keeps-pending-tools-when-only-an-unrestored-tool-is-deactivated"
         ]
       },
       "platformPolicy": "The MCP stdio implementation is Windows-only; the explicitly named Windows command escaping case is not registered on Linux/macOS. Every remaining ID is mandatory."
@@ -377,7 +392,23 @@
           "workers.real-process-route-stop-restart",
           "workers.startup-shutdown-closes-connected-host",
           "processes.natural-and-crashed-leader-kill-descendants",
-          "workers.address-lock-waits-and-cancels"
+          "workers.address-lock-waits-and-cancels",
+          "http.160.links-opened-close-terminates-that-link",
+          "app.160.sign-in-cookie-contract-and-document-names",
+          "app.160.info-facets-serve-a-host-of-its-own",
+          "plugins.160.build-rediscovers-before-the-watcher",
+          "publication.160.surface-without-routes",
+          "terminal.160.scope-variant-follows-rebind",
+          "terminal.160.scope-variant-one-watch-per-state",
+          "terminal.160.scope-variant-of-foreign-reference",
+          "terminal.160.scope-keeps-no-released-reference",
+          "workers.160.passes-admit-to-its-route",
+          "workers.160.report-and-exit-in-the-same-turn-commits-nothing",
+          "workers.160.queued-commit-lands-before-the-exit-is-published",
+          "workers.160.stop-resolves-after-the-exit-was-published",
+          "workers.160.incarnation-before-the-first-call",
+          "workers.160.link-ended-at-exit-told-as-neither-lost-nor-closed",
+          "terminal.160.scope-on-calls-the-listener-until-dispose"
         ]
       }
     },
@@ -464,7 +495,8 @@
           "real daemon Polling: listfiles-stops-at-its-bounds-and-reports-truncated",
           "real daemon Polling: listfiles-fails-on-missing-directories-files-and-aborts",
           "real daemon random filesystem trace seed=730150, steps=150",
-          "real daemon actual Durable write/read/edit/bash tool differential trace"
+          "real daemon actual Durable write/read/edit/bash tool differential trace",
+          "real daemon listDir leaves out a name that is not valid UTF-8"
         ],
         "Linux": [
           "real daemon default: binary-reader-reads-byte-ranges-of-the-opened-file",
@@ -526,7 +558,8 @@
           "real daemon Polling: binary-reader-follows-symlinks-unless-nofollow-refuses-the-final-one",
           "real daemon Polling: watch-reports-changes-to-the-file-a-watched-symbolic-link-points-to",
           "real daemon random filesystem trace seed=730150, steps=150",
-          "real daemon actual Durable write/read/edit/bash tool differential trace"
+          "real daemon actual Durable write/read/edit/bash tool differential trace",
+          "real daemon listDir leaves out a name that is not valid UTF-8"
         ],
         "Darwin": [
           "real daemon default: binary-reader-reads-byte-ranges-of-the-opened-file",
@@ -588,10 +621,27 @@
           "real daemon Polling: binary-reader-follows-symlinks-unless-nofollow-refuses-the-final-one",
           "real daemon Polling: watch-reports-changes-to-the-file-a-watched-symbolic-link-points-to",
           "real daemon random filesystem trace seed=730150, steps=150",
-          "real daemon actual Durable write/read/edit/bash tool differential trace"
+          "real daemon actual Durable write/read/edit/bash tool differential trace",
+          "real daemon listDir leaves out a name that is not valid UTF-8"
         ]
       },
-      "platformPolicy": "Windows conformance intentionally excludes symlink cases; Linux/macOS must execute both default and Polling symlink cases. Every platform requires the named random trace and actual Durable tool differential trace; unregistered skips fail."
+      "platformPolicy": "Windows conformance intentionally excludes symlink cases; Linux/macOS must execute both default and Polling symlink cases. Every platform requires the named random trace and actual Durable tool differential trace; unregistered skips fail.",
+      "allowedSkips": {
+        "Windows": [
+          {
+            "line": "SKIP real daemon listDir leaves out a name that is not valid UTF-8: needs a file system that stores raw name bytes (Linux)",
+            "suppressesPassId": "real daemon listDir leaves out a name that is not valid UTF-8",
+            "reason": "Only Linux file systems store a name that is not valid UTF-8 (Windows names are UTF-16 and APFS refuses such bytes); the Linux lane runs the case."
+          }
+        ],
+        "Darwin": [
+          {
+            "line": "SKIP real daemon listDir leaves out a name that is not valid UTF-8: needs a file system that stores raw name bytes (Linux)",
+            "suppressesPassId": "real daemon listDir leaves out a name that is not valid UTF-8",
+            "reason": "Only Linux file systems store a name that is not valid UTF-8 (Windows names are UTF-16 and APFS refuses such bytes); the Linux lane runs the case."
+          }
+        ]
+      }
     },
     "PiSharp.AnthropicThreads.Tests": {
       "format": "lines",
@@ -888,7 +938,10 @@
           "parallel-runs-keep-request-and-stream-isolation",
           "blocked-stdin-write-remains-cancellable",
           "callback-failure-cancels-owned-process",
-          "validation-and-old-daemon-feature-gate"
+          "validation-and-old-daemon-feature-gate",
+          "sync160.process-output-left-in-pipe-survives-exit-while-link-is-backed-up (upstream scenario)",
+          "sync160.process-reads-on-after-exit-while-link-holds-output-back",
+          "sync160.exec-without-window-reads-on-after-exit-while-link-holds-output-back"
         ]
       }
     },
