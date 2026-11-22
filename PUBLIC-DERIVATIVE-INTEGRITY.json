@@ -615,8 +615,8 @@
       "originalSha256": "20013de8c1947b9e57f46bbfa414224d1fff778f5501de6a89fb6cd9e5d43c6c"
     },
     {
-      "currentSha256": "cc3e836381d0f91db6e5c5f06e34f9630fae302834210325d61a9f2be87b7623",
-      "currentBytes": 703529,
+      "currentSha256": "c6bba6e76d5e82462615998b0c38f00ef0b2fd32e978e8ae76847a29eb30b967",
+      "currentBytes": 703421,
       "originalBytes": 696580,
       "path": "compatibility/implementation-status.json",
       "originalSha256": "2fde7e0cfd5526f5c4ec197d533244189ac6fa2940ff6cf0bebe832d4e5d8abc"
@@ -5844,8 +5844,8 @@
       "originalSha256": "9969064a379ad96f0fd9358b4133bf2652018a32c60d44f37a0638168381a90d"
     },
     {
-      "currentSha256": "18473daa2022b57614f8c311e6b297d4eddf7b7907d98b2a2c10704fd77d5919",
-      "currentBytes": 67992,
+      "currentSha256": "a831686b65f52465acb5ba597bd075c6613bc373ebe800b4fa22baac529b1d5f",
+      "currentBytes": 68103,
       "originalBytes": 61541,
       "path": "IMPLEMENTATION_STATUS.md",
       "originalSha256": "374b440732e7495d87bead963ef3df91052983a62e9bc95ba24f0966f2dd171b"
@@ -5872,8 +5872,8 @@
       "originalSha256": "0f5f73cc466a7aa3c8939d483b171da02d34d7fff0518ab80964f1311c92e6a9"
     },
     {
-      "currentSha256": "8dc792bd96a26e04130695b51f69b0cc9c3dc1c29f0c66dcab20b4bafd0bedd1",
-      "currentBytes": 9805,
+      "currentSha256": "3204892826c9137869e8403269cbeb546472bfa920fa93ea74cc0ea29e187d4e",
+      "currentBytes": 9892,
       "originalBytes": 3622,
       "path": "README.md",
       "originalSha256": "1b053b228b07ff43b8ba7d37d19e4ea3a1d6214731dfa4a1f2ef6f3240f292df"
@@ -11241,8 +11241,8 @@
       "originalSha256": "59776396b6afce7ac55d26e8ff946904219812b5067e43a78505eef6f4128569"
     },
     {
-      "currentSha256": "b5e4bc193469445a10afd5c2b061658ebde87443905b68b2e26a46dde1e51027",
-      "currentBytes": 23244,
+      "currentSha256": "03164eec7f0158a0e1e6d685d20f01e1ba1533875f74395bd6515ecef8b1e50a",
+      "currentBytes": 23281,
       "originalBytes": 23309,
       "path": "tests/PiSharp.CodingAgent.Tests/ImageCapabilityFrontendTests.Tool.cs",
       "originalSha256": "29eaeae4fb044387cd47567f43705637ce58ccfddccab7ce391938fd6a2084a0"
