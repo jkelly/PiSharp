@@ -257,7 +257,11 @@ internal static class Program
         await using var manager = new PluginManager([Path.Combine(root, "plugins")], builder);
         var host = Hosts.Create(new() { OnError = _ => { }, Principal = new() { ["kind"] = "test" }, CloseTimeout = TimeSpan.FromMilliseconds(50), ReadyTimeout = TimeSpan.FromSeconds(10) });
         var http = new ChordHttp(host, new() { OnError = _ => { } });
-        var runtime = new PluginRuntime(host, new() { SharedAssemblies = [Assembly.GetExecutingAssembly()], CallbackDrainTimeout = TimeSpan.FromMilliseconds(150) });
+        // The bound must outlast the steps between DrainRetiredAsync and the "cancelled request" check (two cancelled requests and two 30 ms
+        // waits): at 150 ms a slow macOS runner reached that check after the drain had already timed out. The native-open check below
+        // tells "the drain kept its bound" from "blocked until the 3 s wait" by bound + 1 s.
+        var drainBound = TimeSpan.FromSeconds(1);
+        var runtime = new PluginRuntime(host, new() { SharedAssemblies = [Assembly.GetExecutingAssembly()], CallbackDrainTimeout = drainBound });
         Exception? bodyFailure = null;
         try
         {
@@ -372,7 +376,7 @@ internal static class Program
         Check((await runtime.ReloadAsync(WithWrapper(replacement), Context)).Failed.Count == 0, "replacement of opening generation refused");
         var openDrainWatch = Stopwatch.StartNew();
         try { await runtime.DrainRetiredAsync(Context).WaitAsync(TimeSpan.FromSeconds(3)); throw new InvalidOperationException("retirement abandoned an original native open"); } catch (TimeoutException) { }
-        Check(openDrainWatch.Elapsed < TimeSpan.FromSeconds(1), "native open blocked the public host drain instead of its generation lease outliving that bound");
+        Check(openDrainWatch.Elapsed < drainBound + TimeSpan.FromSeconds(1), "native open blocked the public host drain instead of its generation lease outliving that bound");
         PluginTestContracts.NativeOpenPause.TrySetResult();
         Check(await PluginTestContracts.NativeOpenFinished.Task.WaitAsync(TimeSpan.FromSeconds(3)) == "late:three", "abandoned native open could not load its private dependency for late cleanup");
         await runtime.DrainRetiredAsync(Context).WaitAsync(TimeSpan.FromSeconds(3));
