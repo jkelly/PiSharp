@@ -43,6 +43,27 @@ internal static partial class Program
             await R1Until(() => first.State.Value.Kind == "live"); using var second = await client.GetAsync(type, new(), ChordContext.Background);
             Equal(2, resolutions, "one explicit retry resolves"); Equal(2, authorizations, "authorization for every hold");
         }),
+        // Native regression (not upstream): a retry that lands while a resolve runs is not lost. The resolve's failure may predate it (a
+        // crashed worker's start, rejected for the crash the retry clears), so the address resolves once more instead of staying failed.
+        Case("remote.route.retry-while-resolving-resolves-again", async () =>
+        {
+            var type = R1Type(); await using var client = R1Host(); var resolutions = 0;
+            var first = new TaskCompletionSource<ResolvedLink>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var route = client.Route(R1Server, new()
+            {
+                Authorize = (_, _) => true,
+                Resolve = (_, _) => ++resolutions == 1 ? first.Task : Task.FromException<ResolvedLink>(new IOException("still offline")),
+            }, ChordContext.Background);
+            await client.LoadAsync([], ChordContext.Background); using var reference = client.Hold(type, new(), ChordContext.Background);
+            await R1Until(() => resolutions == 1);
+            route.Retry(R1Server.Address());
+            first.SetException(new IOException("failed before the retry"));
+            await R1Until(() => reference.State.Value.Kind == "failed");
+            Equal(2, resolutions, "a retry while resolving resolves again after that resolve failed");
+            Equal(true, reference.State.Value.Cause?.Error.Message.EndsWith("still offline", StringComparison.Ordinal), "the failure shown is the retry's");
+            route.Retry(R1Server.Address());
+            await R1Until(() => resolutions == 3);
+        }),
         Case("remote.route.handshake-drop-retries-once-then-waits", async () =>
         {
             var type = R1Type(); await using var client = R1Host(); var resolutions = 0; R1Peer? firstPeer = null;

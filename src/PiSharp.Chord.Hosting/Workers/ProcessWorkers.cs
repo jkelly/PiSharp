@@ -215,6 +215,8 @@ public sealed class ProcessWorkers : IAsyncDisposable, IPluginRolloutStep
             ObjectDisposedException.ThrowIf(closing.IsCancellationRequested, this);
             if (!entries.TryGetValue(address.Key, out entry!)) entries.Add(address.Key, entry = new(address));
             if (entry.Failure is not null) throw new IOException(entry.Failure);
+            // A start that failed after a Retry kept it (Retry) left no failure: the retry's resolve starts anew.
+            if (entry.Starting is { IsCompleted: true, IsCompletedSuccessfully: false }) entry.Starting = null;
             start = entry.Starting ??= StartAsync(entry);
         }
         // The child remains admitted if the reference which initiated startup has disappeared.
@@ -232,18 +234,20 @@ public sealed class ProcessWorkers : IAsyncDisposable, IPluginRolloutStep
         PrivatePipeDirectory? addresses = null;
         var tail = new OutputTail();
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(closing.Token);
-        var recorded = false;
+        // The recorded failure this start was rejected for (reported once already), if it was.
+        string? rejected = null;
         try
         {
             // A disconnected child's process and original cleanup finish before its successor starts: after its exit was published (its
-            // link closes before, which may have asked for this start). A crash recorded meanwhile rejects this start, reported once already.
+            // link closes before, which may have asked for this start). A crash recorded meanwhile rejects this start, reported once already;
+            // a Retry of it meanwhile keeps this start as its own (Retry), which goes on.
             if (entry.IdleLease is { } lease) await lease.Task.WaitAsync(closing.Token).ConfigureAwait(false);
             if (entry.Previous is { } previous) await previous.WaitAsync(closing.Token).ConfigureAwait(false);
             lock (sync)
                 if (entry.Failure is { } failure)
                 {
                     // As a failed address's resolve does at once: nothing stays starting (an idle archive lock may take the address).
-                    recorded = true; if (ReferenceEquals(entry.Starting, self)) entry.Starting = null;
+                    rejected = failure; if (ReferenceEquals(entry.Starting, self)) entry.Starting = null;
                     throw new IOException(failure);
                 }
             var baseOutcome = await BuildAsync().WaitAsync(closing.Token).ConfigureAwait(false);
@@ -295,10 +299,11 @@ public sealed class ProcessWorkers : IAsyncDisposable, IPluginRolloutStep
             string failure;
             lock (sync)
             {
-                failure = entry.Failure ?? "worker failed to start";
-                if (closing.IsCancellationRequested) entries.Remove(entry.Address.Key); else entry.Failure = failure;
+                // A rejected start leaves the address's failure as it is now: a Retry may have cleared it since (its route resolves again).
+                failure = rejected ?? entry.Failure ?? "worker failed to start";
+                if (closing.IsCancellationRequested) entries.Remove(entry.Address.Key); else if (rejected is null) entry.Failure = failure;
             }
-            if (!closing.IsCancellationRequested && !recorded) Report(entry.Address, new WorkerProcessException(error.Message, tail.Value, failures.Count == 1 ? error : new AggregateException(failures)));
+            if (!closing.IsCancellationRequested && rejected is null) Report(entry.Address, new WorkerProcessException(error.Message, tail.Value, failures.Count == 1 ? error : new AggregateException(failures)));
             throw new IOException(failure);
         }
     }
@@ -454,6 +459,9 @@ public sealed class ProcessWorkers : IAsyncDisposable, IPluginRolloutStep
         }
         catch (OperationCanceledException) { }
     }
+    /// <summary>Clears a failed address so its next routed use starts it again. A start its crashed worker's link close asked for, still
+    /// waiting behind that exit (which then rejects it), is this retry's start: it goes on once the exit finished, the route's resolve that
+    /// waits on it gets its worker.</summary>
     public void Retry(Address address)
     {
         Entry? retrying = null;
@@ -462,7 +470,8 @@ public sealed class ProcessWorkers : IAsyncDisposable, IPluginRolloutStep
             retrying = entry; entry.Retrying = true;
             if (entry.Child is { } previous)
             { entry.Previous = previous.Finished.Task; entry.Child = null; }
-            entry.Failure = null; entry.Starting = null;
+            entry.Failure = null;
+            if (entry.Starting is { IsCompleted: true }) entry.Starting = null;
         }
         try { Route.Retry(address); }
         finally

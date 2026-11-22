@@ -55,6 +55,10 @@ internal static partial class Program
             await sender.SendAsync(true);
             Equal(0, batches.Count, "nothing is sent while unbound");
             connect();
+            // The sender's hold binds on the connection and its chord.hold root ends then: a send before that has only the page's span.
+            var bound = DateTime.UtcNow.AddSeconds(5);
+            while (recorder.QueuedSpans < 2 && DateTime.UtcNow < bound) await Task.Delay(10);
+            Equal(2, recorder.QueuedSpans, "the page's span and the bound hold's span are queued");
             await Sync160SendUntilDelivered(sender, batches);
             Equal(1, batches.Count, "one batch");
             Equal("page.click,chord.hold", string.Join(",", batches[0].Spans.Select(span => span.Name)), "the page's span and the sender's own hold");

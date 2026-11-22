@@ -47,13 +47,14 @@ internal static partial class Program
                 handle = self.Job(job, new() { Run = async (_, _) => { await finish.Task; return null; } });
                 self.Open(_ => Task.FromResult(1), (_, _, _) => { closed.TrySetResult(); return Task.CompletedTask; });
                 return new(new Dictionary<string, object?>());
-            }, new(Linger: TimeSpan.FromMilliseconds(70)))))], ChordContext.Background);
+            // A linger long enough that the run starts before it ends on a slow runner; the wait below then passes its deadline.
+            }, new(Linger: TimeSpan.FromMilliseconds(400)))))], ChordContext.Background);
             var reference = await host.GetAsync(type, new System.Text.Json.Nodes.JsonObject { ["id"] = 1 }, ChordContext.Background);
             reference.Release();
             Equal(1, host.Activity.Value.Lingering, "object entered linger");
             var run = await handle!.StartAsync(new System.Text.Json.Nodes.JsonObject(), ChordContext.Background);
             Equal(0, host.Activity.Value.Lingering, "run cancels old timer");
-            await Task.Delay(120);
+            await Task.Delay(600);
             Check(!closed.Task.IsCompleted, "active run still owns object after old deadline");
             finish.SetResult();
             await run.OutcomeAsync(ChordContext.Background);

@@ -370,7 +370,7 @@
       "notes": "docs/release-notes/1.6.0.md",
       "changelog": "website/src/content/changelog/1.6.0.md",
       "blockers": [
-        "Post-merge workflows at 367dab07, exact-tag release gates and verified publication."
+        "Post-merge workflows at c250e24f (PR #66), exact-tag release gates and verified publication."
       ]
     }
   },

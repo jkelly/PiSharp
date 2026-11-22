@@ -21,7 +21,7 @@
     "versionSpecificPackageConsumptionQualified": false,
     "fullProviderParity": false,
     "completeNativeGateReady": false,
-    "status": "Release preparation for 1.6.0. PR #63 passed all 63 CI checks at 42aac5ada0d8071fb5d5311561ff9773fbb634d0 and merged as 367dab07e59bed72ff53d38fd4758246006df984. The post-merge workflows and the exact tagged release must pass all required release gates and package validation before publication is recorded. The local source acceptance record (tested-with-limitations) and all historical release evidence remain separate; no complete upstream, provider or all-platform parity is claimed."
+    "status": "Release preparation for 1.6.0. PR #63 passed all 63 CI checks at 42aac5ada0d8071fb5d5311561ff9773fbb634d0 and merged as 367dab07e59bed72ff53d38fd4758246006df984; the MCP HTTP close fix (PR #66) merged afterwards as c250e24f and ships in 1.6.0, with a Chord worker-retry race fix from the release pull request. The post-merge workflows and the exact tagged release must pass all required release gates and package validation before publication is recorded. The local source acceptance record (tested-with-limitations) and all historical release evidence remain separate; no complete upstream, provider or all-platform parity is claimed."
   },
   "releaseCandidate": {
     "branch": "release/1.6.0",
