@@ -1,5 +1,7 @@
-// Pi b4afdddf44e059c67ccf5097e5317d913521b470 (MIT): packages/chord/src/surfaces/active-theme.ts, packages/chord/src/surfaces/active-language.ts, packages/chord/src/surfaces/page-state.ts.
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/chord/src/surfaces/active-theme.ts, packages/chord/src/surfaces/active-language.ts, packages/chord/src/surfaces/page-state.ts.
 // Authored native regression; not an upstream execution capture.
+// The two client cases follow packages/chord/src/surfaces/client.ts at faac585884ae2c013a6b1400f3e9e77f10b34bac (a client starts without
+// waiting for the scripts object).
 using System.Text.Json.Nodes;
 using PiSharp.Chord;
 using PiSharp.Chord.Contracts;
@@ -50,8 +52,10 @@ internal static partial class Program
             });
             try
             {
-                // StartAsync already joined the initial update: the predecessor is completed. The first
-                // fetch then holds the external call while a dispatcher callback tries to enqueue.
+                // Pi 1.6.0: a client starts without waiting for the scripts object, so the set shown at start is joined here. The
+                // predecessor is then completed, and the first fetch holds the external call while a dispatcher callback tries
+                // to enqueue.
+                await client.Followed.WaitAsync(TimeSpan.FromSeconds(5));
                 var external = Task.Run(() => client.UpdateAsync(next));
                 await fetchEntered.Task.WaitAsync(TimeSpan.FromSeconds(5));
                 client.Host.Dispatcher.Post(() =>
@@ -193,6 +197,8 @@ internal static partial class Program
                 },
                 ServerBase = _ => Task.FromResult<string?>("base"), Outdated = () => throw new Exception("unexpected outdated"), OnError = errors.Add,
             });
+            // Pi 1.6.0: a client starts without waiting for the scripts object; the server's object is active once the client follows it.
+            await client.Followed.WaitAsync(TimeSpan.FromSeconds(5));
             using var value = await client.Host.GetAsync(type, new(), ChordContext.Background);
             Equal(1, value.Member("value").Value!.GetValue<int>(), "initial native plugin loaded");
             var update = new ScriptSet("base", "/combined-two.js", [new("plugin", "two", "/two.js")]);

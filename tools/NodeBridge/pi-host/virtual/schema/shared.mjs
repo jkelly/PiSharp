@@ -1,4 +1,4 @@
-// Pi b4afdddf44e059c67ccf5097e5317d913521b470 (MIT): packages/schema/src/shared.ts.
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/schema/src/shared.ts.
 // Ported to plain ESM for the PiSharp Node extension bridge (TypeScript types stripped mechanically; behaviour unchanged).
 export function sharedRegex(source) {
     const hit = regexes.get(source)?.deref();

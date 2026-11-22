@@ -86,9 +86,9 @@ internal static partial class TuiTests
     // ─── task graphs ─────────────────────────────────────────────────────────
 
     public static TaskGraphState State(DurableTaskStatus status, string? phase, ImmutableArray<TaskId>? on = null, JoinPolicy? policy = null,
-        TaskOutcomeStatus? outcome = null, double? until = null) =>
+        TaskOutcomeStatus? outcome = null, double? until = null, ImmutableArray<SignalKey>? signals = null) =>
         (TaskGraphState)typeof(TaskGraphState).GetConstructors(BindingFlags.NonPublic | BindingFlags.Instance).Single()
-            .Invoke([status, phase, on ?? [], policy, outcome, until]);
+            .Invoke([status, phase, on ?? [], policy, outcome, until, signals]);
 
     public static TaskGraphNode Node(long id, string kind, ConversationId conversation, TaskGraphState state, long? owner = null,
         bool background = false, bool abortRequested = false, long[]? conversations = null, BlockedReason? blocked = null) =>

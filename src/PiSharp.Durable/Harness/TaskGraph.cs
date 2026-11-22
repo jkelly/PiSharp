@@ -27,6 +27,7 @@
 // Pi v1.5.0 sync (area group-commit-scheduler, e5c6182ba): the mount is built on the line through the line's Storage (ReadOnLineAsync's
 // argument), whose scans wait for every unpublished commit, so nothing a publication then applies is in the mount already; the guarded
 // Storage field is gone.
+// Pi v1.6.0 sync (faac585884ae2c013a6b1400f3e9e77f10b34bac): a sleeping state's `until` is optional and it may list `signals`.
 using System.Collections.Immutable;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Chord.Delta;
@@ -37,14 +38,14 @@ namespace PiSharp.Durable;
 /// <summary>
 /// A live task's durable status without its checkpoint and outcome payloads (upstream <c>TaskGraphState</c>, spec §9.4). JSON form
 /// (<see cref="ToJson"/>): <c>{status, phase}</c> for pending and running, <c>{status: "waiting", phase, on, policy}</c>,
-/// <c>{status: "sleeping", phase, until}</c>, or <c>{status: "completing", outcome}</c>.
+/// <c>{status: "sleeping", phase, until?, signals?}</c>, or <c>{status: "completing", outcome}</c>.
 /// </summary>
 public sealed class TaskGraphState : IEquatable<TaskGraphState>
 {
     private readonly JsonObjectValue json;
 
     private TaskGraphState(DurableTaskStatus status, string? phase, ImmutableArray<TaskId> on, JoinPolicy? policy, TaskOutcomeStatus? outcome,
-        double? until = null)
+        double? until = null, ImmutableArray<SignalKey>? signals = null)
     {
         Status = status;
         Phase = phase;
@@ -52,6 +53,7 @@ public sealed class TaskGraphState : IEquatable<TaskGraphState>
         Policy = policy;
         Outcome = outcome;
         Until = until;
+        Signals = signals;
         var writer = new RecordJson.Writer().Add("status", WireName.Of(status));
         if (outcome is { } held) writer.Add("outcome", WireName.Of(held));
         else
@@ -60,6 +62,7 @@ public sealed class TaskGraphState : IEquatable<TaskGraphState>
             if (policy is { } join)
                 writer.Add("on", JsonValue.Array(on.Select(id => (JsonValue)id.ToJson()))).Add("policy", WireName.Of(join));
             writer.Number("until", until);
+            if (signals is { } listed) writer.Add("signals", JsonValue.Array(listed.Select(key => (JsonValue)key.ToJson())));
         }
         json = writer.Build();
     }
@@ -80,8 +83,11 @@ public sealed class TaskGraphState : IEquatable<TaskGraphState>
     /// <summary>For a completing task: the held outcome's status.</summary>
     public TaskOutcomeStatus? Outcome { get; }
 
-    /// <summary>For a sleeping task: when it is due, on the Harness clock.</summary>
+    /// <summary>For a sleeping task: when it is due, on the Harness clock; null for a sleep that waits for signals only.</summary>
     public double? Until { get; }
+
+    /// <summary>For a sleeping task: the signal keys it waits for, when it lists any.</summary>
+    public ImmutableArray<SignalKey>? Signals { get; }
 
     /// <summary>The state as upstream's JSON object.</summary>
     public JsonObjectValue ToJson() => json;
@@ -90,7 +96,7 @@ public sealed class TaskGraphState : IEquatable<TaskGraphState>
     internal static TaskGraphState Of(TaskState state) => state switch
     {
         WaitingTaskState waiting => new(DurableTaskStatus.Waiting, PhaseOf(waiting.Checkpoint), waiting.On, waiting.Policy, null),
-        SleepingTaskState sleeping => new(DurableTaskStatus.Sleeping, PhaseOf(sleeping.Checkpoint), [], null, null, sleeping.Until),
+        SleepingTaskState sleeping => new(DurableTaskStatus.Sleeping, PhaseOf(sleeping.Checkpoint), [], null, null, sleeping.Until, sleeping.Signals),
         LiveTaskState live => new(live.Status, PhaseOf(live.Checkpoint), [], null, null),
         // Terminal records never reach here: they leave the graph.
         SettlingTaskState settling => new(DurableTaskStatus.Completing, null, [], null, settling.Outcome.Status),

@@ -1,4 +1,4 @@
-// Pi b4afdddf44e059c67ccf5097e5317d913521b470 (MIT): packages/tui/src/tui-alt-screen.ts.
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/tui/src/tui-alt-screen.ts.
 // Ported to plain ESM for the PiSharp Node extension bridge (TypeScript types stripped mechanically; behaviour unchanged).
 import { AltScreenSearchComponent, AltScreenSearchIndex, getAltScreenSearchMatchKey } from "./alt-screen-search.mjs";
 import { AltScreenFlashContainer } from "./components/alt-screen-flash.mjs";
@@ -290,15 +290,15 @@ export class TuiAltScreen extends TuiBase {
     }
     scrollBy(lines) {
         this.getPrimaryScrollView().scrollBy(lines);
-        this.requestRender();
+        this.requestViewRender();
     }
     scrollToTop() {
         this.getPrimaryScrollView().scrollToStart();
-        this.requestRender();
+        this.requestViewRender();
     }
     scrollToBottom() {
         this.getPrimaryScrollView().scrollToEnd();
-        this.requestRender();
+        this.requestViewRender();
     }
     scrollToPrompt(direction) {
         if (!this.currentLayout) return;
@@ -308,7 +308,7 @@ export class TuiAltScreen extends TuiBase {
         for(let row = scrollView.scrollTop + direction; row >= 0 && row < lines.length; row += direction){
             if (!OSC133_PROMPT_START.test(lines[row] ?? "")) continue;
             scrollView.scrollTo(row);
-            this.requestRender();
+            this.requestViewRender();
             return;
         }
     }
@@ -783,7 +783,7 @@ export class TuiAltScreen extends TuiBase {
         const primary = this.getPrimaryScrollView();
         if (remaining !== 0 && !seen.has(primary)) primary.scrollBy(remaining);
         this.updateScrollbarHover(event.x, event.y);
-        this.requestRender();
+        this.requestViewRender();
     }
     parseSgrMouseEvent(data) {
         const match = /^\x1b\[<(\d+);(\d+);(\d+)([Mm])$/.exec(data);
@@ -1036,7 +1036,7 @@ export class TuiAltScreen extends TuiBase {
         }
         const point = this.getScrollSelectionPoint(scrollView, pointer.x, pointer.y);
         if (point) this.updateSelectionFocus(point);
-        this.requestRender();
+        this.requestViewRender();
     }
     stopSelectionAutoScroll() {
         if (this.selectionAutoScrollTimer) {
@@ -1366,9 +1366,12 @@ export class TuiAltScreen extends TuiBase {
         const width = Math.max(1, this.terminal.columns);
         const height = Math.max(1, this.terminal.rows);
         const root = this.layoutRoot ?? this.implicitScrollView;
-        let nextLayout = renderLayoutFrame(root, width, height, ()=>this.requestRender());
+        const requestViewRender = ()=>this.requestViewRender();
+        const reusableOutput = this.contentChanged ? undefined : this.currentLayout?.renderCache;
+        this.contentChanged = false;
+        let nextLayout = renderLayoutFrame(root, width, height, requestViewRender, reusableOutput);
         if (this.refreshSearch(nextLayout)) {
-            nextLayout = renderLayoutFrame(root, width, height, ()=>this.requestRender());
+            nextLayout = renderLayoutFrame(root, width, height, requestViewRender, nextLayout.renderCache);
         }
         let screen = this.resolveFakeCursors(nextLayout.lines.map((line)=>line.replace(OSC133_ZONE_PREFIX, "")));
         screen = this.applySearchHighlights(screen, nextLayout);
@@ -1403,8 +1406,11 @@ export class TuiAltScreen extends TuiBase {
         let buffer = BEGIN_SYNCHRONIZED_OUTPUT;
         if (fullRedraw) {
             this.fullRedrawCount += 1;
-            const clearImages = this.imageProtocol === "kitty" && hadUploadedKittyImages ? deleteAllKittyPlacements() : this.deleteKittyImages();
-            buffer += `${clearImages}\x1b[2J`;
+            if (this.imageProtocol === "kitty" && hadUploadedKittyImages) {
+                buffer += deleteAllKittyPlacements();
+            } else {
+                buffer += `${this.deleteKittyImages()}\x1b[2J`;
+            }
         } else if (imagesNeedRedraw) {
             if (this.imageProtocol === "iterm2") buffer += "\x1b[2J";
             else if (this.imageProtocol === "kitty") buffer += deleteAllKittyPlacements();

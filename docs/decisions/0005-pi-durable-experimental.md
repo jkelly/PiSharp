@@ -382,3 +382,13 @@ The denial is `FileError(PermissionDenied)` with "Plan mode: <path> is outside t
 - They also cover entering and leaving plan mode, approve, approve-and-stop and reject with feedback, restart awaiting approval, an approval whose settle commit fails, a manual exit cancelling the review, forks as of their entry, and a wrapped write running after the approval.
 - The `plan.*` containment cases run the wrapped tools against relative, absolute, `..`, `@` and Unicode-space paths, file and directory links, dangling links, junctions, Windows names, 8.3 aliases and device prefixes. Link cases skip, with the reason, where the process cannot create the link: symbolic links on Windows without the privilege, junctions off Windows.
 - `crash.<sqlite|jsonl>.ask-user.waiting` and `.answered`, and `crash.<sqlite|jsonl>.plan-approval.approved`, kill a real child process while a question waits, right after an answer landed, and right after an approval landed. They then check that the same call completes once and that the approval was atomic.
+
+## Note, 2026-11-21: Pi Durable v1.6.0 source candidate
+
+This note records what the unreleased 1.6.0 source candidate ([decision 0015](0015-pi-1.6.0-sync.md)) changes in the text above. The decision itself is not rewritten, and the sections above keep describing the port as it stood at the version they name.
+
+- **`CodemodeNamespace` is gone.** The "Durable code mode (v1.2.0, area d)" entry under [Port status](#port-status) names `CodemodeNamespace` among the types of `PiSharp.Durable.Tools`. Pi Durable 1.6.0 removed it, with its `prefix`, `namespaceOf` and `CodemodeToolOptions.namespaces`, and with no fallback. In the 1.6.0 source, code-mode namespaces come from the extension that brings the tools: `Extension.Namespace` is a `ToolNamespace(name, description, instructions?)`, and `DurableCodemode.NamespacesOf(extensions)` maps tool names to their namespaces. The published PiSharp 1.5.2 packages still have `CodemodeNamespace`.
+- **`RunEndTask` is `HookTask`**, `GenerationHooks.AfterTools` and `OnYield` may return tasks, and `pi.tool` is version 4 and `pi.generation` version 3. A database written by the 1.6.0 source is not meant to be opened by PiSharp 1.5.2.
+- **New in 1.6.0:** signals, sleeps that wait for signals, tools that park, gates, image fitting and examples 38 to 47.
+
+The work-package reports `AI_DOCS/agent-reports/sync-1.6.0-durable-core.md` and `sync-1.6.0-durable-edge.md` give the mapping, the cases that ran and what did not run. The experimental status decided here is unchanged.

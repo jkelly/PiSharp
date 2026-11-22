@@ -287,7 +287,7 @@ public static partial class Examples
             [
                 Define.Hook(HarnessTasks.GenerationTask, new GenerationHooks
                 {
-                    OnYield = (answer, _, _) => Task.FromResult<JsonValue?>(TextOf(answer).Contains(done, StringComparison.Ordinal)
+                    OnYield = (answer, _, _) => Task.FromResult<OnYieldResult?>(TextOf(answer).Contains(done, StringComparison.Ordinal)
                         ? null
                         : JsonValue.String($"Look again for anything you missed. Say \"{done}\" when there is nothing left.")),
                 }),

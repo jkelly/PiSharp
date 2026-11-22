@@ -186,6 +186,9 @@ internal static class DurableTuiState
         {
             "waiting" => $"waiting on {string.Join(", ", node.State.On.Select(id => id.Value.ToString(CultureInfo.InvariantCulture)))}",
             "completing" => $"completing ({Str(Node(state), "outcome") ?? "undefined"})",
+            // PiSharp-only (Pi Durable 1.6.0): a sleep that waits for signals names their keys; upstream's line shows the phase only.
+            "sleeping" when node.State.Signals is { Length: > 0 } signals =>
+                $"sleeping {node.State.Phase ?? "undefined"} for {string.Join(", ", signals.Select(key => $"{key.Signal}/{key.Key}"))}",
             _ => $"{status} {node.State.Phase ?? "undefined"}",
         };
         var flags = new[] { node.Background ? "background" : "", node.AbortRequested ? "aborting" : "" }.Where(flag => flag.Length > 0).ToList();

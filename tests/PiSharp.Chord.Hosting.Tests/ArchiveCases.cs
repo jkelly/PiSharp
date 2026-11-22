@@ -1,4 +1,4 @@
-// Pi b4afdddf44e059c67ccf5097e5317d913521b470 (MIT): packages/chord/src/node/app/archive.ts, packages/chord/src/node/app/tar.ts.
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/chord/src/node/app/archive.ts, packages/chord/src/node/app/tar.ts.
 // Authored native regression; not an upstream execution capture.
 using System.Text;
 using System.Text.Json;
@@ -161,7 +161,7 @@ internal static class ArchiveCases
                 Executable = Environment.ProcessPath!, LockDirectory = Path.Combine(root, "locks"),
                 Plugins = (_, _) => throw new Exception("Idle archive unexpectedly started worker"),
                 Authorize = (_, _) => true, Principal = _ => new JsonObject { ["kind"] = "worker" },
-                OnError = (_, _) => { },
+                Store = store, OnError = (_, _) => { },
             }, ChordContext.Background);
             await host.LoadAsync([new("archive.workers", workers.Facet)], ChordContext.Background);
             var service = new AppArchiveService("archive-test", "1", layout, host,

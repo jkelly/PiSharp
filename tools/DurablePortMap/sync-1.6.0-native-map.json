@@ -1,0 +1,135 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "tag": "v1.6.0",
+    "commit": "faac585884ae2c013a6b1400f3e9e77f10b34bac"
+  },
+  "overlay": "compatibility/durable-sync-1.6.0-overlay.json",
+  "note": "Where the Pi Durable 1.6.0 sync put the native counterpart of each upstream file it added, and of each changed file whose port spans more than the one location the historical v1.5.0 map records. The row-level map (compatibility/durable-port-map.json) stays v1.5.0 evidence and has no row for a file added later; tools/CompatibilityReport/sync-1.6.0-applicability.mjs copies each entry into the overlay row of the same upstream file as nativeMapping. An entry names source and test locations only: it is no claim of a passing integrated run, which root records. tests/PiSharp.Durable.Tests (setup.sync160-native-map-names-the-new-durable-files) checks that every listed path exists and that every Durable file the range added has an entry.",
+  "files": {
+    "packages/durable/src/signals.ts": {
+      "workPackage": "durable-core",
+      "pisharp": ["src/PiSharp.Durable/Signals.cs"],
+      "tests": ["tests/PiSharp.Durable.Tests/Sync160SignalsCases.cs"],
+      "note": "defineSignal, SignalToken, SignalKey, SignalState, SignalResult and SubmissionSettled; harness.signal and tx.signal are IHarness.SignalAsync and ITx.SignalAsync (Harness/Harness.cs, Session/Transaction.cs)."
+    },
+    "packages/durable/src/harness/parks.ts": {
+      "workPackage": "durable-core",
+      "pisharp": ["src/PiSharp.Durable/Harness/Parks.cs"],
+      "tests": ["tests/PiSharp.Durable.Tests/Sync160ToolParksCases.cs", "tests/PiSharp.Durable.Tests/Sync160ParkChildrenCases.cs"],
+      "note": "A park is ToolExecutionResult.Park (ToolPark.Sleeping, ToolPark.Waiting; Harness/Types.cs); BASE_PARKS is ToolExecutionApi.BaseParks."
+    },
+    "packages/durable/src/images/fit.ts": {
+      "workPackage": "durable-edge",
+      "pisharp": ["src/PiSharp.Durable.Tools/Images/Fit.cs"],
+      "tests": ["tests/PiSharp.Durable.Tests/Sync160ImagesFitCases.cs"],
+      "note": "fitImage, fitImages and createFitImagesExtension are FitImages.FitImageAsync, FitAsync and CreateExtension."
+    },
+    "packages/durable/src/tools/image-processor.ts": {
+      "workPackage": "durable-edge",
+      "pisharp": ["src/PiSharp.Durable.Tools/Tools/ImageProcessor.cs", "src/PiSharp.Durable.Tools/Tools/Tools.cs"],
+      "tests": ["tests/PiSharp.Durable.Tests/Sync160ImagesFitCases.cs", "tests/PiSharp.Durable.Tests/ToolsImagesCases.cs"],
+      "note": "imageLimits is ImageLimits.Of and CodingTools.ImageLimitsOf; preparedNotes and fromBase64 are ImageFormats.PreparedNotes and FromBase64."
+    },
+    "packages/durable/src/codemode/describe.ts": {
+      "workPackage": "durable-edge",
+      "pisharp": ["src/PiSharp.Durable.Tools/Codemode/Describe.cs", "src/PiSharp.Durable.Tools/Codemode/Codemode.cs"],
+      "tests": ["tests/PiSharp.Durable.Tests/CodemodeDescribeCases.cs", "tests/PiSharp.Durable.Tests/Sync160CodemodeCases.cs"],
+      "note": "namespacesOf is DurableCodemode.NamespacesOf; CodemodeNamespace, its prefix and namespaceOf are removed, as upstream."
+    },
+    "packages/durable/src/env/node.ts": {
+      "workPackage": "durable-edge",
+      "pisharp": ["src/PiSharp.Durable/Env/Local/LocalFileSystem.cs", "src/PiSharp.Durable.Tools/Env/LocalExecutionEnv.cs"],
+      "tests": ["tests/PiSharp.Durable.Tests/Sync160EnvListRaceCases.cs", "tests/PiSharp.Durable.Tests/EnvNodeCases.cs"],
+      "note": "The file-system half of NodeExecutionEnv, listDir included, is LocalFileSystem; the historical map names the shell half."
+    },
+    "packages/durable/test/harness-signals.test.ts": {
+      "workPackage": "durable-core",
+      "tests": ["tests/PiSharp.Durable.Tests/Sync160SignalsCases.cs"]
+    },
+    "packages/durable/test/harness-tool-parks.test.ts": {
+      "workPackage": "durable-core",
+      "tests": ["tests/PiSharp.Durable.Tests/Sync160ToolParksCases.cs"]
+    },
+    "packages/durable/test/harness-park-children.test.ts": {
+      "workPackage": "durable-core",
+      "tests": ["tests/PiSharp.Durable.Tests/Sync160ParkChildrenCases.cs"]
+    },
+    "packages/durable/test/harness-tool-gates.test.ts": {
+      "workPackage": "durable-core",
+      "tests": ["tests/PiSharp.Durable.Tests/Sync160ToolGatesCases.cs"]
+    },
+    "packages/durable/test/harness-hook-tasks.test.ts": {
+      "workPackage": "durable-core",
+      "tests": ["tests/PiSharp.Durable.Tests/Sync160HookTasksCases.cs"]
+    },
+    "packages/durable/test/codemode-describe.test.ts": {
+      "workPackage": "durable-edge",
+      "tests": ["tests/PiSharp.Durable.Tests/CodemodeDescribeCases.cs", "tests/PiSharp.Durable.Tests/Sync160CodemodeCases.cs"],
+      "note": "The cases v1.6.0 rewrote are in CodemodeDescribeCases.cs; the ones it added are in Sync160CodemodeCases.cs."
+    },
+    "packages/durable/test/env-node-list-race.test.ts": {
+      "workPackage": "durable-edge",
+      "tests": ["tests/PiSharp.Durable.Tests/Sync160EnvListRaceCases.cs"]
+    },
+    "packages/durable/test/images-fit.test.ts": {
+      "workPackage": "durable-edge",
+      "tests": ["tests/PiSharp.Durable.Tests/Sync160ImagesFitCases.cs"]
+    },
+    "packages/durable/test/image-fixtures.ts": {
+      "workPackage": "durable-edge",
+      "tests": ["tests/PiSharp.Durable.Tests/ToolsImagesCases.cs"],
+      "note": "The fixtures v1.6.0 moved out of tools-images.test.ts stay in ToolsImagesCases.cs, as private members of the suite's partial Program class that Sync160ImagesFitCases.cs shares."
+    },
+    "packages/durable/test/examples/38-signals.ts": {
+      "workPackage": "durable-edge",
+      "pisharp": ["samples/Durable.Examples/ExamplesSignals.cs"],
+      "tests": ["tests/PiSharp.Durable.Tests/ExamplesCases.cs"]
+    },
+    "packages/durable/test/examples/39-ask-a-person.ts": {
+      "workPackage": "durable-edge",
+      "pisharp": ["samples/Durable.Examples/ExamplesSignals.cs"],
+      "tests": ["tests/PiSharp.Durable.Tests/ExamplesCases.cs"]
+    },
+    "packages/durable/test/examples/40-tool-waits-for-webhook.ts": {
+      "workPackage": "durable-edge",
+      "pisharp": ["samples/Durable.Examples/ExamplesToolParks.cs"],
+      "tests": ["tests/PiSharp.Durable.Tests/ExamplesCases.cs"]
+    },
+    "packages/durable/test/examples/41-tool-polls.ts": {
+      "workPackage": "durable-edge",
+      "pisharp": ["samples/Durable.Examples/ExamplesToolParks.cs"],
+      "tests": ["tests/PiSharp.Durable.Tests/ExamplesCases.cs"]
+    },
+    "packages/durable/test/examples/42-parallel-children.ts": {
+      "workPackage": "durable-edge",
+      "pisharp": ["samples/Durable.Examples/ExamplesToolParks.cs"],
+      "tests": ["tests/PiSharp.Durable.Tests/ExamplesCases.cs"]
+    },
+    "packages/durable/test/examples/43-subagent-waits.ts": {
+      "workPackage": "durable-edge",
+      "pisharp": ["samples/Durable.Examples/ExamplesToolParks.cs"],
+      "tests": ["tests/PiSharp.Durable.Tests/ExamplesCases.cs"]
+    },
+    "packages/durable/test/examples/44-approval-gate.ts": {
+      "workPackage": "durable-edge",
+      "pisharp": ["samples/Durable.Examples/ExamplesGates.cs"],
+      "tests": ["tests/PiSharp.Durable.Tests/ExamplesCases.cs"]
+    },
+    "packages/durable/test/examples/45-review-on-yield.ts": {
+      "workPackage": "durable-edge",
+      "pisharp": ["samples/Durable.Examples/ExamplesGates.cs"],
+      "tests": ["tests/PiSharp.Durable.Tests/ExamplesCases.cs"]
+    },
+    "packages/durable/test/examples/46-after-tools-terminate.ts": {
+      "workPackage": "durable-edge",
+      "pisharp": ["samples/Durable.Examples/ExamplesGates.cs"],
+      "tests": ["tests/PiSharp.Durable.Tests/ExamplesCases.cs"]
+    },
+    "packages/durable/test/examples/47-fit-images.ts": {
+      "workPackage": "durable-edge",
+      "pisharp": ["samples/Durable.Examples/ExamplesFitImages.cs"],
+      "tests": ["tests/PiSharp.Durable.Tests/ExamplesCases.cs"]
+    }
+  }
+}

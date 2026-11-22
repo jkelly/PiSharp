@@ -13,8 +13,12 @@ public sealed record ReadWriteToolOptions(int MaximumReadBytes = 64 * 1024 * 102
     public PiSharp.Tools.Images.ImageResizeOptions? ImageResizeOptions { get; init; }
     /// <summary>The decode/encode backend (Photon upstream). Default: the dependency-free built-in codec.</summary>
     public PiSharp.Tools.Images.IImageCodec? ImageCodec { get; init; }
-    /// <summary>Source ctx.model.input: false adds the non-vision note to image reads; null means no current model.</summary>
+    /// <summary>Source ctx.model.input: false marks image reads with details.imageUnsupportedByModel (the stored content keeps the image
+    /// and gets no note; providers replace the image per request); null means no current model.</summary>
     public Func<bool?>? CurrentModelSupportsImages { get; init; }
+    /// <summary>Source ctx.model.id: the model named in details.imageUnsupportedByModel when it has no image input. Without it the
+    /// detail reads <see cref="ReadWriteTools.UnnamedModel"/>.</summary>
+    public Func<string?>? CurrentModelId { get; init; }
 }
 
 public enum FileToolFailure { ResourceLimit, UnsupportedContent }

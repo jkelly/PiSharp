@@ -1,4 +1,4 @@
-// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/chord/src/next/store/store.ts
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/chord/src/store/store.ts
 //
 // The store (slice 6a §2, §3, slice 6b §1): opened over a backend, one commit queue that serializes only the commit step (the seal fence's
 // admission check, BEGIN, the writes in their order, the outbox commit, lastSeq and the allocator's value, COMMIT, then the owner's
@@ -15,6 +15,11 @@
 // adapters (area store-storage: Durable's StoreStorage in PiSharp.Durable.Store), with only the members they use public. Its error for a
 // seq past the safe range is an InvalidOperationException, and a close's abort is the context's OperationCanceledException (upstream's
 // awaitWithContext rejects with the signal's reason).
+//
+// 1.6.0: the store's reads (ReadIndex; upstream `reads`, a name the test seam Reads holds here), SettledAsync and OnCommitted. Upstream
+// announces a commit to its onCommitted listeners in a microtask; here the announcement is queued to the thread pool, one at a time, with
+// the lastSeq it finds when it runs. Upstream's group commit (S18) is not ported: every commit is a backend transaction of its own, as at
+// 1.5.2.
 using PiSharp.Chord.Data;
 using PiSharp.Chord.Sqlite;
 using PiSharp.Chord.State;
@@ -29,6 +34,12 @@ public interface IStore : IAsyncDisposable
 
     /// <summary>The outbox the sync layer reads; null without one.</summary>
     Outbox? Outbox { get; }
+
+    /// <summary>Calls <paramref name="listener"/> with the new <c>LastSeq</c> after commits are durable (a commit, a series, an applied
+    /// batch): on a turn of its own, never inside a commit, once for however many commits it covers. A listener that throws is removed and
+    /// its error handed to <paramref name="onError"/>, never to the commit. Commits a listener makes are announced like any other.
+    /// Disposing the result removes the listener (upstream <c>onCommitted</c>).</summary>
+    IDisposable OnCommitted(Action<long> listener, Action<Exception> onError);
 
     /// <summary>The store's state after its <c>LastSeq</c> as archive parts (slice 6a §13), holding the commit queue from the first
     /// <c>MoveNextAsync</c> until the iteration ends, throws, is disposed or <paramref name="context"/> aborts (Export.cs).</summary>
@@ -111,6 +122,9 @@ internal interface IChordStore
 
     /// <summary>Runs <paramref name="read"/> on the backend under the guard (<see cref="ChordStore.ReadAsync{T}"/>).</summary>
     Task<T> ReadAsync<T>(Func<ISqliteExecutor, Task<T>> read, ChordContext context);
+
+    /// <summary>Its reads by table and its column-set bindings (slice 14; upstream <c>reads</c>).</summary>
+    Reads ReadIndex { get; }
 }
 
 /// <summary>One commit of a series (<see cref="ChordStore.CommitSeriesAsync"/>): its own checks, which write nothing, and its writes. The
@@ -165,6 +179,9 @@ public sealed class ChordStore : IStore, IChordStore
     private volatile IReadOnlyDictionary<string, TableRecord> catalog;
     /// <summary>The ends of the exports holding the queue or waiting for it, which closing the store calls.</summary>
     private readonly HashSet<Action> held = new(ReferenceEqualityComparer.Instance);
+    /// <summary><see cref="OnCommitted"/> listeners, and whether an announcement is queued (one at a time, with the last <c>LastSeq</c>).</summary>
+    private readonly List<CommittedListener> committedListeners = [];
+    private bool announcing;
 
     internal ChordStore(ISqliteDatabase db, MetaRow meta, IReadOnlyDictionary<string, TableRecord> catalog)
     {
@@ -194,6 +211,78 @@ public sealed class ChordStore : IStore, IChordStore
 
     /// <summary>The claims of its tables and documents (slice 6b).</summary>
     public Claims Claims { get; } = new();
+
+    /// <summary>Its reads by table and its column-set bindings (slice 14; upstream <c>reads</c>).</summary>
+    internal Reads ReadIndex { get; } = new();
+
+    Reads IChordStore.ReadIndex => ReadIndex;
+
+    /// <inheritdoc/>
+    public IDisposable OnCommitted(Action<long> listener, Action<Exception> onError)
+    {
+        ArgumentNullException.ThrowIfNull(listener);
+        ArgumentNullException.ThrowIfNull(onError);
+        var registered = new CommittedListener(this, listener, onError);
+        lock (gate) committedListeners.Add(registered);
+        return registered;
+    }
+
+    /// <summary>One <see cref="OnCommitted"/> listener; disposing it removes it.</summary>
+    private sealed class CommittedListener(ChordStore store, Action<long> listener, Action<Exception> onError) : IDisposable
+    {
+        internal Action<long> Listener => listener;
+
+        internal Action<Exception> OnError => onError;
+
+        public void Dispose()
+        {
+            lock (store.gate) store.committedListeners.Remove(this);
+        }
+    }
+
+    /// <summary>Announces the new <c>LastSeq</c> to <see cref="OnCommitted"/> listeners on one later turn, however many commits it covers
+    /// (upstream <c>#committed</c>).</summary>
+    private void Committed()
+    {
+        lock (gate)
+        {
+            if (announcing || committedListeners.Count == 0) return;
+            announcing = true;
+        }
+        ThreadPool.UnsafeQueueUserWorkItem(static store => store.Announce(), this, preferLocal: false);
+    }
+
+    private void Announce()
+    {
+        CommittedListener[] listeners;
+        lock (gate)
+        {
+            announcing = false;
+            listeners = [.. committedListeners];
+        }
+        var seq = LastSeq;
+        foreach (var each in listeners)
+        {
+            try
+            {
+                each.Listener(seq);
+            }
+            catch (Exception error)
+            {
+                each.Dispose();
+                each.OnError(error);
+            }
+        }
+    }
+
+    /// <summary>Completes once every commit queued before the call settled (stored and adopted, or rejected), also on a stopped or closed
+    /// store; commits queued later are not waited for. For a caller that has ended a source of commits and must not go on while one it
+    /// queued can still be adopted (the workers component, at a worker's exit; upstream <c>settled</c>).</summary>
+    public Task SettledAsync()
+    {
+        // Every turn of the queue ends its own failures: the tail never faults.
+        lock (gate) return tail;
+    }
 
     /// <summary>The open host's batch, in which an adapter publishes its commits; null without a host.</summary>
     public Batch? Batch
@@ -578,7 +667,7 @@ public sealed class ChordStore : IStore, IChordStore
             {
                 try
                 {
-                    var step = new Step(executor, seq, Ids, catalog);
+                    var step = new Step(executor, seq, Ids, catalog) { Transaction = new object() };
                     var nextId = await WriteAsync(step, writes).ConfigureAwait(false);
                     await WriteMetaAsync(step, nextId).ConfigureAwait(false);
                     return (step, nextId);
@@ -600,6 +689,7 @@ public sealed class ChordStore : IStore, IChordStore
         Interlocked.Exchange(ref lastSeq, seq);
         Interlocked.Exchange(ref committedNextId, done.NextId);
         AdoptTables(done.Step.Tables);
+        Committed();
         context.Count("chord.store.commits");
         context.Count("chord.store.statements", done.Step.Statements);
         try
@@ -653,6 +743,7 @@ public sealed class ChordStore : IStore, IChordStore
             Interlocked.Exchange(ref lastSeq, last.Seq);
             Interlocked.Exchange(ref committedNextId, last.NextId);
             AdoptTables(last.Tables);
+            Committed();
         }
         context.Count("chord.store.commits", done.Written);
         context.Count("chord.store.statements", done.Statements);
@@ -673,24 +764,26 @@ public sealed class ChordStore : IStore, IChordStore
     {
         var calls = new WatchedExecutor(executor);
         var progress = new SeriesProgress(Ids.Value);
+        // One backend transaction: its steps share the token a read keeps a run under until it is adopted.
+        var transaction = new object();
         foreach (var commit in commits)
         {
-            var refusal = await CheckCommitAsync(commit, calls, progress).ConfigureAwait(false);
+            var refusal = await CheckCommitAsync(commit, calls, progress, transaction).ConfigureAwait(false);
             if (refusal is not null)
             {
                 refuse(refusal);
                 break;
             }
-            await WriteCommitAsync(commit, executor, progress).ConfigureAwait(false);
+            await WriteCommitAsync(commit, executor, progress, transaction).ConfigureAwait(false);
         }
         return await CloseSeriesAsync(progress).ConfigureAwait(false);
     }
 
     /// <summary>Runs <paramref name="commit"/>'s check on a step at the series' next seq whose backend calls are watched; returns its
     /// refusal, if it refused. A check one of whose backend calls failed throws instead: a failure, not a refusal.</summary>
-    private async Task<Exception?> CheckCommitAsync(ISeriesCommit commit, WatchedExecutor watched, SeriesProgress progress)
+    private async Task<Exception?> CheckCommitAsync(ISeriesCommit commit, WatchedExecutor watched, SeriesProgress progress, object transaction)
     {
-        var step = new Step(watched, NextSeq(progress), Ids, progress.Changed ?? catalog);
+        var step = new Step(watched, NextSeq(progress), Ids, progress.Changed ?? catalog) { Transaction = transaction };
         watched.Failed = false;
         try
         {
@@ -710,7 +803,7 @@ public sealed class ChordStore : IStore, IChordStore
 
     /// <summary>Writes <paramref name="commit"/> on its own step at the series' next seq, unwatched, and keeps the table records it
     /// changed in a copy of the catalog, made only once one changed; a commit without writes takes no seq.</summary>
-    private async Task WriteCommitAsync(ISeriesCommit commit, ISqliteExecutor executor, SeriesProgress progress)
+    private async Task WriteCommitAsync(ISeriesCommit commit, ISqliteExecutor executor, SeriesProgress progress, object transaction)
     {
         var seq = NextSeq(progress);
         if (commit.Writes.Count == 0)
@@ -718,7 +811,7 @@ public sealed class ChordStore : IStore, IChordStore
             progress.Stored.Add((seq - 1, []));
             return;
         }
-        var step = new Step(executor, seq, Ids, progress.Changed ?? catalog);
+        var step = new Step(executor, seq, Ids, progress.Changed ?? catalog) { Transaction = transaction };
         progress.NextId = await WriteAsync(step, commit.Writes).ConfigureAwait(false);
         progress.Statements += step.Statements;
         if (step.Tables.Count > 0)
@@ -825,6 +918,7 @@ public sealed class ChordStore : IStore, IChordStore
         Interlocked.Exchange(ref committedNextId, replayed.NextId);
         Ids.Raise(replayed.NextId - 1);
         AdoptTables(replayed.Tables);
+        Committed();
     }
 
     /// <summary>The catalog with <paramref name="changed"/> taken in: a new map, so a step or a read holding the old one keeps it whole.</summary>

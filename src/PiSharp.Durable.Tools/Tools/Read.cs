@@ -1,10 +1,14 @@
-// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/src/tools/read.ts
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/durable/src/tools/read.ts
 // Line numbers, offsets and limits are JavaScript numbers here too (doubles): the model may send 2.5, a negative number or 1e20, and the
 // result, its notices and its errors are upstream's for each, numbers printed as JavaScript prints them.
 // The conversation's model comes from api.AgentAsync() and api.Models.GetModel(), and its image limits from DurableModel.InputLimits (pi-ai
 // 1.2.0 model.inputLimits.images.resize), as upstream's imageModel() reads them.
+// Pi v1.6.0 (#12131): no diagnostic says that the current model does not support images, which stayed in the stored result after a switch
+// to a vision model. The image is kept; pi-ai replaces it with a placeholder per request for a model without image input, and the result's
+// details name such a model for UIs as `{"imageUnsupportedByModel":"<model id>"}` (ReadTool.ImageUnsupportedByModelProperty), the same
+// shape as the coding agent's read (PiSharp.Tools ReadWriteTools.ImageUnsupportedByModelProperty). Details are absent for every other
+// image read.
 using System.Collections.Immutable;
-using System.Globalization;
 using System.Text;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Env;
@@ -33,6 +37,11 @@ internal static class ReadTool
     /// </summary>
     internal static readonly JsonObjectValue StructuredOutputSchema = (JsonObjectValue)JsonValue.Parse(
         """{"anyOf":[{"type":"string"},{"type":"object","properties":{"type":{"const":"image"},"data":{"type":"string"},"mimeType":{"type":"string"}},"required":["type","data","mimeType"]}]}""");
+
+    /// <summary>The key of an image result's details that names the conversation's model when it has no image input (upstream
+    /// <c>ReadToolDetails.imageUnsupportedByModel</c>). For UIs only: the model gets pi-ai's placeholder per request, so the stored result
+    /// stays right after a switch to a vision model.</summary>
+    internal const string ImageUnsupportedByModelProperty = "imageUnsupportedByModel";
 
     private const int ReadChunk = 64 * 1024;
     private static readonly UTF8Encoding Utf8 = new(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: false);
@@ -97,7 +106,7 @@ internal static class ReadTool
     /// One image block, prepared by <paramref name="processor"/> or, without one, as it is when its format is inline and it fits the limits
     /// (its size is checked before reading it, its dimensions from its header); otherwise an error result saying why. What happened to the
     /// image is an <c>info</c> diagnostic, so programs get the bare image content. A model without image input sees pi-ai's placeholder
-    /// instead; a diagnostic says so.
+    /// instead, decided per request; <c>details</c> names it for UIs.
     /// </summary>
     private static async Task<ToolExecutionResult> ReadImageAsync(IBinaryReader reader, FileMetadata info, string path, string mimeType,
         IImageProcessor? processor, ImageModel model, DurableContext context)
@@ -111,14 +120,7 @@ internal static class ReadTool
             var prepared = await processor.PrepareAsync(bytes, mimeType, limits).ConfigureAwait(false);
             if (prepared is null) return ImageError($"{path} is an image ({mimeType}) that cannot be prepared for the model");
             (data, imageMimeType) = (prepared.Data, prepared.MimeType);
-            if (prepared.ConvertedFrom is { } convertedFrom) notes.Add($"Converted from {convertedFrom} to {prepared.MimeType}.");
-            if (prepared.Resized is { } resized)
-            {
-                var (from, to) = (resized.From, resized.To);
-                // toFixed(2).
-                var scale = ((double)from.Width / to.Width).ToString("F2", CultureInfo.InvariantCulture);
-                notes.Add($"Resized from {from.Width}x{from.Height} to {to.Width}x{to.Height}. Multiply coordinates by {scale} to map them to the original.");
-            }
+            notes.AddRange(ImageFormats.PreparedNotes(prepared));
         }
         else
         {
@@ -134,31 +136,28 @@ internal static class ReadTool
                 return ImageError($"{path} is an image ({mimeType}) of {size.Width}x{size.Height}, larger than {limits.MaxWidth}x{limits.MaxHeight}, {unshrinkable}");
             (data, imageMimeType) = (ImageFormats.ToBase64(bytes), mimeType);
         }
-        if (!model.Vision) notes.Add("The current model does not support images; it sees a placeholder instead.");
         var block = JsonValue.Object([new("type", "image"), new("data", data), new("mimeType", imageMimeType)]);
         return new ToolExecutionResult
         {
             Output = JsonValue.Array(block),
             StructuredOutput = block,
+            Details = model.ImageUnsupportedByModel is { } unsupported ? JsonValue.Object([new(ImageUnsupportedByModelProperty, unsupported)]) : null,
             Diagnostics = [new ToolDiagnostic(ToolDiagnosticSeverity.Info, string.Join(" ", [$"Read image file [{imageMimeType}].", .. notes]), "image")],
         };
     }
 
-    /// <summary>What the conversation's model takes: whether images, and within which limits.</summary>
-    private sealed record ImageModel(bool Vision, ImageLimits Limits);
+    /// <summary>The conversation's model as images see it: its limits, and its id if it has no image input.</summary>
+    private sealed record ImageModel(ImageLimits Limits, string? ImageUnsupportedByModel);
 
     /// <summary>
-    /// The conversation model's image input: <see cref="ImageLimits.Default"/> overridden by its <c>inputLimits.images.resize</c>. Without a
-    /// resolvable model, it counts as one that takes images within the defaults.
+    /// The conversation model's image limits (<see cref="ImageLimits.Of"/>), and its id if it has no image input. Without a resolvable model,
+    /// the defaults and no id.
     /// </summary>
     private static async Task<ImageModel> ImageModelAsync(IToolExecutionApi api, DurableContext context)
     {
         var reference = (await api.AgentAsync(context).ConfigureAwait(false)).Model;
         var model = reference is null ? null : api.Models.GetModel(reference.Provider, reference.ModelId);
-        var resize = model?.InputLimits?.Images?.Resize;
-        var defaults = ImageLimits.Default;
-        return new ImageModel(model is null || model.Input.Contains("image"), new ImageLimits(resize?.MaxWidth ?? defaults.MaxWidth,
-            resize?.MaxHeight ?? defaults.MaxHeight, resize?.MaxBytes ?? defaults.MaxBytes));
+        return new ImageModel(ImageLimits.Of(model), model is null || model.Input.Contains("image") ? null : model.Id);
     }
 
     private static ToolExecutionResult ImageError(string message) => new()

@@ -4,7 +4,7 @@
 // --add paths, and hashes every row under the unchanged hashPolicy. Never touches fixtures.
 // Usage: node refreeze-baseline.mjs --upstream <checkout> --tag <vX.Y.Z> --previous <lock>
 //          --previous-path <repo path of preserved lock> [--add a,b,c] [--add-file <JSON path array>] --out <new lock>
-//          [--decision <repo path of the decision record>]
+//          [--decision <repo path of the decision record>] [--state <text after the decision in the lock's status>]
 //          [--evidence <evidence lock> --evidence-path <repo path of the evidence lock>]
 // --previous supplies the carried-forward paths, hashPolicy, runtime and gaps. previousBaseline names the
 // evidence lock that historical fixtures stay validated against: --evidence when given (a re-freeze of an
@@ -72,7 +72,7 @@ const packageKey = dir => dir.replace(/-([a-z])/g, (_, letter) => letter.toUpper
 
 const lock = {
   schemaVersion: 1,
-  status: `Source-level re-freeze per ${decision}; Phase 1 gate open`,
+  status: `Source-level re-freeze per ${decision}; ${args.state ?? "Phase 1 gate open"}`,
   source: { repository: previous.source.repository, tag: args.tag, commit, tree, tagResolvedCommit: commit, acquiredAt,
     acquisition: "Public git checkout of the tagged release; no private code used" },
   previousBaseline: { tag: evidence.source.tag, commit: evidence.source.commit, lock: evidencePath,

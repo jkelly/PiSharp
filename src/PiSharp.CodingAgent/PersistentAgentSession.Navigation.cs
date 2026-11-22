@@ -111,7 +111,7 @@ public sealed partial class PersistentAgentSession
             // that differs from the recorded one is recorded at the next request (_unrecordedLoadout), as the source records it at
             // the next prompt. A target with no system message keeps the current tools (`if (!current) return`): they stay the
             // logical selection and are recorded at the next request, as the source does.
-            ImmutableArray<string> pendingTools = []; var unrecorded = false;
+            ImmutableArray<string> pendingTools = [], restoredTools = []; var unrecorded = false;
             PendingActivation? keptTools = null;
             var configuration = revision.Configuration;
             // Source navigateTree: the leaf moves and the tools are restored, while agent.state.model and thinkingLevel stay as they
@@ -132,7 +132,7 @@ public sealed partial class PersistentAgentSession
                 if (keepCurrent) keptTools = new(0, registry.NormalizeActiveTools(current, work), keptPresentation);
                 else
                 {
-                    pendingTools = restoredLoadout.Pending;
+                    pendingTools = restoredLoadout.Pending; restoredTools = restoredLoadout.Restored;
                     unrecorded = restoredLoadout.RequiresRecord;
                 }
             }
@@ -212,8 +212,9 @@ public sealed partial class PersistentAgentSession
                     _unrecordedLoadout = unrecorded;
                     // The kept tools remain the logical selection; the next request boundary records them.
                     if (keptTools is not null) _pendingActivation = keptTools with { Epoch = _activationEpoch };
-                    // Source _restoreToolsFromTranscript replaces the pending set with the target's unregistered tools.
-                    _pendingToolNames = pendingTools;
+                    // Source _restoreToolsFromTranscript replaces the pending set with the target's unregistered tools, and the
+                    // restored loadout they belong to with the one the target records (Pi faac585884ae2c013a6b1400f3e9e77f10b34bac).
+                    RestorePendingToolsLocked(pendingTools, restoredTools);
                     selected = new(SessionTreeNavigationDisposition.Selected,
                         new(revision.Attachment, this, publishedLog, prospective, configuration,
                             new SessionTreeQueries(SessionTreeQueryOptions.For(_projector.Options)).Build(publishedLog.Entries), _activationEpoch), _agent.Snapshot, editorText)

@@ -1,4 +1,4 @@
-// Pi b4afdddf44e059c67ccf5097e5317d913521b470 (MIT): packages/chord/src/node/app/owner.ts, packages/chord/src/node/app/pairing.ts, packages/chord/src/node/app/invite.ts, packages/chord/src/node/app/ephemeral.ts.
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/chord/src/node/app/owner.ts, packages/chord/src/node/app/pairing.ts, packages/chord/src/node/app/invite.ts, packages/chord/src/node/app/ephemeral.ts.
 // Authored native regression; not an upstream execution capture.
 using System.Net;
 using System.Text;
@@ -47,23 +47,23 @@ internal static class AppAuthRouteTests
             await using var store = await Layout.OpenStoreAsync(System.IO.Path.Combine(directory, "store.sqlite"), Context);
             var time = new AuthClock();
             await using var host = Hosts.Create(new() { Store = store, Principal = new() { ["kind"] = "server" }, OnError = _ => { } });
-            await using var sessions = new Sessions("test-cookie-secret-owner-pairing", time: time);
+            await using var signIns = new SignIns("test-cookie-secret-owner-pairing", time: time);
             await using var http = new ChordHttp(host, new() { OnError = _ => { } });
             var owner = new JsonObject { ["kind"] = "owner", ["id"] = "one" };
-            var link = new OwnerLink(owner, sessions, time);
-            var pairings = new Pairings(owner, sessions, new(2, 1), time);
-            var invites = new Invite(owner, sessions, maxPending: 1, time);
+            var link = new OwnerLink(owner, signIns, time);
+            var pairings = new Pairings(owner, signIns, new(2, 1), time);
+            var invites = new Invite(owner, signIns, maxPending: 1, time);
             await host.LoadAsync([
-                new("chord.http", http.Facet), new("chord.sessions", sessions.Facet),
+                new("chord.http", http.Facet), new("chord.sign-ins", signIns.Facet),
                 new("chord.owner", link.Facet!), new("chord.pairing", pairings.Facet!),
-                new("app.invites", invites.Facet), new("app.login", EphemeralLogin.CreateFacet(sessions)),
+                new("app.invites", invites.Facet), new("app.login", EphemeralLogin.CreateFacet(signIns)),
                 new("test.relay", Facet.Define((_, self) => self.Contribute(HttpRegistries.Http, new HttpContribution
                 {
                     Relays = [new("test-relay", (_, _) => Task.FromResult<RelayAdmission?>(new("https://relay.test")))],
                     Routes = new Dictionary<string, HttpRoute> { ["GET /rolling"] = new((_, _) => Task.FromResult<HttpResult>(new HttpResult.Empty())) },
                 }))),
             ], Context);
-            await sessions.AttachAsync(host, Context);
+            await signIns.AttachAsync(host, Context);
 
             var badOwner = await Send(http, "POST", OwnerLink.Path, new() { ["token"] = "bad" });
             Check(badOwner.Response.StatusCode == 403, "wrong owner token accepted");
@@ -75,23 +75,23 @@ internal static class AppAuthRouteTests
             Check((await Send(http, "POST", OwnerLink.Path, new() { ["token"] = token })).Response.StatusCode == 403, "owner link replay accepted");
             time.Now += TimeSpan.FromDays(1) + TimeSpan.FromMinutes(1);
             var renewed = await Send(http, "GET", "/rolling", new(), cookie);
-            Check(renewed.Response.StatusCode == 200 && renewed.Response.Headers.SetCookie.ToString().Contains("Max-Age", StringComparison.Ordinal), "daily session cookie was not renewed");
+            Check(renewed.Response.StatusCode == 200 && renewed.Response.Headers.SetCookie.ToString().Contains("Max-Age", StringComparison.Ordinal), "daily sign-in cookie was not renewed");
 
             var first = Read(await Send(http, "POST", Pairings.Path, new() { ["label"] = "device" }));
             var pairCode = first["code"]!.GetValue<string>(); var poll = first["poll"]!.GetValue<string>();
             Check((await Send(http, "POST", Pairings.Path, new() { ["label"] = "other" }, forwarded: "203.0.113.8")).Response.StatusCode == 429, "spoofed forwarded address bypassed per-peer pairing cap");
             Check((await Send(http, "POST", Pairings.Path + "/" + pairCode, new())).Response.StatusCode == 401, "anonymous pairing approval admitted");
-            var other = await sessions.IssueAsync(new() { ["kind"] = "user", ["id"] = "other" }, "other", SessionKind.Device, false, Context);
+            var other = await signIns.IssueAsync(new() { ["kind"] = "user", ["id"] = "other" }, "other", SignInKind.Device, false, Context);
             Check((await Send(http, "POST", Pairings.Path + "/" + pairCode, new(), bearer: other.Token)).Response.StatusCode == 403, "non-owner pairing approval admitted");
             Check((await Send(http, "POST", Pairings.Path + "/" + pairCode, new(), cookie)).Response.StatusCode == 200, "owner pairing approval failed");
             var approved = Read(await Send(http, "POST", Pairings.Path + "/poll", new() { ["poll"] = poll }));
-            Check(approved["status"]!.GetValue<string>() == "approved" && AppPrincipals.Same(await sessions.VerifyAsync(approved["token"]!.GetValue<string>(), Context), owner), "pairing token had wrong principal");
+            Check(approved["status"]!.GetValue<string>() == "approved" && AppPrincipals.Same(await signIns.VerifyAsync(approved["token"]!.GetValue<string>(), Context), owner), "pairing token had wrong principal");
             Check((await Send(http, "POST", Pairings.Path + "/poll", new() { ["poll"] = poll })).Response.StatusCode == 404, "approved pairing token delivered twice");
 
             var concurrent = pairings.Begin("concurrent", "another-peer")!;
-            var count = (await sessions.ListAsync(Context)).Count;
+            var count = (await signIns.ListAsync(Context)).Count;
             var approvals = await Task.WhenAll(pairings.ApproveAsync(concurrent.Code, Context), pairings.ApproveAsync(concurrent.Code, Context));
-            Check(approvals.Count(value => value) == 1 && (await sessions.ListAsync(Context)).Count == count + 1, "concurrent approvals issued duplicate sessions");
+            Check(approvals.Count(value => value) == 1 && (await signIns.ListAsync(Context)).Count == count + 1, "concurrent approvals issued duplicate sign-ins");
 
             var invited = new JsonObject { ["kind"] = "user", ["id"] = "invited" };
             Check((await Send(http, "POST", "/_chord/invites", new() { ["principal"] = invited.DeepClone(), ["label"] = "friend" }, bearer: other.Token)).Response.StatusCode == 403, "non-owner made an invitation");
@@ -109,11 +109,11 @@ internal static class AppAuthRouteTests
             Check(loginOne["id"]!.GetValue<string>() != loginTwo["id"]!.GetValue<string>(), "ephemeral logins reused an identity");
 
             var ownerFile = System.IO.Path.Combine(directory, "owner-token");
-            var fileToken = await OwnerLink.EnsureTokenFileAsync(ownerFile, owner, sessions, Context);
-            Check(fileToken == await OwnerLink.EnsureTokenFileAsync(ownerFile, (JsonObject)JsonNode.Parse("{\"id\":\"one\",\"kind\":\"owner\"}")!, sessions, Context), "equivalent owner did not reuse its file session");
+            var fileToken = await OwnerLink.EnsureTokenFileAsync(ownerFile, owner, signIns, Context);
+            Check(fileToken == await OwnerLink.EnsureTokenFileAsync(ownerFile, (JsonObject)JsonNode.Parse("{\"id\":\"one\",\"kind\":\"owner\"}")!, signIns, Context), "equivalent owner did not reuse its file session");
             var newOwner = new JsonObject { ["kind"] = "owner", ["id"] = "two" };
-            var replaced = await OwnerLink.EnsureTokenFileAsync(ownerFile, newOwner, sessions, Context);
-            Check(replaced != fileToken && await sessions.VerifyAsync(fileToken, Context) is null && AppPrincipals.Same(await sessions.VerifyAsync(replaced, Context), newOwner), "owner change did not revoke and replace the file session");
+            var replaced = await OwnerLink.EnsureTokenFileAsync(ownerFile, newOwner, signIns, Context);
+            Check(replaced != fileToken && await signIns.VerifyAsync(fileToken, Context) is null && AppPrincipals.Same(await signIns.VerifyAsync(replaced, Context), newOwner), "owner change did not revoke and replace the file session");
         }
         finally
         {

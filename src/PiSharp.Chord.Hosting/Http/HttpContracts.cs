@@ -49,8 +49,10 @@ public sealed class ChordHttpOptions
     public int? Port { get; init; }
     public string? LinksPath { get; init; }
     public Func<HttpRequestContext, JsonObject, LinkOptions>? LinkOptions { get; init; }
-    /// <summary>Runs after a link upgrade is accepted; its optional cleanup runs once when the socket closes.</summary>
-    public Func<HttpRequestContext, JsonObject, Task<Func<Task>?>>? LinksOpened { get; init; }
+    /// <summary>Runs after a link upgrade is accepted, with its request, its principal and <c>close</c>, which terminates that link at once
+    /// (an app closing the links of a credential it revoked: the socket is aborted, with no close handshake a peer could ignore; a call
+    /// after the link is gone does nothing). Its optional cleanup runs once when the socket closes.</summary>
+    public Func<HttpRequestContext, JsonObject, Action, Task<Func<Task>?>>? LinksOpened { get; init; }
     public ITelemetryContext? Telemetry { get; init; }
     public TimeSpan CloseTimeout { get; init; } = TimeSpan.FromSeconds(30);
     public required Action<HttpError> OnError { get; init; }

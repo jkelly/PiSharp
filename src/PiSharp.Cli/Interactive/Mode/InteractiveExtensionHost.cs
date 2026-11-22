@@ -155,7 +155,7 @@ internal sealed class ExtensionRowsComponent(Func<int, IReadOnlyList<string>> re
     /// <summary>Pi 1.5.0: the extension component's capturesViewportInput (false when the extension reports none).</summary>
     public bool CapturesViewportInput => captures?.Invoke() == true;
     private readonly Dictionary<int, List<string>> cache = [];
-    public List<string> Render(int width)
+    public IReadOnlyList<string> Render(int width)
     {
         if (cache.TryGetValue(width, out var rows)) return [.. rows];
         rows = [.. render(width).Select(row => TextUtils.VisibleWidth(row) > width ? TextUtils.TruncateToWidth(row, width, "") : row)];

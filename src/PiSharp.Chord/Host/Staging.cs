@@ -1,4 +1,8 @@
-// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/chord/src/next/host/staging.ts
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/chord/src/host/{staging,members}.ts
+// 1.6.0 here: event members (chord-remote), exposed sets checked once (chord-store), queries members in the member check and a
+// recording's named queries, readers and lists (chord-queries; the recording's declarations are in Host/ReadDeclarations.cs), a served
+// type's admission (servedAdmission), a recorded admit and the rehearsal of an admitted factory by its admission's fingerprint, and the
+// refusal of jobs in an admitted factory (slice 14 §2.1, §2.5).
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using PiSharp.Chord.Contracts;
@@ -59,6 +63,19 @@ internal static class PluginStaging
         var self = new RecordingSelf(owner, served, context);
         try
         {
+            // An admitted type (slice 14 §2.5): its new admit runs first, against what an admission declares with; its new factory is
+            // rehearsed with the object's current admitted value only when that value was decided under an admission schema of the new
+            // one's fingerprint. Otherwise (another fingerprint; an object denied, parked or failed) the factory is not rehearsed, a limit
+            // accepted: its declaration errors appear at its activation, and its requests are not recorded.
+            if (served.Admission is { } admission)
+            {
+                using (owner.Host.RetainCallback(admission.Admit, served.DeclaringFacet))
+                    admission.Admit(owner.Parameters.Value, owner.Caller.Principal!, self.AdmitSelf());
+                if (owner.AdmittedValue is not { } current || current.Fingerprint != admission.Fingerprint) return self.Recorded;
+                using var admittedLease = owner.Host.RetainCallback(admission.Factory, served.DeclaringFacet);
+                ValidateImplementation(served.Contract, admission.Factory(owner.Parameters.Value, owner.Caller.Principal!, current.Value?.DeepClone(), self));
+                return self.Recorded;
+            }
             using var lease = owner.Host.RetainCallback(served.Factory, served.DeclaringFacet);
             var implementation = served.Factory(owner.Parameters.Value, served.Contract.Kind == ContractKind.Local ? null : owner.Caller.Principal, self);
             ValidateImplementation(served.Contract, implementation);
@@ -68,7 +85,7 @@ internal static class PluginStaging
         finally { self.Declaring = false; }
     }
 
-    internal static void ValidateImplementation(Contract contract, HostImplementation implementation)
+    internal static void ValidateImplementation(Contract contract, HostImplementation implementation, Attempt? attempt = null)
     {
         ArgumentNullException.ThrowIfNull(implementation);
         var variant = contract.Kind == ContractKind.Local ? ContractsInternal.Local : implementation.Variant;
@@ -93,8 +110,19 @@ internal static class PluginStaging
         foreach (var member in shape.Methods.Keys)
             if (!members.TryGetValue(member, out var value) || value is not HostMethod)
                 throw new ArgumentException($"{contract.Name}.{member}: expected a method");
+        // Event members (Pi 1.6.0): the attempt's own sources or references' event members; a recording's inert ones while staging.
+        foreach (var member in shape.Events.Keys)
+            if (!EventImplementations.Accepts(members.GetValueOrDefault(member), attempt))
+                throw new ArgumentException($"{contract.Name}.{member}: an event member is this object's own self.Events() or a reference's event member");
+        // Queries members (Pi 1.6.0, slice 14 §3.1): what self.Queries returned, with a builder for every query the contract lists.
+        foreach (var (member, listed) in shape.Queries)
+        {
+            try { QueryImplementations.Check(member, listed, members.GetValueOrDefault(member), attempt); }
+            catch (ArgumentException error) { throw new ArgumentException($"{contract.Name}.{error.Message}", error); }
+        }
         foreach (var member in members.Keys)
-            if (!shape.State.ContainsKey(member) && !shape.Keyed.ContainsKey(member) && !shape.Methods.ContainsKey(member))
+            if (!shape.State.ContainsKey(member) && !shape.Keyed.ContainsKey(member) && !shape.Methods.ContainsKey(member) && !shape.Events.ContainsKey(member) &&
+                !shape.Queries.ContainsKey(member))
                 throw new ArgumentException($"{contract.Name}.{member}: not a member of the implementation variant");
     }
 
@@ -111,14 +139,33 @@ internal static class PluginStaging
         internal readonly List<ContributionDeclaration> Contributions = [];
         private void Check() { if (!Open) throw new InvalidOperationException($"plugin \"{plugin}\": declarations are valid only during setup"); }
         public void Serve(Contract type, HostFactory factory, ServeOptions? options = null)
+        { ArgumentNullException.ThrowIfNull(factory); Stage(type, factory, null, options); }
+        public void Serve(Contract type, AdmittedHostFactory factory, ServeOptions options)
+        { ArgumentNullException.ThrowIfNull(factory); ArgumentNullException.ThrowIfNull(options); Stage(type, null, factory, options); }
+        // A served type's admission (slice 14 §2.1; declaration policy): a remote contract that declares an admission is served with
+        // admit, and only such a contract is; anything else refuses the plugin.
+        private static ServedAdmission? AdmissionOf(Contract contract, Admit? admit, HostFactory? plain, AdmittedHostFactory? admitted)
         {
-            Check(); ArgumentNullException.ThrowIfNull(factory); ContractsInternal.DataOf(type);
+            var declared = ContractsInternal.DataOf(contract).Admission;
+            if (declared is null && admit is null && admitted is null) return null;
+            var name = contract.Name;
+            if (contract.Kind == ContractKind.Local) throw new ArgumentException($"{name}: only a remote type takes an admission (admit)");
+            if (declared is null) throw new ArgumentException($"{name}: admit needs the contract to declare its admission");
+            if (admit is null) throw new ArgumentException($"{name}: its contract declares an admission: serve it with admit");
+            return new(admit, declared.Fingerprint, admitted ?? ((parameters, principal, _, self) => plain!(parameters, principal, self)));
+        }
+        private void Stage(Contract type, HostFactory? plain, AdmittedHostFactory? admitted, ServeOptions? options)
+        {
+            Check(); ContractsInternal.DataOf(type);
             if (Types.Any(served => served.Contract.Name == type.Name)) throw new ArgumentException($"{type.Name} is served twice");
             if (type.Kind == ContractKind.Remote && (host.Options.Principal is null || host.Options.Address is null))
                 throw new ArgumentException($"{type.Name}: a host without a principal and address serves only local types");
             options ??= new();
             if (options.Linger < TimeSpan.Zero) throw new ArgumentException($"{type.Name}: linger is negative");
-            Types.Add(new(plugin, type, factory, options, DataInternal.BindProvider(type, options.Accepts ?? new())) { DeclaringFacet = declaringFacet });
+            var admission = AdmissionOf(type, options.Admit, plain, admitted);
+            // An admitted type's attempts call its admission's factory; the plain one stands in for the record only.
+            plain ??= static (_, _, _) => throw new InvalidOperationException("an admitted type's factory takes the admitted value");
+            Types.Add(new(plugin, type, plain, options, DataInternal.BindProvider(type, options.Accepts ?? new())) { DeclaringFacet = declaringFacet, Admission = admission });
         }
         public void Serve<C, V>(Registry<C, V> registry, RegistryProvider<C, V> provider)
         {
@@ -197,6 +244,7 @@ internal sealed partial class RecordingSelf(ChordObject owner, ServedType served
         var store = Persistable($"table \"{definition.Name}\"");
         if (!tables.TryAdd(definition.Name, definition)) throw new ArgumentException($"{owner.Label}: table \"{definition.Name}\" is declared twice");
         store.Claims.AssertTable(StoreInternal.TableSqlName(served.Contract.Name, definition.Name), owner);
+        StoreInternal.CheckExposedOnce(definition, tables.Values.Where(other => !ReferenceEquals(other, definition)), owner.Label);
         return new RecordingTable(definition);
     }
     public void Contribute<C, V>(Registry<C, V> registry, object? value)
@@ -206,9 +254,18 @@ internal sealed partial class RecordingSelf(ChordObject owner, ServedType served
         if (!contributions.TryAdd(registry.Name, new(registry.Name, registry.Version, value)))
             throw new ArgumentException($"{owner.Label}: registry {registry.Name} is contributed to twice");
     }
+    /// <summary>What a recorded admit declares with: references, registries, derives and live queries, recorded as its own.</summary>
+    internal IAdmitSelf AdmitSelf() => new RecordingAdmit(this);
+    private sealed class RecordingAdmit(RecordingSelf self) : IAdmitSelf
+    {
+        public IReference Get(Contract type, JsonObject parameters) => self.Get(type, parameters);
+        public IRegistryValue<V> Registry<C, V>(Registry<C, V> registry) => self.Registry(registry);
+        public IWatchable<JsonNode?> Derive(IReadOnlyList<object> sources, Func<IReadOnlyList<object?>, JsonNode?> compute) => self.Derive(sources, compute);
+        public IWatchable<JsonNode?> LiveQuery(INamedQuery query, object? args, long first) => ((ISelf)self).LiveQuery(query, args, first);
+    }
     public IJobHandle DeclareJob(JobDefinition definition, JobImplementation implementation)
     {
-        Check("job");
+        Check("job"); AdmissionInternal.RefuseAdmittedJob(served, owner.Label);
         if (!jobs.TryAdd(definition.Name, definition)) throw new ArgumentException($"{owner.Label}: job \"{definition.Name}\" is declared twice");
         if (definition.Persist is not null)
         {
@@ -244,6 +301,8 @@ internal sealed class RecordingValue : ISingletonHandle, IKeyedHandle, IReferenc
     public Task RetireAsync(string key, ChordContext context) => throw NotActive();
     public IWatchable<JsonNode?> Member(string name) => this;
     public IKeyedHandle KeyedMember(string name) => this;
+    public IEventMember Event(string name) => RecordingEvents.Instance;
+    public IReadOnlyDictionary<string, INamedQuery> QueriesMember(string name) => RecordingQueries.OfReference;
     public Task<object?> CallAsync(string name, object? arguments, ChordContext context) => throw NotActive();
     public void Retry() => throw NotActive();
     public void Release() { }

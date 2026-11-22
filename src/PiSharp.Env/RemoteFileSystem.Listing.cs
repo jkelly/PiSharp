@@ -1,3 +1,4 @@
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/env/src/remote-env.ts.
 using System.Collections.Immutable;
 using System.Text;
 using System.Text.Json.Nodes;
@@ -43,7 +44,14 @@ public sealed partial class RemoteExecutionEnv
         {
             CheckCancellation(context, resolved);
             var entryPath = RemotePaths.Resolve(info, resolved, entry["name"]!.GetValue<string>());
-            if (entry["error"] is JsonObject error) throw FileFailure(new RemoteError(error), entryPath);
+            if (entry["error"] is JsonObject error)
+            {
+                // Like the directory reader, leave out entries removed between enumeration and lstat; any other entry error fails
+                // the listing. The daemon's lstat also reports a name that is not valid UTF-8 as missing (it looks the
+                // replacement-decoded name up), so such names are left out the same way (#11994).
+                if (error["code"]?.GetValue<string>() == "ENOENT") continue;
+                throw FileFailure(new RemoteError(error), entryPath);
+            }
             var metadata = entry["info"]!.AsObject();
             if (metadata["kind"]?.GetValue<string>() != "other") result.Add(Metadata(entryPath, metadata));
         }

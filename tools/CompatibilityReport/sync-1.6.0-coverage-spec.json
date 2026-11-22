@@ -1,0 +1,486 @@
+{
+  "schemaVersion": 1,
+  "groups": [
+    {
+      "group": "Agent 1.6.0 cases",
+      "project": "tests/PiSharp.Agent.Tests/PiSharp.Agent.Tests.csproj",
+      "sources": [
+        "tests/PiSharp.Agent.Tests/Sync160AgentCases.cs"
+      ],
+      "count": 6
+    },
+    {
+      "group": "Chord 1.6.0 cases",
+      "project": "tests/PiSharp.Chord.Tests/PiSharp.Chord.Tests.csproj",
+      "sources": [
+        "tests/PiSharp.Chord.Tests/Contracts/Sync160ContractsCases.cs",
+        "tests/PiSharp.Chord.Tests/Data/Sync160DataCases.cs",
+        "tests/PiSharp.Chord.Tests/Host/HostDataSync160Cases.cs",
+        "tests/PiSharp.Chord.Tests/Host/Sync160AdmissionCases.cs",
+        "tests/PiSharp.Chord.Tests/Host/Sync160EventsCases.cs",
+        "tests/PiSharp.Chord.Tests/Host/Sync160ListCases.cs",
+        "tests/PiSharp.Chord.Tests/Host/Sync160NamedQueryCases.cs",
+        "tests/PiSharp.Chord.Tests/Host/Sync160ReadDeclarationsCases.cs",
+        "tests/PiSharp.Chord.Tests/Host/Sync160SharedHoldCases.cs",
+        "tests/PiSharp.Chord.Tests/Link/Sync160LinkCases.cs",
+        "tests/PiSharp.Chord.Tests/Remote/Sync160AdmissionCases.cs",
+        "tests/PiSharp.Chord.Tests/Remote/Sync160RemoteEventCases.cs",
+        "tests/PiSharp.Chord.Tests/Remote/Sync160RouteAdmissionCases.cs",
+        "tests/PiSharp.Chord.Tests/Remote/Sync160SharedHoldRemoteCases.cs",
+        "tests/PiSharp.Chord.Tests/Remote/Sync160WindowCases.cs",
+        "tests/PiSharp.Chord.Tests/State/Sync160DeriveCases.cs",
+        "tests/PiSharp.Chord.Tests/State/Sync160FramedCases.cs",
+        "tests/PiSharp.Chord.Tests/Store/Sync160ColumnSetCases.cs",
+        "tests/PiSharp.Chord.Tests/Store/Sync160ReadsCases.cs",
+        "tests/PiSharp.Chord.Tests/Store/Sync160StoreCases.cs",
+        "tests/PiSharp.Chord.Tests/Surfaces/Sync160ClientCases.cs",
+        "tests/PiSharp.Chord.Tests/Sync/Sync160SessionCases.cs",
+        "tests/PiSharp.Chord.Tests/Sync160TelemetrySenderCases.cs",
+        "tests/PiSharp.Chord.Tests/Telemetry160Cases.cs"
+      ],
+      "expectedIds": [
+        "host.query-reader.160-a-references-member-passes-its-live-querys-frame-on-as-it-is",
+        "host.query-reader.160-query-failed-names-the-named-query-for-a-live-query-a-count-and-a-list",
+        "host.query-reader.a-column-set-nobody-serves-parks-the-reader-failed-waiting-and-heals-when-the-set-is-served-the-other-owners-commit-then-reaches-it",
+        "host.query-reader.a-providers-restart-does-not-restart-its-readers-they-read-the-successors-query-and-give-one-frame-none-when-equal",
+        "host.query-reader.arguments-that-follow-a-value-shows-the-old-rows-until-the-read-for-the-new-arguments-ran-then-switches-in-one-frame",
+        "host.query-reader.arguments-that-have-no-value-when-the-reader-opens-break-the-attempt-naming-the-rule",
+        "host.query-reader.arguments-the-builder-refuses-fail-the-member-a-write-to-the-previous-arguments-rows-neither-heals-it-nor-publishes-them",
+        "host.query-reader.count-is-exact-and-uncapped-skipped-only-by-an-update-of-no-condition-column",
+        "host.query-reader.failures-arguments-the-contracts-schema-refuses-break-the-reader",
+        "host.query-reader.failures-the-wrong-form-of-each-call-throws-naming-the-other-a-private-query-needs-its-schema",
+        "host.query-reader.memory-collects-a-readers-live-query-once-its-object-ended",
+        "host.query-reader.open-publishes-a-commits-change-in-its-batch-as-a-diff-a-commit-that-cannot-change-it-runs-nothing",
+        "host.query-reader.open-reads-another-objects-named-query-before-the-reader-is-live-and-counts-it",
+        "host.query-reader.projection-hands-the-mapping-only-the-declared-columns-an-unlisted-columns-update-changes-no-item",
+        "host.query-reader.readers-before-natives-an-attempt-that-waits-on-its-reader-holds-no-native-it-opens-when-the-read-ran",
+        "host.query-reader.the-commit-step-chooses-its-reads-a-read-opened-while-a-commit-waits-in-the-queue-is-refreshed-by-it",
+        "host.tiling.a-publishers-migration-that-changes-the-order-switches-the-list-in-one-frame-every-row-once-in-the-new-order-no-page-reloaded-alone",
+        "host.tiling.a-row-another-owners-commit-lets-in-with-the-commit-that-merged-its-pages-is-known-to-the-merged-page-its-delete-reaches-the-list",
+        "host.tiling.commits-of-two-owners-queued-together-a-commit-refused-in-its-step-leaves-the-same-pages",
+        "host.tiling.commits-of-two-owners-queued-together-a-page-cut-by-the-first-commits-adoption-takes-the-second-commits-run-for-the-uncut-page",
+        "host.tiling.commits-of-two-owners-queued-together-a-run-patched-into-a-merged-page-the-page-knows-its-rows-so-a-later-rename-and-delete-reach-it",
+        "host.tiling.commits-of-two-owners-queued-together-c1-merges-p-and-q-c2s-run-for-qs-old-interval-changes-its-row-and-nothing-else-then-both-orders",
+        "host.tiling.one-commit-several-pages-a-cut-run-patched-into-a-merged-page-keeps-its-continuation-more-rows-are-behind-and-more-loads-them",
+        "host.tiling.one-commit-several-pages-a-merge-by-the-first-pages-run-and-the-second-pages-run-after-it-the-merged-page-knows-the-new-row",
+        "host.tiling.switches-and-failures-a-failed-page-a-retired-pages-later-run-is-patched-into-stays-without-a-result-the-next-commit-runs-it",
+        "host.tiling.switches-and-failures-a-failed-page-fails-the-list-until-that-page-runs-well-another-pages-run-does-not-heal-it",
+        "host.tiling.switches-and-failures-a-more-called-while-a-switch-is-pending-waits-for-it-and-loads-behind-the-new-arguments-pages",
+        "host.tiling.switches-and-failures-a-switch-waits-for-every-page-of-the-new-arguments-no-page-that-has-not-run-is-shown",
+        "host.tiling.switches-and-failures-arguments-the-builder-refuses-fail-the-list-a-write-to-the-previous-arguments-rows-does-not-publish-them",
+        "store.read-plan.a-table-handles-own-reads-page-and-count-take-an-exists-and-refuse-a-joined-query-instead-of-ignoring-the-join",
+        "store.read-plan.checked-when-it-opens-refuses-a-column-an-exists-compares-that-the-bound-table-has-with-another-type-an-unused-one-may-change",
+        "store.read-plan.checked-when-it-opens-refuses-a-joined-set-whose-key-the-bound-table-has-differently-the-join-would-pair-a-row-with-several",
+        "store.read-plan.checked-when-it-opens-takes-a-condition-as-data-only-with-canonical-host-keys-and-no-ordering-of-a-host-column",
+        "store.read-plan.exists-is-refused-in-writes",
+        "store.read-plan.exists-is-true-for-a-row-with-a-matching-row-in-the-sets-table-with-and-without-an-inner-condition",
+        "store.read-plan.exists-matches-by-the-key-a-prefix-of-it-or-a-declared-index-anything-else-is-refused-naming-the-columns",
+        "store.read-plan.exists-matches-nothing-for-a-null-in-a-matched-column-the-exists-is-false",
+        "store.read-plan.exists-negates-and-nests",
+        "store.read-plan.exists-node-and-where-node-apply-to-a-joined-set-with-an-exists-matched-on-the-partner",
+        "store.read-plan.exists-node-and-where-node-check-a-nested-exists-against-the-table-bound-to-its-set-when-the-read-opens",
+        "store.read-plan.exists-node-and-where-node-refuse-a-malformed-node-before-anything-is-rendered",
+        "store.read-plan.exists-node-and-where-node-take-a-condition-as-data-an-optional-pointer-keeps-its-row-a-pointer-to-a-hidden-row-drops-it",
+        "store.read-plan.join-continues-after-a-position-of-a-joined-order-and-ends-through-one",
+        "store.read-plan.join-fails-a-read-whose-partner-column-is-not-what-it-was-written-for",
+        "store.read-plan.join-is-driven-from-the-querys-own-table-whatever-the-planner-would-prefer",
+        "store.read-plan.join-pairs-each-row-with-the-one-row-of-that-key-drops-a-row-without-a-partner-orders-by-a-partner-column",
+        "store.read-plan.join-refuses-a-match-short-of-the-whole-key-a-second-join-the-tables-own-set-and-a-column-of-another-type",
+        "store.read-plan.the-probe-has-no-keyed-probe-where-the-own-table-has-no-index-for-the-match",
+        "store.read-plan.the-probe-is-one-keyed-lookup-by-the-own-key-by-a-joins-match-by-an-exists-match",
+        "store.read-plan.uses-lists-each-table-a-read-uses-with-the-columns-it-depends-on",
+        "store.skip.a-joined-table-the-team-page-of-another-team-is-skipped-by-one-probe-the-sessions-team-runs",
+        "store.skip.an-exists-table-a-pin-moved-from-one-session-to-another-runs-the-reads-of-both-also-under-not-exists",
+        "store.skip.an-exists-table-a-share-of-a-session-of-another-app-is-skipped-by-one-probe-of-a-row-in-the-read-it-runs",
+        "store.skip.cost-a-transaction-writing-many-rows-asks-a-read-a-few-probes-then-runs-it",
+        "store.skip.cost-builds-no-change-of-a-transaction-whose-tables-nothing-reads",
+        "store.skip.own-table-a-bulk-update-skips-by-the-columns-it-assigns-a-bulk-delete-runs-a-count-skips-only-by-its-condition-columns",
+        "store.skip.own-table-an-update-of-a-column-the-read-does-not-depend-on-skips-without-a-probe-a-touch-of-another-row-probes"
+      ],
+      "count": 418
+    },
+    {
+      "group": "Classifiers 1.6.0 cases",
+      "project": "tests/PiSharp.Classifiers.Tests/PiSharp.Classifiers.Tests.csproj",
+      "sources": [
+        "tests/PiSharp.Classifiers.Tests/Sync160LlamaCases.cs"
+      ],
+      "count": 3
+    },
+    {
+      "group": "CliParity 1.6.0 cases",
+      "project": "tests/PiSharp.CliParity.Tests/PiSharp.CliParity.Tests.csproj",
+      "sources": [
+        "tests/PiSharp.CliParity.Tests/Sync160DiagnosticsCases.cs",
+        "tests/PiSharp.CliParity.Tests/Sync160LlamaCases.cs"
+      ],
+      "count": 11
+    },
+    {
+      "group": "CliSync 1.6.0 cases",
+      "project": "tests/PiSharp.CliSync.Tests/PiSharp.CliSync.Tests.csproj",
+      "sources": [
+        "tests/PiSharp.CliSync.Tests/Sync160McpCases.cs"
+      ],
+      "count": 5
+    },
+    {
+      "group": "CodingAgent 1.6.0 cases",
+      "project": "tests/PiSharp.CodingAgent.Tests/PiSharp.CodingAgent.Tests.csproj",
+      "sources": [
+        "tests/PiSharp.CodingAgent.Tests/Sync160RetryCases.cs",
+        "tests/PiSharp.CodingAgent.Tests/Sync160RuntimeDiagnosticsCases.cs"
+      ],
+      "count": 7
+    },
+    {
+      "group": "Durable.Server 1.6.0 cases",
+      "project": "tests/PiSharp.Durable.Server.Tests/PiSharp.Durable.Server.Tests.csproj",
+      "sources": [
+        "tests/PiSharp.Durable.Server.Tests/Sync160ParkModelCases.cs"
+      ],
+      "count": 5
+    },
+    {
+      "group": "DurableCli 1.6.0 cases",
+      "project": "tests/PiSharp.DurableCli.Tests/PiSharp.DurableCli.Tests.csproj",
+      "sources": [
+        "tests/PiSharp.DurableCli.Tests/Sync160ParkTuiCases.cs"
+      ],
+      "count": 3
+    },
+    {
+      "group": "ExtensionParity 1.6.0 cases",
+      "project": "tests/PiSharp.ExtensionParity.Tests/PiSharp.ExtensionParity.Tests.csproj",
+      "sources": [
+        "tests/PiSharp.ExtensionParity.Tests/Sync160EventBusCases.cs",
+        "tests/PiSharp.ExtensionParity.Tests/Sync160ExecCases.cs",
+        "tests/PiSharp.ExtensionParity.Tests/Sync160PackageCases.cs",
+        "tests/PiSharp.ExtensionParity.Tests/Sync160SessionStartCases.cs"
+      ],
+      "count": 22
+    },
+    {
+      "group": "InteractiveParity 1.6.0 cases",
+      "project": "tests/PiSharp.InteractiveParity.Tests/PiSharp.InteractiveParity.Tests.csproj",
+      "sources": [
+        "tests/PiSharp.InteractiveParity.Tests/Sync160CliSessionCases.cs",
+        "tests/PiSharp.InteractiveParity.Tests/Sync160ReadImageCases.cs",
+        "tests/PiSharp.InteractiveParity.Tests/Sync160UiDiagnosticsCases.cs",
+        "tests/PiSharp.InteractiveParity.Tests/Sync160UiHighlightCases.cs",
+        "tests/PiSharp.InteractiveParity.Tests/Sync160UiNoticeCases.cs",
+        "tests/PiSharp.InteractiveParity.Tests/Sync160UiRenderCases.cs",
+        "tests/PiSharp.InteractiveParity.Tests/Sync160UiSelectorCases.cs",
+        "tests/PiSharp.InteractiveParity.Tests/Sync160UiSessionSelectorCases.cs",
+        "tests/PiSharp.InteractiveParity.Tests/Sync160UiSuspendCases.cs"
+      ],
+      "count": 37
+    },
+    {
+      "group": "McpParity 1.6.0 cases",
+      "project": "tests/PiSharp.McpParity.Tests/PiSharp.McpParity.Tests.csproj",
+      "expectedIds": [
+        "sync160.resume-keeps-the-loaded-tool-when-only-an-unrestored-tool-is-deactivated",
+        "sync160.servers-section-summary-is-the-library-server-summary"
+      ],
+      "count": 2
+    },
+    {
+      "group": "McpSync 1.6.0 cases",
+      "project": "tests/PiSharp.McpSync.Tests/PiSharp.McpSync.Tests.csproj",
+      "sources": [
+        "tests/PiSharp.McpSync.Tests/Sync160McpCases.cs"
+      ],
+      "count": 2
+    },
+    {
+      "group": "Models 1.6.0 cases",
+      "project": "tests/PiSharp.Models.Tests/PiSharp.Models.Tests.csproj",
+      "expectedIds": [
+        "sync160.catalog.dropped-developer-role-flag-still-sends-system",
+        "sync160.catalog.every-default-model-streams-as-the-cli-asks",
+        "sync160.catalog.exact-current-package-resources",
+        "sync160.catalog.openai-documented-ttl-models-leave-prompt-cache-unset",
+        "sync160.catalog.pi-1.5.2-release-preserved-beside-current",
+        "sync160.catalog.release-delta-from-1.5.2",
+        "sync160.catalog.snapshot-equals-the-package-tarball",
+        "sync160.catalog.together-and-fireworks-kimi-k3",
+        "sync160.codex.mid-conversation-effort-flags",
+        "sync160.copilot.strict-flags-and-thinking-levels",
+        "sync160.defaults.openai-azure-and-codex-use-gpt-6.2-sol",
+        "sync160.gpt-6.2.azure-1.05m-context-and-long-context-cost",
+        "sync160.gpt-6.2.off-unavailable-and-thinking-levels",
+        "sync160.gpt-6.2.official-metadata-openai-and-codex",
+        "sync160.models-schema-v1.6.0",
+        "sync160.qwen.gateways-and-display-names",
+        "sync160.qwen.live-route-gateway-plan-key-and-thinking-fields",
+        "sync160.qwen.model-lists",
+        "sync160.qwen.per-plan-key-preferred-then-shared",
+        "sync160.qwen.per-plan-key-stays-with-its-plan"
+      ],
+      "count": 20
+    },
+    {
+      "group": "ProviderApis 1.6.0 cases",
+      "project": "tests/PiSharp.ProviderApis.Tests/PiSharp.ProviderApis.Tests.csproj",
+      "expectedIds": [
+        "sync160.codex-max-tokens-as-max-output-tokens",
+        "sync160.codex-response-done-records-input-transformations",
+        "sync160.codex-system-prompt-is-the-leading-developer-item-without-instructions",
+        "sync160.codex-thinking-level-as-configuration-update-items-with-a-fixed-effort",
+        "sync160.codex-ws-connection-limit-after-stream-start-is-retried-on-a-fresh-connection",
+        "sync160.codex-ws-thinking-level-change-keeps-input-deltas",
+        "sync160.retry-live-loopback-connection-failures-are-retryable"
+      ],
+      "count": 7
+    },
+    {
+      "group": "ProviderSync 1.6.0 cases",
+      "project": "tests/PiSharp.ProviderSync.Tests/PiSharp.ProviderSync.Tests.csproj",
+      "expectedIds": [
+        "sync160.anthropic-message-threads-default-by-endpoint-not-provider",
+        "sync160.anthropic-non-strict-schema-keeps-root-additional-properties",
+        "sync160.completions-developer-role-default-on-the-route-and-simple-paths",
+        "sync160.completions-developer-role-only-for-openai",
+        "sync160.completions-top-level-reasoning-tokens-and-copilot-effort",
+        "sync160.copilot-responses-explicit-strict-and-claude-strict-tools",
+        "sync160.google-continuation-finish-ends-the-turn-as-length",
+        "sync160.google-injected-http-handler-and-continuation-switch",
+        "sync160.max-tokens-above-one-million-builds-on-every-request-path",
+        "sync160.mistral-strict-tools-are-opt-in",
+        "sync160.responses-input-transformations-over-openai-and-azure-http",
+        "sync160.responses-openai-input-transformations-diagnostic",
+        "sync160.retry-dotnet-socket-and-connection-failure-texts",
+        "sync160.retry-node-socket-codes-connection-closed-and-codex-connection-limit",
+        "sync160.session-resources-release-anthropic-thread-state",
+        "sync160.strict-untyped-schema-nodes-fall-back-or-fail-on-every-api"
+      ],
+      "count": 16
+    },
+    {
+      "group": "Rpc 1.6.0 cases",
+      "project": "tests/PiSharp.Rpc.Tests/PiSharp.Rpc.Tests.csproj",
+      "sources": [
+        "tests/PiSharp.Rpc.Tests/Sync160RpcCases.cs"
+      ],
+      "count": 3
+    },
+    {
+      "group": "SdkAsyncEventBus 1.6.0 cases",
+      "project": "tests/PiSharp.SdkAsyncEventBus.Tests/PiSharp.SdkAsyncEventBus.Tests.csproj",
+      "sources": [
+        "tests/PiSharp.SdkAsyncEventBus.Tests/Sync160EventBusCases.cs"
+      ],
+      "count": 3
+    },
+    {
+      "group": "SdkEventBus 1.6.0 cases",
+      "project": "tests/PiSharp.SdkEventBus.Tests/PiSharp.SdkEventBus.Tests.csproj",
+      "sources": [
+        "tests/PiSharp.SdkEventBus.Tests/Sync160EventBusCases.cs"
+      ],
+      "count": 5
+    },
+    {
+      "group": "SessionParity 1.6.0 cases",
+      "project": "tests/PiSharp.SessionParity.Tests/PiSharp.SessionParity.Tests.csproj",
+      "sources": [
+        "tests/PiSharp.SessionParity.Tests/Sync160ExportCases.cs",
+        "tests/PiSharp.SessionParity.Tests/Sync160SessionFileCases.cs",
+        "tests/PiSharp.SessionParity.Tests/Sync160ShareCases.cs"
+      ],
+      "count": 12
+    },
+    {
+      "group": "Tools 1.6.0 cases",
+      "project": "tests/PiSharp.Tools.Tests/PiSharp.Tools.Tests.csproj",
+      "sources": [
+        "tests/PiSharp.Tools.Tests/Sync160ToolsCases.cs"
+      ],
+      "count": 10
+    },
+    {
+      "group": "Tui 1.6.0 cases",
+      "project": "tests/PiSharp.Tui.Tests/PiSharp.Tui.Tests.csproj",
+      "expectedIds": [
+        "sync160.alt-screen.kitty-uploads-survive-full-redraw",
+        "sync160.alt-screen.scroll-reuses-component-output",
+        "sync160.alt-screen.search-current-across-view-frames",
+        "sync160.container.box-reuses-output",
+        "sync160.container.mouse-by-rendered-heights",
+        "sync160.container.native-in-place-child-list-contract",
+        "sync160.container.rerenders-on-children-or-width",
+        "sync160.container.same-lines-while-unchanged",
+        "sync160.editor.enter-on-argument-menu-completes",
+        "sync160.editor.enter-on-slash-command-menu-submits",
+        "sync160.editor.enter-on-tab-path-menu-completes",
+        "sync160.layout.reuses-earlier-frame-output",
+        "sync160.markdown.hard-breaks-after-inline-image",
+        "sync160.markdown.native-blank-line-after-paragraph",
+        "sync160.overlay-image.fullscreen-image-beside-overlay-stays",
+        "sync160.overlay-image.fullscreen-placements-removed",
+        "sync160.overlay-image.image-beside-overlay-stays",
+        "sync160.overlay-image.image-inside-lower-overlay-hidden",
+        "sync160.overlay-image.image-line-extent",
+        "sync160.overlay-image.iterm2-rows-above-image-line",
+        "sync160.overlay-image.kitty-deleted-and-redrawn",
+        "sync160.overlay-image.unknown-width-hidden",
+        "sync160.overlay-image.untouched-rows-keep-image",
+        "sync160.settings-list.cursor-keys-keep-selection",
+        "sync160.slice-graphemes.box-arrows-cjk",
+        "sync160.slice-graphemes.joined-clusters",
+        "sync160.slice-graphemes.native-fast-path-matches-segmenter",
+        "sync160.suspend-signal.kept-until-terminal-restored",
+        "sync160.suspend-signal.native-default-registrar",
+        "sync160.suspend-signal.not-before-first-start",
+        "sync160.suspend-signal.not-registered-twice",
+        "sync160.suspend-signal.not-registered-while-stopped",
+        "sync160.suspend-signal.not-removed-while-needed",
+        "sync160.suspend-signal.only-while-started",
+        "sync160.suspend-signal.set-or-cleared-while-started"
+      ],
+      "count": 35
+    },
+    {
+      "group": "Durable 1.6.0 cases built at run time",
+      "project": "tests/PiSharp.Durable.Tests/PiSharp.Durable.Tests.csproj",
+      "expectedIds": [
+        "setup.sync160-native-map-names-the-new-durable-files",
+        "sync160.agent-events.a-call-parked-at-its-gates-starts-sleeping-and-gets-its-arguments-with-its-wake",
+        "sync160.agent-events.a-run-whose-answer-waits-for-its-onyield-tasks-stays-the-run-and-says-so-with-run-yield",
+        "sync160.agent-events.a-stream-attached-while-a-call-is-parked-sees-the-slot-in-its-snapshot-and-an-update-at-the-wake",
+        "sync160.agent-events.a-tool-that-parks-has-one-start-and-its-park-and-wake-are-updates-with-status",
+        "sync160.agent-events.nested-calls-that-park-and-the-call-that-waits-on-them-each-have-one-start",
+        "sync160.agent-events.tool-events-without-parks-are-as-before",
+        "sync160.codemode.a-namespace-two-extensions-declare-is-listed-once",
+        "sync160.codemode.keeps-the-section-identical-before-and-after-a-namespace-s-deferred-tools-appear",
+        "sync160.codemode.lists-a-namespace-without-tools-and-nothing-without-tools-and-namespaces",
+        "sync160.codemode.namespaces-are-sorted-by-name",
+        "sync160.codemode.puts-a-tool-in-its-extension-s-namespace-the-first-extension-naming-a-tool-wins",
+        "sync160.codemode.the-removed-prefix-api-has-no-fallback",
+        "sync160.env-list-race.jsonl-read-only-open-lists-beside-a-writer-that-renames-a-reclaim-file",
+        "sync160.env-list-race.leaves-out-an-entry-removed-between-enumeration-and-lstat",
+        "sync160.env-list-race.lists-a-directory-emptied-during-the-listing",
+        "sync160.env-list-race.still-fails-on-an-error-other-than-a-missing-entry",
+        "sync160.hook-tasks.after-tools.answer-the-run-with-a-steer-the-next-request-sees",
+        "sync160.hook-tasks.after-tools.end-the-run-with-terminate-true-as-a-round-whose-calls-all-asked-to-terminate",
+        "sync160.hook-tasks.after-tools.report-a-result-that-is-no-after-tools-decision-and-go-on",
+        "sync160.hook-tasks.on-yield.ignore-a-continuation-that-holds-no-valid-user-input",
+        "sync160.hook-tasks.on-yield.keep-the-inputs-open-while-they-decide-and-continue-the-run-with-continue",
+        "sync160.hook-tasks.on-yield.let-an-answer-that-stands-run-its-after-run-tasks-next-without-run-yield",
+        "sync160.hook-tasks.on-yield.let-the-answer-stand-without-a-continuation",
+        "sync160.hook-tasks.on-yield.lose-their-continuation-to-a-user-message-queued-meanwhile",
+        "sync160.hook-tasks.on-yield.settle-the-inputs-done-with-the-answer-when-the-run-is-aborted-while-they-decide",
+        "sync160.hook-tasks.recovery.asks-the-after-tools-hooks-again-after-a-crash-before-their-tasks-exist-not-after",
+        "sync160.hook-tasks.recovery.settles-a-yields-inputs-done-with-its-answer-at-the-restart-limit-without-a-run-failure",
+        "sync160.hook-tasks.recovery.settles-a-yields-inputs-done-with-its-answer-when-the-scheduler-ends-the-generation",
+        "sync160.images-fit.extension.fits-a-tool-result-s-images-to-the-conversation-model-s-limits-before-it-is-committed",
+        "sync160.images-fit.extension.leaves-a-result-without-images-alone",
+        "sync160.images-fit.extension.leaves-nested-calls-results-to-the-program-that-made-them",
+        "sync160.images-fit.fit-image.leaves-out-an-image-the-processor-fails-on-with-the-failure-in-its-note",
+        "sync160.images-fit.fit-image.prepares-an-image-from-its-bytes-as-base64-for-the-model",
+        "sync160.images-fit.fit-images.converts-a-format-providers-do-not-take-inline-to-png",
+        "sync160.images-fit.fit-images.corrects-a-declared-type-the-bytes-contradict-without-a-note",
+        "sync160.images-fit.fit-images.is-unchanged-when-every-image-comes-back-as-it-was-and-asks-the-processor-only-about-images",
+        "sync160.images-fit.fit-images.leaves-out-what-cannot-be-prepared-with-a-note-damaged-images-other-bytes-malformed-base64",
+        "sync160.images-fit.fit-images.re-encodes-an-image-within-the-dimensions-but-over-the-byte-limit",
+        "sync160.images-fit.fit-images.scales-an-image-beyond-the-limits-down-keeps-the-text-in-place-and-says-how-to-map-coordinates-back",
+        "sync160.images-fit.fit-images.turns-an-image-upright-that-fits-but-carries-an-exif-orientation",
+        "sync160.images-fit.from-base64-decodes-as-atob-does",
+        "sync160.images-fit.image-limits-of-a-model-default-each-absent-limit",
+        "sync160.park-children.children-after-a-restart.abandons-the-parked-children-of-a-replay-unsafe-call-cut-off-while-it-ran",
+        "sync160.park-children.children-after-a-restart.keeps-the-children-of-a-parked-replay-unsafe-call",
+        "sync160.park-children.nested-calls-without-waiting.need-explicit-keys-after-a-wake-for-nested-calls-and-tasks-alike",
+        "sync160.park-children.nested-calls-without-waiting.park-on-their-handles-with-policy-any-and-collect-the-results-by-key-across-wakes",
+        "sync160.park-children.submissions-that-notify-a-task.compose-in-one-commit-two-queued-writes-placed-together-signal-one-task-under-two-keys",
+        "sync160.park-children.submissions-that-notify-a-task.deliver-it-for-a-submission-created-settled-before-the-task-ran-which-then-wakes-at-once",
+        "sync160.park-children.submissions-that-notify-a-task.deliver-submission-settled-in-the-commit-that-settles-the-submission",
+        "sync160.park-children.submissions-that-notify-a-task.refuse-a-delivery-of-submission-settled-that-is-no-settled-record",
+        "sync160.park-children.submissions-that-notify-a-task.settle-without-failing-when-the-task-to-notify-is-gone",
+        "sync160.park-children.tasks-created-under-a-key.return-the-task-a-key-names-and-refuse-another-kind-other-input-or-a-nested-calls-key",
+        "sync160.signals.any.is-active-in-wake-once-a-task-in-on-is-terminal-not-while-all-are-live",
+        "sync160.signals.any.resumes-once-one-task-in-on-is-terminal-with-the-ended-ones-as-its-wake",
+        "sync160.signals.define.rejects-names-with-a-slash-bad-versions-non-json-schemas-and-empty-keys",
+        "sync160.signals.delivery.answers-closed-for-an-abort-marked-task",
+        "sync160.signals.delivery.answers-not-found-invalid-delivered-duplicate-and-closed",
+        "sync160.signals.delivery.decides-deliveries-started-together-in-one-commit-against-each-other",
+        "sync160.signals.delivery.reads-the-task-so-it-throws-read-after-write-after-a-table-write",
+        "sync160.signals.sleeping.answers-a-delivery-after-the-deadline-closed-and-expires-the-key-before-the-sleep-is-reserved",
+        "sync160.signals.sleeping.composes-a-signal-with-the-tasks-own-state-change-in-one-commit",
+        "sync160.signals.sleeping.ends-a-sleep-on-signals-at-once-when-aborted",
+        "sync160.signals.sleeping.expires-its-keys-at-the-deadline-so-a-late-delivery-is-closed",
+        "sync160.signals.sleeping.holds-no-invocation-while-it-waits-and-wakes-on-the-first-listed-key-holding-a-value",
+        "sync160.signals.sleeping.keeps-a-value-delivered-before-the-sleep-which-then-wakes-at-once",
+        "sync160.signals.sleeping.migrates-a-value-stored-by-an-older-version-when-it-is-read",
+        "sync160.signals.sleeping.rejects-a-sleep-on-a-key-that-already-woke-a-wait-and-one-without-until-or-signals",
+        "sync160.signals.sleeping.rejects-a-sleep-on-a-key-that-expired",
+        "sync160.signals.sleeping.throws-on-reading-a-value-of-a-newer-version-or-of-an-older-one-without-migrate",
+        "sync160.signals.sleeping.wakes-on-the-first-listed-key-in-order-and-keeps-the-other-keys-value-for-a-later-sleep",
+        "sync160.signals.wakes.counts-no-progress-for-a-woken-task-that-commits-its-checkpoint-again",
+        "sync160.signals.wakes.keeps-a-sleep-on-signals-asleep-across-reopen-active-once-a-value-is-delivered",
+        "sync160.signals.wakes.keeps-the-wake-through-a-commit-of-the-same-checkpoint-and-a-reopen-and-drops-it-with-the-next-checkpoint",
+        "sync160.tool-gates.a-beforetool-sleep.asks-every-gate-again-on-each-wake-in-extension-order-and-stops-at-the-first-that-sleeps",
+        "sync160.tool-gates.a-beforetool-sleep.blocks-on-a-denial-and-on-the-deadline-after-which-a-late-answer-is-closed",
+        "sync160.tool-gates.a-beforetool-sleep.ends-the-call-invalid-park-when-the-sleep-waits-for-nothing",
+        "sync160.tool-gates.a-beforetool-sleep.parks-the-call-before-it-runs-and-runs-it-once-approved",
+        "sync160.tool-gates.registry-changes-and-opens.leave-a-call-parked-in-execute-alone",
+        "sync160.tool-gates.registry-changes-and-opens.take-the-deadline-path-for-a-gate-whose-deadline-passed-so-its-keys-expire",
+        "sync160.tool-gates.registry-changes-and-opens.wake-a-call-parked-at-its-gates-at-open-before-its-deadline-so-a-gate-removed-meanwhile-lets-it-run",
+        "sync160.tool-gates.registry-changes-and-opens.wake-a-call-parked-at-its-gates-so-the-gates-installed-then-decide",
+        "sync160.tool-gates.registry-changes-and-opens.wake-a-sleep-committed-under-a-snapshot-a-publication-replaced-while-the-gate-ran",
+        "sync160.tool-parks.cancel.does-not-run-for-a-parked-call-whose-tool-is-gone-the-abort-is-reported",
+        "sync160.tool-parks.cancel.runs-after-an-abort-that-cut-off-a-woken-run-which-cleans-up-through-its-context-too",
+        "sync160.tool-parks.cancel.runs-also-under-restartlimit-1-and-a-throw-from-it-is-reported-while-the-call-still-ends-aborted",
+        "sync160.tool-parks.cancel.runs-in-the-run-itself-when-the-park-s-commit-finds-the-call-abort-marked",
+        "sync160.tool-parks.cancel.runs-when-a-parked-call-is-aborted-with-the-park-s-checkpoint-and-the-environment-and-the-call-ends-aborted",
+        "sync160.tool-parks.invalid-parks-the-commit-refuses.ends-a-call-that-sleeps-again-on-the-key-that-woke-it-with-invalid-park",
+        "sync160.tool-parks.invalid-parks.ends-the-call-with-an-invalid-park-result-through-aftertool-and-fails-its-task",
+        "sync160.tool-parks.parking-nested-calls.parks-a-nested-call-shown-sleeping-while-its-caller-awaits-it-and-returns-its-result-once-woken",
+        "sync160.tool-parks.parking-on-a-signal.holds-no-invocation-shows-the-slot-sleeping-without-output-and-runs-again-once-woken",
+        "sync160.tool-parks.parking-on-a-signal.parks-on-time-and-wakes-with-reason-time",
+        "sync160.tool-parks.parking-on-a-signal.stays-parked-across-reopen-running-no-tool-code-and-wakes-on-a-later-delivery",
+        "sync160.tool-parks.parking-on-tasks.waits-for-a-child-it-owns-with-policy-any-and-runs-again-with-the-ended-task-in-its-wake",
+        "sync160.tool-parks.waking.ends-a-woken-call-whose-tool-is-gone-with-tool-unavailable-failed-and-reports-it",
+        "sync160.tool-parks.waking.reruns-a-woken-safe-run-cut-off-by-a-crash-keeping-the-slot-s-details-and-diagnostics-not-its-output",
+        "sync160.tool-parks.waking.settles-a-woken-unsafe-run-cut-off-by-a-crash-interrupted-after-cancel",
+        "sync160.tool-parks.wrappers.accept-one-park-object-its-base-returns-to-calls-running-at-once",
+        "sync160.tool-parks.wrappers.pass-a-base-s-park-through-and-a-park-of-their-own-is-invalid",
+        "sync160.tool-parks.wrappers.refuse-a-park-the-wrapper-kept-from-an-earlier-run-instead-of-asking-its-base"
+      ],
+      "count": 101
+    },
+    {
+      "group": "Chord Hosting 1.6.0 cases (ids built at run time)",
+      "project": "tests/PiSharp.Chord.Hosting.Tests/PiSharp.Chord.Hosting.Tests.csproj",
+      "expectedIds": [
+        "app.160.info-facets-serve-a-host-of-its-own",
+        "app.160.sign-in-cookie-contract-and-document-names",
+        "http.160.links-opened-close-terminates-that-link",
+        "plugins.160.build-rediscovers-before-the-watcher",
+        "publication.160.surface-without-routes",
+        "terminal.160.scope-keeps-no-released-reference",
+        "terminal.160.scope-on-calls-the-listener-until-dispose",
+        "terminal.160.scope-variant-follows-rebind",
+        "terminal.160.scope-variant-of-foreign-reference",
+        "terminal.160.scope-variant-one-watch-per-state",
+        "workers.160.incarnation-before-the-first-call",
+        "workers.160.link-ended-at-exit-told-as-neither-lost-nor-closed",
+        "workers.160.passes-admit-to-its-route",
+        "workers.160.queued-commit-lands-before-the-exit-is-published",
+        "workers.160.report-and-exit-in-the-same-turn-commits-nothing",
+        "workers.160.stop-resolves-after-the-exit-was-published"
+      ],
+      "count": 16
+    },
+    {
+      "group": "Env.Process 1.6.0 cases (ids built at run time)",
+      "project": "tests/PiSharp.Env.Process.Tests/PiSharp.Env.Process.Tests.csproj",
+      "expectedIds": [
+        "sync160.exec-without-window-reads-on-after-exit-while-link-holds-output-back",
+        "sync160.process-output-left-in-pipe-survives-exit-while-link-is-backed-up (upstream scenario)",
+        "sync160.process-reads-on-after-exit-while-link-holds-output-back"
+      ],
+      "count": 3
+    }
+  ]
+}

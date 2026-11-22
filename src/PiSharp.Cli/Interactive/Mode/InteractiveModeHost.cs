@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): coding-agent/src/main.ts (the interactive branch: InteractiveMode construction
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): coding-agent/src/main.ts (the interactive branch: InteractiveMode construction
 // with InteractiveModeOptions, run, and the resume hint printed after an interactive quit) and coding-agent/src/modes/interactive/
 // interactive-mode.ts (shutdown's terminal handling). PiSharp runs the session in the in-process RPC host and drives it from the
 // interactive mode on a dedicated UI loop, on Windows, Linux and macOS.
@@ -50,6 +50,8 @@ internal static class InteractiveModeHost
             GetTrustEntry = trustStore.GetEntry,
             SaveTrustDecisions = updates => trustStore.SetMany(updates),
             RequestExitImpl = (_, code) => { Interlocked.Exchange(ref userQuit, 1); exitRequested.TrySetResult(code); },
+            // The session host replaces them before it publishes a replacement (session_switched); the mode shows them in the chat.
+            TakeUnreportedRuntimeDiagnostics = () => [.. options.RuntimeDiagnostics.TakeUnreported().Select(diagnostic => (diagnostic.Type, diagnostic.Message))],
             Suspend = Suspend,
             Login = login,
             Mcp = mcp,
@@ -158,7 +160,8 @@ internal static class InteractiveModeHost
         foreach (var line in consoleLines) await stdout.WriteLineAsync(line);
         var diagnostics = hostDiagnostics.ToString();
         if (diagnostics.Length > 0 && exitCode != 0) await stderr.WriteAsync(diagnostics);
-        if (resumeCommand is not null && exitCode == 0) await stdout.WriteAsync($"\u001b[2mTo resume this session:\u001b[22m {resumeCommand}\n");
+        // Pi faac585884ae2c013a6b1400f3e9e77f10b34bac interactive-mode.ts (#12237): the command is on its own line, so a triple-click selects it.
+        if (resumeCommand is not null && exitCode == 0) await stdout.WriteAsync($"\u001b[2mTo resume this session:\u001b[22m\n{resumeCommand}\n");
         await stdout.FlushAsync(CancellationToken.None);
         return exitCode;
     }

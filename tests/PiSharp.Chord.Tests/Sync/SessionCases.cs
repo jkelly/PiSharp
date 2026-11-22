@@ -1,5 +1,5 @@
 // Pi b4afdddf44e059c67ccf5097e5317d913521b470 (MIT): packages/chord/src/sync/client.ts, packages/chord/src/sync/state.ts, packages/chord/src/sync/remote.ts.
-// Authored native regression; not an upstream execution capture.
+// Authored native regression; not an upstream execution capture. The Pi 1.6.0 cases are in Sync160SessionCases.cs.
 using System.Runtime.CompilerServices;
 using System.Text.Json.Nodes;
 using PiSharp.Chord;

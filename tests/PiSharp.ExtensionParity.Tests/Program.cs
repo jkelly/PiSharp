@@ -26,6 +26,7 @@ internal static partial class Program
         var cases = new List<(string Id, Func<Task> Run)>();
         cases.AddRange(PackageCases());
         cases.AddRange(Sync152PackageCases());
+        cases.AddRange(Sync160PackageCases());
         cases.AddRange(DiscoveryCases());
         cases.AddRange(BridgeCases());
         cases.AddRange(CliCases());
@@ -48,7 +49,10 @@ internal static partial class Program
         cases.AddRange(Sync150BridgeCases());
         cases.AddRange(Sync150CliCases());
         cases.AddRange(Sync150RuntimeCases());
+        cases.AddRange(Sync160ExecCases());
         cases.AddRange(GapRuntimeCases());
+        cases.AddRange(Sync160EventBusCases());
+        cases.AddRange(Sync160SessionStartCases());
         var filter = Environment.GetEnvironmentVariable("EXTPARITY_FILTER");
         if (!string.IsNullOrEmpty(filter)) cases = [.. cases.Where(test => test.Id.Contains(filter, StringComparison.Ordinal))];
         var results = new List<object>(); var failures = 0; var skipped = 0;

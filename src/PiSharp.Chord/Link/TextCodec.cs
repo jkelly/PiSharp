@@ -1,4 +1,6 @@
-// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 next/link/text.ts.
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/chord/src/link/text.ts.
+// 1.6.0: ["h", protocol, incarnation] without a call window (calls follows when there is one); an event ack is ["a", events]; an event
+// message is ["E", [[hold, member, at, value]...]]; the cause letter "d" is denied.
 using System.Globalization;
 using System.Text.Json.Nodes;
 
@@ -20,7 +22,7 @@ internal sealed class TextCodec : ICodec
     {
         var text = message switch
         {
-            HelloMessage x => "[\"h\","+N(x.Protocol)+","+Q(x.Incarnation)+","+N(x.Calls)+"]",
+            HelloMessage x => "[\"h\","+N(x.Protocol)+","+Q(x.Incarnation)+(x.Calls is { } calls ? ","+N(calls) : "")+"]",
             HoldMessage x => Hold(x),
             ReleaseMessage x => "[\"R\","+N(x.Hold)+"]",
             CallMessage x => Call(x),
@@ -34,7 +36,9 @@ internal sealed class TextCodec : ICodec
             RevokeMessage x => "[\"V\","+J(x.Revocation)+"]",
             RetryMessage x => "[\"T\","+N(x.Hold)+","+N(x.Hops)+"]",
             LoadingMessage x => "[\"l\","+N(x.Hold)+"]",
-            AckMessage => "[\"a\"]", ClosedMessage => "[\"C\"]", PingMessage => "[\"p\"]", PongMessage => "[\"P\"]",
+            AckMessage x => x.Events is { } events ? "[\"a\","+N(events)+"]" : "[\"a\"]",
+            EventMessage x => "[\"E\","+List(x.Events,e=>"["+N(e.Hold)+","+N(e.Member)+","+N(e.At)+","+Parts.Tagged(e.Value)+"]")+"]",
+            ClosedMessage => "[\"C\"]", PingMessage => "[\"p\"]", PongMessage => "[\"P\"]",
             _ => throw new ArgumentException("text: an unknown kind"),
         };
         return message.Origin is { } origin ? "[\"@\","+N(origin)+","+text+"]" : text;
@@ -79,7 +83,7 @@ internal sealed class TextCodec : ICodec
         long Num(int i)=>Number(f[i]); string Str(int i)=>String(f[i]);
         switch(tag)
         {
-            case "h": Arity(f,4); return new HelloMessage(Num(1),Str(2),Num(3));
+            case "h": Arity(f,3,4); return new HelloMessage(Num(1),Str(2),f.Count==4 ? Num(3) : null);
             case "H":
                 Arity(f,7,8,9,10,11,12); var a=Array(f[6]); Arity(a,2);
                 var principal=f.Count>7 ? f[7]?.DeepClone() : null; var incarnation=f.Count>8 && f[8] is not null ? Str(8) : null;
@@ -112,7 +116,7 @@ internal sealed class TextCodec : ICodec
                     return new StateEntry(Number(e[0]),Pairs(e[1]).Select(p=>new StateMember(Number(p[0]),Parts.FromTagged(p[1]))).ToArray(), e.Count>2 ? ReadFailures(e[2]) : [],e.Count>3 ? Array(e[3]).Select(Number).ToArray() : []);
                 }).ToArray());
             case "f":
-                Arity(f,4,5); var cause=Str(2) switch { "t"=>"transient","b"=>"broken","w"=>"waiting",_=>throw new ArgumentException("text: an unknown failure kind") };
+                Arity(f,4,5); var cause=Str(2) switch { "t"=>"transient","b"=>"broken","w"=>"waiting","d"=>"denied",_=>throw new ArgumentException("text: an unknown failure kind") };
                 return new FailedMessage(Num(1),new FailureCause(cause,Error(f[3])),f.Count==5 ? Num(4) : null);
             case "r": Arity(f,2,3,4); var payload=ReadPayload(f,2,rest); return new ResultMessage(Num(1),payload.Part,payload.Segments);
             case "e": Arity(f,3); return new ErrorMessage(Num(1),Error(f[2]));
@@ -120,7 +124,13 @@ internal sealed class TextCodec : ICodec
             case "V": Arity(f,2); return new RevokeMessage(f[1]?.DeepClone());
             case "T": Arity(f,3); return new RetryMessage(Num(1),Num(2));
             case "l": Arity(f,2); return new LoadingMessage(Num(1));
-            case "a": Arity(f,1); return new AckMessage();
+            case "a": Arity(f,1,2); return f.Count==1 ? new AckMessage() : new AckMessage(Num(1));
+            case "E":
+                Arity(f,2); return new EventMessage(Array(f[1]).Select(raw=>
+                {
+                    var e=Array(raw); if(e.Count!=4) throw new ArgumentException($"text: an event entry with {e.Count} fields");
+                    return new WireEvent(Number(e[0]),Number(e[1]),Number(e[2]),Parts.FromTagged(e[3]));
+                }).ToArray());
             case "C": Arity(f,1); return new ClosedMessage();
             case "p": Arity(f,1); return new PingMessage();
             case "P": Arity(f,1); return new PongMessage();

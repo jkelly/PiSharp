@@ -50,6 +50,8 @@ internal static partial class Program
         cases.AddRange(CapCases());
         cases.AddRange(NamelessToolCallCases());
         cases.AddRange(LlamaCases());
+        cases.AddRange(Sync160LlamaCases());
+        cases.AddRange(Sync160DiagnosticsCases());
         cases.AddRange(CloseoutCases());
         cases.AddRange(ThinkingClampCases());
         cases.AddRange(AutoCompactionCases());

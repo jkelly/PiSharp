@@ -1,4 +1,4 @@
-// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/ai/src/env-api-keys.ts and packages/ai/src/utils/provider-env.ts.
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/ai/src/env-api-keys.ts and packages/ai/src/utils/provider-env.ts.
 using System.Collections.Immutable;
 
 namespace PiSharp.AI.Catalogs;
@@ -15,13 +15,18 @@ public static class ProviderEnvironmentKeys
     /// <summary>The marker upstream returns for ambient credentials (Vertex ADC, the AWS credential chain).</summary>
     public const string AuthenticatedMarker = "<authenticated>";
 
+    // Qwen Token Plan: the per-plan variable first, then the region variable both plans used to share.
+    private static readonly ImmutableDictionary<string, ImmutableArray<string>> PlanMap = new Dictionary<string, ImmutableArray<string>>(StringComparer.Ordinal)
+    {
+        ["qwen-token-plan"] = ["QWEN_TOKEN_PLAN_TEAM_API_KEY", "QWEN_TOKEN_PLAN_API_KEY"],
+        ["qwen-token-plan-cn"] = ["QWEN_TOKEN_PLAN_TEAM_CN_API_KEY", "QWEN_TOKEN_PLAN_CN_API_KEY"],
+        ["qwen-token-plan-individual"] = ["QWEN_TOKEN_PLAN_INDIVIDUAL_API_KEY", "QWEN_TOKEN_PLAN_API_KEY"],
+        ["qwen-token-plan-individual-cn"] = ["QWEN_TOKEN_PLAN_INDIVIDUAL_CN_API_KEY", "QWEN_TOKEN_PLAN_CN_API_KEY"],
+    }.ToImmutableDictionary(StringComparer.Ordinal);
+
     private static readonly ImmutableDictionary<string, string> Map = new Dictionary<string, string>(StringComparer.Ordinal)
     {
         ["ant-ling"] = "ANT_LING_API_KEY",
-        ["qwen-token-plan"] = "QWEN_TOKEN_PLAN_API_KEY",
-        ["qwen-token-plan-cn"] = "QWEN_TOKEN_PLAN_CN_API_KEY",
-        ["qwen-token-plan-individual"] = "QWEN_TOKEN_PLAN_API_KEY",
-        ["qwen-token-plan-individual-cn"] = "QWEN_TOKEN_PLAN_CN_API_KEY",
         ["openai"] = "OPENAI_API_KEY",
         ["azure"] = "AZURE_OPENAI_API_KEY",
         ["nvidia"] = "NVIDIA_API_KEY",
@@ -65,6 +70,7 @@ public static class ProviderEnvironmentKeys
         if (provider == "github-copilot") return ImmutableArray.Create("COPILOT_GITHUB_TOKEN");
         // ANTHROPIC_AUTH_TOKEN participates in discovery and status; GetEnvironmentApiKey skips it (it travels as a Bearer header).
         if (provider == "anthropic") return ImmutableArray.Create(AnthropicAuthToken, AnthropicOAuthToken, AnthropicApiKey);
+        if (PlanMap.TryGetValue(provider, out var names)) return names;
         return Map.TryGetValue(provider, out var name) ? ImmutableArray.Create(name) : (IReadOnlyList<string>?)null;
     }
 

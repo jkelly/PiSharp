@@ -1,4 +1,4 @@
-// Pi b4afdddf44e059c67ccf5097e5317d913521b470 (MIT): packages/chord/src/host/host-data.ts
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/chord/src/host/host-data.ts
 using System.Text.Json.Nodes;
 using PiSharp.Chord.Contracts;
 using PiSharp.Chord.Data;
@@ -135,17 +135,26 @@ public sealed partial class ChordHost
             return await ImportHostArchiveAsync(await Tables.ReadHostArchiveAsync(parts, context), context, options ?? new());
         });
 
-    /// <summary>Deletes data owned by an address and refreshes its live observers in the commit batch.</summary>
-    public Task<HostDataCounts> DeleteHostDataAsync(Address address, ChordContext context) => Dispatcher.RunAsync(async () =>
+    /// <summary>Deletes data owned by an address and refreshes its live observers in the commit batch; with
+    /// <see cref="HostDeleteOptions.Plugin"/>, only the records and rows the objects of that plugin own (slice 14 §6).</summary>
+    public Task<HostDataCounts> DeleteHostDataAsync(Address address, ChordContext context, HostDeleteOptions? options = null) => Dispatcher.RunAsync(async () =>
     {
         var store = HostDataStore("deleteHostData", context);
         ArgumentNullException.ThrowIfNull(address);
+        HashSet<string>? only = null;
+        if (options?.Plugin is { } plugin)
+        {
+            if (!Plugins.ContainsKey(plugin)) throw DataInternal.Invalid("args", $"deleteHostData: plugin \"{plugin}\" is not loaded here");
+            // A plugin's data is what the types it serves own: their names are the owners in the store.
+            only = new HashSet<string>(Types.Where(type => type.Value.Plugin == plugin).Select(type => type.Key), StringComparer.Ordinal);
+        }
         var key = StoreInternal.StoredText(address.Key, "deleteHostData: address");
         return await HostDataGate.TurnAsync(turn => turn.ExclusiveAsync(async () =>
         {
             var owners = await StoreInternal.HostDataOwnersAsync(store, key, null, context);
+            if (only is not null) owners.IntersectWith(only);
             return await CoordinatedHostDataAsync(owners, key, context,
-                commit => StoreInternal.DeleteHostDataAsync(store, key, commit, ChordContext.WithoutAbortSignal(context)));
+                commit => StoreInternal.DeleteHostDataAsync(store, key, commit, ChordContext.WithoutAbortSignal(context), only));
         }), context);
     });
 
@@ -220,10 +229,17 @@ public sealed partial class ChordHost
             var slots = objects.SelectMany(owner => owner.Documents.HostSlots(kind)).Where(slot => slot.Holds(key)).ToArray();
             var changed = new ChangedDocument[slots.Length];
             var quiet = ChordContext.WithoutAbortSignal(context);
-            var queries = new QueryRefresh(objects.SelectMany(owner => owner.LiveQueries.OnHostKind(kind)), quiet);
+            // Every read over a table with a host column of the kind, joined and exists tables included (slice 14 §5).
+            var queries = Store!.ReadIndex.OnHostKind(kind);
+            var runs = new ReadRun[queries.Count];
             var read = new StagedWrite(WriteOrder.Write, async step =>
             {
                 for (var index = 0; index < slots.Length; index++) changed[index] = await slots[index].ReadChangedAsync(key, step, quiet);
+                for (var index = 0; index < queries.Count; index++)
+                {
+                    runs[index] = await queries[index].RunAsync(step, quiet);
+                    queries[index].Ran(step.Transaction, runs[index]);
+                }
                 return Array.Empty<StoreWrite>();
             });
             var fence = new CommitFence(() => !Closed && context.AbortSignal?.IsCancellationRequested != true, (_, _) =>
@@ -231,12 +247,13 @@ public sealed partial class ChordHost
                 Batch.Commit(() =>
                 {
                     for (var index = 0; index < slots.Length; index++) slots[index].AdoptChanged(key, changed[index]);
-                    queries.Adopt();
+                    // Each read ran in the step before COMMIT.
+                    for (var index = 0; index < queries.Count; index++) queries[index].Adopt(runs[index]);
                 }, quiet);
                 for (var index = 0; index < slots.Length; index++)
                     if (changed[index] is ChangedDocument.Failed failed) slots[index].Owner.Fail(failed.Error);
             });
-            return await change(new HostCommit(fence, [read, queries.Write]));
+            return await change(new HostCommit(fence, [read]));
         }
         finally { foreach (var release in releases) release(); }
     }
@@ -273,18 +290,80 @@ internal sealed partial class Self
     public IWatchable<JsonNode?> Query(ITable table, Query query, long limit)
     {
         Declare("query");
+        var label = Attempt.Owner.Label;
+        // Plugin code may pass any table: only a handle this attempt declared is taken (its object's own table).
         if (table is not TableHandle handle || !Tables.Contains(handle))
-            throw DataInternal.Invalid("args", $"{Attempt.Owner.Label}: self.query takes its own declared table");
-        var live = new LiveQuery(handle, query, limit, new QueryOwner(this, handle.Definition.Name), Host.Batch);
-        Queries.Add(live);
-        Attempt.Owner.LiveQueries.Add(live);
+            throw new ArgumentException($"{label}: self.query: the table is not one this factory declared");
+        StoreInternal.CheckLiveQuery(handle.Definition, query, limit, label);
+        // The owner's window: its value the rows themselves.
+        var live = new LiveQuery(new ReadSite(handle.Store, Host.Batch), new QueryOwner(this, handle.Definition.Name), new LiveShape.Rows(new ReadRange(limit)));
+        var rows = handle.Definition.Rows;
+        // The query is of the handle's table (checked above); every column of the row is read.
+        var target = new LiveTarget(new QuerySpec(query, handle.Sql.Table, Projection.All, handle), (stored, context) =>
+        {
+            var row = new JsonObject();
+            foreach (var (column, cell) in rows.Decode(stored, context)) row[column] = cell;
+            return row;
+        });
+        Queries.Add((live, target));
         return live;
     }
 
-    private sealed class QueryOwner(Self self, string table) : IQueryOwner
+    // A failed run of a live query after its object went live: query_failed, once per failure episode (the query is named by its table).
+    private sealed class QueryOwner(Self self, string query) : IFramedOwner
     {
         public string Label => self.Attempt.Owner.Label;
-        public void Report(Exception error) => self.Report(new("query_failed", error, Object: Label, Table: table));
+        public void Report(Exception error) => self.Report(new("query_failed", error, Object: Label, Query: query));
+    }
+
+    // Every read over a table that is created or migrated now waits until it is ready (slice 14 §5): a migration's chunks are not one
+    // commit, and a failed one leaves the table held.
+    internal void HoldTables()
+    {
+        var store = Host.Store!;
+        foreach (var table in Tables)
+            if (store.Table(table.Sql.Table) is not { } recorded || recorded.Version != table.Definition.Version || recorded.State != TableState.Ready)
+                store.ReadIndex.Hold(table.Sql.Table);
+    }
+
+    // The bindings of column sets follow this attempt's declarations (the committed code, slice 14 §5): each set a table exposes is bound to
+    // it, a set its object bound before and no table exposes now is dropped; then the tables are ready, and the reads over them compile
+    // again and run once. An attempt that declares no table drops what its object had bound.
+    internal void BindSets()
+    {
+        if (Host.Store?.ReadIndex is not { } reads) return;
+        var owner = Attempt.Owner;
+        var exposed = new HashSet<string>(StringComparer.Ordinal);
+        try
+        {
+            foreach (var table in Tables)
+            {
+                if (table.Definition.Exposes?.Name is not { } set) continue;
+                exposed.Add(set);
+                reads.Bind(set, new Bound(table.Sql.Table, table.Definition), owner);
+            }
+        }
+        catch (ArgumentException error) { throw new BrokenOpen(error); }
+        foreach (var set in reads.BoundBy(owner)) if (!exposed.Contains(set)) reads.Unbind(set, owner);
+        foreach (var table in Tables) reads.Ready(table.Sql.Table);
+    }
+
+    // The first run of each live query, before the object goes live: a failure fails the activation broken.
+    internal async Task LoadQueriesAsync()
+    {
+        foreach (var (live, target) in Queries)
+        {
+            try { await live.LoadAsync(target, Context); }
+            catch (Exception error) when (!Attempt.Sealed && error is not OperationCanceledException) { throw new BrokenOpen(error); }
+        }
+    }
+
+    // Its live queries end (reads throw the object's error, their watches end; no commit runs them again), and the queries its tables
+    // offered are offered no more (slice 14 §3.2): their readers' reads leave the store's index before a successor prepares the tables.
+    internal void RetireReads(Exception error)
+    {
+        foreach (var (live, _) in Queries) live.Detach(error);
+        foreach (var table in Tables) table.Store.ReadIndex.Retire(table);
     }
 }
 
@@ -301,7 +380,7 @@ internal sealed partial class RecordingSelf
     {
         Check("query");
         if (table is not RecordingTable token || token.Definition is null || !tables.Values.Contains(token.Definition))
-            throw DataInternal.Invalid("args", "self.query takes its own declared table");
+            throw new ArgumentException($"{owner.Label}: self.query: the table is not one this factory declared");
         StoreInternal.CheckLiveQuery(token.Definition, query, limit, owner.Label);
         return RecordingValue.Instance;
     }

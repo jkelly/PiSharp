@@ -16,7 +16,7 @@ PiSharp's version is the Pi version it matches, and a fourth number marks a C#-o
 The release scripts enforce this:
 
 - The version must match `^[0-9]+\.[0-9]+\.[0-9]+(\.[0-9]+)?(-[0-9A-Za-z.-]+)?$`.
-- Its first three numbers must equal the tag in `compatibility/target.lock.json` (`v1.5.2` today). A sync to a new Pi release therefore comes before its release. See [How the port tracks Pi](/docs/contribute/porting/).
+- Its first three numbers must equal the tag in `compatibility/target.lock.json` (`v1.6.0` today, the unreleased source candidate). A sync to a new Pi release therefore comes before its release. See [How the port tracks Pi](/docs/contribute/porting/).
 - A version with a `-` suffix becomes a GitHub prerelease.
 
 Every assembly gets the release version, except `PiSharp.ExtensionHost`, which keeps assembly version `1.0.0.0`.
@@ -85,7 +85,7 @@ Run the release workflow by hand from the Actions tab to build and check a versi
 
 | Input | Default | Effect |
 | --- | --- | --- |
-| `version` | `1.5.2` | The version to build and validate. |
+| `version` | `1.6.0` | The version to build and validate. The default follows the source candidate. A dry run of 1.6.0 stops at the source pin check until `compatibility/sync-1.6.0-applicability.json` carries an acceptance record. |
 | `skip_tests` | `false` | Skip the 22 release-list suites in a dry run. Core and Durable validation still run. |
 
 A dry run runs the build and the reusable validation gates. The publish and GitHub release jobs run only for a pushed tag.

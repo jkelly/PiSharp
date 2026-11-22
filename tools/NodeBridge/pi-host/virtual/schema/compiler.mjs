@@ -1,4 +1,4 @@
-// Pi b4afdddf44e059c67ccf5097e5317d913521b470 (MIT): packages/schema/src/compiler.ts.
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/schema/src/compiler.ts.
 // Ported to plain ESM for the PiSharp Node extension bridge (TypeScript types stripped mechanically; behaviour unchanged).
 import { ANNOTATING_FALSE, ANNOTATING_TRUE, annotateAll, annotateAny, annotateArray, annotateDependent, annotateIf, annotateObject, ignoreAnnotations, indirectAnnotating, isolateAnnotations, scopedAnnotating, unevaluatedItems, unevaluatedProperties, withFreshAnnotations } from "./annotations.mjs";
 import { ALWAYS, and, anyCheck, bytesCheck, constCheck, containsCheck, declaredObject, dependentRequiredCheck, dependentSchemasCheck, enumCheck, GUARD_LOOSE, GUARD_NONE, GUARD_STRICT, guardArray, guardObject, INHERITED, IS_ARRAY, IS_OBJECT, ifCheck, indirect, itemsCheck, leafOf, lengthCheck, listCheck, maskedAnyCheck, NEVER, notCheck, numberCheck, oneCheck, openObject, propertyCountCheck, propertyNamesCheck, REQUIRED, scopedCheck, stringCheck, TYPE_CHECKS, taggedCheck, typeCheck, typeMask, uniqueCheck } from "./checks.mjs";

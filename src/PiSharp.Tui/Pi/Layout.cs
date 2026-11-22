@@ -1,4 +1,4 @@
-// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/tui/src/layout-node.ts, packages/tui/src/layout.ts,
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/tui/src/layout-node.ts, packages/tui/src/layout.ts,
 // packages/tui/src/components/stack.ts, v-stack.ts, h-stack.ts, scroll-view.ts, mouse-region.ts, alt-screen-flash.ts,
 // packages/tui/src/wheel-scroll.ts.
 using System.Text.RegularExpressions;
@@ -25,23 +25,30 @@ public sealed class LayoutBox
     public required LayoutRect Clip;
     public List<LayoutBox> Children = [];
     public LayoutBox? Parent;
-    public List<string>? Lines;
+    public IReadOnlyList<string>? Lines;
     public int LineOffset;
     public ScrollView? ScrollView;
-    public List<string>? ScrollContentLines;
+    public IReadOnlyList<string>? ScrollContentLines;
     public int Layer;
 }
-public sealed record LayoutFrame(LayoutBox Root, int Width, int Height, List<string> Lines, ScrollView? PrimaryScrollView);
+/// <summary>Component output by width, as rendered for one layout frame.</summary>
+[System.Diagnostics.CodeAnalysis.Experimental("PISHARP_TUI001")]
+public sealed class LayoutRenderCache() : Dictionary<IComponent, Dictionary<int, IReadOnlyList<string>>>(ReferenceEqualityComparer.Instance);
+/// <summary>One laid out and painted frame. <paramref name="RenderCache"/> holds the output of every component the frame rendered;
+/// pass it to a later frame whose content did not change.</summary>
+public sealed record LayoutFrame(LayoutBox Root, int Width, int Height, List<string> Lines, ScrollView? PrimaryScrollView, LayoutRenderCache RenderCache);
 public sealed record ScrollbarGeometry(int Column, int TrackTop, int TrackHeight, int ThumbTop, int ThumbHeight, int MaxScrollTop);
 
 public static partial class LayoutEngine
 {
     [GeneratedRegex(@"^(?:\x1b\]133;[ABC](?:\x07|\x1b\\))+")] internal static partial Regex Osc133ZonePrefix();
 
-    private sealed class Context(LayoutViewport viewport, Action requestRender)
+    private sealed class Context(LayoutViewport viewport, Action requestRender, LayoutRenderCache? reusableOutput)
     {
         public LayoutViewport Viewport = viewport;
-        public Dictionary<IComponent, Dictionary<int, List<string>>> Cache = new(ReferenceEqualityComparer.Instance);
+        public LayoutRenderCache Cache = new();
+        // Output of an earlier frame with the same content; entries are copied into Cache when used.
+        public LayoutRenderCache? ReusableOutput = reusableOutput;
         public Action RequestRender = requestRender;
         public ScrollView? Primary;
     }
@@ -53,11 +60,16 @@ public static partial class LayoutEngine
         return new(x, y, Math.Max(0, right - x), Math.Max(0, bottom - y));
     }
 
-    private static List<string> RenderCached(Context context, IComponent component, int width)
+    private static IReadOnlyList<string> RenderCached(Context context, IComponent component, int width)
     {
         var safe = Math.Max(1, width);
         if (!context.Cache.TryGetValue(component, out var widths)) context.Cache[component] = widths = [];
-        if (!widths.TryGetValue(safe, out var lines)) widths[safe] = lines = component.Render(safe);
+        if (!widths.TryGetValue(safe, out var lines))
+        {
+            if (context.ReusableOutput is null || !context.ReusableOutput.TryGetValue(component, out var earlier) || !earlier.TryGetValue(safe, out lines))
+                lines = component.Render(safe);
+            widths[safe] = lines;
+        }
         return lines;
     }
 
@@ -83,7 +95,9 @@ public static partial class LayoutEngine
             var offset = 0;
             if (lines.Count > allocated && allocated > 0)
             {
-                var cursorLine = lines.FindIndex(line => line.Contains(TuiBase.CursorMarker, StringComparison.Ordinal));
+                var cursorLine = -1;
+                for (var index = 0; index < lines.Count; index++)
+                    if (lines[index].Contains(TuiBase.CursorMarker, StringComparison.Ordinal)) { cursorLine = index; break; }
                 if (cursorLine >= allocated) offset = cursorLine - allocated + 1;
             }
             var rect = new LayoutRect(x, y, safeWidth, allocated);
@@ -242,14 +256,19 @@ public static partial class LayoutEngine
         PaintScrollbar(box, screen, totalWidth);
     }
 
-    public static LayoutFrame RenderFrame(IComponent root, int width, int height, Action requestRender)
+    /// <summary>Lays out and paints one frame. <paramref name="reusableOutput"/> is an earlier frame's
+    /// <see cref="LayoutFrame.RenderCache"/>; its output is used instead of calling <see cref="IComponent.Render"/>. Pass it only
+    /// when no component changed since that frame, e.g. when only a scroll position moved: the frame then costs O(viewport)
+    /// instead of re-rendering the whole scrollable document. Each frame keeps only the output it used, so reuse never
+    /// accumulates across frames.</summary>
+    public static LayoutFrame RenderFrame(IComponent root, int width, int height, Action requestRender, LayoutRenderCache? reusableOutput = null)
     {
         var safeWidth = Math.Max(1, width); var safeHeight = Math.Max(1, height);
-        var context = new Context(new(safeWidth, safeHeight), requestRender);
+        var context = new Context(new(safeWidth, safeHeight), requestRender, reusableOutput);
         var rootBox = LayoutComponent(context, root, 0, 0, safeWidth, safeHeight, new(0, 0, safeWidth, safeHeight));
         var lines = Enumerable.Repeat("", safeHeight).ToList();
         PaintBox(rootBox, lines, safeWidth);
-        return new(rootBox, safeWidth, safeHeight, lines, context.Primary);
+        return new(rootBox, safeWidth, safeHeight, lines, context.Primary, context.Cache);
     }
 
     private static bool ContainsPoint(LayoutRect rect, int x, int y) => x >= rect.X && x < rect.X + rect.Width && y >= rect.Y && y < rect.Y + rect.Height;
@@ -378,7 +397,7 @@ public abstract class Stack : Container, ILayoutComponent
 public sealed class VStack(IEnumerable<StackEntry> children, int gap = 0, StackAlign align = StackAlign.Stretch) : Stack(children, gap, align)
 {
     protected override bool Vertical => true;
-    public override List<string> Render(int width)
+    public override IReadOnlyList<string> Render(int width)
     {
         var viewport = new LayoutViewport(Math.Max(1, width), int.MaxValue);
         var entries = Stacks.VisibleEntries(Entries, viewport);
@@ -399,7 +418,7 @@ public sealed class VStack(IEnumerable<StackEntry> children, int gap = 0, StackA
 public sealed class HStack(IEnumerable<StackEntry> children, int gap = 0, StackAlign align = StackAlign.Stretch) : Stack(children, gap, align)
 {
     protected override bool Vertical => false;
-    public override List<string> Render(int width)
+    public override IReadOnlyList<string> Render(int width)
     {
         var safeWidth = Math.Max(1, width);
         var entries = Stacks.VisibleEntries(Entries, new(safeWidth, int.MaxValue));
@@ -549,7 +568,7 @@ public sealed class ScrollView : Container, ILayoutComponent
     public override void AddChild(IComponent component) => throw new InvalidOperationException("ScrollView has exactly one child");
     public override void RemoveChild(IComponent component) => throw new InvalidOperationException("ScrollView child cannot be removed");
     public override void Clear() => throw new InvalidOperationException("ScrollView child cannot be cleared");
-    public override List<string> Render(int width)
+    public override IReadOnlyList<string> Render(int width)
     {
         var contentWidth = GetContentWidth(width);
         var lines = child.Render(contentWidth);
@@ -561,7 +580,7 @@ public sealed class ScrollView : Container, ILayoutComponent
 /// <summary>Adds mouse handling to a component without changing its rendering.</summary>
 public sealed class MouseRegion(IComponent child, Func<TuiMouseEvent, TuiMouseEventResult?> onMouse) : IComponent, IMouseHandler
 {
-    public List<string> Render(int width) => child.Render(width);
+    public IReadOnlyList<string> Render(int width) => child.Render(width);
     public TuiMouseEventResult? HandleMouse(TuiMouseEvent mouseEvent) => Mouse.Dispatch(child, mouseEvent) ?? onMouse(mouseEvent);
     public void Invalidate() => child.Invalidate();
 }
@@ -585,7 +604,7 @@ public sealed class AltScreenFlashContainer(UiLoop loop, Action requestRender) :
     }
     public void Dispose() { foreach (var entry in entries) entry.Timer.Dispose(); entries.Clear(); }
     public void Invalidate() { }
-    public List<string> Render(int width) => entries.Select(entry => "\u001b[7m" + TextUtils.TruncateToWidth(" " + entry.Message + " ", width, "") + "\u001b[27m").ToList();
+    public IReadOnlyList<string> Render(int width) => entries.Select(entry => "\u001b[7m" + TextUtils.TruncateToWidth(" " + entry.Message + " ", width, "") + "\u001b[27m").ToList();
 }
 
 /// <summary>Lines moved per wheel event: a fixed count, or null for "auto" acceleration of fast spins.</summary>

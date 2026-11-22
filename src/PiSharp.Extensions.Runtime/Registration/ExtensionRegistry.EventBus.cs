@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using PiSharp.Extensions.Events;
 
 namespace PiSharp.Extensions.Runtime;
 
@@ -11,6 +12,33 @@ public sealed partial class ExtensionRegistry
     /// <summary>The registry's shared extension event bus, for a host that bridges another runtime's bus into it (the Pi Node host's
     /// pi.events): <see cref="ExtensionEventBus.Tap"/> observes native emissions, and Emit delivers the other runtime's.</summary>
     public ExtensionEventBus SharedEventBus => eventBus;
+
+    /// <summary>Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (#11264), loader.ts <c>pi.events.on</c> and runner.ts
+    /// <c>runtime.reportError</c>: receives the failure of an owner's event-bus listener as an extension error whose event name is
+    /// <c>events:&lt;channel&gt;</c> (the message is the handler's exception message; the exception itself is the second argument),
+    /// instead of the bus's console diagnostic. Null drops the failure, as upstream does before a runner exists. A listener that fails
+    /// after its owner was closed or withdrawn (the extension runtime was replaced), or while the registry closes, is never reported.
+    /// The host's own <see cref="SharedEventBus"/> listeners keep the bus's diagnostic.</summary>
+    public Action<ExtensionEventDiagnostic, Exception>? EventBusErrorReporter { get; set; }
+
+    private void ReportEventBusFailure(RegistrationScope scope, RegistrationEntry entry, string channel, Exception error)
+    {
+        Action<ExtensionEventDiagnostic, Exception>? report;
+        lock (gate)
+        {
+            // runner.ts reportError: a handler still running when its runtime was replaced must not report into the replacement.
+            if (closing || scope.Withdrawn || scope.State is RegistrationScopeState.Closing or RegistrationScopeState.Disposed ||
+                !owners.TryGetValue(scope.OwnerId, out var current) || !ReferenceEquals(current, scope)) return;
+            report = EventBusErrorReporter;
+        }
+        if (report is null) return;
+        try
+        {
+            report(new ExtensionEventDiagnostic("events:" + channel, scope.OwnerId, scope.OwnerGeneration, entry.RegistrationId,
+                ExtensionEventFailure.HandlerFailed) { Message = error.Message }, error);
+        }
+        catch { /* A reporter failure is isolated, as the bus's own diagnostic failure is. */ }
+    }
 
     internal void EmitEventBus(RegistrationScope scope, string channel, object? data)
     {
@@ -117,7 +145,8 @@ public sealed partial class ExtensionRegistry
                 original = handler(data) ?? throw new InvalidOperationException("Event listener returned no original Task.");
                 await original.ConfigureAwait(false);
             }
-            catch (Exception error) { eventBus.ReportFailure(channel, original?.Exception ?? error); }
+            // The caught exception is what the listener threw or its task's first fault (JavaScript's caught rejection).
+            catch (Exception error) { ReportEventBusFailure(scope, entry, channel, error); }
         }
         finally { ReleaseAdmission(admission); }
     }
@@ -138,7 +167,7 @@ public sealed partial class ExtensionRegistry
         {
             using var frame = new CallbackFrame(scope);
             try { handler(data); }
-            catch (Exception error) { eventBus.ReportFailure(channel, error); }
+            catch (Exception error) { ReportEventBusFailure(scope, entry, channel, error); }
         }
         finally { ReleaseAdmission(admission); }
     }

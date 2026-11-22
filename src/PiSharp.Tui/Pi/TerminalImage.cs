@@ -1,4 +1,4 @@
-// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/tui/src/terminal-image.ts and packages/tui/src/terminal-colors.ts.
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/tui/src/terminal-image.ts and packages/tui/src/terminal-colors.ts.
 using System.Buffers.Binary;
 using System.Diagnostics;
 using System.Globalization;
@@ -100,6 +100,52 @@ public static partial class TerminalImage
 
     private const string KittyPrefix = "\u001b_G", ITerm2Prefix = "\u001b]1337;File=";
     public static bool IsImageLine(string line) => line.Contains(KittyPrefix, StringComparison.Ordinal) || line.Contains(ITerm2Prefix, StringComparison.Ordinal);
+
+    /// <summary>Cells covered by the image placement on an image line. Rows are relative to the line; columns are absolute, with
+    /// <see cref="EndCol"/> exclusive and <see cref="int.MaxValue"/> when the image width cannot be read.</summary>
+    [System.Diagnostics.CodeAnalysis.Experimental("PISHARP_TUI001")]
+    public readonly record struct ImageLineExtent(int FirstRow, int LastRow, int StartCol, int EndCol);
+
+    [GeneratedRegex(@"(?:^|,)c=(\d+)(?:,|$)")] private static partial Regex KittyColumnsControl();
+    [GeneratedRegex(@"\x1b\[(\d+)A$")] private static partial Regex TrailingCursorUp();
+    [GeneratedRegex(@"[;=]width=(\d+)[;:]")] private static partial Regex ITerm2CellWidth();
+    [GeneratedRegex(@"\x1b_G[^\x1b]*\x1b\\")] private static partial Regex KittySequence();
+    [GeneratedRegex(@"(?:\x1b\[\d+A)?\x1b\]1337;File=[^\x07]*\x07")] private static partial Regex ITerm2Sequence();
+
+    /// <summary>The cells an image line draws over, or null for a line without an image. Kitty places the image at the line and
+    /// extends it downward; iTerm2 lines move the cursor up before drawing, so the image ends at the line.</summary>
+    [System.Diagnostics.CodeAnalysis.Experimental("PISHARP_TUI001")]
+    public static ImageLineExtent? GetImageLineExtent(string line)
+    {
+        var kittyStart = line.IndexOf(KittyPrefix, StringComparison.Ordinal);
+        if (kittyStart != -1)
+        {
+            var controlsMatch = KittyControls().Match(line);
+            var controls = controlsMatch.Success ? controlsMatch.Groups[1].Value : "";
+            var columnMatch = KittyColumnsControl().Match(controls);
+            int? columns = columnMatch.Success
+                ? int.TryParse(columnMatch.Groups[1].Value, NumberStyles.None, CultureInfo.InvariantCulture, out var parsed) ? parsed : null
+                : RegisteredFromControls(controls)?.Metadata.Columns;
+            var startCol = TextUtils.VisibleWidth(line[..kittyStart]);
+            var rows = GetKittyImagePlacementRows(line) ?? 1;
+            return new(0, rows - 1, startCol, columns is { } known ? (int)Math.Min(int.MaxValue, (long)startCol + known) : int.MaxValue);
+        }
+        var iterm2Start = line.IndexOf(ITerm2Prefix, StringComparison.Ordinal);
+        if (iterm2Start == -1) return null;
+        var before = line[..iterm2Start];
+        var moveUp = TrailingCursorUp().Match(before);
+        // Only a plain cell count is a known width; `auto`, pixel and percent widths depend on the image.
+        var widthMatch = ITerm2CellWidth().Match(line, iterm2Start);
+        int? width = widthMatch.Success && int.TryParse(widthMatch.Groups[1].Value, NumberStyles.None, CultureInfo.InvariantCulture, out var cells) ? cells : null;
+        // VisibleWidth counts the cursor-up sequence as text, so measure only what precedes it.
+        var start = TextUtils.VisibleWidth(moveUp.Success ? before[..moveUp.Index] : before);
+        var up = moveUp.Success && int.TryParse(moveUp.Groups[1].Value, NumberStyles.None, CultureInfo.InvariantCulture, out var movedUp) ? movedUp : 0;
+        return new(-up, 0, start, width is { } knownWidth ? (int)Math.Min(int.MaxValue, (long)start + knownWidth) : int.MaxValue);
+    }
+
+    /// <summary>Removes Kitty and iTerm2 image sequences, including iTerm2's cursor-up prefix, keeping the text.</summary>
+    [System.Diagnostics.CodeAnalysis.Experimental("PISHARP_TUI001")]
+    public static string StripImageSequences(string line) => ITerm2Sequence().Replace(KittySequence().Replace(line, ""), "");
 
     public static int AllocateImageId() => Random.Shared.Next(1, int.MaxValue);
 

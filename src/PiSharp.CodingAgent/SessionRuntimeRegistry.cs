@@ -70,7 +70,13 @@ public sealed record SessionRuntimeSelection(AgentConfiguration Configuration, I
     internal ToolInvoker? Invoker { get; init; }
 }
 /// <summary>A loadout restored from the transcript: tools left out that stay pending, and whether it differs from the record.</summary>
-internal sealed record SessionRestoredLoadout(SessionRuntimeSelection Selection, ImmutableArray<string> Pending, bool RequiresRecord);
+internal sealed record SessionRestoredLoadout(SessionRuntimeSelection Selection, ImmutableArray<string> Pending, bool RequiresRecord)
+{
+    /// <summary>Pi faac585884ae2c013a6b1400f3e9e77f10b34bac agent-session.ts _restoredToolNames (#11996): the loadout the branch records, with
+    /// the selection's <c>+name</c>/<c>-name</c> modifiers where the restore applies them, registered or not. Tools the restore
+    /// activates beyond it (extension tools the branch never mentioned) are not part of it. Empty when no branch loadout is restored.</summary>
+    public ImmutableArray<string> Restored { get; init; } = [];
+}
 public sealed record SessionRuntimeUpdate(ModelDescriptor? Model = null, string? ThinkingLevel = null,
     TranscriptEntry? SystemMessage = null)
 {
@@ -268,8 +274,14 @@ public sealed partial class SessionRuntimeRegistry
     /// <paramref name="current"/> tools (_applyToolLoadout). Null when the branch records no loadout: the current tools stay.
     /// </summary>
     internal ImmutableArray<string>? RestoreBranchTools(ImmutableArray<SessionEntry> branch, ImmutableArray<string> current, bool applyModifiers,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken) => RestoreBranchTools(branch, current, applyModifiers, cancellationToken, out _);
+
+    /// <param name="recordedLoadout">Pi faac585884ae2c013a6b1400f3e9e77f10b34bac _restoredToolNames: the branch's recorded loadout
+    /// (getCurrentTools) with the modifiers, without the newly registered extension tools; empty when the branch records none.</param>
+    internal ImmutableArray<string>? RestoreBranchTools(ImmutableArray<SessionEntry> branch, ImmutableArray<string> current, bool applyModifiers,
+        CancellationToken cancellationToken, out ImmutableArray<string> recordedLoadout)
     {
+        recordedLoadout = [];
         var names = new List<string>(); var mentioned = new HashSet<string>(StringComparer.Ordinal); var recorded = false;
         foreach (var entry in branch)
         {
@@ -285,10 +297,11 @@ public sealed partial class SessionRuntimeRegistry
             if (names.Count > _options.MaximumDeclarations) throw Error(SessionRuntimeRegistryFailure.ResourceLimit);
         }
         if (!recorded) return null;
+        var modifiers = applyModifiers && _options.LifetimeToolSelection is { } lifetime ? lifetime.DefaultToolModifiers : (ImmutableArray<string>?)null;
+        recordedLoadout = modifiers is { } recordedModifiers ? ToolNamePatterns.ApplyModifiers(names, recordedModifiers) : [.. names];
         names.AddRange(_registeredTools.Where(tool => tool.IsExtension && ToolExposureSemantics.ActivatesOnRegistration(tool.Exposure, tool.DefaultActive))
             .Select(tool => Name(tool.Declaration.Value)).Where(name => !mentioned.Contains(name)));
-        var restored = applyModifiers && _options.LifetimeToolSelection is { } lifetime
-            ? ToolNamePatterns.ApplyModifiers(names, lifetime.DefaultToolModifiers) : [.. names];
+        var restored = modifiers is { } entries ? ToolNamePatterns.ApplyModifiers(names, entries) : [.. names];
         return KeepOrder(current, restored);
     }
 
@@ -437,8 +450,9 @@ public sealed partial class SessionRuntimeRegistry
         var restore = new RestoreLog();
         // sdk.ts createAgentSession: the restored (or default) level is clamped to the model's capabilities, never refused.
         var level = ThinkingLevels.Clamp(catalog.Thinking[(model.Model.Provider, model.Model.Id)], thinkingLevel ?? context.ThinkingLevel);
+        ImmutableArray<string> recordedLoadout = [];
         var restored = initialActiveToolNames is null || UsesDefaultTools
-            ? RestoreBranchTools(context.Ancestry, currentTools ?? initialActiveToolNames ?? [], applyModifiers: currentTools is null, cancellationToken) : null;
+            ? RestoreBranchTools(context.Ancestry, currentTools ?? initialActiveToolNames ?? [], applyModifiers: currentTools is null, cancellationToken, out recordedLoadout) : null;
         var selection = ResolveCatalog(catalog, model.Model, context.LlmMessages, level, cancellationToken,
             initialActiveToolNames: restored ?? initialActiveToolNames, restore: restore, restoring: restored is not null);
         if (restored is { } names)
@@ -446,7 +460,7 @@ public sealed partial class SessionRuntimeRegistry
             // _setActiveTools ignores names that are not registered (or hidden, or not activatable); allowed ones stay pending.
             var active = selection.Configuration.Tools.Select(tool => tool.Name).ToImmutableArray();
             return new(selection, [.. names.Where(name => !active.Contains(name, StringComparer.Ordinal) && _options.LifetimeToolSelection?.IsAllowed(name) != false)],
-                restore.Replaced || !active.SequenceEqual(restore.Recorded, StringComparer.Ordinal));
+                restore.Replaced || !active.SequenceEqual(restore.Recorded, StringComparer.Ordinal)) { Restored = recordedLoadout };
         }
         // Source _isAllowedTool: names that --tools/--exclude-tools keep out of the catalog never become pending.
         return new(selection, [.. restore.Skipped.Where(name => _options.LifetimeToolSelection?.IsAllowed(name) != false)],

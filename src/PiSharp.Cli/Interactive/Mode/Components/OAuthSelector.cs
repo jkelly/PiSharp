@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): coding-agent/src/modes/interactive/components/oauth-selector.ts.
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): coding-agent/src/modes/interactive/components/oauth-selector.ts.
 // Also ports InteractiveMode.getLoginProviderOptions (modes/interactive/interactive-mode.ts), which builds this selector's
 // provider list, over the narrow ILoginProviderCatalog.
 using System.Globalization;
@@ -161,7 +161,7 @@ internal sealed class OAuthSelectorComponent : Container, IComponent, IFocusable
     private Func<string, double, string>? GetSelectedBrandStyle() => selectedIndex >= 0 && selectedIndex < filteredProviders.Count
         ? ProviderBrand.GetStyle(filteredProviders[selectedIndex].Id) : null;
 
-    public override List<string> Render(int width)
+    public override IReadOnlyList<string> Render(int width)
     {
         if (animationTimer is not null && GetSelectedBrandStyle() is not null) UpdateList();
         return base.Render(width);
@@ -174,7 +174,8 @@ internal sealed class OAuthSelectorComponent : Container, IComponent, IFocusable
         filteredProviders = query.Length > 0
             ? Fuzzy.Filter(allProviders, query, provider => $"{provider.Name} {provider.Id} {provider.AuthType} {provider.Method?.Name ?? ""}")
             : allProviders;
-        selectedIndex = Math.Max(0, Math.Min(selectedIndex, Math.Max(0, filteredProviders.Count - 1)));
+        // A query moves the selection to the top row, so the best match is highlighted.
+        selectedIndex = query.Length > 0 ? 0 : Math.Min(selectedIndex, Math.Max(0, filteredProviders.Count - 1));
         UpdateList();
     }
 
@@ -264,11 +265,13 @@ internal sealed class OAuthSelectorComponent : Container, IComponent, IFocusable
         {
             onCancelCallback();
         }
-        // Pass everything else to search input
+        // Pass everything else to search input. Cursor keys leave the query as it is and must not move the selection.
         else
         {
+            var previousQuery = searchInput.GetValue();
             searchInput.HandleInput(keyData);
-            FilterProviders(searchInput.GetValue());
+            var query = searchInput.GetValue();
+            if (query != previousQuery) FilterProviders(query);
         }
     }
 }

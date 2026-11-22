@@ -1393,8 +1393,13 @@ public sealed partial class RpcSessionDispatcher : IAsyncDisposable
         {
             if (message.Role != "assistant") continue;
             var body = message.WireBody.Value;
-            if (body.GetProperty("stopReason").GetString() == "aborted" && body.GetProperty("content").GetArrayLength() == 0) continue;
-            var content = RpcCommandCodec.TrimSource(RpcCommandCodec.Text(message)); if (content.Length != 0) text = content;
+            var content = RpcCommandCodec.TrimSource(RpcCommandCodec.Text(message));
+            // Pi faac585884ae2c013a6b1400f3e9e77f10b34bac agent-session.ts getLastAssistantText (#12119): a message without text from a
+            // turn that did not end normally (aborted, failed or only calling tools) is skipped, so the previous answer is returned. A
+            // reply that ended normally stays the last reply even without text.
+            var stopReason = body.TryGetProperty("stopReason", out var stop) && stop.ValueKind == System.Text.Json.JsonValueKind.String ? stop.GetString() : null;
+            if (stopReason != "stop" && content.Length == 0) continue;
+            if (content.Length != 0) text = content;
             break;
         }
         // Pinned runtime returns undefined despite the docs/types saying null; JSON.stringify omits the text property.

@@ -1,4 +1,4 @@
-// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): coding-agent/src/modes/interactive/components/user-message.ts.
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): coding-agent/src/modes/interactive/components/user-message.ts.
 using PiSharp.Tui.Pi;
 using static PiSharp.Cli.Interactive.Mode.ThemeGlobals;
 
@@ -17,6 +17,7 @@ internal sealed class UserMessageComponent : Container
     private readonly IReadOnlyList<MarkdownTransformer> markdownTransformers;
     private readonly string? messageId;
     private readonly string? timestamp;
+    private (IReadOnlyList<string> Source, List<string> Lines)? zoneLines;
 
     public UserMessageComponent(string text, MarkdownTheme? markdownTheme = null, int outputPad = 1, IReadOnlyList<MarkdownTransformer>? markdownTransformers = null,
         string? messageId = null, string? timestamp = null)
@@ -53,13 +54,19 @@ internal sealed class UserMessageComponent : Container
                 Transform: MarkdownTransform.CreateMarkdownTransform(MarkdownMessageType.User, () => false, markdownTransformers, messageId, timestamp))));
     }
 
-    public override List<string> Render(int width)
+    public override IReadOnlyList<string> Render(int width)
     {
         var lines = base.Render(width);
         if (lines.Count == 0) return lines;
 
-        lines[0] = Osc133ZoneStart + lines[0];
-        lines[^1] = Osc133ZoneEnd + Osc133ZoneFinal + lines[^1];
-        return lines;
+        // Container output is shared across frames; copy it once per change instead of mutating it.
+        if (zoneLines is not { } cached || !ReferenceEquals(cached.Source, lines))
+        {
+            var zoned = new List<string>(lines);
+            zoned[0] = Osc133ZoneStart + zoned[0];
+            zoned[^1] = Osc133ZoneEnd + Osc133ZoneFinal + zoned[^1];
+            zoneLines = cached = (lines, zoned);
+        }
+        return cached.Lines;
     }
 }

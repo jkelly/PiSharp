@@ -342,6 +342,7 @@ internal static class ToolsRecoveryTests
                         reached.Resolve();
                         await Aborted(callContext.CancellationToken);
                     }
+                    return null;
                 },
             });
             setup.Faux.SetResponses(Call("work"), Done);

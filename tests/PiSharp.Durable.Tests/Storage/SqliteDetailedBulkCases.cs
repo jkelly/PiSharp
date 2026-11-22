@@ -1,4 +1,4 @@
-// Pi b4afdddf44e059c67ccf5097e5317d913521b470 (MIT): packages/durable/src/storage/sqlite/commit.ts, packages/durable/test/sqlite-commit.test.ts.
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/durable/src/storage/sqlite/commit.ts, packages/durable/test/sqlite-commit.test.ts.
 // Authored native regression; not an upstream execution capture.
 // Pi v1.5.2 bounded-commit regressions, adapted from packages/durable/test/sqlite-commit.test.ts.
 // Physical rows are compared as well as public values: pending writes must preserve all retained history.

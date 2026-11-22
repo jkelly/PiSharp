@@ -1,8 +1,8 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/ai/src/api/openai-codex-responses.ts (stream over SSE with the zstd
-// request body, streamSimple, buildRequestBody, resolveCodexUrl, mapCodexEvents, normalizeCodexStatus, parseErrorResponse,
-// extractAccountId, buildSSEHeaders, the retry helpers and service tier pricing; the WebSocket transport is in the .WebSocket part) and
-// providers/openai-codex.ts. Event processing reuses the native Responses state
-// machine (openai-responses-shared.ts processResponsesStream).
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/ai/src/api/openai-codex-responses.ts (stream over SSE with the zstd
+// request body, streamSimple, buildRequestBody, getConfigurationUpdateEffort, resolveReasoningEffort, resolveCodexUrl, mapCodexEvents,
+// normalizeCodexStatus, parseErrorResponse, extractAccountId, buildSSEHeaders, the retry helpers and service tier pricing; the
+// WebSocket transport is in the .WebSocket part), api/simple-options.ts (buildBaseOptions' maxTokens) and providers/openai-codex.ts.
+// Event processing reuses the native Responses state machine (openai-responses-shared.ts processResponsesStream).
 using System.Collections.Immutable;
 using System.Globalization;
 using System.Net;
@@ -28,6 +28,10 @@ public sealed record OpenAICodexResponsesOptions
     /// <summary>"low" (default), "medium" or "high".</summary>
     public string? TextVerbosity { get; init; }
     public double? Temperature { get; init; }
+    /// <summary>SimpleStreamOptions.maxTokens (Pi 1.6.0): the response's output limit, sent as <c>max_output_tokens</c> (at least 16)
+    /// unless the model's compat.supportsMaxOutputTokens is false. Null uses the model's maxTokens. Either is first fitted into the
+    /// context window, as streamSimple's buildBaseOptions does.</summary>
+    public double? MaxTokens { get; init; }
     /// <summary>The session id: prompt_cache_key and the session-id/x-client-request-id headers, unless caching is off.</summary>
     public string? SessionId { get; init; }
     public string? CacheRetention { get; init; }
@@ -88,7 +92,11 @@ public sealed partial class OpenAICodexResponsesTransport : IChatTransport, IThi
     private readonly ImmutableArray<string> _levels;
     private readonly string? _defaultLevel;
     private readonly ResponsesTokenRates _rates;
-    private readonly bool _grammar, _strictMode, _midConversation, _developerRole, _additionalTools, _toolSearch;
+    private readonly bool _grammar, _strictMode, _midConversation, _developerRole, _additionalTools, _toolSearch, _midEffort, _maxOutputTokens;
+    // The Responses API rejects max_output_tokens below 16 (https://github.com/earendil-works/pi/issues/6265).
+    private const double MinOutputTokens = 16;
+    // CONFIGURATION_UPDATE_REQUEST_EFFORT: the fixed reasoning.effort while configuration_update items carry the thinking level.
+    private const string ConfigurationUpdateRequestEffort = "medium";
 
     public OpenAICodexResponsesTransport(HttpClient client, ModelDescriptor model, JsonData modelMetadata, OpenAICodexResponsesOptions options,
         Func<CancellationToken, ValueTask<string>> accessToken, string? defaultThinkingLevel = null)
@@ -107,6 +115,7 @@ public sealed partial class OpenAICodexResponsesTransport : IChatTransport, IThi
         _grammar = Compat("supportsOpenAIGrammarTools", false); _strictMode = Compat("supportsStrictMode", true);
         _additionalTools = Compat("supportsAdditionalTools", false); _toolSearch = Compat("supportsToolSearch", false);
         _midConversation = Compat("supportsMidConvoSystemMessages", false); _developerRole = Compat("supportsDeveloperRole", true);
+        _midEffort = Compat("supportsMidConvoEffort", false); _maxOutputTokens = Compat("supportsMaxOutputTokens", true);
     }
 
     public ImmutableArray<string> GetSupportedThinkingLevels(ModelDescriptor model) => model == _model ? _levels : throw new ArgumentException("Unknown Codex model.");
@@ -150,10 +159,11 @@ public sealed partial class OpenAICodexResponsesTransport : IChatTransport, IThi
 
     private static readonly JsonSerializerOptions BodyJson = new() { Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping, MaxDepth = 2 * JsonData.MaximumDepth };
 
-    /// <summary>convertResponsesMessages options for Codex: no system prompt, Codex tool-call providers.</summary>
-    private ResponsesTranscriptProjectionOptions ProjectionOptions() => new(
+    /// <summary>convertResponsesMessages options for Codex: Codex tool-call providers, and the thinking level as configuration_update
+    /// items when <paramref name="configurationUpdateEffort"/> is set. The system prompt is the leading developer item (Pi 1.6.0).</summary>
+    private ResponsesTranscriptProjectionOptions ProjectionOptions(string? configurationUpdateEffort = null) => new(
             Reasoning: _metadata.TryGetProperty("reasoning", out var reasoning) && reasoning.ValueKind == JsonValueKind.True,
-            SupportsDeveloperRole: _developerRole, SupportsMidConversationSystemMessages: _midConversation, IncludeInitialSystemPrompt: false,
+            SupportsDeveloperRole: _developerRole, SupportsMidConversationSystemMessages: _midConversation,
             MaximumMessages: _options.MaximumMessages, MaximumEntryCharacters: _options.MaximumEntryCharacters,
             MaximumInputCharacters: Budget, MaximumOutputCharacters: Budget,
             ToolDeclarations: new(SupportsStrictMode: _strictMode, Strict: null, MaximumMessages: _options.MaximumMessages,
@@ -162,21 +172,55 @@ public sealed partial class OpenAICodexResponsesTransport : IChatTransport, IThi
         {
             SupportsAdditionalTools = _additionalTools, SupportsToolSearch = _toolSearch,
             ModelSupportsImages = _metadata.TryGetProperty("input", out var inputs) && inputs.ValueKind == JsonValueKind.Array &&
-                inputs.EnumerateArray().Any(item => item.ValueKind == JsonValueKind.String && item.GetString() == "image")
+                inputs.EnumerateArray().Any(item => item.ValueKind == JsonValueKind.String && item.GetString() == "image"),
+            ConfigurationUpdateEffort = configurationUpdateEffort
         };
 
-    /// <summary>buildRequestBody for the request's thinking level (streamSimple clamps it; "off" omits reasoningEffort).</summary>
+    private bool ModelReasoning => _metadata.TryGetProperty("reasoning", out var reasoning) && reasoning.ValueKind == JsonValueKind.True;
+
+    /// <summary>streamSimple's reasoningEffort: the request's level clamped to the model's (none requested counts as off); off travels as
+    /// effort "none" on a reasoning model, so that with configuration_update items switching to it keeps the prompt cache. Null on a
+    /// model without reasoning.</summary>
+    private string? ReasoningEffort(ChatRequest request)
+    {
+        var level = request.ThinkingLevel ?? _defaultLevel;
+        var clamped = level is null ? "off" : ProviderTranscript.ClampThinkingLevel(_metadata, level);
+        return clamped != "off" ? clamped : ModelReasoning ? "none" : null;
+    }
+
+    /// <summary>resolveReasoningEffort: the provider-native effort of a requested level; null when the model takes no reasoning field
+    /// for it (thinkingLevelMap.off is null).</summary>
+    private string? ResolveReasoningEffort(string reasoningEffort)
+    {
+        var (present, mapped) = ProviderTranscript.MappedLevel(_metadata, reasoningEffort == "none" ? "off" : reasoningEffort);
+        if (reasoningEffort == "none") return present ? mapped : "none";
+        return present && mapped is not null ? mapped : reasoningEffort;
+    }
+
+    /// <summary>getConfigurationUpdateEffort (Pi 1.6.0, #12269): the effort to send in configuration_update items, or null to send it as
+    /// reasoning.effort. Only models with compat.supportsMidConvoEffort take the items.</summary>
+    internal string? ConfigurationUpdateEffort(ChatRequest request) =>
+        _midEffort && ReasoningEffort(request) is { } reasoningEffort ? ResolveReasoningEffort(reasoningEffort) : null;
+
+    /// <summary>buildBaseOptions' maxTokens: clampMaxTokensToContext(model, context, options.maxTokens ?? model.maxTokens); NaN when the
+    /// model row gives no number to work from.</summary>
+    private double MaxTokens(IReadOnlyList<JsonObject> messages)
+    {
+        double Number(string name) => _metadata.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.Number ? value.GetDouble() : double.NaN;
+        var maximum = _options.MaxTokens ?? Number("maxTokens"); var contextWindow = Number("contextWindow");
+        if (double.IsNaN(maximum) || double.IsNaN(contextWindow)) return double.NaN;
+        return SimpleOutputBudget.ClampToContext(contextWindow, contextWindow <= 0 ? 0 : ProviderTranscript.EstimateContextTokens(messages), maximum);
+    }
+
+    /// <summary>buildRequestBody for the request's thinking level (streamSimple clamps it). The system prompt goes into a leading
+    /// developer item, not a top-level <c>instructions</c> field, as in Codex: from GPT-6.2 on the backend appends instructions after
+    /// input, so every new turn changed the prompt before the system prompt and it was never served from the prompt cache (#12273).</summary>
     public JsonObject BuildBody(ChatRequest request)
     {
         ArgumentNullException.ThrowIfNull(request);
-        var level = request.ThinkingLevel ?? _defaultLevel;
-        string? effort = level is null ? null : ProviderTranscript.ClampThinkingLevel(_metadata, level);
-        if (effort == "off") effort = null;
-        var messages = ProviderTranscript.Parse(request.Messages);
-        var resolved = _midConversation ? messages : ProviderTranscript.CollapseSystemMessages(messages);
-        var initial = resolved.Count > 0 && ProviderTranscript.Role(resolved[0]) == "system" ? resolved[0] : null;
-        var instructions = initial is null ? "" : ProviderTranscript.SystemText(initial);
-        var projection = ProjectionOptions();
+        var reasoningEffort = ReasoningEffort(request);
+        var configurationUpdateEffort = ConfigurationUpdateEffort(request);
+        var projection = ProjectionOptions(configurationUpdateEffort);
         var projector = new ResponsesTranscriptProjector(projection);
         var input = JsonNode.Parse(projector.ProjectInput(request, CancellationToken.None).ToString(), documentOptions: JsonData.DocumentOptions);
         var tools = JsonNode.Parse(projector.ProjectTools(request, CancellationToken.None).ToString(), documentOptions: JsonData.DocumentOptions) as JsonArray;
@@ -184,7 +228,6 @@ public sealed partial class OpenAICodexResponsesTransport : IChatTransport, IThi
         var body = new JsonObject
         {
             ["model"] = _model.Id, ["store"] = false, ["stream"] = true,
-            ["instructions"] = instructions.Length != 0 ? instructions : "You are a helpful assistant.",
             ["input"] = input,
             ["text"] = new JsonObject { ["verbosity"] = _options.TextVerbosity ?? "low" },
             ["include"] = new JsonArray("reasoning.encrypted_content")
@@ -192,18 +235,20 @@ public sealed partial class OpenAICodexResponsesTransport : IChatTransport, IThi
         if (cacheKey is not null) body["prompt_cache_key"] = cacheKey;
         body["tool_choice"] = _options.ToolChoice ?? "auto";
         body["parallel_tool_calls"] = true;
+        // if (options?.maxTokens && (compat.supportsMaxOutputTokens ?? true)): zero and NaN are falsy.
+        if (_maxOutputTokens && MaxTokens(ProviderTranscript.Parse(request.Messages)) is var maxTokens && !double.IsNaN(maxTokens) && maxTokens != 0)
+        {
+            var limit = Math.Max(maxTokens, MinOutputTokens);
+            body["max_output_tokens"] = limit == Math.Truncate(limit) && Math.Abs(limit) < 9_007_199_254_740_992 ? JsonValue.Create((long)limit) : JsonValue.Create(limit);
+        }
         if (_options.Temperature is { } temperature) body["temperature"] = temperature;
         // PiSharp-only: a request's own tier (ChatRequest.ServiceTier) wins over the configured one.
         if ((request.ServiceTier is { } requested ? ServiceTiers.Codex(requested) : _options.ServiceTier) is { } tier) body["service_tier"] = tier;
         if (tools is { Count: > 0 }) body["tools"] = tools;
-        var (offPresent, off) = ProviderTranscript.MappedLevel(_metadata, "off");
-        if (effort is not null)
-        {
-            var (present, mapped) = ProviderTranscript.MappedLevel(_metadata, effort);
-            body["reasoning"] = new JsonObject { ["effort"] = present && mapped is not null ? mapped : effort, ["summary"] = _options.ReasoningSummary ?? "auto" };
-        }
-        else if (projection.Reasoning && !(offPresent && off is null))
-            body["reasoning"] = new JsonObject { ["effort"] = offPresent ? off : "none" };
+        // streamSimple leaves reasoningEffort undefined only for a model without reasoning, which takes no reasoning field.
+        if (reasoningEffort is not null &&
+            (configurationUpdateEffort is null ? ResolveReasoningEffort(reasoningEffort) : ConfigurationUpdateRequestEffort) is { } effort)
+            body["reasoning"] = new JsonObject { ["effort"] = effort, ["summary"] = _options.ReasoningSummary ?? "auto" };
         return body;
     }
 
@@ -290,7 +335,8 @@ public sealed partial class OpenAICodexResponsesTransport : IChatTransport, IThi
         var inner = new ResponsesTextToolTransport((chat, cancellation, context) => PrepareAsync(chat, invocation, cancellation),
             new ResponsesTextToolOptions(MaximumEvents: int.MaxValue, MaximumEventCharacters: 16 * 1_048_576, MaximumInputCharacters: 64 * 1_048_576,
                 MaximumContentSlots: int.MaxValue, MaximumContentCharacters: 16 * 1_048_576, MaximumJsonDepth: JsonData.MaximumDepth, Rates: _rates)
-            { SupportsOpenAIGrammarTools = _grammar });
+            // stream(): a managed reply records its configuration_update effort on the output (providerThinkingLevel).
+            { SupportsOpenAIGrammarTools = _grammar, ProviderThinkingLevel = ConfigurationUpdateEffort(request), Clock = _options.Time ?? TimeProvider.System });
         var keep = false;
         try
         {
@@ -342,10 +388,13 @@ public sealed partial class OpenAICodexResponsesTransport : IChatTransport, IThi
     private static AssistantMessage WithDiagnostics(AssistantMessage message, Invocation invocation)
     {
         if (invocation.Diagnostics.Count == 0) return message;
-        var existing = message.ExtraProperties is { } properties && properties.Values.TryGetValue("diagnostics", out var value) && JsonNode.Parse(value.ToString()) is JsonArray array
-            ? array : new JsonArray();
-        foreach (var diagnostic in invocation.Diagnostics) existing.Add(diagnostic.DeepClone());
-        return message with { ExtraProperties = (message.ExtraProperties ?? JsonFields.Empty).Set("diagnostics", JsonData.Parse(existing.ToJsonString())) };
+        // The transport diagnostics were appended to the output before the response's own (openai_input_transformations, which the
+        // terminal event appends), so they come first.
+        var all = new JsonArray();
+        foreach (var diagnostic in invocation.Diagnostics) all.Add(diagnostic.DeepClone());
+        if (message.ExtraProperties is { } properties && properties.Values.TryGetValue("diagnostics", out var value) && JsonNode.Parse(value.ToString()) is JsonArray array)
+            foreach (var diagnostic in array) all.Add(diagnostic?.DeepClone());
+        return message with { ExtraProperties = (message.ExtraProperties ?? JsonFields.Empty).Set("diagnostics", JsonData.Parse(all.ToJsonString())) };
     }
 
     private async ValueTask<IAsyncEnumerator<JsonData>> PrepareAsync(ChatRequest request, Invocation invocation, CancellationToken token)

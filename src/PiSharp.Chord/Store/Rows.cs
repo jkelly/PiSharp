@@ -1,4 +1,4 @@
-// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/chord/src/next/store/rows.ts
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/chord/src/store/rows.ts
 //
 // Rows (slice 6a §5 "Values at write", §9): one compiled codec per table version between a plugin's rows and keys (a trust boundary,
 // checked closed) and what the store binds and reads; json(...) cells serialized at staging (rule 8), never walked (R9), and migrated on
@@ -204,6 +204,16 @@ internal static partial class StoreInternal
         }
     }
 
+    /// <summary>A stored scalar cell (not <c>NULL</c>) as reads return it: a boolean from 0 and 1, an address from a <c>host(...)</c> key
+    /// (upstream <c>decodeScalar</c>).</summary>
+    internal static JsonNode DecodeScalar(Column column, object value)
+    {
+        if (column.Type == ColumnType.Bool) return JsonValue.Create(value is not string && SqliteNumber(value) == 1);
+        // A host(...) column holds the keys of addresses of its kind.
+        if (column.Host is { } host) return host.Address((string)value);
+        return value is string text ? JsonValue.Create(text) : JsonValue.Create(SqliteNumber(value));
+    }
+
     /// <summary>A number as SQLite returned it (a long or a double) as a double.</summary>
     internal static double SqliteNumber(object value) => value switch
     {
@@ -308,16 +318,12 @@ internal sealed class RowCodec
             if (!stored.TryGetValue(column.Name, out var value) || value is null) continue;
             switch (column.Type)
             {
-                case ColumnType.Bool:
-                    row[column.Name] = value is not string && StoreInternal.SqliteNumber(value) == 1;
-                    break;
                 case ColumnType.Json:
                     var version = (long)StoreInternal.SqliteNumber(stored[StoreInternal.VersionColumn(column.Name)]!);
                     row[column.Name] = column.Json!.Read((string)value, version, $"{table}.{column.Name}", context);
                     break;
                 default:
-                    row[column.Name] = column.Host is { } host ? host.Address((string)value)
-                        : value is string text ? JsonValue.Create(text) : JsonValue.Create(StoreInternal.SqliteNumber(value));
+                    row[column.Name] = StoreInternal.DecodeScalar(column, value);
                     break;
             }
         }

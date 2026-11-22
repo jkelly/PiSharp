@@ -17,26 +17,33 @@
 //   round calls a tool its request did not offer (chat turns' unavailable, tool rounds' round) take UnofferedFirstCall first: the call's
 //   tool_unavailable result, which v1.2.0 appended in the round's commit, comes from the call's own pi.tool task (1c6928b30), which takes
 //   the result's ID; the result and every later record move up one ID.
+//
+// Pi v1.6.0 sync (faac585884ae2c013a6b1400f3e9e77f10b34bac): the same authored forms at v1.6.0's versions, pi.tool 4 (the parked phase)
+// and pi.generation 3 (the afterTools and yield phases); the rules above are unchanged, and where they say version 3 and 2 the records
+// now carry 4 and 3. Durations160.cs authors the other v1.6.0 difference, a durationMs on every result a tool task writes.
 using PiSharp.Durable.Chord;
 
 /// <summary>The authored v1.5.0 forms of v1.2.0 captures for the task versions of pi.tool and pi.generation (see the file header).</summary>
 internal static class ToolTasks150
 {
-    /// <summary>The definitions' versions in v1.5.0, by task kind.</summary>
-    private static readonly Dictionary<string, int> Versions = new(StringComparer.Ordinal) { ["pi.tool"] = 3, ["pi.generation"] = 2 };
+    /// <summary>The definitions' versions in v1.6.0, by task kind (3 and 2 in v1.5.0).</summary>
+    private static readonly Dictionary<string, int> Versions = new(StringComparer.Ordinal) { ["pi.tool"] = 4, ["pi.generation"] = 3 };
 
     /// <summary>What a v1.5.0 run writes where <paramref name="capture"/> holds what v1.2.0's wrote: every pi.tool and pi.generation task
     /// record at the new version.</summary>
-    public static JsonValue Written(JsonValue capture) => Map(capture, _ => true);
+    public static JsonValue Written(JsonValue capture) => Durations160.Written(Map(capture, _ => true));
 
     /// <summary><see cref="Written"/> over persisted JSON text (a JSONL line, a SQLite column). A text that changes must print back as
     /// captured first, so nothing else in it moves.</summary>
     public static string WrittenText(string text)
     {
-        if (text.Length == 0 || text[0] is not ('{' or '[') || !Versions.Keys.Any(kind => text.Contains($"\"kind\":\"{kind}\",\"version\":", StringComparison.Ordinal)))
+        // Pi v1.6.0: a text that holds a tool result may gain a durationMs (Durations160.cs).
+        if (text.Length == 0 || text[0] is not ('{' or '[') ||
+            (!Versions.Keys.Any(kind => text.Contains($"\"kind\":\"{kind}\",\"version\":", StringComparison.Ordinal)) &&
+                !text.Contains("\"toolResult\"", StringComparison.Ordinal) && !text.Contains("\"taskId\"", StringComparison.Ordinal)))
             return text;
         var value = JsonValue.Parse(text);
-        var authored = Written(value).ToJson();
+        var authored = Durations160.WrittenText(Map(value, _ => true)).ToJson();
         if (authored == value.ToJson()) return text;
         if (value.ToJson() != text) throw new InvalidOperationException($"a captured JSON text does not print back as captured: {text[..Math.Min(200, text.Length)]}");
         return authored;
@@ -49,7 +56,7 @@ internal static class ToolTasks150
     {
         var held = new Dictionary<long, bool>();
         Collect(before, held);
-        return Map(resumed, id => !held.TryGetValue(id, out var live) || live);
+        return Durations160.Resumed(Map(resumed, id => !held.TryGetValue(id, out var live) || live), before);
     }
 
     /// <summary>A differential capture's authored v1.5.0 form (see the file header): <see cref="Written"/> over every scenario, after
@@ -58,7 +65,7 @@ internal static class ToolTasks150
     {
         foreach (var (scenario, callId) in unoffered)
             capture = capture.SetItem(scenario, UnofferedFirstCall((JsonObjectValue)capture[scenario], callId));
-        return (JsonObjectValue)Written(capture);
+        return Durations160.Differential((JsonObjectValue)Map(capture, _ => true));
     }
 
     /// <summary>The ID keys of a records dump (entries, tasks, submissions and their references).</summary>

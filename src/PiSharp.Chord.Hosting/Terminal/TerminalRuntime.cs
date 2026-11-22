@@ -1,4 +1,6 @@
-// Pi b4afdddf44e059c67ccf5097e5317d913521b470 (MIT): packages/chord/src/tui/runtime.ts.
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/chord/src/tui/runtime.ts (unchanged at 1.6.0).
+// 1.6.0: the client's start no longer waits for the scripts object (surfaces/client.ts), so Render runs as soon as the client's host is
+// loaded with the initial scripts, before the server's set was applied (offline too), as upstream's startTui renders after startClient.
 // Native adapters retain explicit trusted-code and terminal ownership boundaries.
 using System.Text.Json.Nodes;
 using PiSharp.Chord.Host;

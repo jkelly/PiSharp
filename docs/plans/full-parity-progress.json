@@ -357,6 +357,22 @@
       "blockers": [],
       "publishedOn": "2026-11-12",
       "tag": "v1.5.2 (f786a55dc32d1767ac220ed1ad4c44748bccba97), release run 43171815825"
+    },
+    "1.6.0": {
+      "version": "1.6.0",
+      "kind": "sync",
+      "baseline": "v1.6.0",
+      "status": "source-candidate",
+      "branch": "sync/pi-1.6.0",
+      "ships": "Not published. Pi and Pi Durable v1.6.0 source sync from v1.5.2: the exact 1.6.0 model catalog, provider, CLI, TUI, Durable and Chord changes.",
+      "decision": "docs/decisions/0015-pi-1.6.0-sync.md",
+      "applicability": "compatibility/sync-1.6.0-applicability.json",
+      "notes": "docs/release-notes/1.6.0.md",
+      "changelog": "website/src/content/changelog/1.6.0.md",
+      "blockers": [
+        "Integrated validation and an acceptance record for the 1.6.0 applicability table.",
+        "Release authorization, exact-tag release gates and verified publication."
+      ]
     }
   },
   "messageCaps": {

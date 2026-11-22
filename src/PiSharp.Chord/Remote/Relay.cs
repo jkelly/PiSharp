@@ -1,10 +1,58 @@
-// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): next/remote/relay.ts.
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/chord/src/remote/relay.ts.
+// 1.6.0: a relayed call waits in its upstream link's call window for its origin (decision "Call windows only for untrusted links": a relay
+// honours each upstream window) and is forwarded as a slot frees. A route's admission may hold a relayed hold back (slice 14 §2.3):
+// released upstream, its calls rejected (forbidden/revoked for a denial), told failed with the cause, and held again, under its id, by
+// the next allow.
 using PiSharp.Chord.Data;
 using PiSharp.Chord.Host;
 using PiSharp.Chord.Link;
 using PiSharp.Telemetry;
+using DataFailure = PiSharp.Chord.Data.FailureCause;
 
 namespace PiSharp.Chord.Remote;
+
+/// <summary>
+/// A downstream call on a relayed hold, as its downstream origin keeps it: registered (answered at once when its hold has no upstream
+/// link), waiting in its upstream link's window for the origin until a slot forwards it (<see cref="Send"/>), then in flight (with its
+/// <c>chord.relay</c> span when this host records) until its reply, its abort, its hold's end or the upstream's drop.
+/// </summary>
+internal sealed class RelayedCall(RelayedHold hold, CallMessage message) : IQueuedCall
+{
+    private enum Stage { New, Queued, Forwarded, Ended }
+    private Stage stage;
+    private CallWindow<RelayedCall>? window;
+    private OpenSpan? span;
+    internal RelayedHold Hold => hold;
+    internal CallMessage Message => message;
+    /// <summary>Whether it was forwarded upstream and is not answered yet.</summary>
+    internal bool Forwarded => stage == Stage.Forwarded;
+    /// <summary>Waits in <paramref name="queue"/> (its hold's upstream link's, for its origin), forwarded at once when a slot is free.</summary>
+    internal void Queue(CallWindow<RelayedCall> queue) { stage = Stage.Queued; window = queue; queue.Submit(this); }
+    /// <summary>Its window has a slot for it: forwarded upstream.</summary>
+    public void Send() { stage = Stage.Forwarded; span = hold.Call(message); }
+    /// <summary>Takes it out of its window when it still waits there (ended unsent); whether it did.</summary>
+    internal bool Unqueue()
+    {
+        if (stage != Stage.Queued) return false;
+        stage = Stage.Ended; window!.Remove(this); return true;
+    }
+    /// <summary>Ends it: a waiting one leaves its window, a forwarded one frees its slot (which may forward the next waiting call) and its
+    /// span ends with <paramref name="reply"/> (none: aborted).</summary>
+    internal void End(Message? reply = null)
+    {
+        var was = stage; stage = Stage.Ended;
+        if (was == Stage.Queued) window!.Remove(this);
+        if (was != Stage.Forwarded) return;
+        RelayedHold.EndCall(span, reply); window!.Freed();
+    }
+    /// <summary>Ends <paramref name="calls"/> (of one hold or origin): the waiting ones leave their windows first, so a slot a forwarded
+    /// one frees never forwards one of them.</summary>
+    internal static void EndAll(IReadOnlyList<RelayedCall> calls)
+    {
+        foreach (var call in calls) call.Unqueue();
+        foreach (var call in calls) call.End();
+    }
+}
 
 internal sealed class RelayedHold(ProviderSide downstream, HoldMessage request, Caller caller, RemotePath path) : IIncomingHold, IUpstream
 {
@@ -13,6 +61,8 @@ internal sealed class RelayedHold(ProviderSide downstream, HoldMessage request, 
     private OpenSpan? relaying;
     private IReadOnlyDictionary<string, string>? firstTrace;
     private int holds;
+    // What its downstream was told holds it back (Withheld), until it is told that it is admitted again.
+    private DataFailure? heldBack;
     public ITelemetrySpan? Span => relaying?.Span;
     public long Id => request.Hold;
     public Caller Caller => caller;
@@ -40,14 +90,49 @@ internal sealed class RelayedHold(ProviderSide downstream, HoldMessage request, 
     public void Dropped(ChordError error) { var previous = upstream; upstream = null; if (previous is not null) downstream.UpstreamDropped(this, error); }
     public void Unreachable(ChordError error)
     { Relayed("error", error); downstream.Send(new FailedMessage(Id, new("waiting", WireError.FromException(error)))); }
-    internal OpenSpan? Call(CallMessage message)
+    /// <summary>Its route's admission holds it back with <paramref name="cause"/> (slice 14 §2.3): released upstream when it is held there
+    /// (what still arrives for it from that link is dropped: a link answers only for what is relayed over it); downstream its calls, in
+    /// flight and waiting, are rejected and it is told <c>failed</c> with the cause. It stays on its path: an allow holds it again, under
+    /// its id.</summary>
+    public void Withheld(DataFailure cause)
     {
-        // A relay is a trust boundary even when it is not recording telemetry.
+        var link = upstream; upstream = null;
+        link?.Send(new ReleaseMessage(Id) { Origin = origin });
+        Relayed("error", cause.Error);
+        heldBack = cause;
+        downstream.Withheld(this, cause);
+    }
+    /// <summary>Its route's admission allows it: a hold that was told what held it back is <c>loading</c> downstream from here on, through
+    /// the fence and its host's start, until its next <c>bound</c>. A hold never told anything is loading already.</summary>
+    public void Admitted()
+    {
+        if (heldBack is null) return;
+        heldBack = null;
+        downstream.Send(new LoadingMessage(Id));
+    }
+    /// <summary>A call from downstream (registered there under its id): it waits in its upstream link's window for this origin and is
+    /// forwarded (<see cref="Call"/>) as a slot frees, at once when one is free and nothing waits; its reply comes back by the origin.
+    /// Without an upstream link it is answered at once: <c>unavailable</c> (it crossed the <c>loading</c> notice), or, held back by its
+    /// route's admission, what held it back (it crossed that <c>failed</c>: <c>forbidden/revoked</c> for a denial, access withdrawn under
+    /// a call already made).</summary>
+    internal void Submit(RelayedCall call)
+    {
         if (upstream is not { } link)
         {
-            downstream.Reply(message.Call, new ErrorMessage(message.Call, WireError.FromException(new ChordError("unavailable", "the upstream link is down"))));
-            return null;
+            var id = call.Message.Call;
+            var unreached = heldBack is { } cause ? AdmissionInternal.Cut($"hold {Id}", cause) : new ChordError("unavailable", "the upstream link is down");
+            downstream.Reply(id, new ErrorMessage(id, WireError.FromException(unreached)));
+            return;
         }
+        call.Queue(link.Consumer.RelayWindow(origin));
+    }
+    /// <summary>Forwards a submitted call upstream, now that its window has a slot; returns its <c>chord.relay</c> span when this host
+    /// records.</summary>
+    internal OpenSpan? Call(CallMessage message)
+    {
+        // A call waits only in its hold's current upstream window: the drop answers it first (UpstreamDropped), a release forgets it.
+        var link = upstream!;
+        // A relay is a trust boundary even when it is not recording telemetry.
         var forwarded = message with { Origin = origin, Old = downstream.Link.Trusted ? message.Old : null };
         OpenSpan? span = null;
         var adapter = downstream.Link.Host.Telemetry;

@@ -21,6 +21,7 @@ internal static class PersistentAgentSessionTests
         ("Persistent Agent explicit leaf appends a branch without inserting sibling history", SelectedBranch),
         ("Persistent Agent rejects mismatched model/thinking/influences and closes failed opens", OpenAdmission),
         ("Persistent Agent cancellation and concurrent disposal await durable aborted settlement", CancellationSettlement),
+        ("sync160.Persistent Agent abort during a tool batch persists a result for every call", AbortedBatchResults),
         ("Persistent Agent subscriptions see acknowledged bytes and hold idle/end settlement", ObserverBarrier)
     ];
 
@@ -262,6 +263,52 @@ internal static class PersistentAgentSessionTests
         Equal(StopReason.Aborted, PiWireJson.ReadMessage(reopened.Snapshot.Agent.Messages[^1].WireBody.Value).StopReason);
     }
 
+    // Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/agent/src/agent-loop.ts, packages/coding-agent/CHANGELOG.md [1.6.0]
+    // ("pressing Esc during a batch of tool calls", #9986). Authored from the source, not an upstream capture: Abort() is what Esc
+    // calls. The calls the batch had not started get an "Operation aborted" result in the session file, so a reopened session
+    // sends the provider no tool call without its result.
+    private static async Task AbortedBatchResults()
+    {
+        using var files = new Files();
+        var ids = new Ids();
+        string[] callIds = ["call-1", "call-2", "call-3"];
+        var batch = new AssistantMessage(Model.Api, Model.Provider, Model.Id, 123,
+            callIds.Select(id => (AssistantContent)new ToolCallContent(id, "read", JsonData.Parse("""{"path":"/fake"}"""))).ToImmutableArray(),
+            TokenUsage.Zero, StopReason.ToolUse);
+        var transport = new Script([batch]);
+        PersistentAgentSession? running = null; var executed = new List<string>();
+        var tool = new AbortingExecutor(invocation =>
+        {
+            executed.Add(invocation.Call.Id);
+            Check(running!.Abort(), "Active abort was rejected.");
+        });
+        static IEnumerable<string> Results(ImmutableArray<TranscriptEntry> messages) => messages.Where(entry => entry.Role == "toolResult")
+            .Select(entry => entry.WireBody.Value).Select(result => result.GetProperty("toolCallId").GetString() + "=" +
+                result.GetProperty("content")[0].GetProperty("text").GetString() + "/" + result.GetProperty("isError").GetBoolean());
+        string[] expected = ["call-1=interrupted/True", "call-2=Operation aborted/True", "call-3=Operation aborted/True"];
+        await using (var session = running = await Create(files, new(Model, transport, [new("read", tool, ToolExecutionMode.Sequential)]), ids))
+        {
+            var result = await Within(session.PromptAsync(Input("three calls")));
+            Equal(AgentLoopStopReason.ChatFailure, result.Reason);
+            Check(executed.SequenceEqual(["call-1"]), "A call started after the abort.");
+            Equal(1, transport.Requests.Count);
+            Check(session.Snapshot.Context.LlmMessages.Select(entry => entry.Role).SequenceEqual(["user", "assistant", "toolResult", "toolResult", "toolResult"]),
+                "The aborted batch did not commit one result for each call.");
+            Check(Results(session.Snapshot.Context.LlmMessages).SequenceEqual(expected), "Committed results of the aborted batch differ.");
+            Equal(new FileInfo(files.Path).Length, session.Snapshot.Log.CommittedByteLength);
+        }
+        var resumed = new Script([Message()]);
+        await using var reopened = await PersistentAgentSession.OpenAsync(files.Path, Configuration(resumed), () => 123, ids.Next);
+        Check(Results(reopened.Snapshot.Agent.Messages).SequenceEqual(expected), "The session file lost a result of the aborted batch.");
+        await Within(reopened.PromptAsync(Input("after the abort")));
+        var sent = resumed.Requests.Single().Messages;
+        var calls = sent.Where(entry => entry.Role == "assistant").SelectMany(entry => entry.WireBody.Value.GetProperty("content").EnumerateArray())
+            .Where(block => block.GetProperty("type").GetString() == "toolCall").Select(block => block.GetProperty("id").GetString()).ToArray();
+        Check(calls.SequenceEqual(callIds), "The next request lost the aborted batch's calls.");
+        Check(sent.Where(entry => entry.Role == "toolResult").Select(entry => entry.WireBody.Value.GetProperty("toolCallId").GetString()).SequenceEqual(calls),
+            "The next request carries a tool call without its result.");
+    }
+
     private static async Task ObserverBarrier()
     {
         using var files = new Files();
@@ -375,6 +422,11 @@ internal static class PersistentAgentSessionTests
         public int Calls;
         public ValueTask<ToolResult> ExecuteAsync(ToolInvocation invocation, CancellationToken token)
         { token.ThrowIfCancellationRequested(); Calls++; return ValueTask.FromResult(new ToolResult([new("effect")], JsonData.Parse("""{"scale":1.0,"opaque":null}"""))); }
+    }
+    private sealed class AbortingExecutor(Action<ToolInvocation> onExecute) : IToolExecutor
+    {
+        public ValueTask<ToolResult> ExecuteAsync(ToolInvocation invocation, CancellationToken token)
+        { onExecute(invocation); throw new InvalidOperationException("interrupted"); }
     }
     private sealed class Sink(Func<AgentEvent, CancellationToken, ValueTask> callback) : IAgentEventSink
     { public ValueTask EmitAsync(AgentEvent observation, CancellationToken token) => callback(observation, token); }

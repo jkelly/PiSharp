@@ -7,6 +7,8 @@ PiSharp is an independent native .NET implementation of the [Pi coding agent](ht
 
 The published **PiSharp 1.5.2** release follows **Pi v1.5.2**, pinned to `b4afdddf`, including v1.5.1. Source, hosted and package validation retain explicit limitations; matching the version does not claim complete parity. See [How versions work](/docs/versioning/) and the [release notes](https://github.com/jkelly/PiSharp/blob/main/docs/release-notes/1.5.2.md).
 
+The current **unreleased source candidate targets Pi v1.6.0**, pinned to `faac5858`. Its local source validation is recorded with explicit limitations; the source version does not claim completed parity, and nothing of it is on NuGet. See the [candidate notes](https://github.com/jkelly/PiSharp/blob/main/docs/release-notes/1.6.0.md).
+
 ## What's included
 
 - **Pi's command line:** run `pisharp` as you would run `pi`. The same flags, print and JSON modes, RPC, and the `install`, `update`, `config`, `auth` and `mcp` commands.

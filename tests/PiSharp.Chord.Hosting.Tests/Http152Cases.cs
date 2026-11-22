@@ -94,7 +94,7 @@ internal static class Http152Cases
         await using var http = new ChordHttp(host, new()
         {
             Port = 0, LinksPath = "/links", OnError = _ => { },
-            LinksOpened = (_, _) => { opened++; return Task.FromResult<Func<Task>?>(() => { cleaned++; cleanup.TrySetResult(); return Task.CompletedTask; }); }
+            LinksOpened = (_, _, _) => { opened++; return Task.FromResult<Func<Task>?>(() => { cleaned++; cleanup.TrySetResult(); return Task.CompletedTask; }); }
         });
         HttpSocket receive = async (socket, _, call) => { callbacks++; await socket.ReceiveAsync(new byte[64].AsMemory(), call.AbortSignal); };
         await host.LoadAsync([new("chord.http", http.Facet), new("test.http", Facet.Define((_, self) =>

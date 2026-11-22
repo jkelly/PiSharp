@@ -17,5 +17,5 @@ internal sealed class DynamicBorder(Func<string, string>? color = null) : ICompo
         // No cached state to invalidate currently
     }
 
-    public List<string> Render(int width) => [color(TextUtils.Repeat("─", Math.Max(1, width)))];
+    public IReadOnlyList<string> Render(int width) => [color(TextUtils.Repeat("─", Math.Max(1, width)))];
 }

@@ -251,7 +251,7 @@ internal static partial class HarnessTests
             var local = Registry.Create();
             var first = new ToolHooks { BeforeTool = (_, _, _) => Task.FromResult<BeforeToolDecision?>(null) };
             var second = new ToolHooks { BeforeTool = (_, _, _) => Task.FromResult<BeforeToolDecision?>(null) };
-            var onYield = new GenerationHooks { OnYield = (_, _, _) => Task.FromResult<JsonValue?>(null) };
+            var onYield = new GenerationHooks { OnYield = (_, _, _) => Task.FromResult<OnYieldResult?>(null) };
             local.Install(new Extension
             {
                 Name = "a",

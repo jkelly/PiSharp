@@ -10,7 +10,7 @@
 // - The probe's lists are SyncLists, and its gates and admit are read when the task or hook runs, as upstream's mutable fields are.
 // - afterRun returns the requests themselves, null for none (GenerationHooks.AfterRun), where upstream returns { tasks }.
 // - "reports broken requests and hooks and creates the rest": a C# JsonValue is strict JSON, so upstream's input holding a function cannot
-//   be built. A request with a null input stands in for it, rejected with its own message ("The afterRun request for task test.run-tests
+//   be built. A request with a null input stands in for it, rejected with its own message ("The hook's request for task test.run-tests
 //   has no input; expected strict JSON", where upstream's copyJson says "Value contains a non-JSON function; expected strict JSON"). The
 //   not-a-list hook returns a list holding null, as a C# list cannot be a string: a request without a task. AggregateError is
 //   AggregateException, its errors InnerExceptions. Infos and Reports are ChatSetup's, at the same index.
@@ -103,7 +103,7 @@ internal static class AfterRunTests
         },
     });
 
-    private delegate Task<IReadOnlyList<RunEndTask>?> AfterRunHook(RunSummary run, IHookApi api, DurableContext context);
+    private delegate Task<IReadOnlyList<HookTask>?> AfterRunHook(RunSummary run, IHookApi api, DurableContext context);
 
     /// <summary>Installs the after-run extension: its task and an afterRun hook, by default asking for one task per run. Returns the task
     /// (upstream <c>install</c>).</summary>
@@ -114,7 +114,7 @@ internal static class AfterRunTests
         {
             state.Asked.Add(run);
             if (state.HookGate is { } gate) await gate.Task;
-            return [Define.RunEndTask(tests, Obj(("label", $"run {state.Asked.Count}")))];
+            return [Define.HookTask(tests, Obj(("label", $"run {state.Asked.Count}")))];
         });
         setup.Registry.Install(Define.Extension(new Extension
         {
@@ -258,7 +258,7 @@ internal static class AfterRunTests
             Install(setup, state, (run, _, _) =>
             {
                 state.Asked.Add(run);
-                return Task.FromResult<IReadOnlyList<RunEndTask>?>(null);
+                return Task.FromResult<IReadOnlyList<HookTask>?>(null);
             });
             setup.Faux.SetResponses(FauxAssistantMessage("done"));
             var (harness, root) = await OpenChat(memory(), setup);
@@ -286,7 +286,7 @@ internal static class AfterRunTests
                     {
                         state.Asked.Add(run);
                         // Only the first run gets a task.
-                        return Task.FromResult<IReadOnlyList<RunEndTask>?>(state.Asked.Count == 1 ? [Define.RunEndTask(tests, Obj(("label", "run 1")))] : null);
+                        return Task.FromResult<IReadOnlyList<HookTask>?>(state.Asked.Count == 1 ? [Define.HookTask(tests, Obj(("label", "run 1")))] : null);
                     },
                 })],
             }));
@@ -353,7 +353,7 @@ internal static class AfterRunTests
                 Name = "again",
                 Hooks = [Define.Hook(HarnessTasks.GenerationTask, new GenerationHooks
                 {
-                    OnYield = (_, _, _) => Task.FromResult<JsonValue?>(Interlocked.Increment(ref yields) <= 2 ? (JsonValue)"again" : null),
+                    OnYield = (_, _, _) => Task.FromResult<OnYieldResult?>(Interlocked.Increment(ref yields) <= 2 ? (JsonValue)"again" : null),
                 })],
             }));
             setup.Faux.SetResponses(FauxAssistantMessage("1"), FauxAssistantMessage("2"), FauxAssistantMessage("3"));
@@ -458,7 +458,7 @@ internal static class AfterRunTests
                         {
                             state.Asked.Add(run);
                             if (stage == "finish") await HarnessTests.Aborted(context.CancellationToken);
-                            return [Define.RunEndTask(tests, Obj(("label", "run 1")))];
+                            return [Define.HookTask(tests, Obj(("label", "run 1")))];
                         },
                     })],
                 }));
@@ -529,21 +529,21 @@ internal static class AfterRunTests
                 Phases = tests.Definition.Phases,
                 Abort = tests.Definition.Abort,
             });
-            IReadOnlyList<RunEndTask> requests =
+            IReadOnlyList<HookTask> requests =
             [
-                Define.RunEndTask(unknown, JsonValue.Null),
-                Define.RunEndTask(HarnessTasks.GenerationTask, JsonObjectValue.Empty),
+                Define.HookTask(unknown, JsonValue.Null),
+                Define.HookTask(HarnessTasks.GenerationTask, JsonObjectValue.Empty),
                 // Upstream's input holding a function, which a JsonValue cannot (see the file header).
-                new RunEndTask(tests, null!),
-                Define.RunEndTask(throwing, JsonValue.Null),
-                Define.RunEndTask(badStart, JsonValue.Null),
-                Define.RunEndTask(tests, Obj(("label", "ok"))),
+                new HookTask(tests, null!),
+                Define.HookTask(throwing, JsonValue.Null),
+                Define.HookTask(badStart, JsonValue.Null),
+                Define.HookTask(tests, Obj(("label", "ok"))),
             ];
             setup.Registry.Install(Define.Extension(new Extension
             {
                 Name = "after-run",
                 Tasks = [tests, throwing, badStart],
-                Hooks = [Define.Hook(HarnessTasks.GenerationTask, new GenerationHooks { AfterRun = (_, _, _) => Task.FromResult<IReadOnlyList<RunEndTask>?>(requests) })],
+                Hooks = [Define.Hook(HarnessTasks.GenerationTask, new GenerationHooks { AfterRun = (_, _, _) => Task.FromResult<IReadOnlyList<HookTask>?>(requests) })],
             }));
             setup.Registry.Install(Define.Extension(new Extension
             {
@@ -558,7 +558,7 @@ internal static class AfterRunTests
                 Name = "not-a-list",
                 Hooks = [Define.Hook(HarnessTasks.GenerationTask, new GenerationHooks
                 {
-                    AfterRun = (_, _, _) => Task.FromResult<IReadOnlyList<RunEndTask>?>([null!]),
+                    AfterRun = (_, _, _) => Task.FromResult<IReadOnlyList<HookTask>?>([null!]),
                 })],
             }));
             setup.Faux.SetResponses(FauxAssistantMessage("done"));
@@ -573,8 +573,8 @@ internal static class AfterRunTests
             var rejected = (AggregateException)reports[0];
             Seq([
                 "Task test.unknown is not installed",
-                "An afterRun hook cannot start the built-in task pi.generation",
-                "The afterRun request for task test.run-tests has no input; expected strict JSON",
+                "A hook cannot start the built-in task pi.generation",
+                "The hook's request for task test.run-tests has no input; expected strict JSON",
                 "initial failed",
                 "Task test.bad-start starts at the unknown phase nowhere",
             ], rejected.InnerExceptions.Select(error => error.Message), "rejections");
@@ -613,7 +613,7 @@ internal static class AfterRunTests
                 Name = "asker",
                 Hooks = [Define.Hook(HarnessTasks.GenerationTask, new GenerationHooks
                 {
-                    AfterRun = (_, _, _) => Task.FromResult<IReadOnlyList<RunEndTask>?>([Define.RunEndTask(stale, JsonValue.Null)]),
+                    AfterRun = (_, _, _) => Task.FromResult<IReadOnlyList<HookTask>?>([Define.HookTask(stale, JsonValue.Null)]),
                 })],
             }));
             setup.Faux.SetResponses(FauxAssistantMessage("done"));
@@ -787,7 +787,7 @@ internal static class AfterRunTests
                     AfterRun = (run, _, _) =>
                     {
                         state.Asked.Add(run);
-                        return Task.FromResult<IReadOnlyList<RunEndTask>?>(state.Asked.Count == 1 ? [Define.RunEndTask(tests, Obj(("label", "run 1")))] : null);
+                        return Task.FromResult<IReadOnlyList<HookTask>?>(state.Asked.Count == 1 ? [Define.HookTask(tests, Obj(("label", "run 1")))] : null);
                     },
                 })],
             }));
@@ -1107,7 +1107,7 @@ internal static class AfterRunTests
                     {
                         state.Asked.Add(run);
                         if (Volatile.Read(ref hookGate) is { } gate) await await Task.WhenAny(gate.Task, HarnessTests.Aborted(context.CancellationToken));
-                        return [Define.RunEndTask(tests, Obj(("label", "run")))];
+                        return [Define.HookTask(tests, Obj(("label", "run")))];
                     },
                 })],
             }));

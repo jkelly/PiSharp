@@ -629,7 +629,7 @@ internal sealed class TreeList : IComponent, IInputHandler
         return labels;
     }
 
-    public List<string> Render(int width)
+    public IReadOnlyList<string> Render(int width)
     {
         var lines = new List<string>();
 
@@ -1107,7 +1107,7 @@ internal sealed class TreeSelectorComponent : Container, IComponent, IFocusable,
     {
         private readonly Func<string, string> color = color ?? (s => theme.Fg("border", s));
         public void Invalidate() { }
-        public List<string> Render(int width) => [color(TextUtils.Repeat("─", Math.Max(1, width)))];
+        public IReadOnlyList<string> Render(int width) => [color(TextUtils.Repeat("─", Math.Max(1, width)))];
     }
 
     /// <summary>Component that displays the current search query.</summary>
@@ -1116,7 +1116,7 @@ internal sealed class TreeSelectorComponent : Container, IComponent, IFocusable,
         public bool Focused { get; set; }
         public void Invalidate() { }
 
-        public List<string> Render(int width)
+        public IReadOnlyList<string> Render(int width)
         {
             if (width <= 0) return [""];
             var query = treeList.GetSearchQuery();
@@ -1145,7 +1145,7 @@ internal sealed class TreeSelectorComponent : Container, IComponent, IFocusable,
     {
         public void Invalidate() { }
 
-        public List<string> Render(int width)
+        public IReadOnlyList<string> Render(int width)
         {
             var items = TreeHelpItems.Select(item =>
             {
@@ -1241,7 +1241,7 @@ internal sealed class TreeSelectorComponent : Container, IComponent, IFocusable,
 
         public void Invalidate() { }
 
-        public List<string> Render(int width)
+        public IReadOnlyList<string> Render(int width)
         {
             var lines = new List<string>();
             const string indent = "  ";

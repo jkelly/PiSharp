@@ -109,7 +109,7 @@ internal static partial class CodemodeTests
     {
         private int starts;
 
-        public Chat(IReadOnlyList<CodemodeGlobal>? globals = null, IReadOnlyList<CodemodeNamespace>? namespaces = null)
+        public Chat(IReadOnlyList<CodemodeGlobal>? globals = null)
         {
             Setup = ChatTests.Setup();
             Sandbox = NewSandbox();
@@ -117,7 +117,6 @@ internal static partial class CodemodeTests
             {
                 Sandbox = Sandbox,
                 Globals = globals ?? [],
-                Namespaces = namespaces ?? [],
                 OnRunStarted = run =>
                 {
                     Interlocked.Increment(ref starts);
@@ -1152,21 +1151,36 @@ internal static partial class CodemodeTests
 
         yield return Case(prefix + "finds-tools-with-searchtools-describetool-and-describenamespace-and-lists-them-in-all-tools", async () =>
         {
-            var chat = new Chat([], [new CodemodeNamespace("github", "mcp__github__") { Description = "GitHub MCP server" }]);
-            AddTool(chat.Setup.Registry, Tool("mcp__github__list_issues", (_, _, _) => Task.FromResult(new ToolExecutionResult { Output = JsonArrayValue.Empty })));
+            var chat = new Chat();
+            // The namespace is the extension's: its tools belong to it whatever their names.
+            chat.Setup.Registry.Install(Define.Extension(new Extension
+            {
+                Name = "mcp:github",
+                Namespace = new ToolNamespace("github", "GitHub MCP server", "Pass the repository as owner/name."),
+                Tools = [Tool("list_issues", (_, _, _) => Task.FromResult(new ToolExecutionResult { Output = JsonArrayValue.Empty }))],
+            }));
+            // A namespace without tools yet (a server waiting for sign-in) is described too.
+            chat.Setup.Registry.Install(Define.Extension(new Extension
+            {
+                Name = "mcp:linear",
+                Namespace = new ToolNamespace("linear", "Linear: sign in first."),
+            }));
             var ran = await RunScript("""
                 const found = await searchTools("issues");
+                				const byInstructions = await searchTools("repository owner");
                 				const inNamespace = await searchTools("echo", { namespace: "github" });
                 				return {
                 					found: found.map((tool) => tool.name),
+                					byInstructions: byInstructions.map((tool) => tool.name),
                 					inNamespace,
                 					described: (await describeTool("echo")).includes("echo(args:"),
                 					missing: (await describeTool("nope")) ?? null,
                 					namespace: await describeNamespace("github"),
-                					all: ALL_TOOLS.map((tool) => tool.name).includes("mcp__github__list_issues"),
+                					empty: await describeNamespace("linear"),
+                					all: ALL_TOOLS.map((tool) => tool.name).includes("list_issues"),
                 				};
                 """, chat);
-            SameJson("""{"found":["mcp__github__list_issues"],"inNamespace":[],"described":true,"missing":null,"namespace":{"name":"github","description":"GitHub MCP server","tools":["mcp__github__list_issues"]},"all":true}""",
+            SameJson("""{"found":["list_issues"],"byInstructions":["list_issues"],"inNamespace":[],"described":true,"missing":null,"namespace":{"name":"github","description":"GitHub MCP server","instructions":"Pass the repository as owner/name.","tools":["list_issues"]},"empty":{"name":"linear","description":"Linear: sign in first.","tools":[]},"all":true}""",
                 JsonValue.Parse(Header.Replace(ran.Text, "", 1)), "result");
         });
     }

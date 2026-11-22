@@ -1,4 +1,4 @@
-// Pi b4afdddf44e059c67ccf5097e5317d913521b470 (MIT): core/radius-mcp.ts.
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): core/radius-mcp.ts.
 using System.Text.Json.Nodes;
 using PiSharp.Cli.Commands;
 using PiSharp.Extensions.Mcp.Configuration;

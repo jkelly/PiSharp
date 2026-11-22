@@ -32,7 +32,6 @@ internal static partial class Program
         ("resolver.cli-custom-fallback-thinking-suffix", Sync(CliFallback)),
         ("resolver.defaults-exist-in-generated-catalogs", Sync(DefaultsExist)),
         ("resolver.find-initial-model", Sync(InitialModel)),
-        ("resolver.restore-model-from-session", Sync(RestoreModel)),
     ];
 
     private static (RegistryModel? Model, string? ThinkingLevel, string? Warning) Parse(string pattern, IReadOnlyList<RegistryModel> models)
@@ -195,14 +194,16 @@ internal static partial class Program
 
     private static void DefaultsExist()
     {
-        Equal("gpt-6.1-sol", ModelResolver.DefaultModelFor("openai"), "openai"); Equal("gpt-6.1-sol", ModelResolver.DefaultModelFor("openai-codex"), "codex");
+        // Pi 1.6.0 model-resolver.ts: the OpenAI defaults moved from gpt-6.1-sol to gpt-6.2-sol.
+        Equal("gpt-6.2-sol", ModelResolver.DefaultModelFor("openai"), "openai"); Equal("gpt-6.2-sol", ModelResolver.DefaultModelFor("openai-codex"), "codex");
         Equal("glm-5.3", ModelResolver.DefaultModelFor("zai"), "zai"); Equal("MiniMax-M3", ModelResolver.DefaultModelFor("minimax-cn"), "minimax-cn");
         Equal("gpt-oss-120b", ModelResolver.DefaultModelFor("cerebras"), "cerebras"); Equal("Ring-2.6-1T", ModelResolver.DefaultModelFor("ant-ling"), "ant-ling");
         Equal("zai/glm-5.3", ModelResolver.DefaultModelFor("vercel-ai-gateway"), "gateway"); Equal("grok-4.7", ModelResolver.DefaultModelFor("xai"), "xai");
         Equal("qwen3.8-max", ModelResolver.DefaultModelFor("qwen-token-plan-individual"), "qwen individual");
-        foreach (var provider in BuiltinModelCatalog.ShardHashes.Keys)
+        // The generated catalogs are the current release (Pi 1.6.0); the frozen 1.5.0 shards predate gpt-6.2-sol.
+        foreach (var provider in CurrentModelCatalog.Providers)
         {
-            var chat = BuiltinModelCatalog.Get(provider).Models.Where(model => model.Type == CatalogModelType.Chat).ToList();
+            var chat = CurrentModelCatalog.Get(provider)!.Models.Where(model => model.Type == CatalogModelType.Chat).ToList();
             var id = ModelResolver.DefaultModelFor(provider);
             if (chat.Count == 0) { Check(id is null, provider + " has no chat models and should have no chat default"); continue; }
             Check(chat.Any(model => model.Id == id), $"{provider} default {id} should exist in its generated catalog");
@@ -226,16 +227,5 @@ internal static partial class Program
         Check(scoped.Model?.Reference == "openai/gpt-4o" && scoped.ThinkingLevel == "high", "scoped first with per-model level");
         var continuing = ModelResolver.FindInitialModel([new(AllModels[1], "low")], true, null, null, null, null, (_, _) => null, NoAuth, () => []);
         Check(continuing.Model is null, "scoped models skipped when continuing");
-    }
-
-    private static void RestoreModel()
-    {
-        Registry(out var registry, Env(("GROQ_API_KEY", "k")));
-        var restored = ModelResolver.RestoreModelFromSession("groq", "openai/gpt-oss-120b", null, registry);
-        Check(restored.Model?.Reference == "groq/openai/gpt-oss-120b" && restored.FallbackMessage is null, "restored");
-        var missing = ModelResolver.RestoreModelFromSession("groq", "gone", null, registry);
-        Equal("Could not restore model groq/gone (model no longer exists). Using groq/openai/gpt-oss-120b.", missing.FallbackMessage, "fallback to default");
-        var noAuth = ModelResolver.RestoreModelFromSession("deepseek", "deepseek-v4-pro", restored.Model, registry);
-        Equal("Could not restore model deepseek/deepseek-v4-pro (no auth configured). Using groq/openai/gpt-oss-120b.", noAuth.FallbackMessage, "current model fallback");
     }
 }

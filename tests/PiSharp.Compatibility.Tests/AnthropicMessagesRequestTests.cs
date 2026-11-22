@@ -194,7 +194,9 @@ static class AnthropicMessagesRequestTests
         Equal("Question", actual.GetProperty("messages")[0].GetProperty("content").GetString());
         var tool = actual.GetProperty("tools")[0]; Equal("read", tool.GetProperty("name").GetString()); Assert(tool.GetProperty("eager_input_streaming").GetBoolean(), "Default eager input streaming absent.");
         var schema = tool.GetProperty("input_schema"); Equal("object", schema.GetProperty("type").GetString()); Equal("path", schema.GetProperty("required")[0].GetString());
-        Assert(!schema.TryGetProperty("additionalProperties", out _) && !tool.TryGetProperty("strict", out _), "Legacy schema retained fields not forwarded by source.");
+        // Pi 1.6.0 (#12067): the non-strict schema keeps the declared root additionalProperties (it was dropped before); still not strict.
+        Assert(schema.GetProperty("additionalProperties").ValueKind == System.Text.Json.JsonValueKind.False && schema.EnumerateObject().Count() == 4 &&
+            !tool.TryGetProperty("strict", out _), "Legacy schema lost its root additionalProperties or retained fields not forwarded by source.");
         Assert(!actual.TryGetProperty("betas", out _) && !actual.TryGetProperty("temperature", out _), "Omitted options were fabricated.");
         Assert(!actual.GetProperty("system")[0].TryGetProperty("cache_control", out _), "Disabled cache was reintroduced.");
         return Task.CompletedTask;

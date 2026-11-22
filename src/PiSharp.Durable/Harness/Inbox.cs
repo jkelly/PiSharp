@@ -1,7 +1,8 @@
 // Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/src/harness/inbox.ts. Items are stored as upstream's JSON:
 // {id, mode: "steer" | "followUp", content, entry?} (entry the input's InputEntry as {kind, data?}) or {id, mode: "write", entry}, where
 // entry is the write's EntryDraft as plain JSON {kind, head?, model?, data?, edits?} (head an entry ID or "self"). The conversation view of
-// the inbox is view.ts's.
+// the inbox is view.ts's. Pi v1.6.0 sync (faac585884ae2c013a6b1400f3e9e77f10b34bac): an input item may carry onAbort: "keep", and
+// an abort withdraws only the others (WithdrawAbortedInputsAsync); a failed run still withdraws every queued input.
 using System.Collections.Immutable;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Chord.Delta;
@@ -153,17 +154,30 @@ public static class Inbox
     }
 
     /// <summary>
-    /// Withdraws every queued input of a conversation, as <c>Conversation.AbortAsync()</c> and abort cascades do (upstream
-    /// <c>withdrawQueuedInputs</c>): each settles <c>unanswered</c> with <paramref name="reason"/> (default <c>aborted</c>; a failed run's
-    /// <c>run_failed</c>) and leaves the inbox; queued writes stay for later placement.
+    /// Withdraws the queued inputs of a conversation as <c>Conversation.AbortAsync()</c> and abort cascades do (upstream
+    /// <c>withdrawAbortedInputs</c>): each settles <c>unanswered</c> with reason <c>aborted</c> and leaves the inbox, except those submitted
+    /// with <see cref="InputOnAbort.Keep"/>; queued writes stay for later placement.
     /// </summary>
-    public static async Task WithdrawQueuedInputsAsync(ITx tx, ConversationId conversationId, string reason = "aborted")
+    public static Task WithdrawAbortedInputsAsync(ITx tx, ConversationId conversationId) =>
+        WithdrawInputsAsync(tx, conversationId, "aborted", static item => !(item.TryGetValue("onAbort", out var onAbort) && onAbort is JsonStringValue { Value: "keep" }));
+
+    /// <summary>
+    /// Withdraws every queued input of a conversation, as a failed run does under <see cref="AfterFailedRun.Withdraw"/> (upstream
+    /// <c>withdrawQueuedInputs</c>): each settles <c>unanswered</c> with <paramref name="reason"/> and leaves the inbox; queued writes stay
+    /// for later placement.
+    /// </summary>
+    public static Task WithdrawQueuedInputsAsync(ITx tx, ConversationId conversationId, string reason) =>
+        WithdrawInputsAsync(tx, conversationId, reason, static _ => true);
+
+    /// <summary>Settles and removes the queued inputs <paramref name="withdraws"/> selects, keeping the order of the items that stay
+    /// (upstream <c>withdrawInputs</c>).</summary>
+    private static async Task WithdrawInputsAsync(ITx tx, ConversationId conversationId, string reason, Func<JsonObjectValue, bool> withdraws)
     {
         var items = (await tx.DocAsync(InboxDoc, conversationId).ConfigureAwait(false)).GetArray("items");
         for (var index = items.Count - 1; index >= 0; index--)
         {
             var item = (JsonObjectValue)items.Get(index);
-            if (item["mode"] is JsonStringValue { Value: "write" }) continue;
+            if (item["mode"] is JsonStringValue { Value: "write" } || !withdraws(item)) continue;
             tx.SettleSubmission(new SubmissionId(ItemId(item)), SubmissionSettlement.Unanswered(reason));
             items.RemoveAt(index);
         }

@@ -48,8 +48,10 @@ internal static class ViewsDifferentialTests
     private const double T = 1000;
 
     // Pi v1.5.0 (area model-requests): the capture's authored v1.5.0 form (see the file header).
-    private static readonly Lazy<JsonObjectValue> Upstream = new(() => LiveV3150.Views(RunFailure150.Views(Splices150((JsonObjectValue)ModelRequests150.Authored(JsonValue.Parse(
-        File.ReadAllText(Path.Combine(RepositoryRoot(), "tests", "PiSharp.Durable.Tests", "Fixtures", "v1.2.0", "views.upstream.json"))))))));
+    // Pi v1.6.0 sync: and with Durations160.cs's, the durationMs of every result a tool task writes.
+    private static readonly Lazy<JsonObjectValue> Upstream = new(() => LiveV3150.Views(RunFailure150.Views(Splices150(Durations160.Differential(
+        (JsonObjectValue)ModelRequests150.Authored(JsonValue.Parse(
+            File.ReadAllText(Path.Combine(RepositoryRoot(), "tests", "PiSharp.Durable.Tests", "Fixtures", "v1.2.0", "views.upstream.json")))))))));
 
     /// <summary>Pi v1.5.0 (area view): every scenario's frames with each run of consecutive entry splices joined into one (see the file
     /// header).</summary>

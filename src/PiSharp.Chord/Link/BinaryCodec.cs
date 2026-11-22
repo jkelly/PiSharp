@@ -1,4 +1,7 @@
-// Exact next/link/binary.ts wire layout, Pi f9a26365568127461c47a07a37dcb42c140a3ac5.
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/chord/src/link/binary.ts, its exact wire layout.
+// 1.6.0: kind 18 event (a count, then hold, member, at as varints and the value as a part per entry); the kind byte's third flag (0x20)
+// is a call's old-work flag and, on an ack, an event ack whose count follows (a state ack stays one byte); hello.calls 0 is no window
+// (a window is at least 1); failure cause byte 3 is denied.
 using System.Text.Json.Nodes;
 
 namespace PiSharp.Chord.Link;
@@ -7,20 +10,21 @@ internal sealed class BinaryCodec : ICodec
 {
     internal static BinaryCodec Instance { get; } = new();
     public string Name => "binary";
-    private static readonly string[] Kinds = ["hello", "hold", "release", "call", "abort", "bound", "state", "failed", "result", "error", "gone", "retry", "loading", "ack", "closed", "ping", "pong", "revoke"];
-    private static readonly string[] Causes = ["transient", "broken", "waiting"];
+    private static readonly string[] Kinds = ["hello", "hold", "release", "call", "abort", "bound", "state", "failed", "result", "error", "gone", "retry", "loading", "ack", "closed", "ping", "pong", "revoke", "event"];
+    private static readonly string[] Causes = MessageCheck.CauseKinds;
     public byte[] Encode(Message message)
     {
         var w = new Writer(); var kind = Array.IndexOf(Kinds, message.Kind);
         if (kind < 0) throw new ArgumentException("binary: an unknown kind");
         var trace = message switch { HoldMessage hold => hold.Trace, CallMessage call => call.Trace, _ => null };
-        var old = message is CallMessage { Old: true };
+        var old = message is CallMessage { Old: true } or AckMessage { Events: not null };
         w.Byte((byte)(kind | (message.Origin is null ? 0 : 128) | (trace is null ? 0 : 64) | (old ? 32 : 0)));
         if (message.Origin is { } origin) w.Number(origin);
         if (trace is not null) w.Json(MessageCheck.CarrierJson(trace));
         switch (message)
         {
-            case HelloMessage x: w.Number(x.Protocol); w.Hex(x.Incarnation.Replace("-", ""), 16); w.Number(x.Calls); break;
+            // 0 when absent: no window (a window is at least 1).
+            case HelloMessage x: w.Number(x.Protocol); w.Hex(x.Incarnation.Replace("-", ""), 16); w.Number(x.Calls ?? 0); break;
             case HoldMessage x:
                 w.Number(x.Hold); w.String(x.Type); w.Number(x.Version); w.Hex(x.Fingerprint, 8); w.Part(x.Params);
                 w.String(x.Address.Kind); w.Json(x.Address.Params);
@@ -62,6 +66,12 @@ internal sealed class BinaryCodec : ICodec
             case ErrorMessage x: w.Number(x.Call); w.Json(x.Error.Json); break;
             case GoneMessage x: w.Number(x.Hold); w.Json(x.Error.Json); break;
             case RevokeMessage x: w.Json(x.Revocation); break;
+            case EventMessage x:
+                w.Number(x.Events.Count);
+                foreach (var e in x.Events) { w.Number(e.Hold); w.Number(e.Member); w.Number(e.At); w.Part(e.Value); }
+                break;
+            // An event ack's count (the kind byte's flag says it follows); a state ack has no field.
+            case AckMessage { Events: { } events }: w.Number(events); break;
         }
         return w.Finish();
     }
@@ -73,11 +83,15 @@ internal sealed class BinaryCodec : ICodec
         var old = (header & 32) != 0;
         var kind = header & 31;
         if (kind >= Kinds.Length) throw new ArgumentException("binary: an unknown kind");
-        if (trace is not null && kind is not (1 or 3) || old && kind != 3) throw MessageCheck.Invalid("kind flags");
+        // The third flag belongs to a call (old work) and an ack (an event ack): another kind with it is unknown.
+        if (old && kind is not (3 or 13)) throw new ArgumentException("binary: an unknown kind");
+        if (trace is not null && kind is not (1 or 3)) throw MessageCheck.Invalid("kind flags");
         Message result;
         switch (kind)
         {
-            case 0: result = new HelloMessage(r.Number(), r.Uuid(), r.Number()); break;
+            case 0:
+                var protocol = r.Number(); var peer = r.Uuid(); var window = r.Number();
+                result = new HelloMessage(protocol, peer, window == 0 ? null : window); break;
             case 1:
                 var hold = r.Number(); var type = r.String(); var version = r.Number(); var fingerprint = r.Hex(8); var p = r.Part();
                 var address = new WireAddress(r.String(), r.Json()); var flags = r.Byte();
@@ -112,11 +126,12 @@ internal sealed class BinaryCodec : ICodec
             case 10: result = new GoneMessage(r.Number(),r.Error()); break;
             case 11: result = new RetryMessage(r.Number(),r.Number()); break;
             case 12: result = new LoadingMessage(r.Number()); break;
-            case 13: result = new AckMessage(); break;
+            case 13: result = old ? new AckMessage(r.Number()) : new AckMessage(); break;
             case 14: result = new ClosedMessage(); break;
             case 15: result = new PingMessage(); break;
             case 16: result = new PongMessage(); break;
             case 17: result = new RevokeMessage(r.Json()); break;
+            case 18: result = new EventMessage(r.List(() => new WireEvent(r.Number(), r.Number(), r.Number(), r.Part()))); break;
             default: throw new ArgumentException("binary: an unknown kind");
         }
         r.End(); return result with { Origin = origin };

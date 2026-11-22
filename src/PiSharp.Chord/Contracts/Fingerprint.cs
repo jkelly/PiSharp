@@ -1,4 +1,4 @@
-// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/chord/src/next/contracts/fingerprint.ts
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/chord/src/contracts/fingerprint.ts
 //
 // Fingerprints: the normal form of a contract version and its portable 64-bit hash. Not a security boundary. The hash input is
 // JavaScript's JSON.stringify of the normal form (ChordJson.Stringify), so a contract declared here has the fingerprint the same
@@ -34,10 +34,19 @@ internal static partial class ContractsInternal
         return Hash64(text.Append('}').ToString());
     }
 
-    /// <summary>Members as a sorted dictionary of <c>{ state }</c>, <c>{ args, result }</c> or <c>{ keyed }</c> (slice 6a §12: a node of
-    /// its own, so contracts without keyed members keep their fingerprints and <see cref="NormalFormVersion"/> stays).</summary>
+    /// <summary>Members as a sorted dictionary of <c>{ state }</c>, <c>{ args, result }</c>, <c>{ keyed }</c> (<c>{ keyed, key }</c> keyed
+    /// by a host kind), <c>{ event }</c> or <c>{ queries, args }</c> (slice 6a §12, decision "Events: fire-and-forget members", slice 14: a
+    /// node of its own per kind, so contracts without keyed, event or queries members keep their fingerprints and
+    /// <see cref="NormalFormVersion"/> stays). The concatenation order is upstream's (queries, state, events, keyed, methods); a name has
+    /// one kind, so the sort leaves one node per name.</summary>
     private static JsonObject VariantNormal(VariantData variant) => SortedDict(
-        variant.State.Select(entry => (entry.Key, (JsonNode?)new JsonObject { ["state"] = entry.Value.Normal.DeepClone() }))
+        variant.Queries.Select(entry => (entry.Key, (JsonNode?)new JsonObject
+        {
+            ["queries"] = entry.Value.Item.Normal.DeepClone(),
+            ["args"] = SortedDict(entry.Value.Args.Select(query => (query.Key, (JsonNode?)query.Value.Normal.DeepClone()))),
+        }))
+            .Concat(variant.State.Select(entry => (entry.Key, (JsonNode?)new JsonObject { ["state"] = entry.Value.Normal.DeepClone() })))
+            .Concat(variant.Events.Select(entry => (entry.Key, (JsonNode?)new JsonObject { ["event"] = entry.Value.Normal.DeepClone() })))
             .Concat(variant.Keyed.Select(entry => (entry.Key, (JsonNode?)KeyedNormal(entry.Value))))
             .Concat(variant.Methods.Select(entry => (entry.Key, (JsonNode?)new JsonObject
             {

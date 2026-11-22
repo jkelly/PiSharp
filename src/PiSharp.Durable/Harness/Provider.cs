@@ -1,5 +1,7 @@
 // Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/src/harness/provider.ts. pi-ai's uuidv7 is PiAiUuid.UuidV7
-// (Guid.CreateVersion7 in its lowercase hyphenated form).
+// (Guid.CreateVersion7 in its lowercase hyphenated form). Pi v1.6.0 sync (faac585884ae2c013a6b1400f3e9e77f10b34bac): the identity a
+// task uses is recorded with its Harness (upstream providerSessionsByRuntime, a WeakMap keyed by the runtime; here the scheduler's runtime
+// records it, ISchedulerRuntime.UseProviderSession), which releases the session's provider resources at close.
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Internal.PiAi;
 
@@ -14,19 +16,24 @@ public static class ProviderIdentity
         () => JsonValue.Object([KeyValuePair.Create("sessionId", (JsonValue)PiAiUuid.UuidV7())]), checkpointWhen: (_, _, _) => true);
 
     /// <summary>
-    /// Returns the persisted identity without writing in the normal path (upstream <c>ensureProviderSessionId</c>). A legacy conversation
-    /// without <c>pi.provider</c> gets one migration commit whose document access runs the initial value before the provider request starts.
+    /// Returns and records the persisted provider identity without writing in the normal path (upstream <c>ensureProviderSessionId</c>). A
+    /// legacy conversation without <c>pi.provider</c> gets one migration commit whose document access runs the initial value before the
+    /// provider request starts.
     /// </summary>
     public static async Task<string> EnsureProviderSessionIdAsync(ITaskRuntime runtime, DurableContext context)
     {
         ArgumentNullException.ThrowIfNull(runtime);
         var existing = await runtime.SnapshotAsync(ProviderDoc, runtime.ConversationId, context).ConfigureAwait(false);
-        if (existing is not null) return ((JsonStringValue)existing["sessionId"]).Value;
-        string? created = null;
-        await runtime.CommitAsync(async (tx, _) =>
+        var sessionId = existing is null ? null : ((JsonStringValue)existing["sessionId"]).Value;
+        if (sessionId is null)
         {
-            created = ((JsonStringValue)(await tx.DocAsync(ProviderDoc, runtime.ConversationId).ConfigureAwait(false)).Get("sessionId")!).Value;
-        }, context).ConfigureAwait(false);
-        return created ?? throw new InvalidOperationException($"Conversation {runtime.ConversationId} has no provider session ID");
+            await runtime.CommitAsync(async (tx, _) =>
+            {
+                sessionId = ((JsonStringValue)(await tx.DocAsync(ProviderDoc, runtime.ConversationId).ConfigureAwait(false)).Get("sessionId")!).Value;
+            }, context).ConfigureAwait(false);
+            if (sessionId is null) throw new InvalidOperationException($"Conversation {runtime.ConversationId} has no provider session ID");
+        }
+        (runtime as ISchedulerRuntime)?.UseProviderSession(sessionId);
+        return sessionId;
     }
 }

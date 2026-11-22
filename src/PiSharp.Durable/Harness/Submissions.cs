@@ -3,6 +3,9 @@
 // SubmissionRecord whose status is done or unanswered (upstream SettledSubmissionRecord). Upstream's checkInputEntry guards untyped callers;
 // an InputEntry is typed, so only its kind is checked.
 //
+// Pi v1.6.0 sync (faac585884ae2c013a6b1400f3e9e77f10b34bac): admission stores the draft's `notify` on the record and marks a queued
+// input submitted with onAbort keep; isSettled moved to signals.ts (Signals.IsSettled).
+//
 // Pi v1.5.0 sync (area deferred-commits, 6c2fd73b0): the inbox observes the Session's commits as memory adopts them
 // (Session.FollowCommits) and skips a held one, which holds no submission.
 //
@@ -137,7 +140,7 @@ internal sealed class Submissions
         {
             var record = await line.GetSubmissionAsync(id, context).ConfigureAwait(false) ??
                 throw new InvalidOperationException($"Submission {id} does not exist");
-            if (IsSettled(record)) return Task.FromResult(record);
+            if (Signals.IsSettled(record)) return Task.FromResult(record);
             // Close rejects registered waiters synchronously and may begin during the read.
             if (closed) throw HarnessUtil.ClosedError(session);
             return waiters.Add(id, context);
@@ -168,7 +171,7 @@ internal sealed class Submissions
         // Resumed after host observers saw the commit that settled them (upstream: promise continuations behind their dispatch).
         List<Action>? resumes = null;
         foreach (var change in publication.Changes)
-            if (change is SubmissionWrite { Value: var record } && IsSettled(record) && waiters.Take(record.Id, record) is { } resume)
+            if (change is SubmissionWrite { Value: var record } && Signals.IsSettled(record) && waiters.Take(record.Id, record) is { } resume)
                 (resumes ??= []).Add(resume);
         if (resumes is not null)
             session.AfterPublication(() =>
@@ -176,8 +179,6 @@ internal sealed class Submissions
                 foreach (var resume in resumes) resume();
             });
     }
-
-    private static bool IsSettled(SubmissionRecord record) => record.Status is SubmissionStatus.Done or SubmissionStatus.Unanswered;
 
     /// <summary>Rejects an input entry whose kind is empty or starts with <c>pi.</c> (upstream <c>checkInputEntry</c>).</summary>
     private static void CheckInputEntry(InputEntry entry)
@@ -222,7 +223,7 @@ internal sealed class Submissions
                 var appended = await tx.AppendEntryAsync(conversationId, draft.Entry!).ConfigureAwait(false);
                 return new Admission((await tx.CreateSubmissionAsync(new SubmissionCreate
                 {
-                    ConversationId = conversationId, RequestId = draft.RequestId, Trace = trace, Type = SubmissionType.Write,
+                    ConversationId = conversationId, RequestId = draft.RequestId, Trace = trace, Notify = draft.Notify, Type = SubmissionType.Write,
                     Status = SubmissionStatus.Done, Entry = appended.Id,
                 }).ConfigureAwait(false)).Id, "done");
             }
@@ -244,7 +245,7 @@ internal sealed class Submissions
             var continueBoundary = await Inbox.PrepareBoundaryAsync(tx, conversationId, queueModes).ConfigureAwait(false);
             var continued = await tx.CreateSubmissionAsync(new SubmissionCreate
             {
-                ConversationId = conversationId, RequestId = draft.RequestId, Trace = trace, Type = SubmissionType.Continue,
+                ConversationId = conversationId, RequestId = draft.RequestId, Trace = trace, Notify = draft.Notify, Type = SubmissionType.Continue,
                 Status = SubmissionStatus.Placed,
             }).ConfigureAwait(false);
             // Items an earlier failed run left queued (afterFailedRun: keep) are placed first and join the run. Its history starts with the
@@ -260,7 +261,8 @@ internal sealed class Submissions
         {
             var queued = await tx.CreateSubmissionAsync(new SubmissionCreate
             {
-                ConversationId = conversationId, RequestId = draft.RequestId, Trace = trace, Type = draft.Type, Status = SubmissionStatus.Queued,
+                ConversationId = conversationId, RequestId = draft.RequestId, Trace = trace, Notify = draft.Notify, Type = draft.Type,
+                Status = SubmissionStatus.Queued,
             }).ConfigureAwait(false);
             var items = (boundary?.Inbox ?? await tx.DocAsync(Inbox.InboxDoc, conversationId).ConfigureAwait(false)).GetArray("items");
             items.Add(draft.Type == SubmissionType.Write
@@ -274,6 +276,9 @@ internal sealed class Submissions
                     KeyValuePair.Create("mode", (JsonValue)(draft.WhenBusy == WhenBusy.Steer ? "steer" : "followUp")),
                     KeyValuePair.Create("content", draft.Content!),
                     .. draft.InputEntry is { } queuedEntry ? [KeyValuePair.Create("entry", (JsonValue)Inbox.PickInputEntry(queuedEntry))] :
+                        Array.Empty<KeyValuePair<string, JsonValue>>(),
+                    // Submitted with onAbort keep: an abort leaves it queued.
+                    .. draft.OnAbort == InputOnAbort.Keep ? [KeyValuePair.Create("onAbort", (JsonValue)"keep")] :
                         Array.Empty<KeyValuePair<string, JsonValue>>(),
                 ]));
             if (boundary is null) return new Admission(queued.Id, "queued");
@@ -289,21 +294,21 @@ internal sealed class Submissions
             {
                 return new Admission((await tx.CreateSubmissionAsync(new SubmissionCreate
                 {
-                    ConversationId = conversationId, RequestId = draft.RequestId, Trace = trace, Type = SubmissionType.Write,
+                    ConversationId = conversationId, RequestId = draft.RequestId, Trace = trace, Notify = draft.Notify, Type = SubmissionType.Write,
                     Status = SubmissionStatus.Unanswered, Reason = "stale",
                 }).ConfigureAwait(false)).Id, "done");
             }
             var written = await tx.AppendEntryAsync(conversationId, entryDraft).ConfigureAwait(false);
             return new Admission((await tx.CreateSubmissionAsync(new SubmissionCreate
             {
-                ConversationId = conversationId, RequestId = draft.RequestId, Trace = trace, Type = SubmissionType.Write,
+                ConversationId = conversationId, RequestId = draft.RequestId, Trace = trace, Notify = draft.Notify, Type = SubmissionType.Write,
                 Status = SubmissionStatus.Done, Entry = written.Id,
             }).ConfigureAwait(false)).Id, "done");
         }
         var entry = await Inbox.AppendInputAsync(tx, conversationId, draft.Content!, draft.InputEntry, now).ConfigureAwait(false);
         var input = await tx.CreateSubmissionAsync(new SubmissionCreate
         {
-            ConversationId = conversationId, RequestId = draft.RequestId, Trace = trace, Type = SubmissionType.Input,
+            ConversationId = conversationId, RequestId = draft.RequestId, Trace = trace, Notify = draft.Notify, Type = SubmissionType.Input,
             Status = SubmissionStatus.Placed, Entry = entry.Id,
         }).ConfigureAwait(false);
         await HarnessTasks.StartRunAsync(tx, conversationId, live, [input.Id], entry.Id).ConfigureAwait(false);

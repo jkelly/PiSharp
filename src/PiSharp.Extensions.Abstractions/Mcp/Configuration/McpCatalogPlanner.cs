@@ -1,4 +1,5 @@
 // Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/core/mcp-servers.ts, packages/coding-agent/src/extensions/mcp/tools.ts and packages/coding-agent/src/extensions/mcp/index.ts.
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/mcp/src/naming.ts (Namespace, CreateToolName, ServerSummary).
 using System.Collections.Immutable;
 using System.Security.Cryptography;
 using System.Text;
@@ -81,6 +82,16 @@ public static class McpCatalogPlanner
     /// <summary>Namespace of a server's tools: `mcp__&lt;server&gt;` with `-` replaced by `_`, like the tool names.</summary>
     public static string Namespace(string server)
     { ArgumentNullException.ThrowIfNull(server); return "mcp__" + server.Replace('-', '_'); }
+
+    /// <summary>naming.ts mcpServerSummary: a server's one-line summary for the system prompt, the first line of its configured
+    /// `description`, else of the instructions it sent in `initialize`; empty when it has neither. A description that is
+    /// only white space counts as none, and the first line is the first of the trimmed text.</summary>
+    public static string ServerSummary(string? description, string? instructions)
+    {
+        var text = description is null ? "" : McpJson.JsTrim(description);
+        if (text.Length == 0) text = instructions is null ? "" : McpJson.JsTrim(instructions);
+        return McpJson.JsTrim(text.Split('\n', 2)[0]);
+    }
 
     /// <summary>`codemode` and `deferred` both leave tools out of the codemode description; they differ only in
     /// which discovery tool reaches them.</summary>

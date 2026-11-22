@@ -60,7 +60,7 @@ internal static class Sync150Cases
 
     private sealed class FixedLines(params string[] lines) : IComponent
     {
-        public List<string> Render(int width) => [.. lines];
+        public IReadOnlyList<string> Render(int width) => [.. lines];
         public void Invalidate() { }
     }
 
@@ -784,7 +784,7 @@ internal static class Sync150Cases
     private sealed class MutableLines(params string[] lines) : IComponent
     {
         public List<string> Lines { get; set; } = [.. lines];
-        public List<string> Render(int width) => [.. Lines];
+        public IReadOnlyList<string> Render(int width) => [.. Lines];
         public void Invalidate() { }
     }
 }

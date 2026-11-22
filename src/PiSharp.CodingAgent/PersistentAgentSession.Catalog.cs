@@ -65,12 +65,12 @@ public sealed partial class PersistentAgentSession
             idle = new(TaskCreationOptions.RunContinuationsAsynchronously); _active = idle; _configuring = true; _catalogPublication = idle;
         }
         // Owned retirement publications (reload, resource withdrawal) keep the previous active names pending.
-        return PublishToolCatalogCoreAsync(expected, replacement, activeNames, publishPreparedRegistry, cancellationToken, idle, restorePrevious || reservation is not null);
+        return PublishToolCatalogCoreAsync(expected, replacement, activeNames, publishPreparedRegistry, cancellationToken, idle, restorePrevious || reservation is not null, reservation);
     }
 
     private async Task<SessionToolCatalogReceipt> PublishToolCatalogCoreAsync(SessionRuntimeRegistry expected,
         SessionRuntimeRegistry replacement, ImmutableArray<string> activeNames, Action publishPreparedRegistry,
-        CancellationToken token, TaskCompletionSource idle, bool restorePrevious)
+        CancellationToken token, TaskCompletionSource idle, bool restorePrevious, object? reloadOwner)
     {
         var writeAdmitted = false; var commitHeld = false;
         var prior = _configurationCallback.Value; _configurationCallback.Value = idle;
@@ -80,14 +80,14 @@ public sealed partial class PersistentAgentSession
             var work = cancellation.Token;
             await _commits.WaitAsync(work).ConfigureAwait(false); commitHeld = true;
             SessionContextProjection context; SessionLogStoreSnapshot log; AgentConfiguration configuration; long nextActivation;
-            ImmutableArray<string> requested, pendingCandidates;
+            ImmutableArray<string> requested, pendingCandidates, reloadedLoadout;
             lock (_gate)
             {
                 if (!ReferenceEquals(_registry, expected)) throw new InvalidOperationException("Captured registry changed.");
                 context = _context; log = _acknowledgedLog; configuration = _configuration;
                 nextActivation = checked(_activationEpoch + 1);
                 // Source _refreshToolRegistry: pending tools that are registered now become active.
-                (requested, pendingCandidates) = PendingToolRequestLocked(replacement, activeNames, restorePrevious);
+                (requested, pendingCandidates, reloadedLoadout) = PendingToolRequestLocked(replacement, activeNames, restorePrevious);
             }
             var selected = replacement.NormalizeActiveTools(requested, work);
             // Source _refreshToolRegistry: the new catalog and loadout apply in memory; the next request records the loadout's
@@ -110,7 +110,8 @@ public sealed partial class PersistentAgentSession
                 _registry = replacement; _configuration = selection.Configuration;
                 _activationEpoch = nextActivation; _pendingActivation = null;
                 _unrecordedLoadout = true;
-                RetirePendingToolsLocked(pendingCandidates, selected);
+                // Pi faac585884ae2c013a6b1400f3e9e77f10b34bac reload: the names active before it are the reloaded loadout (_restoredToolNames).
+                RetirePendingToolsLocked(pendingCandidates, selected, reloadedLoadout, reloadOwner);
             }
             return new(Snapshot with { IsConfiguring = false }, replacement);
         }

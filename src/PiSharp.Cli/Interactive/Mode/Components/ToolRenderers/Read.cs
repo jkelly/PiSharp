@@ -1,4 +1,4 @@
-// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): coding-agent/src/core/tools/renderers/read.ts.
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): coding-agent/src/core/tools/renderers/read.ts.
 // getReadmePath (coding-agent/src/config.ts) is PiSharp's documentation location (PiSystemPrompt.Documentation).
 using System.Text.Json.Nodes;
 using PiSharp.Cli.Pi;
@@ -93,7 +93,12 @@ internal static class ReadRenderers
 
     private static string FormatReadResult(JsonNode? args, JsonObject result, ToolRenderResultOptions options, Theme theme, bool showImages, bool isError)
     {
-        if (!options.Expanded && !isError) return "";
+        // ReadToolDetails.imageUnsupportedByModel (#12131): the user sees that the model got a placeholder, also when collapsed.
+        var unsupportedBy = ToolJson.GetString(ToolJson.Get(result, "details"), "imageUnsupportedByModel");
+        var imageWarning = !string.IsNullOrEmpty(unsupportedBy)
+            ? "\n" + theme.Fg("warning", $"[{unsupportedBy} does not support images; it saw a placeholder instead]")
+            : "";
+        if (!options.Expanded && !isError) return imageWarning;
 
         var rawPath = RenderUtils.Str(ToolJson.Get(args, "file_path") ?? ToolJson.Get(args, "path"));
         var output = RenderUtils.GetTextOutput(result, showImages);
@@ -117,7 +122,7 @@ internal static class ReadRenderers
             else
                 text += "\n" + theme.Fg("warning", $"[Truncated: {ToolJson.Template(ToolJson.Get(truncation, "outputLines"))} lines shown ({maxBytes} limit)]");
         }
-        return text;
+        return text + imageWarning;
     }
 
     public static ToolRenderers Renderers { get; } = new(

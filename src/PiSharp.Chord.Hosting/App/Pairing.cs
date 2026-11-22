@@ -1,4 +1,4 @@
-// Pi b4afdddf44e059c67ccf5097e5317d913521b470 (MIT): packages/chord/src/node/app/pairing.ts.
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/chord/src/node/app/pairing.ts.
 using System.Net;
 using System.Security.Cryptography;
 using System.Text.Json.Nodes;
@@ -35,7 +35,7 @@ public sealed class Pairings
     private readonly PairingLimits limits;
     private readonly TimeProvider time;
     private int anonymous;
-    private readonly Sessions? sessions;
+    private readonly SignIns? signIns;
     private readonly JsonObject? owner;
     public Facet? Facet { get; }
 
@@ -44,9 +44,9 @@ public sealed class Pairings
         this.limits = limits ?? new(); this.time = time ?? TimeProvider.System;
         if (this.limits.MaxPending < 0 || this.limits.PerAddress < 0) throw new ArgumentOutOfRangeException(nameof(limits));
     }
-    public Pairings(JsonObject owner, Sessions sessions, PairingLimits? limits = null, TimeProvider? time = null) : this(limits, time)
+    public Pairings(JsonObject owner, SignIns signIns, PairingLimits? limits = null, TimeProvider? time = null) : this(limits, time)
     {
-        this.owner = AppPrincipals.Require(owner); this.sessions = sessions;
+        this.owner = AppPrincipals.Require(owner); this.signIns = signIns;
         Facet = PiSharp.Chord.Host.Facet.Define((_, self) => self.Contribute(HttpRegistries.Http, new HttpContribution
         {
             Routes = new Dictionary<string, HttpRoute>
@@ -130,10 +130,10 @@ public sealed class Pairings
         }
     }
 
-    /// <summary>Reserves a code before issuing its session, preventing two simultaneous approvals.</summary>
+    /// <summary>Reserves a code before issuing its sign-in, preventing two simultaneous approvals.</summary>
     public async Task<bool> ApproveAsync(string code, ChordContext context)
     {
-        if (sessions is null || owner is null) throw new InvalidOperationException("Pairing approval requires sessions and an owner.");
+        if (signIns is null || owner is null) throw new InvalidOperationException("Pairing approval requires sign-ins and an owner.");
         context.AbortSignal?.ThrowIfCancellationRequested();
         Pending found;
         lock (gate)
@@ -142,9 +142,9 @@ public sealed class Pairings
             if (code.Length > 32 || !codes.TryGetValue(code.ToUpperInvariant(), out found!) || found.Token is not null || found.Approving) return false;
             found.Approving = true;
         }
-        IssuedSession issued;
-        // Once reserved, finish or roll back the actual session even if the browser disconnects.
-        try { issued = await sessions.IssueAsync(owner, found.Label, SessionKind.Device, false, ChordContext.WithoutAbortSignal(context)).ConfigureAwait(false); }
+        IssuedSignIn issued;
+        // Once reserved, finish or roll back the actual sign-in even if the browser disconnects.
+        try { issued = await signIns.IssueAsync(owner, found.Label, SignInKind.Device, false, ChordContext.WithoutAbortSignal(context)).ConfigureAwait(false); }
         catch { lock (gate) found.Approving = false; throw; }
         lock (gate)
         {
@@ -152,8 +152,8 @@ public sealed class Pairings
             if (codes.TryGetValue(found.Code, out var current) && ReferenceEquals(current, found))
             { found.Token = issued.Token; found.Approving = false; return true; }
         }
-        // It expired while the persisted session was being committed; no inaccessible credential survives.
-        await sessions.RevokeAsync(issued.Id, ChordContext.Background).ConfigureAwait(false);
+        // It expired while the persisted sign-in was being committed; no inaccessible credential survives.
+        await signIns.RevokeAsync(issued.Id, ChordContext.Background).ConfigureAwait(false);
         return false;
     }
 

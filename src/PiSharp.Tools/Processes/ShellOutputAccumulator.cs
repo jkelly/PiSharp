@@ -1,3 +1,5 @@
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/coding-agent/src/core/tools/output-accumulator.ts (the decoded rolling tail and
+// its snapshot, the raw spill, and readFullOutput as Structured).
 using System.Text;
 using PiSharp.Agent.Tools;
 
@@ -70,6 +72,9 @@ internal sealed class ShellOutputAccumulator : IAsyncDisposable
         {
             var newline = content.IndexOf('\n');
             if (newline >= 0) content = content[(newline + 1)..];
+            // Clipping drops the partial first line of the retained tail. When the tail is only the end of one over-long line, that
+            // is everything, so show the end of that line instead (#12062).
+            if (content.Length == 0) content = _text;
         }
         var tail = ToolOutputTruncator.Tail(content, new(_options.ModelMaxLines, _options.ModelMaxBytes));
         var truncated = _totalLines > _options.ModelMaxLines || _decodedBytes > _options.ModelMaxBytes;

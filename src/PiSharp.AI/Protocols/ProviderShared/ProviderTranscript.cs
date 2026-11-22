@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/ai/src/utils/transcript.ts (collapseSystemMessages,
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/ai/src/utils/transcript.ts (collapseSystemMessages,
 // getCurrentSystemMessage, getCurrentTools, getInitialSystemMessage), utils/text.ts (contentText, getSystemMessageText),
 // api/transform-messages.ts (transformMessages), utils/estimate.ts (estimateContextTokens), api/constrained-sampling.ts
 // (makeStrictJsonSchema, resolveJsonSchemaStrictSampling) and models.ts (getSupportedThinkingLevels, clampThinkingLevel).
@@ -418,6 +418,9 @@ internal static class ProviderTranscript
     {
         if (node is not JsonObject schema) throw new UnsupportedStrictSchema("boolean schemas are unsupported");
         foreach (var key in UnsupportedStrictKeys) if (schema.ContainsKey(key)) throw new UnsupportedStrictSchema(key + " schemas are unsupported");
+        // Pi 1.6.0 (#12049): strict mode rejects a node without a type; a bare enum counts as typed, a bare const does not.
+        if (!schema.ContainsKey("type") && !schema.ContainsKey("anyOf") && !schema.ContainsKey("enum"))
+            throw new UnsupportedStrictSchema("schemas without a type are unsupported");
         if (schema.ContainsKey("anyOf"))
         {
             if (schema["anyOf"] is not JsonArray variants || variants.Count == 0) throw new UnsupportedStrictSchema("anyOf must contain at least one schema");

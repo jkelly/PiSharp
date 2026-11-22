@@ -1,4 +1,5 @@
-// Pinned Pi api/google-generative-ai.ts response mapping (MIT). Native progress is immutable.
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/ai/src/api/google-generative-ai.ts (response mapping) and google-shared.ts (mapStopReason).
+// Native progress is immutable.
 using System.Collections.Immutable;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -142,8 +143,11 @@ internal sealed class GoogleEventMapper
             var previousLength = _extra.TryGet("rawStopReason", out var previous) ? previous!.Value.GetString()!.Length : 0;
             Charge(finish.Length - previousLength);
             _extra = _extra.Set("rawStopReason", JsonData.Parse(JsonSerializer.Serialize(finish)));
+            // Pi 1.6.0 google-shared.ts mapStopReason (@google/genai 2.32.0 FinishReason.CONTINUATION): the per-request token limit was
+            // reached before generation completed. Pi does not resume with the candidate's continuationToken, and the adapters turn the
+            // SDK's automatic continuation off; this transport sends one request per call, so the turn ends as "length".
             _reason = finish switch { "STOP" => _blocks.OfType<ToolCallContent>().Any() ? StopReason.ToolUse : StopReason.Stop,
-                "MAX_TOKENS" => StopReason.Length, _ => StopReason.Error };
+                "MAX_TOKENS" or "CONTINUATION" => StopReason.Length, _ => StopReason.Error };
         }
         if (value.TryGetProperty("usageMetadata", out var usage))
         {

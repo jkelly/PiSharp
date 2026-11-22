@@ -1,3 +1,6 @@
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/chord/src/host/{object,reference,dependencies,internal}.ts (the shapes
+// the host's files share). 1.6.0: a holder's calls and retries name it, a queries member's named query, the park step's Parking and
+// IBlocked, a served type's admission, and `denied` as what a reference follows of an object an admission refused its caller.
 using System.Text.Json.Nodes;
 using PiSharp.Chord.Contracts;
 using PiSharp.Chord.Data;
@@ -12,6 +15,9 @@ internal sealed record CheckedParams(JsonObject Value, string Key);
 internal sealed record ServedType(string Plugin, Contract Contract, HostFactory Factory, ServeOptions Options, Provider Provider)
 {
     internal Facet? DeclaringFacet { get; init; }
+    /// <summary>Its admission, when its contract declares one (remote types only): its attempts run it before <see cref="Factory"/>'s
+    /// counterpart that takes the admitted value (<c>ServedAdmission.Factory</c>; <see cref="Factory"/> itself is never called then).</summary>
+    internal ServedAdmission? Admission { get; init; }
     internal bool HostLifetime => Contract.Kind == ContractKind.Local && ContractsInternal.DataOf(Contract).Params.Fields.Count == 0;
 }
 internal sealed record RegistryServing(string Name, long Version, IRegistryProvider Provider)
@@ -22,6 +28,9 @@ internal sealed record ContributionDeclaration(string Name, long Version, object
 internal sealed record LoadedPlugin(string Name, Facet Facet, IReadOnlyList<ServedType> Types,
     IReadOnlyList<RegistryServing> Registries, IReadOnlyList<ContributionDeclaration> Contributions);
 internal sealed record RetryWalk(HashSet<ITarget> Visited, int Hops = 16);
+/// <summary>What a reference follows of its target for one state member: <c>live</c> (the member of the instance it follows),
+/// <c>lacking</c> (its live variant has no such member), <c>loading</c>, <c>failed</c> (the cause's error; it keeps its last value), or
+/// <c>denied</c> (Pi 1.6.0, slice 14 §2.2: an admission refused its caller; no value is kept, reads throw the error).</summary>
 internal sealed record Followed(string Kind, object? Source = null, object? Instance = null, ChordError? Error = null, object? Last = null);
 internal interface IHolder
 {
@@ -47,11 +56,56 @@ internal interface ITarget
     object? Instance { get; }
     void Hold(IHolder holder);
     void Unhold(IHolder holder);
-    Task<object?> CallAsync(string method, object? args, ChordContext context, Caller caller, long version);
+    /// <summary>Calls a method of the live object for <paramref name="holder"/> (its caller, at its contract's version: an older one is
+    /// mapped); over a link the call is the holder's own, cancelled with its release.</summary>
+    Task<object?> CallAsync(string method, object? args, IHolder holder, ChordContext context);
     Followed Followed(string member, long version);
     IKeyedHandle KeyedMember(string member, long version);
-    void Retry(RetryWalk walk);
+    /// <summary><c>Retry()</c> from <paramref name="holder"/>, as one step of <paramref name="walk"/>: an attempt now if failed; an object
+    /// parked on failed dependencies passes it on; ignored otherwise.</summary>
+    void Retry(RetryWalk walk, IHolder? holder = null);
+    /// <summary>How many values the shared replica of state member <paramref name="member"/> took (a remote object's; decision "References
+    /// share one wire hold"); null without one (and on this host, where members are no replicas).</summary>
+    long? GenerationOf(string member) => null;
+    /// <summary>The named query <paramref name="name"/> of <c>queries</c> member <paramref name="member"/> of the live object (Pi 1.6.0,
+    /// slice 14 §3.1; local objects only). Throws while the object is not live: <c>not_ready</c>, its failure's error, or its end's.</summary>
+    OwnQuery QueryMember(string member, string name);
     bool Reaches(ITarget target, HashSet<ITarget> visited);
+}
+
+/// <summary>A blocker as <c>parked_long</c> names it (upstream <c>Blocker</c>): a reference's label, <c>registry name</c> or a reader's
+/// label, and whether it loads or failed.</summary>
+internal sealed record Blocker(string Label, string State);
+
+/// <summary>What a check names its blocker to (upstream <c>Blocked</c>): a parking episode's <c>parked_long</c> clock.</summary>
+internal interface IBlocked
+{
+    void BlockedBy(Blocker? blocker);
+}
+
+/// <summary>What a parked attempt does after one check, of its dependencies, of its readers or of its admission (upstream
+/// <c>Parking</c>): it goes on; it stays parked showing a state; or it breaks.</summary>
+internal abstract record Parking
+{
+    private Parking()
+    {
+    }
+
+    /// <summary>Nothing to wait for: the attempt goes on.</summary>
+    internal sealed record Ready : Parking;
+
+    /// <summary>It stays parked showing <paramref name="Shown"/> (<c>loading</c>, or <c>failed</c> with a waiting cause).
+    /// <paramref name="FirstPass"/>: no blocker here is still without its first outcome, so the object has its own first outcome now.
+    /// <paramref name="Cause"/>: why it parked, for a reload's report (null: the report names no failure).</summary>
+    internal sealed record Parked(RefState Shown, bool FirstPass, FailureCause? Cause) : Parking;
+
+    /// <summary>It never comes back by itself (a cycle, authority, an ended dependency, the reader's own code): the attempt fails
+    /// <c>broken</c> with <paramref name="Error"/>.</summary>
+    internal sealed record Broken(ChordError Error) : Parking;
+
+    /// <summary>The shared answer of a check that found nothing to wait for, and its completed task (a check that awaits nothing).</summary>
+    internal static readonly Parking Go = new Ready();
+    internal static readonly Task<Parking> GoNow = Task.FromResult(Go);
 }
 internal interface IJobOwner
 {

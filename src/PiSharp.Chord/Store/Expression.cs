@@ -1,4 +1,4 @@
-// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/chord/src/next/store/expression.ts
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/chord/src/store/expression.ts
 //
 // The table expression language (slice 6a §6, §7; rules 10, 13, 14, 16; decision "Nullable columns and the `set` form"): the builders
 // plugins write `where` and `set` with, and their compilation at staging into one data-only vocabulary (what the outbox and archives
@@ -8,6 +8,11 @@
 // Operand.Undefined (upstream's undefined, which clears an Opt(...) column). A set is a map from column name to Operand (or a JsonObject of
 // plain values). Upstream's Expression<T, K>, ColumnRef<T, K> and SetOf<C, K> carry TypeScript types of the value and column type; here
 // the classes are untyped and what those types refuse is refused when the expression is compiled.
+//
+// 1.6.0 (slice 14 §5, §6): a query's condition may test Exists over another plugin's column set, a condition is compiled in a Scope (one
+// table, a column set alone, or a table joined with a set), and a condition can travel as data: Tables.Compile gives the WhereNode,
+// CheckNode reads one back from JSON (upstream's checkNode asserts that an unknown value is a WhereNode; here it is the parser from the
+// JSON form to the typed node, with the same checks and messages). A Match is a map from a set's column to a reference of the enclosing row.
 using System.Text.Json.Nodes;
 using PiSharp.Chord.Contracts;
 using PiSharp.Chord.Data;
@@ -46,9 +51,18 @@ public abstract record WhereNode
     /// <summary><c>{ not: node }</c>: the node does not hold (<c>NULL</c> stays <c>NULL</c>).</summary>
     public sealed record Not(WhereNode Node) : WhereNode;
 
+    /// <summary><c>{ exists: [set, [[setColumn, column], ...], inner] }</c> (slice 14 §5): true for a row when the set's table has a row
+    /// equal in the matched columns that satisfies <paramref name="Inner"/> (null: any). A query's condition only; writes take none.</summary>
+    public sealed record Exists(string Set, IReadOnlyList<ExistsPair> Pairs, WhereNode? Inner) : WhereNode;
+
     /// <summary>The node in upstream's data form, as the outbox and archives carry it.</summary>
     public JsonObject ToJson() => this switch
     {
+        Exists node => new JsonObject
+        {
+            ["exists"] = new JsonArray(node.Set,
+                new JsonArray([.. node.Pairs.Select(pair => (JsonNode)new JsonArray(pair.SetColumn, pair.Column))]), node.Inner?.ToJson()),
+        },
         Compare node => new JsonObject { [StoreInternal.Name(node.Op)] = new JsonArray(node.Column, node.Value.ToNode()) },
         InArray node => new JsonObject { ["inArray"] = new JsonArray(node.Column, new JsonArray([.. node.Values.Select(value => value.ToNode())])) },
         IsNull node => new JsonObject { ["isNull"] = node.Column },
@@ -62,6 +76,11 @@ public abstract record WhereNode
     /// <summary>The node's JSON text (<c>JSON.stringify</c>).</summary>
     public sealed override string ToString() => ChordJson.Stringify(ToJson());
 }
+
+/// <summary>One matched pair of an <see cref="WhereNode.Exists"/>: a column of the set and the column of the enclosing row it equals.</summary>
+/// <param name="SetColumn">The set's column.</param>
+/// <param name="Column">The enclosing row's column, as its side names it.</param>
+public readonly record struct ExistsPair(string SetColumn, string Column);
 
 /// <summary>The operations of a <see cref="ExprNode.Binary"/> (upstream <c>Operation</c>, without <c>replacePrefix</c> and <c>when</c>,
 /// which have nodes of their own).</summary>
@@ -148,14 +167,22 @@ public class Expression
 }
 
 /// <summary>A reference to a column of the row, as a table's <c>Refs</c> give them to <c>t =&gt; ...</c> callbacks (upstream
-/// <c>ColumnRef</c>).</summary>
+/// <c>ColumnRef</c>). One of a column set (<see cref="ColumnSet.Refs"/>) carries the set's name: a condition names the side it means by it
+/// (a query's own table, a joined set, an <c>Exists</c>).</summary>
 public sealed class ColumnRef : Expression
 {
-    internal ColumnRef(string column)
-        : base("col", [column]) => Column = column;
+    internal ColumnRef(string column, string? set = null)
+        : base("col", [column])
+    {
+        Column = column;
+        Set = set;
+    }
 
     /// <summary>The column's name.</summary>
     public string Column { get; }
+
+    /// <summary>The name of the column set the reference is of; null for a table's own reference.</summary>
+    public string? Set { get; }
 }
 
 /// <summary>A condition as a plugin builds it with <see cref="Expressions"/>; compiled when staged or run (upstream <c>Condition</c>).</summary>
@@ -167,7 +194,8 @@ public sealed class Condition
         Args = args;
     }
 
-    /// <summary>The operator (upstream <c>Comparison | "inArray" | "isNull" | "prefix" | "and" | "or" | "not"</c>).</summary>
+    /// <summary>The operator (upstream <c>Comparison | "inArray" | "isNull" | "prefix" | "and" | "or" | "not" | "exists" |
+    /// "existsNode"</c>).</summary>
     internal string Op { get; }
 
     /// <summary>The operands as built: a column reference and a JsonNode value (or a list of them), or conditions.</summary>
@@ -273,6 +301,42 @@ public static class Expressions
     /// <summary>The condition does not hold (<c>NULL</c> stays <c>NULL</c>: it never matches).</summary>
     public static Condition Not(Condition condition) => new("not", [condition]);
 
+    /// <summary>A match of an <see cref="Exists(ColumnSet, IReadOnlyDictionary{string, ColumnRef}, Func{IReadOnlyDictionary{string, ColumnRef}, Condition}?)"/>
+    /// or a join, pair by pair in the order given: <c>(setColumn, column)</c> (upstream's object literal <c>{ setColumn: column }</c>).</summary>
+    public static IReadOnlyDictionary<string, ColumnRef> Match(params (string SetColumn, ColumnRef Column)[] pairs)
+    {
+        ArgumentNullException.ThrowIfNull(pairs);
+        var match = new OrderedDictionary<string, ColumnRef>(StringComparer.Ordinal);
+        foreach (var (setColumn, column) in pairs) match[setColumn] = column;
+        return match;
+    }
+
+    /// <summary><paramref name="set"/>'s table has a row equal to the enclosing row in the matched columns (a leading prefix of the set's
+    /// key or of one of its declared indexes) that satisfies <paramref name="inner"/>. In queries only (upstream <c>exists</c>).</summary>
+    public static Condition Exists(ColumnSet set, IReadOnlyDictionary<string, ColumnRef> match,
+        Func<IReadOnlyDictionary<string, ColumnRef>, Condition>? inner = null)
+    {
+        ArgumentNullException.ThrowIfNull(set);
+        return new("exists", [set, match, inner?.Invoke(set.Refs)]);
+    }
+
+    /// <summary><see cref="Exists"/> with its inner condition as data (<see cref="Tables.Compile"/>'s result in its JSON form): for a
+    /// condition handed over as an argument. A trust boundary: <paramref name="inner"/> is whatever arrived, and is checked whole before
+    /// anything is rendered (upstream <c>existsNode</c>).</summary>
+    public static Condition ExistsNode(ColumnSet set, IReadOnlyDictionary<string, ColumnRef> match, JsonNode? inner)
+    {
+        ArgumentNullException.ThrowIfNull(set);
+        return new("existsNode", [set, match, inner]);
+    }
+
+    /// <summary><see cref="ExistsNode(ColumnSet, IReadOnlyDictionary{string, ColumnRef}, JsonNode?)"/> for a compiled node: checked as its
+    /// JSON form is.</summary>
+    public static Condition ExistsNode(ColumnSet set, IReadOnlyDictionary<string, ColumnRef> match, WhereNode inner)
+    {
+        ArgumentNullException.ThrowIfNull(inner);
+        return ExistsNode(set, match, inner.ToJson());
+    }
+
     /// <summary><c>a + b</c> over integers; a result outside ±(2^53 - 1) fails (rule 10).</summary>
     public static Expression Add(Operand a, Operand b) => Expression.Of("add", [a, b]);
 
@@ -337,12 +401,43 @@ internal static partial class StoreInternal
     internal static IReadOnlyDictionary<string, ColumnRef> ColumnRefs(IEnumerable<Column> columns) =>
         columns.ToDictionary(column => column.Name, column => new ColumnRef(column.Name), StringComparer.Ordinal);
 
-    /// <summary>Compiles a plugin's condition over <paramref name="table"/>'s columns (a trust boundary: plugin values): known scalar
-    /// columns, operands of their type made storable (<c>invalid/args</c> otherwise, null included: ask with <c>IsNull</c>, rule 16;
-    /// upstream <c>compileWhere</c>).</summary>
-    internal static WhereNode CompileWhere(TableDefinition table, object? condition, string what)
+    /// <summary>The scope of one table: its own references, and those of the set it exposes (upstream <c>tableScope</c>).
+    /// <paramref name="exists"/>: whether a condition here may test <c>exists</c> (a query's may, a write's may not).</summary>
+    internal static Scope TableScope(TableDefinition table, bool exists) => new(table.Name, exists, reference =>
     {
-        if (condition is not Condition built) throw DataInternal.Invalid("args", $"{table.Name}: {what}: expected a condition");
+        if (reference.Set is not null && reference.Set != table.Exposes?.Name) return null;
+        return table.ByName.TryGetValue(reference.Column, out var column) ? new Resolved(column, column.Name) : null;
+    });
+
+    /// <summary>The scope of a column set alone: its own references (<c>Compile</c>, an <c>exists</c>' inner condition; upstream
+    /// <c>setScope</c>).</summary>
+    internal static Scope SetScope(ISide set) => new(set.Name, true, reference =>
+        reference.Set == set.Name && set.ByName.TryGetValue(reference.Column, out var column) ? new Resolved(column, column.Name) : null);
+
+    /// <summary>The name of a joined set's column in compiled nodes, orders and cursors: <c>&lt;set&gt;:&lt;column&gt;</c> (upstream
+    /// <c>partnerName</c>).</summary>
+    internal static string PartnerName(string set, string column) => $"{set}:{column}";
+
+    /// <summary>The scope of a query of <paramref name="own"/> joined with <paramref name="set"/>: the partner's columns are named
+    /// <c>&lt;set&gt;:&lt;column&gt;</c> (upstream <c>joinedScope</c>).</summary>
+    internal static Scope JoinedScope(Scope own, ISide set) => new(own.Name, true, reference =>
+    {
+        if (reference.Set != set.Name) return own.Resolve(reference);
+        return set.ByName.TryGetValue(reference.Column, out var column) ? new Resolved(column, PartnerName(set.Name, column.Name)) : null;
+    });
+
+    /// <summary>Compiles a plugin's condition over <paramref name="table"/>'s columns for a write (a trust boundary: plugin values): known
+    /// scalar columns, operands of their type made storable (<c>invalid/args</c> otherwise, null included: ask with <c>IsNull</c>, rule 16).
+    /// No <c>exists</c> (upstream <c>compileWhere</c>).</summary>
+    internal static WhereNode CompileWhere(TableDefinition table, object? condition, string what) =>
+        CompileCondition(TableScope(table, false), condition, what);
+
+    /// <summary>Compiles a plugin's condition in <paramref name="scope"/> (a trust boundary), as <see cref="CompileWhere"/> does for one
+    /// table. The set columns its <c>exists</c> use are added to <paramref name="expected"/> (upstream <c>compileCondition</c>).</summary>
+    internal static WhereNode CompileCondition(Scope scope, object? condition, string what, Dictionary<string, Dictionary<string, Column>>? expected = null)
+    {
+        if (condition is not Condition built) throw DataInternal.Invalid("args", $"{scope.Name}: {what}: expected a condition");
+        expected ??= new Dictionary<string, Dictionary<string, Column>>(StringComparer.Ordinal);
         var args = built.Args;
         object? Arg(int index) => index < args.Count ? args[index] : null;
         switch (built.Op)
@@ -350,34 +445,238 @@ internal static partial class StoreInternal
             case "and":
             case "or":
             {
-                var nodes = args.Select(each => CompileWhere(table, each, what)).ToList();
+                var nodes = args.Select(each => CompileCondition(scope, each, what, expected)).ToList();
                 return built.Op == "and" ? new WhereNode.And(nodes) : new WhereNode.Or(nodes);
             }
             case "not":
-                return new WhereNode.Not(CompileWhere(table, Arg(0), what));
+                return new WhereNode.Not(CompileCondition(scope, Arg(0), what, expected));
+            case "exists":
+            case "existsNode":
+                return CompileExists(scope, built, what, expected);
             case "isNull":
-                return new WhereNode.IsNull(OrderedColumn(table, Arg(0), what, "isNull").Name);
+                return new WhereNode.IsNull(Ordered(scope, ScalarColumn(scope, Arg(0), what), "isNull", what).Name);
             case "prefix":
             {
-                var column = OrderedColumn(table, Arg(0), what, "prefix");
-                if (column.Type != ColumnType.Str) throw DataInternal.Invalid("args", $"{table.Name}: {what}: prefix needs a str() column");
-                return new WhereNode.Prefix(column.Name, (string)OperandOf(column, Arg(1), what).Value);
+                var resolved = Ordered(scope, ScalarColumn(scope, Arg(0), what), "prefix", what);
+                if (resolved.Column.Type != ColumnType.Str) throw DataInternal.Invalid("args", $"{scope.Name}: {what}: prefix needs a str() column");
+                return new WhereNode.Prefix(resolved.Name, (string)OperandOf(resolved.Column, Arg(1), what).Value);
             }
             case "inArray":
             {
-                var column = ScalarColumn(table, Arg(0), what);
-                if (Arg(1) is not IEnumerable<JsonNode?> values) throw DataInternal.Invalid("args", $"{table.Name}: {what}: inArray needs an array");
-                return new WhereNode.InArray(column.Name, [.. values.Select(value => OperandOf(column, value, what))]);
+                var resolved = ScalarColumn(scope, Arg(0), what);
+                if (Arg(1) is not IEnumerable<JsonNode?> values) throw DataInternal.Invalid("args", $"{scope.Name}: {what}: inArray needs an array");
+                return new WhereNode.InArray(resolved.Name, [.. values.Select(value => OperandOf(resolved.Column, value, what))]);
             }
             default:
             {
                 if (!Comparisons.TryGetValue(built.Op, out var op)) throw new ArgumentException($"An unknown condition operator \"{built.Op}\".");
-                var column = ScalarColumn(table, Arg(0), what);
+                var resolved = ScalarColumn(scope, Arg(0), what);
+                if (op is not (Comparison.Eq or Comparison.Ne)) Ordered(scope, resolved, built.Op, what);
                 // One of the six comparisons: the node's shape is { [op]: [column, value] }.
-                if (op is not (Comparison.Eq or Comparison.Ne) && column.Host is not null)
-                    throw DataInternal.Invalid("args", $"{table.Name}: {what}: {built.Op} on host(...) column \"{column.Name}\" (eq, ne, inArray only)");
-                return new WhereNode.Compare(op, column.Name, OperandOf(column, Arg(1), what));
+                return new WhereNode.Compare(op, resolved.Name, OperandOf(resolved.Column, Arg(1), what));
             }
+        }
+    }
+
+    /// <summary>How deep a condition handed over as data may nest (<c>and</c>, <c>or</c>, <c>not</c>, <c>exists</c>; upstream
+    /// <c>NODE_DEPTH</c>).</summary>
+    internal const int NodeDepth = 16;
+
+    /// <summary>Compiles an <c>exists</c> of <paramref name="scope"/>: the set's matched columns are a leading prefix of its key or of one of
+    /// its declared indexes, each of the type (and host kind) of the enclosing column it is matched to; the inner condition is the
+    /// callback's, compiled over the set, or a node, checked as <c>WhereNode</c> checks one (upstream <c>compileExists</c>).</summary>
+    private static WhereNode.Exists CompileExists(Scope scope, Condition condition, string what, Dictionary<string, Dictionary<string, Column>> expected)
+    {
+        // The builders' arguments (Exists, ExistsNode): plugin values, read as unknown data.
+        var args = condition.Args;
+        if (!scope.Exists) throw DataInternal.Invalid("args", $"{scope.Name}: {what}: exists is for queries, not for writes");
+        if (args.Count < 2 || args[0] is not ColumnSet set || args[1] is not IEnumerable<KeyValuePair<string, ColumnRef>> match)
+            throw DataInternal.Invalid("args", $"{scope.Name}: {what}: exists needs a match");
+        var inner = args.Count > 2 ? args[2] : null;
+        var pairs = new List<ExistsPair>();
+        foreach (var (name, reference) in match)
+        {
+            var column = set.ByName.GetValueOrDefault(name);
+            var outer = reference is null ? null : scope.Resolve(reference);
+            if (column is null || outer is null)
+                throw DataInternal.Invalid("args", $"{scope.Name}: {what}: exists({set.Name}): \"{name}\" is matched to no column");
+            CheckPair(set.Name, column, outer.Column, $"{scope.Name}: {what}");
+            pairs.Add(new ExistsPair(name, outer.Name));
+        }
+        CheckMatch(set, [.. pairs.Select(pair => pair.SetColumn)], $"{scope.Name}: {what}");
+        WhereNode? node = null;
+        if (condition.Op == "existsNode") node = CheckNode(inner as JsonNode, set, $"{scope.Name}: {what}: existsNode({set.Name})");
+        else if (inner is not null) node = CompileCondition(SetScope(set), inner, what, expected);
+        // What this exists uses of the set, as its author's set declares it.
+        if (!expected.TryGetValue(set.Name, out var columns)) expected[set.Name] = columns = new Dictionary<string, Column>(StringComparer.Ordinal);
+        foreach (var name in pairs.Select(pair => pair.SetColumn).Concat(node is null ? [] : ColumnsOf(node))) columns[name] = set.ByName[name];
+        return new WhereNode.Exists(set.Name, pairs, node);
+    }
+
+    /// <summary>The columns a condition uses of its own side: the ones it compares, and the ones its <c>exists</c> are matched to. An
+    /// <c>exists</c>' inner condition is another side's (upstream <c>columnsOf</c>).</summary>
+    internal static IEnumerable<string> ColumnsOf(WhereNode node) => node switch
+    {
+        WhereNode.And all => all.Nodes.SelectMany(ColumnsOf),
+        WhereNode.Or any => any.Nodes.SelectMany(ColumnsOf),
+        WhereNode.Not negated => ColumnsOf(negated.Node),
+        WhereNode.IsNull isNull => [isNull.Column],
+        WhereNode.Exists exists => exists.Pairs.Select(pair => pair.Column),
+        WhereNode.InArray inArray => [inArray.Column],
+        WhereNode.Prefix prefix => [prefix.Column],
+        WhereNode.Compare compare => [compare.Column],
+        _ => throw new InvalidOperationException("An unknown condition node."),
+    };
+
+    /// <summary>The <c>exists</c> a condition tests on its own side, not the ones nested inside them (upstream <c>existsIn</c>).</summary>
+    internal static IEnumerable<WhereNode.Exists> ExistsIn(WhereNode node) => node switch
+    {
+        WhereNode.And all => all.Nodes.SelectMany(ExistsIn),
+        WhereNode.Or any => any.Nodes.SelectMany(ExistsIn),
+        WhereNode.Not negated => ExistsIn(negated.Node),
+        WhereNode.Exists exists => [exists],
+        _ => [],
+    };
+
+    /// <summary>Whether <paramref name="key"/> is the canonical stored key of an address of <paramref name="host"/>'s kind.</summary>
+    private static bool IsHostKey(HostColumn host, string key)
+    {
+        try
+        {
+            return host.Key(host.Address(key), "") == key;
+        }
+        catch (Exception)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>Refuses a match that is no leading prefix of <paramref name="set"/>'s key or of one of its declared indexes
+    /// (<c>invalid/args</c>, listing them): two tables are matched only by such an equality (the bounding rule, slice 14 §5; upstream
+    /// <c>checkMatch</c>).</summary>
+    internal static void CheckMatch(IMatchedSet set, IReadOnlyList<string> matched, string what)
+    {
+        bool Fits(IReadOnlyList<string> path) =>
+            matched.Count > 0 && matched.Count <= path.Count && path.Take(matched.Count).All(column => matched.Contains(column));
+        if (Fits(set.Key) || set.Indexes.Values.Any(Fits)) return;
+        var listed = new[] { $"key ({string.Join(", ", set.Key)})" }.Concat(set.Indexes.Select(index => $"{index.Key} ({string.Join(", ", index.Value)})"));
+        throw DataInternal.Invalid("args",
+            $"{what}: {set.Name} is matched by ({string.Join(", ", matched)}), no leading prefix of its {string.Join(" or ", listed)}");
+    }
+
+    /// <summary>Refuses a pair of matched columns of different types or host kinds (<c>invalid/args</c>, naming the set's column; upstream
+    /// <c>checkPair</c>).</summary>
+    internal static void CheckPair(string set, Column column, Column outer, string what)
+    {
+        var (a, b) = (RecordOf(column), RecordOf(outer));
+        if (a.Type == ColumnType.Json || a.Type != b.Type || a.Host != b.Host)
+            throw DataInternal.Invalid("args", $"{what}: {set} column \"{column.Name}\" and the column it is matched to differ in type");
+    }
+
+    /// <summary>Reads a condition handed over as data against <paramref name="side"/>'s columns (a trust boundary, slice 14 §6): one known
+    /// kind per node, operand shapes and types (a <c>host(...)</c> column's operands are stored keys), every column in the side, a depth
+    /// bound. The inner condition of a nested <c>exists</c> is over another set: its structure is checked here, its columns when the read
+    /// opens and the set's table is known. <c>invalid/args</c> otherwise (upstream <c>checkNode</c>, which asserts the shape; here the
+    /// checked value is returned as the typed node).</summary>
+    internal static WhereNode CheckNode(JsonNode? node, ISide? side, string what, int depth = 0)
+    {
+        ChordError Refuse(string message) => DataInternal.Invalid("args", $"{what}: {message}");
+        if (depth > NodeDepth) throw Refuse($"nested deeper than {NodeDepth}");
+        if (ChordJson.AsObject(node) is not { } fields) throw Refuse("a condition node is an object");
+        if (fields.Count != 1) throw Refuse("a condition node has one kind");
+        var (kind, value) = fields.First();
+        Column? ColumnOf(JsonNode? name, out string text)
+        {
+            text = ChordJson.AsString(name) ?? throw Refuse("a column is named by a string");
+            Column? found = null;
+            if (side is not null && !side.ByName.TryGetValue(text, out found)) throw Refuse($"no column \"{text}\" in {side.Name}");
+            if (found?.Type == ColumnType.Json) throw Refuse($"json(...) column \"{text}\" is not queryable");
+            return found;
+        }
+        Scalar Operand(Column? of, JsonNode? each)
+        {
+            var primitive = each is JsonValue held && ChordJson.Primitive(held, out var read) ? read : null;
+            if (primitive is not (string or bool) && !(primitive is double number && double.IsFinite(number)))
+                throw Refuse("an operand is a string, a number or a boolean");
+            if (of is null) return Scalar.FromPrimitive(primitive!);
+            var scalar = CheckScalar(of.Type, each, what);
+            // A host(...) column holds canonical address keys: anything else would silently match nothing.
+            if (of.Type == ColumnType.Str && of.Host is { } host && !IsHostKey(host, (string)scalar.Value))
+                throw Refuse($"\"{scalar.Value}\" is no address key of {host.Kind.Kind} (column \"{of.Name}\")");
+            return scalar;
+        }
+        // A host(...) column compares only with eq, ne and inArray, as Compile has it.
+        void OrderedOnly(Column? of)
+        {
+            if (of is { Type: ColumnType.Str, Host: not null }) throw Refuse($"{kind} on host(...) column \"{of.Name}\"");
+        }
+        JsonArray Pair() => ChordJson.AsArray(value) is { Count: 2 } pair ? pair : throw Refuse($"{kind} takes [column, operand]");
+        switch (kind)
+        {
+            case "and":
+            case "or":
+            {
+                if (ChordJson.AsArray(value) is not { } each) throw Refuse($"{kind} takes an array");
+                List<WhereNode> nodes = [.. each.Select(item => CheckNode(item, side, what, depth + 1))];
+                return kind == "and" ? new WhereNode.And(nodes) : new WhereNode.Or(nodes);
+            }
+            case "not":
+                return new WhereNode.Not(CheckNode(value, side, what, depth + 1));
+            case "isNull":
+            {
+                OrderedOnly(ColumnOf(value, out var name));
+                return new WhereNode.IsNull(name);
+            }
+            case "inArray":
+            {
+                var pair = Pair();
+                var of = ColumnOf(pair[0], out var name);
+                if (ChordJson.AsArray(pair[1]) is not { } values) throw Refuse("inArray takes an array of operands");
+                return new WhereNode.InArray(name, [.. values.Select(each => Operand(of, each))]);
+            }
+            case "prefix":
+            {
+                var pair = Pair();
+                var of = ColumnOf(pair[0], out var name);
+                OrderedOnly(of);
+                if (ChordJson.AsString(pair[1]) is not { } text || (of is not null && of.Type != ColumnType.Str))
+                    throw Refuse("prefix takes a str() column and a string");
+                return new WhereNode.Prefix(name, text);
+            }
+            case "eq":
+            case "ne":
+            {
+                var pair = Pair();
+                var of = ColumnOf(pair[0], out var name);
+                return new WhereNode.Compare(Comparisons[kind], name, Operand(of, pair[1]));
+            }
+            case "lt":
+            case "lte":
+            case "gt":
+            case "gte":
+            {
+                var pair = Pair();
+                var of = ColumnOf(pair[0], out var name);
+                OrderedOnly(of);
+                return new WhereNode.Compare(Comparisons[kind], name, Operand(of, pair[1]));
+            }
+            case "exists":
+            {
+                if (ChordJson.AsArray(value) is not { Count: 3 } parts) throw Refuse("exists takes [set, pairs, inner]");
+                if (ChordJson.AsString(parts[0]) is not { } set || ChordJson.AsArray(parts[1]) is not { Count: > 0 } pairs)
+                    throw Refuse("exists takes a set name and its matched pairs");
+                var matched = new List<ExistsPair>();
+                foreach (var each in pairs)
+                {
+                    if (ChordJson.AsArray(each) is not { Count: 2 } pair || ChordJson.AsString(pair[0]) is not { } setColumn)
+                        throw Refuse("an exists pair is [setColumn, column]");
+                    ColumnOf(pair[1], out var column);
+                    matched.Add(new ExistsPair(setColumn, column));
+                }
+                return new WhereNode.Exists(set, matched, parts[2] is null ? null : CheckNode(parts[2], null, what, depth + 1));
+            }
+            default:
+                throw Refuse($"unknown kind \"{kind}\"");
         }
     }
 
@@ -494,16 +793,28 @@ internal static partial class StoreInternal
         _ => JsonValue.Create(value),
     };
 
-    /// <summary>The column a condition compares: a reference to a known scalar column.</summary>
-    private static Column ScalarColumn(TableDefinition table, object? reference, string what)
+    /// <summary>The column a condition compares: a reference to a known scalar column of <paramref name="scope"/> (upstream
+    /// <c>scalarColumn</c>).</summary>
+    private static Resolved ScalarColumn(Scope scope, object? reference, string what)
     {
-        if (reference is not ColumnRef column) throw DataInternal.Invalid("args", $"{table.Name}: {what}: expected a column reference");
-        if (!table.ByName.TryGetValue(column.Column, out var found)) throw DataInternal.Invalid("args", $"{table.Name}: {what}: no column \"{column.Column}\"");
-        if (found.Type == ColumnType.Json) throw DataInternal.Invalid("args", $"{table.Name}: {what}: json(...) column \"{column.Column}\" is not queryable");
-        return found;
+        if (reference is not ColumnRef column) throw DataInternal.Invalid("args", $"{scope.Name}: {what}: expected a column reference");
+        var resolved = scope.Resolve(column) ?? throw DataInternal.Invalid("args", $"{scope.Name}: {what}: no column \"{column.Column}\"");
+        if (resolved.Column.Type == ColumnType.Json)
+            throw DataInternal.Invalid("args", $"{scope.Name}: {what}: json(...) column \"{column.Column}\" is not queryable");
+        return resolved;
     }
 
-    /// <summary>An operand compared with <paramref name="column"/>, made storable; null is refused (rule 16).</summary>
+    /// <summary><paramref name="resolved"/> for a comparison by order, <c>isNull</c> or <c>prefix</c>: a <c>host(...)</c> column compares
+    /// only with eq, ne, inArray (upstream <c>ordered</c>).</summary>
+    private static Resolved Ordered(Scope scope, Resolved resolved, string operation, string what)
+    {
+        if (resolved.Column.Host is not null)
+            throw DataInternal.Invalid("args", $"{scope.Name}: {what}: {operation} on host(...) column \"{resolved.Column.Name}\" (eq, ne, inArray only)");
+        return resolved;
+    }
+
+    /// <summary>An operand compared with <paramref name="column"/>, made storable (an address as its key for a <c>host(...)</c> column);
+    /// null is refused (rule 16; upstream <c>operand</c>).</summary>
     private static Scalar OperandOf(Column column, object? value, string what)
     {
         if (value is null) throw DataInternal.Invalid("args", $"{what}: column \"{column.Name}\" compared with null; ask with isNull");
@@ -511,11 +822,20 @@ internal static partial class StoreInternal
         // ScalarColumn refused json columns.
         return CheckScalar(column.Type, value as JsonNode ?? JsonValue.Create(value), $"{what}: column \"{column.Name}\"");
     }
+}
 
-    private static Column OrderedColumn(TableDefinition table, object? reference, string what, string operation)
-    {
-        var column = ScalarColumn(table, reference, what);
-        if (column.Host is not null) throw DataInternal.Invalid("args", $"{table.Name}: {what}: {operation} on host(...) column \"{column.Name}\" (eq, ne, inArray only)");
-        return column;
-    }
+/// <summary>A column as a scope resolved it (upstream <c>Resolved</c>): the column and its name in compiled nodes.</summary>
+internal sealed record Resolved(Column Column, string Name);
+
+/// <summary>Where a condition's columns are looked up: one side of a query, or two for a joined one (upstream <c>Scope</c>).</summary>
+/// <param name="name">Named in errors.</param>
+/// <param name="exists">Whether a condition here may test <c>exists</c> (a query's may, a write's may not).</param>
+/// <param name="resolve">The column a reference names here and its name in compiled nodes; null when it is of no side of this scope.</param>
+internal sealed class Scope(string name, bool exists, Func<ColumnRef, Resolved?> resolve)
+{
+    internal string Name => name;
+
+    internal bool Exists => exists;
+
+    internal Resolved? Resolve(ColumnRef reference) => resolve(reference);
 }

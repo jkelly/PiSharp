@@ -32,6 +32,9 @@ internal static class Program
             (string Provider, string Name)[] mappings = [
                 ("github-copilot", "COPILOT_GITHUB_TOKEN"), ("ant-ling", "ANT_LING_API_KEY"),
                 ("qwen-token-plan", "QWEN_TOKEN_PLAN_API_KEY"), ("qwen-token-plan-cn", "QWEN_TOKEN_PLAN_CN_API_KEY"), ("qwen-token-plan-individual", "QWEN_TOKEN_PLAN_API_KEY"),
+                // Pi 1.6.0 (#11773): each plan has its own variable; the shared region variables above still work.
+                ("qwen-token-plan-individual-cn", "QWEN_TOKEN_PLAN_CN_API_KEY"), ("qwen-token-plan", "QWEN_TOKEN_PLAN_TEAM_API_KEY"), ("qwen-token-plan-cn", "QWEN_TOKEN_PLAN_TEAM_CN_API_KEY"),
+                ("qwen-token-plan-individual", "QWEN_TOKEN_PLAN_INDIVIDUAL_API_KEY"), ("qwen-token-plan-individual-cn", "QWEN_TOKEN_PLAN_INDIVIDUAL_CN_API_KEY"),
                 ("openai", "OPENAI_API_KEY"), ("azure", "AZURE_OPENAI_API_KEY"), ("nvidia", "NVIDIA_API_KEY"), ("deepseek", "DEEPSEEK_API_KEY"),
                 ("google", "GEMINI_API_KEY"), ("google-vertex", "GOOGLE_CLOUD_API_KEY"), ("groq", "GROQ_API_KEY"), ("cerebras", "CEREBRAS_API_KEY"),
                 ("xai", "XAI_API_KEY"), ("typesafe", "TYPESAFE_API_KEY"), ("radius", "RADIUS_API_KEY"), ("openrouter", "OPENROUTER_API_KEY"),
@@ -48,6 +51,20 @@ internal static class Program
                 Require(InjectedAuthenticationResolver.FindEnvKeys(provider, env).SequenceEqual([name]));
                 var auth = Auth(InjectedAuthenticationResolver.GetEnvApiKey(provider, env));
                 Require(auth.EnvironmentName == name && auth.Secret == Secret && auth.Kind == AuthenticationKind.ApiKey);
+            }
+            // The per-plan variable is read first; a per-plan key of the other plan is not a key of this one.
+            foreach (var (provider, plan, shared, other) in new[] {
+                ("qwen-token-plan", "QWEN_TOKEN_PLAN_TEAM_API_KEY", "QWEN_TOKEN_PLAN_API_KEY", "QWEN_TOKEN_PLAN_INDIVIDUAL_API_KEY"),
+                ("qwen-token-plan-cn", "QWEN_TOKEN_PLAN_TEAM_CN_API_KEY", "QWEN_TOKEN_PLAN_CN_API_KEY", "QWEN_TOKEN_PLAN_INDIVIDUAL_CN_API_KEY"),
+                ("qwen-token-plan-individual", "QWEN_TOKEN_PLAN_INDIVIDUAL_API_KEY", "QWEN_TOKEN_PLAN_API_KEY", "QWEN_TOKEN_PLAN_TEAM_API_KEY"),
+                ("qwen-token-plan-individual-cn", "QWEN_TOKEN_PLAN_INDIVIDUAL_CN_API_KEY", "QWEN_TOKEN_PLAN_CN_API_KEY", "QWEN_TOKEN_PLAN_TEAM_CN_API_KEY") })
+            {
+                var both = Env((shared, "shared-marker"), (plan, Secret), (other, "other-marker"));
+                Require(InjectedAuthenticationResolver.FindEnvKeys(provider, both).SequenceEqual([plan, shared]));
+                var preferred = Auth(InjectedAuthenticationResolver.GetEnvApiKey(provider, both));
+                Require(preferred.EnvironmentName == plan && preferred.Secret == Secret);
+                Require(InjectedAuthenticationResolver.FindEnvKeys(provider, Env((other, "other-marker"))).IsEmpty);
+                Require(InjectedAuthenticationResolver.GetEnvApiKey(provider, Env((other, "other-marker"))).Diagnostic == AuthenticationDiagnostic.Missing);
             }
             return Task.CompletedTask;
         });

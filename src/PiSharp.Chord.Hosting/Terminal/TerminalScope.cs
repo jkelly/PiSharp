@@ -1,5 +1,8 @@
-// Pi b4afdddf44e059c67ccf5097e5317d913521b470 (MIT): packages/chord/src/tui/scope.ts, packages/chord/src/tui/theme.ts.
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/chord/src/tui/scope.ts, packages/chord/src/tui/theme.ts.
+// 1.6.0: `variant` and `#follow` (one watch per reference state), and `on(member, listener)` (event members, decision "Events:
+// fire-and-forget members").
 // Native adapters retain explicit trusted-code and terminal ownership boundaries.
+using System.Runtime.CompilerServices;
 using System.Text.Json.Nodes;
 using PiSharp.Chord.Contracts;
 using PiSharp.Chord.Host;
@@ -16,6 +19,9 @@ public sealed class TerminalScope : IDisposable
     private readonly CancellationTokenSource _stop = new();
     private readonly object _gate = new();
     private readonly List<Action> _release = [];
+    // The reference states it follows: one watch each, however often Hold and Variant ask. Weak: a reference released by its own holder
+    // is not kept by a scope that read its variant.
+    private readonly ConditionalWeakTable<INativeWatchable<RefState>, object> _states = new();
     private bool _disposed;
     public TerminalScope(ChordHost host, Action changed) { _host = host; _changed = changed; }
     private ChordContext Context => ChordContext.WithAbortSignal(_stop.Token, ChordContext.Background);
@@ -23,7 +29,43 @@ public sealed class TerminalScope : IDisposable
     {
         lock (_gate) ObjectDisposedException.ThrowIf(_disposed, this);
         var reference = _host.Hold(contract, parameters, Context);
-        Retain(reference.Release); Watch(reference.State); return reference;
+        Retain(reference.Release); Follow(reference.State); return reference;
+    }
+    /// <summary>A reader of <paramref name="reference"/> while it is live in <paramref name="variant"/>, else <c>null</c> (loading, failed
+    /// or denied, ended, another variant): <see cref="Variants.LiveIn{T}"/> over a reference whose state is followed until
+    /// <see cref="Dispose"/>, so a change of its variant calls <c>changed</c>. True of the redraw that read it: a call made after an
+    /// <c>await</c> may find another variant. The scope itself keeps no reference its holder released.</summary>
+    public Func<T?> Variant<T>(T reference, string variant) where T : class, IReference
+    {
+        ArgumentNullException.ThrowIfNull(reference); ArgumentNullException.ThrowIfNull(variant);
+        lock (_gate) ObjectDisposedException.ThrowIf(_disposed, this);
+        Follow(reference.State);
+        return () => Variants.LiveIn(reference, variant);
+    }
+    /// <summary>Subscribes <paramref name="listener"/> to event member <paramref name="member"/> (a reference's,
+    /// <see cref="IReference.Event"/>) until <see cref="Dispose"/>. Events call <paramref name="listener"/> only, never <c>changed</c>: the
+    /// listener decides what redraws.</summary>
+    public void On(IEventMember member, Action<ChordEvent> listener)
+    {
+        ArgumentNullException.ThrowIfNull(member); ArgumentNullException.ThrowIfNull(listener);
+        lock (_gate) ObjectDisposedException.ThrowIf(_disposed, this);
+        _ = SubscribeAsync();
+        async Task SubscribeAsync()
+        {
+            // The scope's context ends the subscription at Dispose; its Stop is kept as well, for a subscription made as the scope ends.
+            try { var subscription = await member.OnAsync(listener, Context).ConfigureAwait(false); Retain(subscription.Stop); }
+            catch { /* Rejected only once released or disposed: nothing to follow then. */ }
+        }
+    }
+    // Follows the reference state `state` until Dispose, once.
+    private void Follow(INativeWatchable<RefState> state)
+    {
+        lock (_gate)
+        {
+            if (_states.TryGetValue(state, out _)) return;
+            _states.Add(state, _gate);
+        }
+        _ = FollowAsync(state);
     }
     public Func<T?> Watch<T>(IWatchable<T> source)
     {
@@ -56,7 +98,10 @@ public sealed class TerminalScope : IDisposable
         try
         {
             var watch = await source.WatchAsync(Context).ConfigureAwait(false);
-            Retain(() => _ = watch.StopAsync());
+            Action stop = () => _ = watch.StopAsync();
+            Retain(stop);
+            // A watch that ended by itself (its reference was released by its holder) leaves nothing behind in the scope.
+            _ = watch.Closed.ContinueWith(_ => { lock (_gate) _release.Remove(stop); }, TaskScheduler.Default);
             lock (_gate)
             {
                 if (_disposed) return;

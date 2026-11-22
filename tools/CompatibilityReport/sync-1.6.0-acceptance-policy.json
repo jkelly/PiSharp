@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "version": "1.6.0",
+  "sourceCommit": "faac585884ae2c013a6b1400f3e9e77f10b34bac",
+  "ledger": "AI_DOCS/sync-1.6.0-source-validation.json",
+  "coverage": "AI_DOCS/sync-1.6.0-source-coverage.json",
+  "scope": "Current-source local suite acceptance; no whole-product, hosted, live-provider, cross-platform or publication claim.",
+  "limitations": [
+    "Execution evidence is local and platform-scoped; hosted, other-platform and live-provider acceptance are not inferred.",
+    "Not run: CompletionsGrammar, CompletionsThinking, Tui.SelectList, Terminal.SelectList.Integration, Tui.Focus, Tui.IndicConjunct, Tui.Keybindings, Tui.Keypad, Tui.KittyAlternate, Tui.LockModifiers, Tui.ModifyOtherKeys. They replay captured Source fixtures or need frozen evidence-admission inputs (source observations, review checkout, source manifest and build receipt) that this checkout does not hold; the tui and ai-providers packages built them only. They cover key decoding, the segmenter, the native TerminalSelectList and the Completions grammar and thinking replays, which the 1.6.0 changes did not touch.",
+    "Not accepted: GoogleGenerativeAI (36 of 37; google.native-diagnostics-preterminal-real-consumer-limit fails with \"The JSON value of length 536870889 is too large\") and OpenAIResponsesOriginalParity (70 of 76 records) fail identically on the base commit 343ece01, as the ai-providers report records; their results are reported, not accepted.",
+    "Not accepted: MistralOriginalOptions, OpenAIResponsesHooks, ResponsesGrammarFallback, ResponsesOrphan, VertexSimple exit 0 on the current source (ai-providers ran them), but they print their results as JSON records or only to a report file, which the validation owner (tools/GapValidation/CaseEvidence.ps1) does not read as case evidence, so their receipts show no selected cases."
+  ],
+  "blockingFindings": ["pending-package", "not-in-report"],
+  "workPackages": {
+    "meta": ["Models", "ExtensionParity", "Agent", "CliParity", "CodingAgent", "Codemode", "Durable", "InteractiveParity", "SessionParity", "ProviderApis", "ProviderSync", "Classifiers", "Chord"],
+    "ai-catalog": ["Models", "NativeModelCatalog", "ModelRuntime", "ProviderSync", "ProviderApis", "Authentication", "ClassifierConfig", "CliSync", "CliParity", "InteractiveParity", "SessionParity", "CodingAgent", "ExtensionParity", "Durable", "Durable.Hosting", "Durable.Server", "DurableCli", "WebAgent"],
+    "ai-providers": ["ProviderSync", "ProviderApis", "OpenAICompatibilityGap", "AnthropicThreads", "AnthropicResolved", "AnthropicSimple", "AnthropicProfile", "AnthropicAuthSync", "AzureResponses", "AzureSimple", "MistralConversations", "ResponsesPublicMetadata", "ResponsesTranscriptTools", "Transport", "WireSync", "Compatibility", "ProviderOfflineDifferential", "SimpleOutputBudget", "ToolSearch", "Models", "NativeModelCatalog", "Classifiers", "Agent", "CliSync", "CliParity", "CodingAgent", "Durable", "WebAgent"],
+    "core-small": ["Agent", "CodingAgent", "McpSync", "Env.Adapter", "Env.Connection", "Env.Daemon", "Env.Process", "Env.Ssh", "Env.Terminal", "Env.Watch", "Rpc", "Transport", "WireSync", "Extensions.ContractTests"],
+    "tui": ["Tui", "Tui.Editor", "Tui.NativeModifiers", "InteractiveParity", "CliSync", "DurableCli", "SessionParity", "McpSync", "McpParity", "ProviderApis", "Codemode", "ExtensionParity", "ToolSearch", "CodingAgent"],
+    "cli-tools": ["Tools", "SessionParity", "InteractiveParity", "ExtensionParity", "CliParity", "CodingAgent", "Rpc", "WireSync", "WebAgent"],
+    "cli-session": ["CliParity", "InteractiveParity", "ExtensionParity", "CodingAgent", "Rpc", "SessionParity", "Sessions", "CliSync", "McpParity", "McpSync", "ToolSearch", "Classifiers", "ModelRuntime", "Models", "SdkEventBus", "SdkAsyncEventBus", "DurableCli", "ExtensionHost", "ProviderSync", "OpenAICompatibilityGap", "Durable"],
+    "cli-ui": ["InteractiveParity", "CliParity", "Tui", "CliSync", "CodingAgent", "DurableCli", "SessionParity", "ExtensionParity"],
+    "durable-core": ["Durable", "Durable.Hosting", "Durable.Server", "DurableCli", "DurableMessages", "CustomAgents", "Chord.Durable.Integration", "Chord.Hosting", "Durable150.Capture", "Durable.Web", "WebAgent"],
+    "durable-edge": ["Durable", "Durable.Hosting", "Durable.Server", "Durable.Web", "DurableCli", "CustomAgents", "WebAgent", "Codemode", "Chord.Durable.Integration", "Durable150.Capture", "McpParity", "ToolSearch", "CodingAgent"],
+    "chord-foundation": ["Chord", "Chord.Hosting", "Chord.Durable.Integration", "Durable"],
+    "chord-edge": ["Chord", "Chord.Hosting"],
+    "chord-store": ["Chord", "Chord.Hosting", "Chord.Durable.Integration", "Chord.Legacy.Cluster", "Durable"],
+    "chord-remote": ["Chord", "Chord.Hosting", "Chord.Durable.Integration"],
+    "chord-queries": ["Chord", "Chord.Hosting", "Chord.Durable.Integration", "Durable"],
+    "chord-admission": ["Chord", "Chord.Hosting", "Chord.Durable.Integration"],
+    "chord-workers": ["Chord", "Chord.Hosting", "Chord.Durable.Integration", "Telemetry"]
+  },
+  "catalog": {
+    "provenance": "src/PiSharp.AI/Catalogs/Releases/1.6.0.provenance.json",
+    "directory": "src/PiSharp.AI/Catalogs/Releases/1.6.0",
+    "report": "AI_DOCS/agent-reports/sync-1.6.0-ai-catalog.md"
+  },
+  "packageValidationRecord": "AI_DOCS/sync-1.6.0-packaging.json",
+  "documentationEdits": []
+}

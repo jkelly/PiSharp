@@ -313,7 +313,7 @@ internal sealed class DurableQuestionForm : Container, IFocusable, IInputHandler
     private sealed class InputRow(Input input) : IComponent
     {
         public void Invalidate() => input.Invalidate();
-        public List<string> Render(int width) => [.. input.Render(Math.Max(1, width - 1)).Select(line => " " + line)];
+        public IReadOnlyList<string> Render(int width) => [.. input.Render(Math.Max(1, width - 1)).Select(line => " " + line)];
     }
 }
 
@@ -444,7 +444,7 @@ internal sealed class DurablePlanReview : Container, IFocusable, IInputHandler
     {
         public void Invalidate() => inner.Invalidate();
 
-        public List<string> Render(int width)
+        public IReadOnlyList<string> Render(int width)
         {
             var lines = inner.Render(width);
             var max = Math.Max(1, maxLines());

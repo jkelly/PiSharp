@@ -172,6 +172,11 @@ internal static class PiCommand
         if (parsed.Export is { } exportPath) return await PiExport.RunAsync(exportPath, parsed.Messages.FirstOrDefault(), host, token).ConfigureAwait(false);
 
         var appMode = ResolveAppMode(parsed, host.StdinIsTty, host.StdoutIsTty);
+        // Pi faac585884ae2c013a6b1400f3e9e77f10b34bac main.ts (#11264): interactive mode installs and refreshes packages again on /reload
+        // while the TUI draws on the terminal, where git and npm output would corrupt its screen. Their output is captured there, and
+        // until the TUI starts each install is announced on stderr instead. The other modes keep live output on stderr.
+        var packageRun = new PiSharp.Cli.Packages.PiPackageRunOutput(appMode == PiAppMode.Interactive
+            ? PiSharp.Cli.Packages.PiPackageCommandOutput.Capture : PiSharp.Cli.Packages.PiPackageCommandOutput.Inherit, err, color);
         if (parsed.Mode == PiOutputMode.Rpc && parsed.FileArgs.Count > 0) { await Error("@file arguments are not supported in RPC mode").ConfigureAwait(false); return 1; }
         ValidateForkFlags(parsed);
         ValidateSessionIdFlags(parsed);
@@ -201,7 +206,7 @@ internal static class PiCommand
             {
                 // main.ts createRuntime: the saved decision comes before auto-trust.
                 var helpTrusted = parsed.ProjectTrustOverride ?? new ProjectTrustStore(agentDir, home).Get(cwd) ?? !ProjectTrustStore.HasTrustRequiringProjectResources(cwd, home);
-                await using var helpRun = await PiExtensionRun.LoadAsync(host, parsed, cwd, agentDir, home, helpTrusted, "print", false, null, token).ConfigureAwait(false);
+                await using var helpRun = await PiExtensionRun.LoadAsync(host, parsed, cwd, agentDir, home, helpTrusted, "print", false, null, token, packageRun).ConfigureAwait(false);
                 helpFlags = helpRun.Host?.Flags; helpDiagnostics = [.. helpRun.Diagnostics];
             }
             await Report(Deduplicate([.. startupDiagnostics, .. helpDiagnostics])).ConfigureAwait(false);
@@ -218,12 +223,11 @@ internal static class PiCommand
             if (host.LoadExtensions is null)
             {
                 var listTrusted = parsed.ProjectTrustOverride ?? new ProjectTrustStore(agentDir, home).Get(cwd) ?? !ProjectTrustStore.HasTrustRequiringProjectResources(cwd, home);
-                listRun = await PiExtensionRun.LoadAsync(host, parsed, cwd, agentDir, home, listTrusted, "print", false, null, token).ConfigureAwait(false);
+                listRun = await PiExtensionRun.LoadAsync(host, parsed, cwd, agentDir, home, listTrusted, "print", false, null, token, packageRun).ConfigureAwait(false);
                 PiSharp.Cli.Packages.PiResolvedPaths listPackages;
                 try
                 {
-                    listPackages = await new PiSharp.Cli.Packages.PiPackageManager(cwd, agentDir, home, PiSettings.Load(cwd, agentDir, listTrusted), host.GetEnvironment,
-                        host.PackageProcesses?.Invoke(err, err) ?? new() { Output = err, ErrorOutput = err }, PiBuiltinExtensions.Names)
+                    listPackages = await packageRun.CreateManager(host, cwd, agentDir, home, PiSettings.Load(cwd, agentDir, listTrusted), err, err, PiBuiltinExtensions.Names)
                         .ResolveAsync(cancellationToken: token).ConfigureAwait(false);
                 }
                 catch (PiSharp.Cli.Packages.PiPackageException) { listPackages = PiSharp.Cli.Packages.PiResolvedPaths.Empty; }
@@ -295,7 +299,7 @@ internal static class PiCommand
         var extensionMode = appMode switch { PiAppMode.Interactive => "tui", PiAppMode.Rpc => "rpc", PiAppMode.Json => "json", _ => "print" };
         await using var extensionRun = host.LoadExtensions is null
             ? await PiExtensionRun.LoadAsync(host, parsed, sessionCwd, agentDir, home, false, extensionMode, appMode is PiAppMode.Interactive or PiAppMode.Rpc,
-                appMode == PiAppMode.Interactive ? null : err, token).ConfigureAwait(false)
+                appMode == PiAppMode.Interactive ? null : err, token, packageRun).ConfigureAwait(false)
             : null;
         var extensions = host.LoadExtensions is not null ? await host.LoadExtensions(sessionCwd, token).ConfigureAwait(false)
             : extensionRun?.Host is not null ? await extensionRun.PreSessionAsync(token).ConfigureAwait(false) : null;
@@ -326,9 +330,7 @@ internal static class PiCommand
         PiSharp.Cli.Packages.PiResolvedPaths packageResources;
         try
         {
-            var packageOutput = appMode == PiAppMode.Interactive ? host.Stdout : err;
-            packageResources = await new PiSharp.Cli.Packages.PiPackageManager(sessionCwd, agentDir, home, settings, host.GetEnvironment,
-                host.PackageProcesses?.Invoke(packageOutput, err) ?? new() { Output = packageOutput, ErrorOutput = err }, PiBuiltinExtensions.Names)
+            packageResources = await packageRun.CreateManager(host, sessionCwd, agentDir, home, settings, err, err, PiBuiltinExtensions.Names)
                 .ResolveAsync(cancellationToken: token).ConfigureAwait(false);
         }
         catch (PiSharp.Cli.Packages.PiPackageException error) { await Error(error.Message).ConfigureAwait(false); return 1; }
@@ -346,13 +348,12 @@ internal static class PiCommand
             if (parsed.Extensions is not { Count: > 0 } sources) return null;
             try
             {
-                return await new PiSharp.Cli.Packages.PiPackageManager(sessionCwd, agentDir, home, sourceSettings, host.GetEnvironment,
-                    host.PackageProcesses?.Invoke(output, errorOutput) ?? new() { Output = output, ErrorOutput = errorOutput })
+                return await packageRun.CreateManager(host, sessionCwd, agentDir, home, sourceSettings, output, errorOutput)
                     .ResolveExtensionSourcesAsync(sources, temporary: true, cancellationToken: sourceToken).ConfigureAwait(false);
             }
             catch (PiSharp.Cli.Packages.PiPackageException) { return null; } // The extension loader reports the failed source.
         }
-        var extensionSources = await ExtensionSourcesAsync(settings, appMode == PiAppMode.Interactive ? host.Stdout : err, err, token).ConfigureAwait(false);
+        var extensionSources = await ExtensionSourcesAsync(settings, err, err, token).ConfigureAwait(false);
         var resources = PiResources.Discover(new(sessionCwd, agentDir, home, settings, projectTrusted)
         {
             Packages = packageResources, ExtensionSources = extensionSources,
@@ -388,16 +389,17 @@ internal static class PiCommand
             PiSharp.Cli.Packages.PiResolvedPaths reloadPackages;
             try
             {
-                reloadPackages = await new PiSharp.Cli.Packages.PiPackageManager(sessionCwd, agentDir, home, reloadSettings, host.GetEnvironment,
-                    host.PackageProcesses?.Invoke(TextWriter.Null, TextWriter.Null) ?? new() { Output = TextWriter.Null, ErrorOutput = TextWriter.Null },
-                    PiBuiltinExtensions.Names).ResolveAsync(cancellationToken: reloadToken).ConfigureAwait(false);
+                // Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (#11264): the reload's git and npm output is captured in interactive mode
+                // and goes to stderr in the other modes, as at startup.
+                reloadPackages = await packageRun.CreateManager(host, sessionCwd, agentDir, home, reloadSettings, err, err, PiBuiltinExtensions.Names)
+                    .ResolveAsync(cancellationToken: reloadToken).ConfigureAwait(false);
             }
             catch (PiSharp.Cli.Packages.PiPackageException) { reloadPackages = packageResources; }
             // The reload resolves the built-in extensions again over the reloaded settings and extensions.
             builtins.Set(PiBuiltinExtensions.Resolve(parsed.Extensions, reloadPackages, parsed.NoExtensions, disabledBuiltins,
                 activation?.Pi?.Extensions ?? extensionRun?.Host?.Extensions ?? []).Enabled);
             builtins.SetScopes(reloadPackages);
-            var reloadSources = await ExtensionSourcesAsync(reloadSettings, TextWriter.Null, TextWriter.Null, reloadToken).ConfigureAwait(false) ?? extensionSources;
+            var reloadSources = await ExtensionSourcesAsync(reloadSettings, err, err, reloadToken).ConfigureAwait(false) ?? extensionSources;
             var reloaded = PiResources.WithDiscovered(PiResources.Discover(new(sessionCwd, agentDir, home, reloadSettings, projectTrusted)
             {
                 Packages = reloadPackages, ExtensionSources = reloadSources,
@@ -486,6 +488,14 @@ internal static class PiCommand
             return 1;
         }
 
+        // Pi faac585884ae2c013a6b1400f3e9e77f10b34bac main.ts createRuntime: "Could not restore model x/y. Using a/b" is a diagnostic,
+        // so every mode reports it at startup (and the session host after each replacement). Without any model the message is login
+        // guidance instead: interactive mode shows it at startup, and each prompt is refused until a model is selected.
+        if (!selection.IsUnselected && selection.FallbackMessage is { } restoreFallback)
+        {
+            runtimeDiagnostics.Add(new("warning", restoreFallback));
+            selection.FallbackMessage = null; // Already in the startup diagnostics.
+        }
         host.Timings.Time("createAgentSessionRuntime");
         // Piped stdin joins the first message; it also turns interactive mode into print mode.
         string? stdinContent = null;
@@ -504,7 +514,11 @@ internal static class PiCommand
         var (initialMessage, initialImages) = PiInitialMessage.Build(parsed.Messages, fileText, fileImages, stdinContent);
         host.Timings.Time("prepareInitialMessage");
 
-        var allDiagnostics = Deduplicate([.. startupDiagnostics, .. runtimeDiagnostics]);
+        // main.ts: taking the runtime's diagnostics marks them reported, so the modes do not report them again after a session
+        // replacement (AgentSessionRuntime.takeUnreportedDiagnostics).
+        var runtimeView = new PiSharp.CodingAgent.AgentSessionRuntimeDiagnostics();
+        runtimeView.Replace(runtimeDiagnostics.Select(diagnostic => new PiSharp.CodingAgent.AgentSessionRuntimeDiagnostic(diagnostic.Type, diagnostic.Message)));
+        var allDiagnostics = Deduplicate([.. startupDiagnostics, .. runtimeView.TakeUnreported().Select(diagnostic => new PiDiagnostic(diagnostic.Type, diagnostic.Message))]);
         if (appMode != PiAppMode.Interactive) await Report(allDiagnostics).ConfigureAwait(false);
         // main.ts: runtime errors (an extension that failed to load, an unknown extension flag) stop the run in every mode.
         if (extensionRun?.Diagnostics.Any(diagnostic => diagnostic.Type == "error") == true || !builtinResolution.Errors.IsEmpty)
@@ -549,6 +563,10 @@ internal static class PiCommand
             ShowStartupHeader = parsed.Verbose || settings.QuietStartup is not true, ShowStartupDetails = parsed.Verbose || settings.QuietStartup is false,
             MigratedAuthProviders = migrations.MigratedAuthProviders, DeprecationWarnings = migrations.DeprecationWarnings,
             ProjectTrusted = PiProjectTrust.Seam(trustedDirectories), StartupDiagnostics = allDiagnostics,
+            RuntimeDiagnostics = runtimeView, DiagnosticsColor = color,
+            // main.ts createRuntime runs again on /new, /resume and /fork: the settings files are read again, and their errors are
+            // diagnostics of the replacement's runtime.
+            CollectReplacementDiagnostics = _ => Task.FromResult(PiSettings.Load(sessionCwd, agentDir, projectTrusted).DrainDiagnostics()),
             ExtensionPaths = [.. (parsed.Extensions ?? []).Select(path => PiPaths.IsLocalPath(path) ? PiPaths.ResolvePath(path, cwd, home) : path)],
             NoExtensions = parsed.NoExtensions, ExtensionFlagValues = parsed.UnknownFlags.ToImmutableDictionary(StringComparer.Ordinal),
             Extensions = extensionRun?.Host, ExtensionMode = extensionMode, BuiltinExtensions = builtins,
@@ -615,6 +633,8 @@ internal static class PiCommand
                     await Error("Interactive mode is not available in this host; use -p or --mode json|rpc.").ConfigureAwait(false);
                     return 1;
                 }
+                // main.ts announcePackageInstalls = false: the TUI takes the terminal from here on.
+                packageRun.StopAnnouncing();
                 return await host.RunInteractive(["session", "terminal", .. sessionArgs], options, token).ConfigureAwait(false);
             default:
             {
@@ -637,14 +657,8 @@ internal static class PiCommand
         });
 
         async Task Error(string message) => await Line(err, Paint(Red, $"Error: {message}")).ConfigureAwait(false);
-        async Task Report(IEnumerable<PiDiagnostic> diagnostics)
-        {
-            foreach (var diagnostic in diagnostics)
-            {
-                var prefix = diagnostic.Type == "error" ? "Error: " : diagnostic.Type == "warning" ? "Warning: " : "";
-                await Line(err, Paint(diagnostic.Type == "error" ? Red : diagnostic.Type == "warning" ? Yellow : Dim, prefix + diagnostic.Message)).ConfigureAwait(false);
-            }
-        }
+        // modes/diagnostics-stderr.ts writeDiagnosticsToStderr.
+        Task Report(IEnumerable<PiDiagnostic> diagnostics) => PiDiagnosticsStderr.WriteAsync(err, diagnostics, color);
         string Paint(string code, string text) => color ? code + text + "\u001b[39m" : text;
     }
 

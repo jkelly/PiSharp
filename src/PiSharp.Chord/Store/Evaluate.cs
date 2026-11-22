@@ -1,4 +1,4 @@
-// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/chord/src/next/store/evaluate.ts
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/chord/src/store/evaluate.ts
 //
 // The C# evaluator of the compiled table vocabulary (slice 6a §6; rule 10): the tx.get overlay matches WhereNode conditions and applies
 // SetNode assignments with SQL's three-valued NULL rules and code point text order, as the SQL that Sql.cs renders from the same nodes does
@@ -28,6 +28,9 @@ internal static partial class StoreInternal
                 return Truth(negated.Node, row) is { } inner ? !inner : null;
             case WhereNode.IsNull isNull:
                 return !row.ContainsKey(isNull.Column);
+            // Only a read's condition tests exists, and reads run in the database (slice 14 §3.3: no second evaluator).
+            case WhereNode.Exists:
+                throw new InvalidOperationException("exists is not evaluated in memory");
             // The row is checked against the table the condition was compiled for: its columns hold scalars.
             case WhereNode.InArray inArray:
             {

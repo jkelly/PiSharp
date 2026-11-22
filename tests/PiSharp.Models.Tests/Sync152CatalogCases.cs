@@ -18,9 +18,14 @@ internal static partial class Program
 {
     private static IEnumerable<(string, Func<Task>)> Sync152CatalogCases()
     {
+        // Since the Pi 1.6.0 sync the 1.5.2 release is the preserved historical layer (ReleasedModelCatalog.Pi152). The cases that pinned
+        // its bytes, counts and its delta from the 1.5.0 shards read that layer; the current-release pins are the sync160.catalog cases.
         yield return ("sync152.catalog.exact-current-package-resources", Sync(() =>
         {
+            var release = ReleasedModelCatalog.Pi152;
             const string manifestHash = "71375843feaa116c7d928e74e0500a22cc267e12bfb6869efb92dfd39acf7fee";
+            Equal(manifestHash, release.ManifestSha256, "pinned manifest fingerprint");
+            Equal("d5715efa834c23bfdf10a042b49df4ee169cc99000bf16d7998fab2d533b45f8", release.PackageSha256, "pinned package SHA256");
             using var resource = typeof(CurrentModelCatalog).Assembly.GetManifestResourceStream("PiSharp.AI.Catalogs.Releases.1.5.2..manifest.json")!;
             Check(resource is not null, "exact release manifest resource");
             using var buffer = new MemoryStream(); resource!.CopyTo(buffer);
@@ -28,21 +33,21 @@ internal static partial class Program
             using var manifest = JsonDocument.Parse(buffer.ToArray());
             var files = manifest.RootElement.GetProperty("files").EnumerateObject().ToArray();
             Equal(43, files.Length, "all released provider files");
-            Names(files.Select(f => f.Name[..^5]).Order(StringComparer.Ordinal), CurrentModelCatalog.Providers, "provider enumeration derives from current snapshot");
+            Names(files.Select(f => f.Name[..^5]).Order(StringComparer.Ordinal), release.Providers, "provider enumeration derives from the 1.5.2 snapshot");
             foreach (var file in files)
-                Equal(file.Value.GetString(), CurrentModelCatalog.Get(file.Name[..^5])!.ProviderJsonSha256, file.Name + " byte fingerprint");
-            Equal(1_794_312_337_628L, CurrentModelCatalog.GeneratedAtUnixMilliseconds, "current snapshot age gate");
-            Equal("b4afdddf44e059c67ccf5097e5317d913521b470", ReviewedModelCatalog.UpstreamCommit, "effective source provenance");
-            var registry = ModelRegistry.Create(new() { MaintainedCatalogPath = Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".absent") });
-            Equal(1643, registry.GetAllOfType(CatalogModelType.Chat).Count, "current chat rows");
-            Equal(66, registry.GetAllOfType(CatalogModelType.Image).Count, "current image rows");
-            Equal(64, registry.GetAllOfType(CatalogModelType.Classifier).Count, "current classifier rows");
+                Equal(file.Value.GetString(), release.Get(file.Name[..^5])!.ProviderJsonSha256, file.Name + " byte fingerprint");
+            Equal(1_794_312_337_628L, release.GeneratedAtUnixMilliseconds, "1.5.2 snapshot age gate");
+            Equal("b4afdddf44e059c67ccf5097e5317d913521b470", release.SourceCommit, "1.5.2 source provenance");
+            var rows = release.Providers.SelectMany(p => release.Get(p)!.Models).ToArray();
+            Equal(1643, rows.Count(m => m.Type == CatalogModelType.Chat), "1.5.2 chat rows");
+            Equal(66, rows.Count(m => m.Type == CatalogModelType.Image), "1.5.2 image rows");
+            Equal(64, rows.Count(m => m.Type == CatalogModelType.Classifier), "1.5.2 classifier rows");
         }));
         yield return ("sync152.catalog.release-additions-removals-and-metadata", Sync(() =>
         {
             var historical = BuiltinModelCatalog.ShardHashes.Keys.SelectMany(p => BuiltinModelCatalog.Get(p).Models)
                 .ToDictionary(m => (m.Provider, m.Type, m.Id));
-            var current = CurrentModelCatalog.Providers.SelectMany(p => CurrentModelCatalog.Get(p)!.Models)
+            var current = ReleasedModelCatalog.Pi152.Providers.SelectMany(p => ReleasedModelCatalog.Pi152.Get(p)!.Models)
                 .ToDictionary(m => (m.Provider, m.Type, m.Id));
             Equal(82, current.Keys.Except(historical.Keys).Count(), "all released additions");
             Equal(21, historical.Keys.Except(current.Keys).Count(), "all released removals");
@@ -63,7 +68,8 @@ internal static partial class Program
         }));
         yield return ("sync152.catalog.fable-all-released-provider-variants", Sync(() =>
         {
-            var rows = CurrentModelCatalog.Providers.SelectMany(p => CurrentModelCatalog.Get(p)!.Models)
+            // The 1.5.2 release had 11 variants on six providers; sync160.catalog.release-delta-from-1.5.2 pins the 13 of 1.6.0.
+            var rows = ReleasedModelCatalog.Pi152.Providers.SelectMany(p => ReleasedModelCatalog.Pi152.Get(p)!.Models)
                 .Where(m => m.Id.Contains("fable-5-2", StringComparison.Ordinal) || m.Id.Contains("fable-5.2", StringComparison.Ordinal)).ToArray();
             Equal(11, rows.Length, "all direct, dotted, prefixed and gateway Fable 5.2 variants");
             Names(new[] { "amazon-bedrock", "anthropic", "opencode", "openrouter", "radius", "vercel-ai-gateway" },

@@ -1,4 +1,4 @@
-// Pi b4afdddf44e059c67ccf5097e5317d913521b470 (MIT): packages/chord/src/surfaces/messages.ts.
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/chord/src/surfaces/messages.ts.
 using System.Reflection;
 using System.Runtime.ExceptionServices;
 using System.Text.Json.Nodes;

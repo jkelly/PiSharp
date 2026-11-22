@@ -1,4 +1,4 @@
-// Pi b4afdddf44e059c67ccf5097e5317d913521b470 (MIT): packages/agent/src/agent-loop.ts.
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/agent/src/agent-loop.ts.
 // Ported to plain ESM for the PiSharp Node extension bridge (TypeScript types stripped mechanically; behaviour unchanged except for the marked PiSharp adaptations).
 import { EventStream, getCurrentTools, getToolStateChanges, mergeClientIdentity, normalizeContext, PI_ATTRIBUTION, toToolDeclaration, validateToolArguments } from "../pi-ai.mjs";
 import { getDefaultStreamFn } from "./stream-fn.mjs";
@@ -421,9 +421,6 @@ async function executeToolCallsSequential(currentContext, assistantMessage, tool
         await emitToolResultMessage(toolResultMessage, emit);
         finalizedCalls.push(finalized);
         messages.push(toolResultMessage);
-        if (signal?.aborted) {
-            break;
-        }
     }
     return {
         messages,
@@ -448,9 +445,6 @@ async function executeToolCallsParallel(currentContext, assistantMessage, toolCa
             };
             await emitToolExecutionEnd(finalized, emit);
             finalizedCalls.push(finalized);
-            if (signal?.aborted) {
-                break;
-            }
             continue;
         }
         finalizedCalls.push(async ()=>{
@@ -468,9 +462,6 @@ async function executeToolCallsParallel(currentContext, assistantMessage, toolCa
             await emitToolExecutionEnd(finalized, emit);
             return finalized;
         });
-        if (signal?.aborted) {
-            break;
-        }
     }
     const orderedFinalizedCalls = await Promise.all(finalizedCalls.map((entry)=>typeof entry === "function" ? entry() : Promise.resolve(entry)));
     const messages = [];
@@ -501,6 +492,13 @@ function prepareToolCallArguments(tool, toolCall) {
     };
 }
 async function prepareToolCall(currentContext, assistantMessage, toolCall, config, signal, tools = currentContext.tools ?? []) {
+    if (signal?.aborted) {
+        return {
+            kind: "immediate",
+            result: createErrorToolResult("Operation aborted"),
+            isError: true
+        };
+    }
     const tool = tools.find((t)=>t.name === toolCall.name);
     if (!tool) {
         return {
@@ -537,13 +535,6 @@ async function prepareToolCall(currentContext, assistantMessage, toolCall, confi
                     isError: true
                 };
             }
-        }
-        if (signal?.aborted) {
-            return {
-                kind: "immediate",
-                result: createErrorToolResult("Operation aborted"),
-                isError: true
-            };
         }
         return {
             kind: "prepared",

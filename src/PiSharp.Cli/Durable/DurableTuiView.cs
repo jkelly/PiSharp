@@ -410,6 +410,8 @@ internal sealed class DurableTuiView
         var generation = Obj(live, "generation");
         var compaction = Arr(live, "compactions").FirstOrDefault();
         var runningTool = Arr(live, "tools").FirstOrDefault(slot => Str(slot, "status") == "running");
+        // PiSharp-only (Pi Durable 1.6.0): a call parked while nothing else runs. It holds no process until a time, a signal or its tasks.
+        var parkedTool = Arr(live, "tools").FirstOrDefault(slot => Str(slot, "status") is "sleeping" or "waiting");
         var text = "";
         if (Obj(generation, "retry") is { } retry)
             text = $"Retrying (attempt {JsNumber((Num(generation, "attempt") ?? double.NaN) + 1)}): {Str(retry, "error") ?? "undefined"}";
@@ -424,6 +426,8 @@ internal sealed class DurableTuiView
         else if (pending is not null)
             text = pending.Kind == UserQuestions.DetailsKind ? "Waiting for your answer... (esc to abort)" : "Waiting for plan approval... (esc to abort)";
         else if (runningTool is not null) text = $"Running {Str(runningTool, "name") ?? "undefined"}... (esc to abort)";
+        else if (parkedTool is not null)
+            text = $"{Str(parkedTool, "name") ?? "undefined"} is {Str(parkedTool, "status")}... (esc to abort)";
         else if (live["run"] is not null) text = "Working... (esc to abort)";
         if (text == statusText) return;
         statusText = text;

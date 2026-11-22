@@ -1,4 +1,4 @@
-// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): coding-agent/src/modes/interactive/components/thinking-selector.ts.
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): coding-agent/src/modes/interactive/components/thinking-selector.ts.
 using PiSharp.Tui.Pi;
 using static PiSharp.Cli.Interactive.Mode.ThemeGlobals;
 
@@ -117,8 +117,11 @@ internal sealed class ThinkingSelectorComponent : Container, IFocusable, IInputH
             return;
         }
 
+        // Cursor keys leave the query as it is and must not rebuild the list.
+        var previousQuery = searchInput.GetValue();
         searchInput.HandleInput(keyData);
-        ApplyFilter(searchInput.GetValue());
+        var query = searchInput.GetValue();
+        if (query != previousQuery) ApplyFilter(query);
     }
 
     public SelectList GetSelectList() => selectList;

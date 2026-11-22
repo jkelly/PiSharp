@@ -1,4 +1,4 @@
-// Pi b4afdddf44e059c67ccf5097e5317d913521b470 (MIT): packages/tui/src/components/settings-list.ts.
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/tui/src/components/settings-list.ts.
 // Ported to plain ESM for the PiSharp Node extension bridge (TypeScript types stripped mechanically; behaviour unchanged).
 import { fuzzyFilter } from "../fuzzy.mjs";
 import { getKeybindings, getSelectPageIndex } from "../keybindings.mjs";
@@ -177,8 +177,10 @@ export class SettingsList {
         } else if (kb.matches(data, "tui.select.cancel")) {
             this.onCancel();
         } else if (this.searchEnabled && this.searchInput) {
+            const previousQuery = this.searchInput.getValue();
             this.searchInput.handleInput(data);
-            this.applyFilter(this.searchInput.getValue());
+            const query = this.searchInput.getValue();
+            if (query !== previousQuery) this.applyFilter(query);
         }
     }
     getDisplayItems() {

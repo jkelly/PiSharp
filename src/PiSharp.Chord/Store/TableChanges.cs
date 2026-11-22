@@ -1,4 +1,4 @@
-// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/chord/src/next/store/table-changes.ts
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/chord/src/store/table-changes.ts
 //
 // A transaction's writes to one table (slice 6a §6, §7; W10): checked and staged synchronously like a draft's ops (no I/O, a bad row
 // throws at its own call), kept in staging order for the commit step, and overlaid on committed rows for tx.get until a bulk write makes
@@ -19,7 +19,10 @@ internal sealed class TableChanges
     private readonly record struct KeyWrite(IReadOnlyDictionary<string, JsonNode?>? Row, SetNode? Set);
 
     private readonly List<IStagedWrite> staged;
-    private readonly Dictionary<string, List<KeyWrite>> byKey = new(StringComparer.Ordinal);
+    // In the order the keys were first written, as upstream's Map: Changes lists them so.
+    private readonly OrderedDictionary<string, List<KeyWrite>> byKey = new(StringComparer.Ordinal);
+    /// <summary>The columns each bulk write assigned (null: a <c>deleteWhere</c>), for <see cref="Changes"/>.</summary>
+    private readonly List<IReadOnlyList<string>?> bulks = [];
     /// <summary>An updateWhere or deleteWhere was staged: Get is refused from then on (W10).</summary>
     private bool bulk;
 
@@ -31,9 +34,6 @@ internal sealed class TableChanges
 
     /// <summary>The table's handle.</summary>
     internal TableHandle Handle { get; }
-
-    /// <summary>Only successfully staged table mutations invalidate live queries.</summary>
-    internal bool HasWrites => bulk || byKey.Count != 0;
 
     /// <summary>Stages a <c>put</c> of <paramref name="row"/> (an upsert).</summary>
     internal void Put(object? row)
@@ -78,6 +78,7 @@ internal sealed class TableChanges
         var versions = StoreInternal.JsonVersions(definition, compiled);
         var statement = sql.UpdateWhere(condition, compiled, versions);
         staged.Add(StoreInternal.StageUpdateWhere(statement, sql.Table, condition, compiled, StoreInternal.RecordedVersions(compiled, versions)));
+        bulks.Add([.. compiled.Keys]);
         bulk = true;
     }
 
@@ -94,6 +95,7 @@ internal sealed class TableChanges
         var (definition, sql) = (Handle.Definition, Handle.Sql);
         var condition = StoreInternal.CompileWhere(definition, ConditionOf(where), "deleteWhere");
         staged.Add(StoreInternal.StageDeleteWhere(sql.DeleteWhere(condition), sql.Table, condition));
+        bulks.Add(null);
         bulk = true;
     }
 
@@ -121,6 +123,28 @@ internal sealed class TableChanges
             if (row is not null) row = StoreInternal.ApplySet(write.Set!, row, definition.Name);
         }
         return row is null ? null : definition.Rows.Read(row);
+    }
+
+    /// <summary>Its writes as the skip test of the store's reads takes them (slice 14 §3.3). Built when a commit step found a read over
+    /// the table, from what the overlay keeps anyway: a table nothing reads costs its writes nothing more (upstream <c>changes</c>).</summary>
+    internal List<TableChange> Changes()
+    {
+        var (definition, table) = (Handle.Definition, Handle.Sql.Table);
+        List<TableChange> changes = [.. bulks.Select(assigned => new TableChange(table, TableChangeKind.Bulk, null, assigned))];
+        foreach (var (id, writes) in byKey)
+        {
+            // A key's identity is the JSON of its values in key order (EncodedKey.Id): strings and numbers.
+            var values = JsonNode.Parse(id)!.AsArray();
+            var key = new Dictionary<string, object?>(StringComparer.Ordinal);
+            for (var index = 0; index < definition.Key.Count; index++)
+                key[definition.Key[index]] = values[index] is JsonValue value && value.TryGetValue<string>(out var text) ? text : values[index]!.GetValue<double>();
+            foreach (var write in writes)
+            {
+                var kind = write.Row is not null ? TableChangeKind.Put : write.Set is not null ? TableChangeKind.Update : TableChangeKind.Delete;
+                changes.Add(new TableChange(table, kind, key, write.Set is null ? null : [.. write.Set.Keys]));
+            }
+        }
+        return changes;
     }
 
     /// <summary>A recorded key as a key object (its scalars as JSON values).</summary>

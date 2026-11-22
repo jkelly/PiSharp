@@ -80,6 +80,7 @@ internal static class Program
     private static async Task<int> Main(string[] args)
     {
         if (args.Contains("--worker-snapshot-fixture")) return await WorkerSnapshotCases.RunChildAsync();
+        if (args.Contains("--worker-160-fixture")) return await Sync160WorkerCases.RunChildAsync();
         if (args.Contains("--sleep-child")) { await Task.Delay(Timeout.InfiniteTimeSpan); return 0; }
         if (args.Length >= 2 && (args[0] == "--spawn-descendant" || args[0] == "build"))
         {
@@ -142,7 +143,7 @@ internal static class Program
             ("app.152.owner-links-and-caps", AppAuthRouteTests.OwnerLinksAndCaps),
             ("app.152.routes-and-invites", AppAuthRouteTests.RoutesAndInvites),
             ("app.152.startup-and-recovery", AppStartTests.StartupAndRecovery),
-            ("app.152.session-expiry-and-ephemeral-links", AppStartTests.SessionExpiryAndEphemeralLinks),
+            ("app.152.session-expiry-and-ephemeral-links", AppStartTests.SignInExpiryAndEphemeralLinks),
             ("app.152.base-build-isolation", AppStartTests.BaseBuildIsolation),
             ("app.152.telemetry-shutdown", AppStartTests.TelemetryShutdown),
             ("app.152.cleanup-retains-store-and-lock", AppStartTests.CleanupRetainsStoreAndLock),
@@ -153,6 +154,24 @@ internal static class Program
             ("terminal.152.scope-and-optimistic", Terminal152Cases.ScopeAndOptimistic),
             ("terminal.152.actual-attachment", Terminal152Cases.ActualAttachment),
             ("terminal.152.native-runtime", Terminal152Cases.NativeRuntime),
+            // Pi 1.6.0, the chord-edge package (Sync160EdgeCases.cs): one contiguous block.
+            ("http.160.links-opened-close-terminates-that-link", Sync160EdgeCases.LinksOpenedClose),
+            ("app.160.sign-in-cookie-contract-and-document-names", Sync160EdgeCases.SignInNames),
+            ("app.160.info-facets-serve-a-host-of-its-own", Sync160EdgeCases.InfoFacetsServeAHostOfItsOwn),
+            ("plugins.160.build-rediscovers-before-the-watcher", Sync160EdgeCases.PluginsRediscoverBeforeWatcher),
+            ("publication.160.surface-without-routes", Sync160EdgeCases.SurfaceWithoutRoutes),
+            ("terminal.160.scope-variant-follows-rebind", Sync160EdgeCases.ScopeVariantFollowsRebind),
+            ("terminal.160.scope-variant-one-watch-per-state", Sync160EdgeCases.ScopeVariantOneWatchPerState),
+            ("terminal.160.scope-variant-of-foreign-reference", Sync160EdgeCases.ScopeVariantOfForeignReference),
+            ("terminal.160.scope-keeps-no-released-reference", Sync160EdgeCases.ScopeKeepsNoReleasedReference),
+            // Pi 1.6.0, the chord-workers package (Sync160WorkerCases.cs): one contiguous block.
+            ("workers.160.passes-admit-to-its-route", Sync160WorkerCases.PassesAdmitToItsRoute),
+            ("workers.160.report-and-exit-in-the-same-turn-commits-nothing", Sync160WorkerCases.ReportAndExitInTheSameTurn),
+            ("workers.160.queued-commit-lands-before-the-exit-is-published", Sync160WorkerCases.QueuedCommitLandsBeforeTheExitIsPublished),
+            ("workers.160.stop-resolves-after-the-exit-was-published", Sync160WorkerCases.StopResolvesAfterTheExitWasPublished),
+            ("workers.160.incarnation-before-the-first-call", Sync160WorkerCases.IncarnationBeforeTheFirstCall),
+            ("workers.160.link-ended-at-exit-told-as-neither-lost-nor-closed", () => { Sync160WorkerCases.LinkEndedAtExitIsToldAsNeitherLostNorClosed(); return Task.CompletedTask; }),
+            ("terminal.160.scope-on-calls-the-listener-until-dispose", Sync160WorkerCases.ScopeOnCallsTheListenerUntilDispose),
             ("plugins.discovery-validates-and-orders", Discovery),
             ("plugins.rollout-continues-failures-and-stops-explicitly", RolloutOrder),
             ("plugins.new-failed-plugin-retains-dirty-mark", FailedAddedPlugin),
@@ -238,7 +257,11 @@ internal static class Program
         await using var manager = new PluginManager([Path.Combine(root, "plugins")], builder);
         var host = Hosts.Create(new() { OnError = _ => { }, Principal = new() { ["kind"] = "test" }, CloseTimeout = TimeSpan.FromMilliseconds(50), ReadyTimeout = TimeSpan.FromSeconds(10) });
         var http = new ChordHttp(host, new() { OnError = _ => { } });
-        var runtime = new PluginRuntime(host, new() { SharedAssemblies = [Assembly.GetExecutingAssembly()], CallbackDrainTimeout = TimeSpan.FromMilliseconds(150) });
+        // The bound must outlast the steps between DrainRetiredAsync and the "cancelled request" check (two cancelled requests and two 30 ms
+        // waits): at 150 ms a slow macOS runner reached that check after the drain had already timed out. The native-open check below
+        // tells "the drain kept its bound" from "blocked until the 3 s wait" by bound + 1 s.
+        var drainBound = TimeSpan.FromSeconds(1);
+        var runtime = new PluginRuntime(host, new() { SharedAssemblies = [Assembly.GetExecutingAssembly()], CallbackDrainTimeout = drainBound });
         Exception? bodyFailure = null;
         try
         {
@@ -353,7 +376,7 @@ internal static class Program
         Check((await runtime.ReloadAsync(WithWrapper(replacement), Context)).Failed.Count == 0, "replacement of opening generation refused");
         var openDrainWatch = Stopwatch.StartNew();
         try { await runtime.DrainRetiredAsync(Context).WaitAsync(TimeSpan.FromSeconds(3)); throw new InvalidOperationException("retirement abandoned an original native open"); } catch (TimeoutException) { }
-        Check(openDrainWatch.Elapsed < TimeSpan.FromSeconds(1), "native open blocked the public host drain instead of its generation lease outliving that bound");
+        Check(openDrainWatch.Elapsed < drainBound + TimeSpan.FromSeconds(1), "native open blocked the public host drain instead of its generation lease outliving that bound");
         PluginTestContracts.NativeOpenPause.TrySetResult();
         Check(await PluginTestContracts.NativeOpenFinished.Task.WaitAsync(TimeSpan.FromSeconds(3)) == "late:three", "abandoned native open could not load its private dependency for late cleanup");
         await runtime.DrainRetiredAsync(Context).WaitAsync(TimeSpan.FromSeconds(3));
@@ -483,7 +506,7 @@ internal static class Program
         await using var workers = new ProcessWorkers("tests", host, PluginTestContracts.Worker, new()
         {
             Executable = Sdk, Arguments = [Assembly.GetExecutingAssembly().Location, "--worker"], Authorize = (_, _) => true,
-            Principal = _ => new() { ["kind"] = "worker" }, Plugins = (_, _) => Task.FromResult(new PluginBuildSet([], [])), LockDirectory = root, OnError = (_, _) => { },
+            Principal = _ => new() { ["kind"] = "worker" }, Plugins = (_, _) => Task.FromResult(new PluginBuildSet([], [])), LockDirectory = root, Store = null, OnError = (_, _) => { },
             StartTimeout = TimeSpan.FromSeconds(25), CloseTimeout = TimeSpan.FromSeconds(3), IdleTimeout = TimeSpan.FromMilliseconds(500),
         }, Context);
         var parent = Facet.Define((h, _) => h.Serve(PluginTestContracts.ParentService, (_, _, _) => new(new Dictionary<string, object?> { ["ready"] = (HostMethod)((_, _) => Task.FromResult<object?>(JsonValue.Create(1))) }, "reader")));
@@ -635,7 +658,7 @@ internal static class Program
         {
             Executable = Sdk, Arguments = [Assembly.GetExecutingAssembly().Location, "--worker", "--hold-startup"], Authorize = (_, _) => true,
             Principal = _ => new() { ["kind"] = "worker" }, Plugins = (_, _) => Task.FromResult(new PluginBuildSet([], [])), Data = _ => new JsonObject { ["closeMarker"] = marker },
-            LockDirectory = root, OnError = (_, _) => { }, CloseTimeout = TimeSpan.FromSeconds(5), StartTimeout = TimeSpan.FromSeconds(20),
+            LockDirectory = root, Store = null, OnError = (_, _) => { }, CloseTimeout = TimeSpan.FromSeconds(5), StartTimeout = TimeSpan.FromSeconds(20),
         }, Context);
         var core = Facet.Define((facet, _) => facet.Serve(PluginTestContracts.ParentService, (_, _, _) => new(new Dictionary<string, object?> { ["ready"] = (HostMethod)((_, _) => Task.FromResult<object?>(JsonValue.Create(1))) }, "reader")));
         await host.LoadAsync([new("test.parent", core), new("test.workers", workers.Facet)], Context);

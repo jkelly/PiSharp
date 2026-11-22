@@ -1,6 +1,7 @@
-// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/chord/src/next/state/internal.ts, which only re-exports: state for Chord's
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/chord/src/state/internal.ts, which only re-exports: state for Chord's
 // layers. Its exports are internal types of PiSharp.Chord.State: Batch and BatchError (with its BatchErrorKind) and IDelivered (batch.ts),
 // Derive (derive.ts; DeriveSource is a Source or a Constant and DeriveInput those or a NativeSource, both plain objects here),
+// FramedSource and IFramedOwner (framed.ts, 1.6.0),
 // FollowedSource, NativeSource and NativeStart (native-source.ts; NativeObservation and INativeObserver are public, for apps), Constant,
 // IDependent, Source, ISubscriber and WatchStart (watchable.ts) and IWritableOwner and WritableSource (writable.ts); handedOut is
 // StateInternal.HandedOut. StateInternal also holds the two helpers every file of the layer shares: JavaScript's identity on in-process

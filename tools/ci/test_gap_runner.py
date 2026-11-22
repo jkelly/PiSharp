@@ -204,7 +204,7 @@ class EvidenceTests(unittest.TestCase):
     def test_adapter_requires_every_actual_platform_case_and_final_trace(self):
         policy = json.loads(Path(__file__).with_name("gap-suites.json").read_text())["policies"]["PiSharp.Env.Adapter.Tests"]
         summary = "PASS remote adapters: paths, chunked transfers, lines, listing, errors, exec, cancellation and session fencing"
-        for host, count in (("Windows", 54), ("Linux", 60), ("Darwin", 60)):
+        for host, count in (("Windows", 55), ("Linux", 61), ("Darwin", 61)):
             ids = policy["expectedCaseIds"][host]
             raw = summary + "\n" + "\n".join("PASS " + case for case in ids)
             evidence = parse_evidence(raw, policy, host)
@@ -216,8 +216,11 @@ class EvidenceTests(unittest.TestCase):
 
     def test_registered_daemon_and_legacy_platform_skips(self):
         policies = json.loads(Path(__file__).with_name("gap-suites.json").read_text())["policies"]
-        for name, host, summary in (("PiSharp.Env.Daemon.Tests", "Windows", "PASS: 10 daemon integration tests"),
-                                    ("PiSharp.Chord.Legacy.Cluster.Tests", "Linux", "0 failures; legacy cluster/manager tests; authored native evidence, source " + "a" * 40)):
+        adapter = "PASS remote adapters: paths, chunked transfers, lines, listing, errors, exec, cancellation and session fencing"
+        for name, host, summary, selected in (("PiSharp.Env.Daemon.Tests", "Windows", "PASS: 10 daemon integration tests", 10),
+                                              ("PiSharp.Chord.Legacy.Cluster.Tests", "Linux", "0 failures; legacy cluster/manager tests; authored native evidence, source " + "a" * 40, 25),
+                                              ("PiSharp.Env.Adapter.Tests", "Windows", adapter, 55),
+                                              ("PiSharp.Env.Adapter.Tests", "Darwin", adapter, 61)):
             policy = policies[name]
             exception = policy["allowedSkips"][host][0]
             raw = exception["line"] + "\n" + "\n".join("PASS " + case for case in policy["expectedCaseIds"][host]) + "\n" + summary
@@ -226,7 +229,6 @@ class EvidenceTests(unittest.TestCase):
             self.assertTrue(result["hasAllowedSkips"])
             case = next(c for c in result["cases"] if c["id"] == exception["suppressesPassId"])
             self.assertEqual(case["status"], "SKIP")
-            selected = 10 if name == "PiSharp.Env.Daemon.Tests" else 25
             self.assertEqual(result["counts"], {"cases": selected, "passed": selected - 1, "skipped": 1, "failed": 0})
             self.assertEqual(len(result["consoleSkipObservations"]), 1)
             self.assertEqual(result["consoleSkipObservations"][0]["raw"], exception["line"])

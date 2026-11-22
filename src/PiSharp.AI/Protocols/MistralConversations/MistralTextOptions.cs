@@ -36,6 +36,9 @@ public sealed record MistralTextOptions(Uri BaseUrl, bool SupportsText, MistralT
     public bool Reasoning { get; init; }
     public bool SupportsImages { get; init; }
     public bool SupportsMidConversationSystemMessages { get; init; }
+    /// <summary>Model compat <c>supportsStrictMode</c> (Pi 1.6.0, #12148): whether tools with JSON-schema constrained sampling are sent
+    /// strict. Off by default: Mistral Large 4 can go silent for minutes before a strict tool call.</summary>
+    public bool SupportsStrictMode { get; init; }
     public ImmutableDictionary<string, string?>? ThinkingLevelMap { get; init; }
     public string? SessionId { get; init; }
     public bool CachePrompt { get; init; } = true;

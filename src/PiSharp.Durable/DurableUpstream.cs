@@ -14,7 +14,8 @@
 // - errors (admission, harness-options): ConversationIdle and ReadOnlySession are ConversationIdleException and ReadOnlySessionException
 //   (Errors.cs).
 // - agent.ts (restarts): DEFAULT_RESTART_LIMIT is Agents.DefaultRestartLimit (Harness/Agent.cs).
-// - define.ts and types.ts (run-end): runEndTask is Define.RunEndTask, and RunEndTask and RunSummary are records of Harness/Types.cs.
+// - define.ts and types.ts (run-end): hookTask is Define.HookTask, and HookTask and RunSummary are records of Harness/Types.cs (runEndTask,
+//   Define.RunEndTask and RunEndTask until Pi v1.6.0 renamed them, as afterTools and onYield hooks ask for tasks too).
 // - harness.ts (model-requests): DEFAULT_HARNESS_IDENTITY is Harness.DefaultIdentity, empty in PiSharp: no attribution (decision 0013).
 // - live.ts (run-failure, live-turns): RunFailure and RunFailureReason are Live.cs's record and enum; LiveRun is pi.live.run's JSON.
 // - registry-reader.ts (registry-reader, 6eb99ad65): registryReader is RegistryReader.Create in PiSharp.Durable.Store (RegistryReader.cs),
@@ -30,20 +31,27 @@
 //   of TypesSession.cs, Observer<T> and Observation<T> generic; CommitOptions and CommitPersistence (deferred-commits) are its records;
 //   CommitResult (storage-batches) is TypesStorage.cs's; HostCallback, Report, ReportFrom, ReportInfo and ReportTask (reports) are
 //   TypesReports.cs's (ReportInfo one sealed record with Kind and optional fields); SetTimer (sleep) is the delegate of Timers.cs.
+// What Pi v1.6.0 adds (faac585884ae2c013a6b1400f3e9e77f10b34bac):
+// - signals.ts: defineSignal, SignalDefinition, SignalKey, SignalResult, SignalState, SignalToken and SubmissionSettled are Signals.cs's
+//   (Signals.DefineSignal, Signals.SubmissionSettled).
+// - harness/types.ts: AfterToolsDecision, HookTask, NestedToolCall, ToolNamespace, ToolPark and YieldDecision are records of
+//   Harness/Types.cs (a park is the ToolExecutionResult that carries it); types.ts's SubmissionNotify and WakeReason are Types.cs's.
+// - The subpaths' additions are in PiSharp.Durable.Tools: `/codemode` namespacesOf is DurableCodemode.NamespacesOf, `/images/fit` is
+//   Images/Fit.cs (FitImages), and `/tools` imageLimits is CodingTools.ImageLimitsOf.
 // - Removed: watchEvents and its types (AgentEvent, AgentEventStream, SnapshotEvent, MessageChange, ToolEventCall; area events, f3255de76),
 //   as upstream removed them; PiSharp.Durable.Hosting keeps the projection, PiSharp-only, for the device wire (AgentEvents.cs). DocumentState
 //   (area watches, 92ab53602), with Session.documentState().
 namespace PiSharp.Durable;
 
 /// <summary>The upstream source this port follows (decision 0005): Pi's <c>packages/durable</c> and the Chord subset it uses, at the
-/// pinned Pi v1.5.2 commit. The port began at Pi v1.1.0 and was synced to v1.2.0, v1.5.0 and v1.5.2:
+/// pinned Pi v1.6.0 commit. The port began at Pi v1.1.0 and was synced to v1.2.0, v1.5.0, v1.5.2 and v1.6.0:
 /// <c>compatibility/durable-port-map.json</c> maps each upstream file to its C# counterpart and status, and marks the files whose port still
 /// follows v1.2.0 (<c>needs-sync</c>: Chord v1 files phase 6 of the v1.5.0 sync re-syncs); <c>compatibility/durable-sync-1.5.0-worklist.json</c>
 /// records how the v1.5.0 sync was split.</summary>
 public static class DurableUpstream
 {
     /// <summary>The pinned Pi commit.</summary>
-    public const string Commit = "b4afdddf44e059c67ccf5097e5317d913521b470";
+    public const string Commit = "faac585884ae2c013a6b1400f3e9e77f10b34bac";
     /// <summary>The upstream package and version.</summary>
-    public const string Package = "@earendil-works/pi-durable@1.5.2";
+    public const string Package = "@earendil-works/pi-durable@1.6.0";
 }

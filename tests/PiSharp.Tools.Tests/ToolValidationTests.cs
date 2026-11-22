@@ -26,6 +26,12 @@ internal static class ToolValidationTests
         ("validation non-object final arguments get the upstream root error", NonObjectArguments),
     ];
 
+    private static readonly (string Schema, string Property, string Description)[] Sync160Descriptions =
+    [
+        ("builtin_find", "pattern", "Glob pattern relative to the search directory, e.g. 'src/**/*.ts'. Without '/', e.g. '*.ts', it matches file names at any depth"),
+        ("builtin_grep", "glob", "Filter files by glob pattern relative to path, e.g. 'src/**/*.ts'. Without '/', e.g. '*.ts', it matches file names at any depth"),
+    ];
+
     internal static JsonElement Goldens()
     {
         var path = Path.Combine(AppContext.BaseDirectory, "ToolValidation", "tool-validation-goldens.json");
@@ -59,6 +65,10 @@ internal static class ToolValidationTests
         {
             var parameters = declaration.Value.GetProperty("parameters");
             var upstream = Strip(JsonNode.Parse(schemas.GetProperty(name).GetProperty("schema").GetRawText()));
+            // Pi v1.6.0 sync: find.ts and grep.ts reworded two parameter descriptions (#12066). The 1.1.0 capture keeps its bytes; the
+            // 1.6.0 texts (faac585884ae2c013a6b1400f3e9e77f10b34bac) are laid over it here. Descriptions change no validation result.
+            foreach (var (tool, property, description) in Sync160Descriptions)
+                if (tool == name) upstream!["properties"]![property]!["description"] = description;
             Check(JsonNode.DeepEquals(upstream, JsonNode.Parse(parameters.GetRawText())), name + " declaration differs from the upstream schema.");
             foreach (var item in root.GetProperty("cases").EnumerateArray().Where(item => item.GetProperty("schema").GetString() == name))
             {

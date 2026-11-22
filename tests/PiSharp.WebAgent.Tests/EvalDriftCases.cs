@@ -474,7 +474,9 @@ internal static partial class Program
             var runtime = new RuntimeModelCatalog();
             var snapshots = new CatalogPriceSource(runtime).Snapshots(DwNow);
             var openai = snapshots.Single(snapshot => snapshot.Provider == "openai");
-            Equal(PiSharp.Cli.Models.BuiltinModelCatalog.Get("openai").ProviderJsonSha256, openai.CatalogSha256, "a built-in provider is named by its shard's hash");
+            // The shard is the current release's (Pi 1.6.0 changed openai.json, which had been byte-identical from 1.5.0 through 1.5.2).
+            Equal(PiSharp.AI.Catalogs.CurrentModelCatalog.Get("openai")!.ProviderJsonSha256, openai.CatalogSha256, "a built-in provider is named by its shard's hash");
+            Check(openai.CatalogSha256 != PiSharp.Cli.Models.BuiltinModelCatalog.Get("openai").ProviderJsonSha256, "not the frozen 1.5.0 shard");
             Equal("openai.json", PriceSnapshots.FileName(openai), "openai.json changed");
             Check(openai.Models.Count > 0 && openai.Models.All(price => runtime.FindModel("openai", price.Model) is not null), "the routed models");
             Check(snapshots.Select(snapshot => snapshot.Provider).Distinct().Count() == snapshots.Count, "one snapshot per provider");

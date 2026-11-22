@@ -93,13 +93,14 @@ public sealed class CatalogPriceSource(IModelCatalog catalog) : IPriceSource
     }
 
     /// <summary>The built-in shard's <see cref="FrozenModelCatalog.ProviderJsonSha256"/> when <paramref name="provider"/> has one and every
-    /// listed price is the shard's own; null otherwise (an override, a custom provider, or a shard that cannot be read).</summary>
+    /// listed price is the shard's own; null otherwise (an override, a custom provider, or a shard that cannot be read). The shard is the
+    /// one models are resolved from: the current release's, else the frozen shard of a provider that release lacks.</summary>
     internal static string? ShardHash(string provider, IReadOnlyList<ModelPrice> models)
     {
-        if (!BuiltinModelCatalog.Has(provider)) return null;
-        FrozenModelCatalog shard;
-        try { shard = BuiltinModelCatalog.Get(provider); }
+        FrozenModelCatalog? shard;
+        try { shard = ReviewedModelCatalog.Apply(provider, BuiltinModelCatalog.Has(provider) ? BuiltinModelCatalog.Get(provider) : null); }
         catch (Exception error) when (error is not OutOfMemoryException) { return null; }
+        if (shard is null) return null;
         foreach (var price in models)
         {
             if (!shard.TryGetModel(CatalogModelType.Chat, price.Model, out var row)) return null;

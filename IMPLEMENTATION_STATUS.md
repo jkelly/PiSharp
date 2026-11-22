@@ -1,6 +1,25 @@
-# Current source candidate: Pi 1.5.2
+# Current source candidate: Pi 1.6.0
 
-The source candidate targets Pi v1.5.2 (`b4afdddf44e059c67ccf5097e5317d913521b470`), including v1.5.1. The published release remains **PiSharp 1.5.0.1**, on Pi v1.5.0. Applicable candidate work is **tested-with-limitations** in local source validation; this section does not replace or extend any historical acceptance below.
+The source candidate targets Pi v1.6.0 and Pi Durable 1.6.0 (`faac585884ae2c013a6b1400f3e9e77f10b34bac`). The published release remains **PiSharp 1.5.2**, on Pi v1.5.2. Applicable candidate work is **tested-with-limitations** in local source validation: the [acceptance record](compatibility/sync-1.6.0-acceptance.json) accepts full runs of 66 required suites on the integrated source, on Windows only, with the limitations it lists. This section does not replace or extend any historical acceptance below.
+
+- [Complete source applicability](compatibility/sync-1.6.0-applicability.json): all 1,311 changed upstream files have an owner or an explicit no-op reason (96 tested, 299 tested-with-limitations, 916 no-op).
+- [Unreleased candidate notes](docs/release-notes/1.6.0.md), with the breaking changes, what was not verified and the known limitations, and [decision 0015](docs/decisions/0015-pi-1.6.0-sync.md).
+- [Durable candidate overlay](compatibility/durable-sync-1.6.0-overlay.json), with the [1.5.2 overlay](compatibility/durable-sync-1.5.2-overlay.json) and the exact [v1.5.0 map](compatibility/durable-port-map.v1.5.0.json) preserved.
+- [Work plan](AI_DOCS/sync-1.6.0.md) and area reports (`AI_DOCS/agent-reports/sync-1.6.0-*.md`). Root owns integrated validation and final status changes.
+- The current model catalog is the exact Pi 1.6.0 catalog: 43 providers and 1,853 entries (1,698 chat, 74 image, 81 classifier); see its [provenance](src/PiSharp.AI/Catalogs/Releases/1.6.0.provenance.json).
+
+Open at the time of writing, from the reports:
+
+- Not run: Linux and macOS for most packages, eleven fixture-replay suites, the SQL Server-backed Durable groups, the two browser test projects, real `SIGTSTP` delivery, the provider suites that need captured fixtures, and the PowerShell packaging and release scripts.
+- No Durable host delivers a signal, and none installs image fitting.
+- Connection failures on the Completions, Anthropic, Google and Mistral transports are still not retried.
+- Native `pi.exec` reads 137 on Linux and macOS where Pi reads 143. The explicit-policy find profile is not updated.
+- The native Chord store has no group commit.
+
+
+# Previous source candidate: Pi 1.5.2 (released as PiSharp 1.5.2)
+
+The 1.5.2 source candidate targeted Pi v1.5.2 (`b4afdddf44e059c67ccf5097e5317d913521b470`), including v1.5.1. It was released as **PiSharp 1.5.2** on 2026-11-12; while it was a candidate the published release was PiSharp 1.5.0.1, on Pi v1.5.0. Applicable candidate work is **tested-with-limitations** in local source validation; this section does not replace or extend any historical acceptance below.
 
 - [Complete source applicability](compatibility/sync-1.5.2-applicability.json): all 2,531 changed upstream files have an owner or explicit no-op reason.
 - [Unreleased candidate notes](docs/release-notes/1.5.2.md) and [decision 0014](docs/decisions/0014-pi-1.5.2-sync.md).

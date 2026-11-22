@@ -1,4 +1,4 @@
-// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/chord/src/next/contracts/history.ts
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/chord/src/contracts/history.ts
 //
 // The history of a contract: every version's members and the changes that produced it. Upstream's history is type-level (VariantShape,
 // Variants, Step, History, CurrentStep, StepAt, OlderVersions, ChangesAfter, MemberNames, VariantsWith, MethodAt, Increment): the types
@@ -9,13 +9,15 @@
 // because every declared version records its changes (VersionData.Changes, empty for a base); area cv2-evolve ported the rest.
 namespace PiSharp.Chord.Contracts;
 
-/// <summary>The side of a member an edit changed: its state schema, its arguments, its result, or a local contract's keyed member (slice 7b).</summary>
+/// <summary>The side of a member an edit changed: its state schema, its arguments, its result, a local contract's keyed member (slice 7b),
+/// or an event member.</summary>
 internal enum ChangeSide
 {
     State,
     Args,
     Result,
     Keyed,
+    Event,
 }
 
 /// <summary>What one edit changed: one side of one member in one variant.</summary>

@@ -11,7 +11,7 @@ namespace PiSharp.AI.Protocols.OpenAIResponses;
 public sealed record ResponsesKeyAuthRequestOptions(
     bool SupportsMaxOutputTokens = true, int? MaxOutputTokens = null,
     JsonData? PayloadOverrides = null,
-    int MaximumOutputTokens = 1_000_000, int MaximumKeyCharacters = 4096,
+    int MaximumOutputTokens = PiRequestBudget.OutputTokens, int MaximumKeyCharacters = 4096,
     int MaximumEndpointCharacters = 4096, int MaximumModelCharacters = 1024,
     int MaximumPayloadBytes = PiRequestBudget.RequestPayloadBytes, int MaximumPayloadDepth = PiSharp.Contracts.JsonData.MaximumDepth,
     string? SessionId = null, double? Temperature = null,

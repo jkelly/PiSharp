@@ -41,6 +41,20 @@
 // list itself (null for none), as BeforeRequest returns its messages. Upstream's tools-schema typing (ToolArgs, object schemas) has no
 // C# counterpart beyond the JsonObjectValue schemas area tools-schema documented. With this area every area that changes the file has
 // landed, so it cites v1.5.0.
+//
+// Pi v1.6.0 sync (faac585884ae2c013a6b1400f3e9e77f10b34bac): signals, parks, gates and hook tasks.
+// - Upstream's `execute()` returns `ToolExecutionResult | ToolPark`. C# has no union types, so a park is carried by the result itself:
+//   ToolExecutionResult.Park (ToolPark, with Sleep or Wait), and a ToolPark converts implicitly to a result, so `return ToolPark.Sleeping(...)`
+//   works in a tool. ToolExecute's signature is unchanged; a park that also sets a result field, or both Sleep and Wait, is refused at
+//   run time (`invalid_park`), which is where upstream's parkError checks the shape too. ToolRegistration.Cancel is upstream's `cancel`.
+// - IToolExecutionApi: Wake, Checkpoint, ReadSignalAsync, CreateTaskAsync with a key (its own overload; upstream adds `key` to the
+//   options), and StartToolAsync, upstream's `executeTool(..., { wait: false })`, returning a NestedToolCall.
+// - IHookApi: ReadSignalAsync and Now (ITaskRuntime inherits both). ToolHooks.BeforeTool's decision may carry a GateSleep.
+// - GenerationHooks: OnYield returns an OnYieldResult (a continuation, or tasks; a user input converts implicitly, so a hook that returned
+//   its continuation still does); AfterTools returns the tasks it asks for (null for none), as AfterRun does. RunEndTask is HookTask
+//   (Define.HookTask). YieldDecision and AfterToolsDecision are what such tasks complete with (their ToJson()).
+// - SubmissionDraft: Notify on every type, OnAbort (InputOnAbort) on input. IHarness.SignalAsync. TaskInspectionState.Until was already
+//   optional. Extension.Namespace (ToolNamespace) is declared here for the code-mode package that reads it; nothing in the Harness does.
 using System.Collections.Immutable;
 using PiSharp.AI;
 using PiSharp.Durable.Chord;
@@ -299,6 +313,77 @@ public sealed record ToolExecutionResult
     public JsonObjectValue? Usage { get; init; }
     /// <summary>Post-tools controls.</summary>
     public ToolControl? Control { get; init; }
+    /// <summary>
+    /// Set instead of every result field to park the call (upstream's <c>ToolPark</c> return of <c>execute()</c>, Pi v1.6.0): the call holds
+    /// no invocation meanwhile and <c>Execute</c> runs again once woken. A result that sets it with any other field is an invalid park.
+    /// </summary>
+    public ToolPark? Park { get; init; }
+}
+
+/// <summary>What a parked call sleeps for (upstream <c>ToolPark["sleep"]</c>): <see cref="Until"/>, <see cref="Signals"/>, or both.</summary>
+public sealed record ToolParkSleep
+{
+    /// <summary>What <see cref="IToolExecutionApi.Checkpoint"/> holds in the run after the wake; null: nothing.</summary>
+    public JsonValue? Checkpoint { get; init; }
+    /// <summary>A time on the Harness clock, in milliseconds.</summary>
+    public double? Until { get; init; }
+    /// <summary>The signal keys to wait for.</summary>
+    public ImmutableArray<SignalKey>? Signals { get; init; }
+}
+
+/// <summary>What a parked call waits on (upstream <c>ToolPark["wait"]</c>): tasks the call's task owns.</summary>
+public sealed record ToolParkWait
+{
+    /// <summary>What <see cref="IToolExecutionApi.Checkpoint"/> holds in the run after the wake; null: nothing.</summary>
+    public JsonValue? Checkpoint { get; init; }
+    /// <summary>Tasks the call's task owns: child tasks it created, or nested calls it started.</summary>
+    public required ImmutableArray<TaskId> On { get; init; }
+    /// <summary>The join policy.</summary>
+    public required JoinPolicy Policy { get; init; }
+}
+
+/// <summary>
+/// What <c>Execute</c> returns instead of a result to park the call (upstream <c>ToolPark</c>, spec suspendable §4): <see cref="Sleep"/>
+/// until a time, for signals, or both; or <see cref="Wait"/> for tasks the call's task owns. Exactly one of the two. The call holds no
+/// invocation meanwhile, then runs <c>Execute</c> again with the same arguments, <see cref="IToolExecutionApi.Wake"/> saying why, and
+/// <see cref="IToolExecutionApi.Checkpoint"/> set to the park's checkpoint. Converts implicitly to a <see cref="ToolExecutionResult"/>
+/// carrying it (<see cref="ToolExecutionResult.Park"/>). Compared by reference where the Harness tells a base tool's park from a wrapper's.
+/// </summary>
+public sealed record ToolPark
+{
+    /// <summary>Sleep until a time, for signals, or both.</summary>
+    public ToolParkSleep? Sleep { get; init; }
+    /// <summary>Wait for tasks the call's task owns.</summary>
+    public ToolParkWait? Wait { get; init; }
+
+    /// <summary><c>{ sleep: { checkpoint?, until?, signals? } }</c>.</summary>
+    public static ToolPark Sleeping(double? until = null, IEnumerable<SignalKey>? signals = null, JsonValue? checkpoint = null) =>
+        new() { Sleep = new ToolParkSleep { Checkpoint = checkpoint, Until = until, Signals = signals is null ? null : [.. signals] } };
+
+    /// <summary><c>{ wait: { checkpoint?, on, policy } }</c>.</summary>
+    public static ToolPark Waiting(IEnumerable<TaskId> on, JoinPolicy policy, JsonValue? checkpoint = null) =>
+        new() { Wait = new ToolParkWait { Checkpoint = checkpoint, On = [.. on ?? throw new ArgumentNullException(nameof(on))], Policy = policy } };
+
+    /// <summary>The result that carries <paramref name="park"/>, as <c>Execute</c> returns it.</summary>
+    public static implicit operator ToolExecutionResult(ToolPark park) => new() { Park = park ?? throw new ArgumentNullException(nameof(park)) };
+}
+
+/// <summary>A nested call started without waiting for it (upstream <c>NestedToolCall</c>; <see cref="IToolExecutionApi.StartToolAsync"/>).</summary>
+public sealed class NestedToolCall
+{
+    private readonly Func<DurableContext, Task<NestedToolExecutionResult>> result;
+
+    internal NestedToolCall(TaskId taskId, Func<DurableContext, Task<NestedToolExecutionResult>> result)
+    {
+        TaskId = taskId;
+        this.result = result;
+    }
+
+    /// <summary>The nested call's tool task, for a park's <see cref="ToolParkWait.On"/>.</summary>
+    public TaskId TaskId { get; }
+
+    /// <summary>The stored result once the nested call is terminal; otherwise waits for it.</summary>
+    public Task<NestedToolExecutionResult> ResultAsync(DurableContext context) => result(context ?? throw new ArgumentNullException(nameof(context)));
 }
 
 /// <summary>
@@ -326,7 +411,9 @@ public sealed record NestedToolExecutionResult
     public required ImmutableArray<ToolDiagnostic> Diagnostics { get; init; }
     /// <summary>pi-ai usage (wire JSON); null when absent.</summary>
     public JsonObjectValue? Usage { get; init; }
-    /// <summary>Execution time of the attempt that produced the result; null when it never executed.</summary>
+    /// <summary>The span from the tool task's first run (<see cref="TaskRecord.StartedAt"/>) to its result on the Harness clock, hooks,
+    /// parks, crash downtime and reruns included (Pi v1.6.0); results that never executed have one too. A record written before lifecycle
+    /// times keeps the old measure: the execution time of the last attempt, or null when it never executed.</summary>
     public double? DurationMs { get; init; }
 
     /// <summary><c>{taskId, structuredOutput?, isError, details?, diagnostics, usage?, durationMs?}</c>, upstream's key order.</summary>
@@ -413,6 +500,11 @@ public interface IToolExecutionApi : IDocumentObserver, IDocumentReader
     ConversationId ConversationId { get; }
     /// <summary>The model's tool call ID.</summary>
     string CallId { get; }
+    /// <summary>Why this run started after a park; null on a fresh call, and in <see cref="ToolRegistration.Cancel"/> (upstream
+    /// <c>wake</c>).</summary>
+    WakeReason? Wake { get; }
+    /// <summary>What the call last parked with; null on a fresh call or after a park without one (upstream <c>checkpoint</c>).</summary>
+    JsonValue? Checkpoint { get; }
     /// <summary>The tool task's phase snapshot.</summary>
     IRegistrySnapshot Registry { get; }
     /// <summary>The calling conversation's agent, as the tool task's phase resolved it.</summary>
@@ -456,10 +548,20 @@ public interface IToolExecutionApi : IDocumentObserver, IDocumentReader
     Task<JsonValue?> MemoAsync(string name, DurableContext context);
     /// <summary>Stores a memo of the tool task unless one exists; returns the winner.</summary>
     Task<JsonValue> MemoAsync(string name, JsonValue candidate, DurableContext context);
+    /// <summary>A signal key's committed state in this call's task, as <see cref="IHookApi.ReadSignalAsync"/>.</summary>
+    Task<SignalState?> ReadSignalAsync(SignalToken token, string key, DurableContext context);
     /// <summary>Creates a task in its own commit; <see cref="TaskOptions.ConversationId"/> defaults to the calling conversation (upstream
     /// takes the options without it). A child task of a tool that is not replay-safe defaults to <see cref="TaskOptions.AbandonOnRestart"/>:
-    /// the tool never resumes after a restart, so nothing awaits the child then.</summary>
+    /// the tool never resumes after a restart, so nothing awaits the child then. After a wake (<see cref="Wake"/> set) a key is required:
+    /// use the overload that takes one.</summary>
     Task<TaskId> CreateTaskAsync(DurableTask task, JsonValue input, TaskOptions options, DurableContext context);
+    /// <summary>
+    /// <see cref="CreateTaskAsync(DurableTask, JsonValue, TaskOptions, DurableContext)"/> with a <paramref name="key"/> (upstream
+    /// <c>createTask()</c>'s <c>options.key</c>), validated like a nested call's: the task is recorded under it in the same commit, and a
+    /// later call with the key, in this run, a rerun, or a run after a wake, returns that task; another task kind, other input, or a key a
+    /// nested call uses throws.
+    /// </summary>
+    Task<TaskId> CreateTaskAsync(DurableTask task, JsonValue input, TaskOptions options, string key, DurableContext context);
     /// <summary>The committed task record.</summary>
     Task<TaskRecord?> GetTaskAsync(TaskId id, DurableContext context);
     /// <summary>Resolves with the task's terminal receipt; rejects when the invocation ends.</summary>
@@ -480,12 +582,22 @@ public interface IToolExecutionApi : IDocumentObserver, IDocumentReader
     /// <para>Nested calls run as soon as they are made; cancelling <paramref name="context"/> stops only the wait. When this call settles,
     /// nested calls it left running are aborted first. Rejects once <c>Execute</c> has returned, when this call is aborted, or when the Harness
     /// closes.</para>
+    /// <para>After a wake (<see cref="Wake"/> set) the same position may mean another call, so a key is required. Awaiting a nested call
+    /// holds this call's invocation for as long as it takes, also while it is parked; a tool that starts calls with
+    /// <see cref="StartToolAsync"/> and parks on their tasks (<see cref="ToolPark.Waiting"/>) lets the Session go idle instead.</para>
     /// </summary>
     Task<NestedToolExecutionResult> ExecuteToolAsync(string name, JsonObjectValue arguments, DurableContext context, NestedCallOptions? options = null);
+    /// <summary>As <see cref="ExecuteToolAsync"/>, but returns once the nested call is started or found, with a handle to its result
+    /// (upstream <c>executeTool(..., { wait: false })</c>).</summary>
+    Task<NestedToolCall> StartToolAsync(string name, JsonObjectValue arguments, DurableContext context, NestedCallOptions? options = null);
 }
 
-/// <summary>Runs a tool with its validated arguments.</summary>
+/// <summary>Runs a tool with its validated arguments. Returns a result, or a park (<see cref="ToolPark"/>, carried by
+/// <see cref="ToolExecutionResult.Park"/>): the call then runs <c>Execute</c> again once woken.</summary>
 public delegate Task<ToolExecutionResult> ToolExecute(JsonValue arguments, IToolExecutionApi api, DurableContext context);
+
+/// <summary>Cleans up the external work of a call that parked (upstream <c>cancel</c>).</summary>
+public delegate Task ToolCancel(JsonValue arguments, IToolExecutionApi api, DurableContext context);
 
 /// <summary>
 /// An executable tool registered in a registry (upstream <c>ToolRegistration</c>). Only the pi-ai <c>Tool</c> fields (name, description,
@@ -534,8 +646,14 @@ public record ToolRegistration
     public bool Deferred { get; init; }
     /// <summary>Output bounds.</summary>
     public ToolOutputLimits? OutputLimits { get; init; }
-    /// <summary>Runs the tool.</summary>
+    /// <summary>Runs the tool. A result, or a park (<see cref="ToolPark"/>): the call runs it again once woken.</summary>
     public required ToolExecute Execute { get; init; }
+    /// <summary>
+    /// Cleans up the external work of a call that parked, when it is aborted while no code of the tool runs (spec suspendable §4.2):
+    /// <see cref="IToolExecutionApi.Checkpoint"/> is the last park's, <see cref="IToolExecutionApi.Wake"/> null, and it starts no nested calls
+    /// or tasks. May run more than once, so idempotent. A throw is reported and the call still ends.
+    /// </summary>
+    public ToolCancel? Cancel { get; init; }
 }
 
 // ─── Prompt sections, hooks, wraps, extensions, registries ──────────────
@@ -579,11 +697,18 @@ public abstract record Wrap
     private protected Wrap() { }
 }
 
-/// <summary>Wraps the tool named <paramref name="Tool"/> (upstream <c>wrapTool</c>).</summary>
+/// <summary>Wraps the tool named <paramref name="Tool"/> (upstream <c>wrapTool</c>). Wrappers never park: one passes its api to its base
+/// unchanged or through a <see cref="DelegatingToolExecutionApi"/> and returns the base's park unchanged; a park of its own ends the call
+/// <c>invalid_park</c>.</summary>
 public sealed record ToolWrap(string Tool, Func<ToolRegistration, ToolRegistration> Apply) : Wrap;
 
 /// <summary>Wraps the section <paramref name="Section"/> (upstream <c>wrapSection</c>).</summary>
 public sealed record SectionWrap(string Section, Func<PromptSection, PromptSection> Apply) : Wrap;
+
+/// <summary>A named group of tools for code mode: the extension that brings the tools declares it (upstream <c>ToolNamespace</c>, Pi
+/// v1.6.0). <paramref name="Description"/> is one line, shown in the <c>codemode</c> prompt section; <paramref name="Instructions"/> is the
+/// longer how-to, returned only by <c>describeNamespace()</c>; <c>searchTools()</c> searches both.</summary>
+public sealed record ToolNamespace(string Name, string Description, string? Instructions = null);
 
 /// <summary>A named bundle of code, installed in a registry and selected by conversations by name (upstream <c>Extension</c>). Compared
 /// by reference, as upstream compares objects.</summary>
@@ -591,6 +716,9 @@ public sealed class Extension
 {
     /// <summary>The name; unique within a registry.</summary>
     public required string Name { get; init; }
+    /// <summary>The code-mode namespace of this extension's tools (a tool named by several extensions belongs to the first). The
+    /// <c>codemode</c> section lists it while the extension is selected, also before it has any tools.</summary>
+    public ToolNamespace? Namespace { get; init; }
     /// <summary>Tools; names are unique within the extension.</summary>
     public IReadOnlyList<ToolRegistration>? Tools { get; init; }
     /// <summary>Prompt sections; keys are unique within the extension.</summary>
@@ -976,7 +1104,8 @@ public enum TaskInspectionKind
     Pending,
     /// <summary>It waits for live tasks.</summary>
     Waiting,
-    /// <summary>It sleeps until the Harness clock reaches <see cref="TaskInspectionState.Until"/>.</summary>
+    /// <summary>It sleeps until the Harness clock reaches <see cref="TaskInspectionState.Until"/>, if set, or a signal it sleeps on
+    /// arrives.</summary>
     Sleeping,
     /// <summary>Its outcome is held until its ordinary owned work drains.</summary>
     Completing,
@@ -1002,7 +1131,8 @@ public sealed record TaskInspectionState(TaskInspectionKind Kind)
     public bool Migrates { get; init; }
     /// <summary>For <see cref="TaskInspectionKind.Waiting"/>: the live tasks it waits for.</summary>
     public ImmutableArray<TaskId> On { get; init; } = [];
-    /// <summary>For <see cref="TaskInspectionKind.Sleeping"/>: when it is due, on the Harness clock.</summary>
+    /// <summary>For <see cref="TaskInspectionKind.Sleeping"/>: when it is due, on the Harness clock; null for a sleep that waits for
+    /// signals only.</summary>
     public double? Until { get; init; }
     /// <summary>For <see cref="TaskInspectionKind.Blocked"/>: why.</summary>
     public BlockedReason? Reason { get; init; }
@@ -1103,13 +1233,18 @@ public sealed record SubmissionDraft
     private SubmissionDraft() { }
     /// <summary>User input (pi-ai <c>UserMessage["content"]</c>, wire JSON), placed as <paramref name="entry"/> when given, else as
     /// <c>pi.user</c> without data. <paramref name="whenIdle"/> <see cref="Durable.WhenIdle.Reject"/> refuses it on an idle
-    /// conversation.</summary>
+    /// conversation. <paramref name="onAbort"/> <see cref="InputOnAbort.Keep"/> keeps it queued through an abort;
+    /// <paramref name="notify"/> names the task to signal when it settles.</summary>
     public static SubmissionDraft Input(JsonValue content, WhenBusy? whenBusy = null, string? requestId = null, InputEntry? entry = null,
-        WhenIdle? whenIdle = null) =>
-        new() { Type = SubmissionType.Input, Content = content, WhenBusy = whenBusy, WhenIdle = whenIdle, RequestId = requestId, InputEntry = entry };
+        WhenIdle? whenIdle = null, InputOnAbort? onAbort = null, SubmissionNotify? notify = null) =>
+        new()
+        {
+            Type = SubmissionType.Input, Content = content, WhenBusy = whenBusy, WhenIdle = whenIdle, RequestId = requestId, InputEntry = entry,
+            OnAbort = onAbort, Notify = notify,
+        };
     /// <summary>A passive entry write.</summary>
-    public static SubmissionDraft Write(EntryDraft entry, string? requestId = null) =>
-        new() { Type = SubmissionType.Write, Entry = entry, RequestId = requestId };
+    public static SubmissionDraft Write(EntryDraft entry, string? requestId = null, SubmissionNotify? notify = null) =>
+        new() { Type = SubmissionType.Write, Entry = entry, RequestId = requestId, Notify = notify };
     /// <summary>
     /// Starts a run on the context as it is, without a user message (upstream <c>{ type: "continue" }</c>). Only when idle: a busy conversation
     /// rejects it with <see cref="ConversationBusyException"/>, and it never queues. Items kept in <c>pi.inbox</c> are placed first and join
@@ -1117,7 +1252,8 @@ public sealed record SubmissionDraft
     /// without a request, <c>unanswered</c> with <c>nothing_to_answer</c>. A cut-off answer with tool calls is continued: its calls never ran,
     /// and the context ends in their error results (<c>missing_result</c>).
     /// </summary>
-    public static SubmissionDraft Continue(string? requestId = null) => new() { Type = SubmissionType.Continue, RequestId = requestId };
+    public static SubmissionDraft Continue(string? requestId = null, SubmissionNotify? notify = null) =>
+        new() { Type = SubmissionType.Continue, RequestId = requestId, Notify = notify };
     /// <summary>Input, write or continue.</summary>
     public SubmissionType Type { get; private init; }
     /// <summary>Host deduplication key, scoped to the conversation.</summary>
@@ -1132,6 +1268,29 @@ public sealed record SubmissionDraft
     public EntryDraft? Entry { get; private init; }
     /// <summary>The entry an input is placed as (upstream <c>entry</c> of an input); null places it as <c>pi.user</c>.</summary>
     public InputEntry? InputEntry { get; private init; }
+    /// <summary>
+    /// What <c>Conversation.AbortAsync()</c> and abort cascades do with an input while it is queued (upstream <c>onAbort</c>, Pi v1.6.0):
+    /// null or <see cref="InputOnAbort.Withdraw"/> settles it <c>unanswered</c> with reason <c>aborted</c>; <see cref="InputOnAbort.Keep"/>
+    /// leaves it queued, as a failed run leaves its queue under <see cref="AfterFailedRun.Keep"/>, so the next input places it and that run
+    /// answers it. For input its sender cannot take back, such as another agent's message. <c>Submission.AbortAsync()</c> withdraws it either
+    /// way.
+    /// </summary>
+    public InputOnAbort? OnAbort { get; private init; }
+    /// <summary>
+    /// When the submission settles, deliver <see cref="Signals.SubmissionSettled"/> (the settled record) to this task under this key, in
+    /// the settling commit (upstream <c>notify</c>, Pi v1.6.0); a delivery the task refuses (<c>closed</c>, <c>not_found</c>) fails nothing.
+    /// A submission that settles before the task sleeps on the key wakes the sleep at once.
+    /// </summary>
+    public SubmissionNotify? Notify { get; private init; }
+}
+
+/// <summary>What an abort does with a queued input (upstream <c>onAbort</c>).</summary>
+public enum InputOnAbort
+{
+    /// <summary><c>withdraw</c> (the default): settled <c>unanswered</c> with reason <c>aborted</c>.</summary>
+    Withdraw,
+    /// <summary><c>keep</c>: left queued.</summary>
+    Keep,
 }
 
 /// <summary>Result of aborting a submission.</summary>
@@ -1338,6 +1497,12 @@ public interface IHarness : ISession
     /// cannot take it settles as <c>orphaned</c> instead.
     /// </summary>
     Task<TaskAbortResult> AbortTaskAsync(TaskId id, DurableContext context);
+    /// <summary>
+    /// <see cref="ITx.SignalAsync"/> in a commit of its own: delivers <paramref name="value"/> to task <paramref name="taskId"/> under
+    /// <paramref name="key"/> (upstream <c>signal</c>, Pi v1.6.0). Enables scheduling, so a host arms its recovery wakeup first, as before
+    /// <c>SubmitAsync()</c>. Checks nothing about the caller.
+    /// </summary>
+    Task<SignalResult> SignalAsync(TaskId taskId, SignalToken token, string key, JsonValue value, DurableContext context);
     /// <summary>Resolves with the terminal receipt; cancelling <paramref name="context"/> cancels only this wait.</summary>
     Task<TaskRecord> WaitForTaskAsync(TaskId id, DurableContext context);
     /// <summary>Resolves when the ordinary ownership scope of every ownerless conversation has no live non-background task.</summary>
@@ -1392,6 +1557,13 @@ public interface IHookApi : IDocumentReader
     Task<JsonValue?> MemoAsync(string name, DurableContext context);
     /// <summary>Stores a memo unless one exists; returns the winner.</summary>
     Task<JsonValue> MemoAsync(string name, JsonValue candidate, DurableContext context);
+    /// <summary>
+    /// A signal key's committed state in the asking task, the value migrated to the token's version; null while nothing came (upstream
+    /// <c>readSignal</c>, Pi v1.6.0). Throws when the stored value cannot be migrated or the migrated value does not match the schema.
+    /// </summary>
+    Task<SignalState?> ReadSignalAsync(SignalToken token, string key, DurableContext context);
+    /// <summary>The Harness clock, in milliseconds (upstream <c>now</c>).</summary>
+    double Now();
     /// <summary>A committed entry visible from the task's conversation.</summary>
     Task<EntryRecord?> EntryAsync(EntryId id, DurableContext context);
     /// <summary>A committed entry visible from the task's conversation; null when absent, not visible, or of another kind.</summary>
@@ -1422,19 +1594,30 @@ public sealed class GenerationHooks
     public Func<DurableModel, JsonValue, IHookApi, DurableContext, Task<JsonValue?>>? BeforeProviderRequest { get; init; }
     /// <summary>Every terminal provider message, before classification.</summary>
     public Func<JsonObjectValue, IHookApi, DurableContext, Task>? AfterResponse { get; init; }
-    /// <summary>A final answer; the first returned user input continues the run.</summary>
-    public Func<JsonObjectValue, IHookApi, DurableContext, Task<JsonValue?>>? OnYield { get; init; }
-    /// <summary>After every tool of the round is terminal; the round's result entries in call order.</summary>
-    public Func<EntryId, ImmutableArray<EntryId>, IHookApi, DurableContext, Task>? AfterTools { get; init; }
+    /// <summary>
+    /// A final answer; the first result wins (null asks the next hook). A continuation (<see cref="OnYieldResult.Continue"/>; a user input
+    /// converts implicitly) appends a user message and continues the run. Tasks (<see cref="OnYieldResult.Tasks"/>) decide whether the
+    /// answer stands (spec suspendable §6): the answer is appended, the run's inputs stay open (<c>pi.live.run.yield</c>), the tasks run as
+    /// the generation's children, and the first in creation order that completes with a <see cref="YieldDecision"/> holding a continuation
+    /// provides it; without one the run ends with the answer.
+    /// </summary>
+    public Func<JsonObjectValue, IHookApi, DurableContext, Task<OnYieldResult?>>? OnYield { get; init; }
+    /// <summary>
+    /// After every tool of the round is terminal; the round's result entries in call order. Returns the tasks to run
+    /// (<see cref="Define.HookTask"/>), or null for none: the requested tasks of every hook, concatenated in extension order, run as the
+    /// generation's children before the round ends; one that completes with <see cref="AfterToolsDecision"/> <c>{ terminate: true }</c> ends
+    /// the run as a round whose calls all asked to terminate. A task answers the run otherwise by submitting a steer in its terminal commit.
+    /// </summary>
+    public Func<EntryId, ImmutableArray<EntryId>, IHookApi, DurableContext, Task<IReadOnlyList<HookTask>?>>? AfterTools { get; init; }
     /// <summary>
     /// After a run answered, its answer committed and its inputs settled <c>done</c>: a final answer, or a <c>terminate</c> round; not when an
     /// <see cref="OnYield"/> continuation is taken, and never after a failure or an abort (upstream <c>afterRun</c>, spec §8.3). Returns the
-    /// tasks to run (<see cref="Define.RunEndTask"/>), or null for none. The requested tasks of every hook are created together as children of
+    /// tasks to run (<see cref="Define.HookTask"/>), or null for none. The requested tasks of every hook are created together as children of
     /// the generation, which keeps the run, and the conversation busy, until they are terminal; then queued items are placed and the run
     /// ends. A crash before they are created asks again; once created, never again for this run. A request that cannot start (a built-in or
     /// uninstalled task, a throwing <c>Initial</c>, an unknown first phase) is skipped and reported against the hook's extension.
     /// </summary>
-    public Func<RunSummary, IHookApi, DurableContext, Task<IReadOnlyList<RunEndTask>?>>? AfterRun { get; init; }
+    public Func<RunSummary, IHookApi, DurableContext, Task<IReadOnlyList<HookTask>?>>? AfterRun { get; init; }
 }
 
 /// <summary>How a run ended, for <see cref="GenerationHooks.AfterRun"/> (upstream <c>RunSummary</c>). Read the run's history with
@@ -1473,14 +1656,63 @@ public enum RunSummaryReason
     Terminate,
 }
 
-/// <summary>A task a <see cref="GenerationHooks.AfterRun"/> hook asks for (upstream <c>RunEndTask</c>), built by <see cref="Define.RunEndTask"/>:
-/// the task and its input.</summary>
+/// <summary>A task a hook (<see cref="GenerationHooks.AfterTools"/>, <see cref="GenerationHooks.OnYield"/>,
+/// <see cref="GenerationHooks.AfterRun"/>) asks for (upstream <c>HookTask</c>; <c>RunEndTask</c> before Pi v1.6.0), built by
+/// <see cref="Define.HookTask"/>: the task and its input.</summary>
 /// <param name="Task">The task, which must be installed and not built-in; it is created from the installed definition.</param>
 /// <param name="Input">Its input.</param>
-public sealed record RunEndTask(DurableTask Task, JsonValue Input);
+public sealed record HookTask(DurableTask Task, JsonValue Input);
 
-/// <summary>What <see cref="ToolHooks.BeforeTool"/> decides: replacement arguments or a block.</summary>
-public sealed record BeforeToolDecision(JsonObjectValue? Arguments = null, string? Block = null);
+/// <summary>What a <see cref="GenerationHooks.OnYield"/> hook returns (upstream <c>{ continue } | { tasks }</c>): a continuation, or the tasks
+/// that decide whether the answer stands. A user input (pi-ai <c>UserMessage["content"]</c>, wire JSON) converts implicitly to its
+/// continuation.</summary>
+public sealed record OnYieldResult
+{
+    private OnYieldResult(JsonValue? continuation, IReadOnlyList<HookTask>? tasks) { Continuation = continuation; HookTasks = tasks; }
+
+    /// <summary><c>{ continue }</c>: append <paramref name="input"/> as a user message and continue the run.</summary>
+    public static OnYieldResult Continue(JsonValue input) => new(input ?? throw new ArgumentNullException(nameof(input)), null);
+    /// <summary><c>{ tasks }</c>: run <paramref name="tasks"/> as the generation's children; they decide whether the answer stands.</summary>
+    public static OnYieldResult Tasks(IReadOnlyList<HookTask> tasks) => new(null, tasks ?? throw new ArgumentNullException(nameof(tasks)));
+
+    /// <summary>The continuation; null for tasks.</summary>
+    public JsonValue? Continuation { get; }
+    /// <summary>The tasks; null for a continuation.</summary>
+    public IReadOnlyList<HookTask>? HookTasks { get; }
+
+    /// <summary>A continuation with <paramref name="input"/>; null stays null (the next hook is asked).</summary>
+    public static implicit operator OnYieldResult?(JsonValue? input) => input is null ? null : Continue(input);
+    /// <summary>A continuation with the text <paramref name="input"/>; null stays null.</summary>
+    public static implicit operator OnYieldResult?(string? input) => input is null ? null : Continue(JsonValue.String(input));
+}
+
+/// <summary>What an <c>onYield</c> task completes with to continue the run instead of letting its answer stand (upstream
+/// <c>YieldDecision</c>): its <see cref="ToJson"/> is the task's result.</summary>
+/// <param name="Continue">The user input to continue with (a string, or a non-empty list of text and image items); null lets the answer
+/// stand.</param>
+public sealed record YieldDecision(JsonValue? Continue = null)
+{
+    /// <summary><c>{ continue? }</c>.</summary>
+    public JsonObjectValue ToJson() => new RecordJson.Writer().Add("continue", Continue).Build();
+}
+
+/// <summary>What an <c>afterTools</c> task completes with to end the run after this round (upstream <c>AfterToolsDecision</c>): its
+/// <see cref="ToJson"/> is the task's result. A task with nothing to decide completes with JSON <c>null</c> or <c>{}</c>.</summary>
+/// <param name="Terminate">End the run as a round whose calls all asked to terminate.</param>
+public sealed record AfterToolsDecision(bool Terminate = false)
+{
+    /// <summary><c>{ terminate?: true }</c>.</summary>
+    public JsonObjectValue ToJson() => Terminate ? JsonValue.Object([KeyValuePair.Create("terminate", (JsonValue)true)]) : JsonObjectValue.Empty;
+}
+
+/// <summary>What a <see cref="ToolHooks.BeforeTool"/> hook sleeps for: a deadline, signals, or both (upstream <c>GateSleep</c>).</summary>
+/// <param name="Until">A time on the Harness clock, in milliseconds.</param>
+/// <param name="Signals">The signal keys to wait for.</param>
+public sealed record GateSleep(double? Until = null, ImmutableArray<SignalKey>? Signals = null);
+
+/// <summary>What <see cref="ToolHooks.BeforeTool"/> decides: replacement arguments, a block, or a sleep that parks the call before it
+/// runs.</summary>
+public sealed record BeforeToolDecision(JsonObjectValue? Arguments = null, string? Block = null, GateSleep? Sleep = null);
 
 /// <summary>Hooks of the built-in tool task, for model-issued and nested calls (upstream <c>ToolHooks</c>); every handler is optional. A
 /// call is upstream's <c>ToolHookCall</c>: pi-ai <c>ToolCall</c> wire JSON with, for a nested call (one a running tool made through
@@ -1488,7 +1720,12 @@ public sealed record BeforeToolDecision(JsonObjectValue? Arguments = null, strin
 /// <see cref="IHookApi"/>, so their memos are the call's.</summary>
 public sealed class ToolHooks
 {
-    /// <summary>Before intent; the first block wins, otherwise arguments replace the call's arguments. A throw blocks.</summary>
+    /// <summary>
+    /// Before intent; arguments replace the call's arguments, and the first block or sleep stops the chain. A throw blocks. A sleep parks
+    /// the call before it runs (spec suspendable §5): every wake, and every registry change, runs the whole <c>call</c> phase again, so a
+    /// gate reads the key it waited on with <see cref="IHookApi.ReadSignalAsync"/> and passes, blocks, or sleeps on a new key. A sleep that
+    /// breaks a rule ends the call <c>invalid_park</c>.
+    /// </summary>
     public Func<JsonObjectValue, IHookApi, DurableContext, Task<BeforeToolDecision?>>? BeforeTool { get; init; }
     /// <summary>
     /// Before the result is committed; replaces the result. Runs on every result the tool task writes: an executed call's, and the error

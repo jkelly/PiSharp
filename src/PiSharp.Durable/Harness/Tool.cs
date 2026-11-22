@@ -57,6 +57,18 @@
 // - Pi v1.5.0 sync (area tool-tasks, 1c6928b30): a call to a tool its request did not offer is a task whose input is flagged unoffered
 //   (pi.tool version 3): it resolves nothing, so it settles tool_unavailable through afterTool even when the agent has the tool, and its
 //   abort handler settles tool_unavailable too.
+// - Pi v1.6.0 sync (faac585884ae2c013a6b1400f3e9e77f10b34bac): pi.tool is version 4. A call may park: `Execute` returns a park
+//   (ToolExecutionResult.Park; Parks.cs) and the task sleeps or waits at the `parked` checkpoint {phase: "parked", arguments, replay,
+//   checkpoint?}, its slot `sleeping` or `waiting` without output; once woken, the `parked` phase resolves the tool again, records intent
+//   with the wake ({phase: "execute", arguments, replay, wake?, checkpoint?}) and runs `Execute` again (api.Wake, api.Checkpoint). A
+//   beforeTool hook may park the call at its gates (ParkAtGateAsync): the task sleeps at `call`, and every wake runs the whole phase
+//   again. An invalid park ends the call with an invalid_park result. `Cancel` cleans up a parked call that is aborted (CancelAsync). One
+//   run of the tool's code is an Attempt (StartAttemptAsync); a woken run starts from the details and diagnostics earlier runs left in
+//   the slot and needs explicit keys for nested calls and tasks. api.StartToolAsync is executeTool with wait false, and api.CreateTaskAsync
+//   with a key records the task under it in NestedCallDoc, whose members carry kind "nested" or "task" (absent: a nested call's, from
+//   before keyed tasks). A result's durationMs is the span from the task's first run (TaskRecord.StartedAt) on the Harness clock,
+//   computed in the settling commit, so results that never executed have one too; a record without StartedAt keeps the measured time
+//   of the last attempt. The intent's two commits keep PiSharp's order (state first, slot second; above).
 using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Globalization;
@@ -69,7 +81,7 @@ using PiSharp.Durable.Internal.PiAi.Validation;
 
 namespace PiSharp.Durable;
 
-/// <summary>Built-in tasks: the tool task (upstream <c>ToolTask</c>, kind <c>pi.tool</c>, version 3) and its nested call document.</summary>
+/// <summary>Built-in tasks: the tool task (upstream <c>ToolTask</c>, kind <c>pi.tool</c>, version 4) and its nested call document.</summary>
 public static partial class HarnessTasks
 {
     /// <summary>
@@ -79,20 +91,24 @@ public static partial class HarnessTasks
     /// both its recorded and its current registration say <see cref="ToolReplay.Safe"/>; otherwise it settles <c>failed</c> with an
     /// <c>interrupted</c> result. A model-issued call settles by appending its result entry; a nested call by writing its result to its
     /// caller's <see cref="NestedCallDoc"/>. Every result the task writes passes <c>afterTool</c>, also the error results the Harness writes
-    /// itself, except past the restart limit. A call flagged <c>unoffered</c> resolves nothing and settles <c>tool_unavailable</c>. Version 1
-    /// tasks, which had only model-issued calls, and version 2 tasks, which had no <c>unoffered</c>, migrate.
+    /// itself, except past the restart limit. A call flagged <c>unoffered</c> resolves nothing and settles <c>tool_unavailable</c>. A call
+    /// that parks runs again in <c>parked</c>, which resolves the tool, records intent, and executes in one handler too. Version 1 tasks,
+    /// which had only model-issued calls, version 2 tasks, which had no <c>unoffered</c>, and version 3 tasks, which had no <c>parked</c>
+    /// phase, migrate.
     /// </summary>
     public static DurableTask ToolTask { get; } = Tasks.DefineTask(new TaskDefinition
     {
         Name = "pi.tool",
-        Version = 3,
+        Version = 4,
         Initial = _ => JsonValue.Parse("""{"phase":"call"}"""),
-        // Version 1 had only model-issued calls, without kind; version 3 added unoffered, absent in version 2 inputs.
+        // Version 1 had only model-issued calls, without kind; version 3 added unoffered, absent in version 2 inputs; version 4 added
+        // parked and the optional fields of execute, absent in older checkpoints.
         Migrate = (input, checkpoint, fromVersion) => new TaskMigrationResult(
             fromVersion == 1 ? JsonValue.Object([KeyValuePair.Create("kind", (JsonValue)"model"), .. (JsonObjectValue)input]) : input, checkpoint),
         Phases = new Dictionary<string, TaskPhaseHandler>(StringComparer.Ordinal)
         {
             ["call"] = ToolPhases.CallAsync,
+            ["parked"] = ToolPhases.ParkedAsync,
             ["execute"] = ToolPhases.ExecuteAsync,
         },
         Abort = ToolPhases.AbortAsync,
@@ -103,7 +119,9 @@ public static partial class HarnessTasks
     /// task keyed by the nested call's key, so a rerun finds the calls it already made, and the caller reads each result. Each member is
     /// <c>{taskId?, result?}</c>: created with the nested task; the nested call's terminal commit adds its result
     /// (<see cref="NestedToolExecutionResult.ToJson"/>), absent for a call the scheduler faulted or orphaned. One document per call, so no
-    /// commit rewrites the others. Retires with the caller.
+    /// commit rewrites the others. Retires with the caller. Since Pi v1.6.0 a member is one key of a running tool: a nested call
+    /// (<c>kind: "nested"</c>), or a task created under the key (<c>kind: "task"</c>, <c>CreateTaskAsync</c> with a key); a member without
+    /// <c>kind</c>, written before keyed tasks, is a nested call's.
     /// </summary>
     public static TaskDocFamilyToken NestedCallDoc { get; } = Documents.DefineTaskDocFamily("pi.tool.nested-call", 1, _ => JsonObjectValue.Empty,
         // The document retires with its task.
@@ -184,14 +202,16 @@ internal static class ToolPhases
         }
         var args = checkedArgs.Args!;
         string? block = null;
+        GateSleep? sleep = null;
         await runtime.Hooks.EachAsync<ToolHooks, Func<JsonObjectValue, IHookApi, DurableContext, Task<BeforeToolDecision?>>>(hooks => hooks.BeforeTool,
             async hook =>
             {
-                if (block is not null) return;
+                if (block is not null || sleep is not null) return;
                 try
                 {
                     var decision = await hook(call.SetItem("arguments", args), runtime, context).ConfigureAwait(false);
                     if (decision?.Block is not null) block = decision.Block;
+                    else if (decision?.Sleep is not null) sleep = decision.Sleep;
                     else if (decision?.Arguments is not null) args = decision.Arguments;
                 }
                 catch (Exception error)
@@ -206,6 +226,11 @@ internal static class ToolPhases
             await RejectAsync(runtime, input, call, tool, blocked, context).ConfigureAwait(false);
             return;
         }
+        if (sleep is not null)
+        {
+            await ParkAtGateAsync(runtime, input, call, tool, sleep, context).ConfigureAwait(false);
+            return;
+        }
         var validated = Validate(tool, call, args);
         if (validated.Error is { } rejected)
         {
@@ -213,28 +238,118 @@ internal static class ToolPhases
             return;
         }
         var final = validated.Args!;
-        // The intent is durable before the tool runs; the slot's status and arguments are presentation, stored like progress
-        // (Live.ProgressCommit). Parallel calls of one round then share no immediate write to pi.live. Upstream commits the slot first; the
-        // intent goes first here so the agent events read its arguments when the slot turns running (see the file header).
-        await runtime.CommitAsync((_, _) =>
+        await CommitIntentAsync(runtime, Intent(final, tool, null, null), final, context).ConfigureAwait(false);
+        await RunAsync(runtime, input, call, tool, final, default, context).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Woken from a park: resolves the tool again, records intent with the wake, and runs <c>Execute</c> again (upstream <c>parked</c>). A
+    /// tool that no longer resolves cannot run or clean up; the call ends <c>failed</c>, so what it owns is aborted.
+    /// </summary>
+    public static async Task ParkedAsync(RunningTask task, ITaskRuntime runtime, DurableContext context)
+    {
+        var input = ToolInput.Parse(task.Input);
+        var checkpoint = (JsonObjectValue)task.Checkpoint;
+        var args = checkpoint["arguments"];
+        var parked = checkpoint.TryGetValue("checkpoint", out var stored) ? stored : null;
+        var wake = task.Wake;
+        var call = await ReadCallAsync(runtime, input, context).ConfigureAwait(false);
+        if (Live.CutOffTooOften(task, runtime))
         {
-            var intent = new RecordJson.Writer()
-                .Add("phase", "execute")
-                .Add("arguments", final)
-                .Add("replay", WireName.Of(tool.Replay ?? ToolReplay.Unsafe))
-                .Build();
-            return (TaskState?)NextTaskState.Running(intent);
-        }, context).ConfigureAwait(false);
+            await EndCutOffAsync(runtime, task, input, call, context).ConfigureAwait(false);
+            return;
+        }
+        var name = Name(call);
+        var tool = await ResolveToolAsync(runtime, input, name, context).ConfigureAwait(false);
+        if (tool is null)
+        {
+            var message = $"Tool {name} is not available";
+            runtime.Report(new InvalidOperationException($"{message}: its parked call {CallIdOf(call)} cannot run again"));
+            await SettleFromSlotAsync(runtime, input, call, new SlotHooks(null), Ending.Failed(message), "tool_unavailable", message, context)
+                .ConfigureAwait(false);
+            return;
+        }
+        await CommitIntentAsync(runtime, Intent(args, tool, wake, parked), args, context).ConfigureAwait(false);
+        await RunAsync(runtime, input, call, tool, args, new Resumed(wake, parked), context).ConfigureAwait(false);
+    }
+
+    /// <summary>The <c>execute</c> checkpoint: the final arguments and the replay policy recorded before execution, and for a run after a
+    /// park, why it woke and what it parked with.</summary>
+    private static JsonObjectValue Intent(JsonValue args, ToolRegistration tool, WakeReason? wake, JsonValue? checkpoint) => new RecordJson.Writer()
+        .Add("phase", "execute")
+        .Add("arguments", args)
+        .Add("replay", WireName.Of(tool.Replay ?? ToolReplay.Unsafe))
+        .Add("wake", wake?.ToJson())
+        .Add("checkpoint", checkpoint)
+        .Build();
+
+    /// <summary>
+    /// Records intent (upstream <c>commitIntent</c>): the <c>execute</c> checkpoint, durable before the tool runs, and the slot showing the
+    /// call <c>running</c> (and a nested call the arguments it runs with), stored like progress (<see cref="Live.ProgressCommit"/>), so
+    /// parallel calls of one round share no immediate write to <c>pi.live</c>. Upstream commits the slot first; the intent goes first here so
+    /// the agent events read its arguments when the slot turns running (see the file header).
+    /// </summary>
+    private static async Task CommitIntentAsync(ITaskRuntime runtime, JsonObjectValue intent, JsonValue args, DurableContext context)
+    {
+        await runtime.CommitAsync((_, _) => (TaskState?)NextTaskState.Running(intent), context).ConfigureAwait(false);
         await runtime.CommitAsync(async (tx, _) =>
         {
             var slot = Live.ToolSlot(await tx.DocAsync(Live.LiveDoc, runtime.ConversationId).ConfigureAwait(false), runtime.TaskId);
             slot?.Set("status", "running");
             // A nested slot shows the arguments the call runs with, which repair, hooks, and coercion may have changed. Assigned whole: an
             // equal value records no change, and a rerun corrects what an earlier attempt showed.
-            if (slot is not null && Live.IsNested(slot)) slot.Set("arguments", final);
+            if (slot is not null && Live.IsNested(slot)) slot.Set("arguments", args);
         }, context, Live.ProgressCommit).ConfigureAwait(false);
-        await RunAsync(runtime, input, call, tool, final, context).ConfigureAwait(false);
     }
+
+    /// <summary>
+    /// Parks the call at its gates, before it runs (spec suspendable §5.1; upstream <c>parkAtGate</c>): the task sleeps at <c>call</c>, its
+    /// slot <c>sleeping</c>, and every wake runs the whole phase again. A sleep the commit refuses (no <c>until</c> or signals, a used key, a
+    /// bad deadline) ends the call <c>invalid_park</c>, through <c>afterTool</c>.
+    /// </summary>
+    private static async Task ParkAtGateAsync(ITaskRuntime runtime, ToolInput input, JsonObjectValue call, ToolRegistration tool, GateSleep sleep,
+        DurableContext context)
+    {
+        try
+        {
+            await runtime.CommitAsync(async (tx, _) =>
+            {
+                var slot = Live.ToolSlot(await tx.DocAsync(Live.LiveDoc, runtime.ConversationId).ConfigureAwait(false), runtime.TaskId);
+                slot?.Set("status", "sleeping");
+                return (TaskState?)new SleepingTaskState(JsonValue.Parse("""{"phase":"call"}"""), sleep.Until, sleep.Signals);
+            }, context).ConfigureAwait(false);
+        }
+        catch (Exception error)
+        {
+            // A close seals the Session before it signals the run.
+            if (runtime.Signal.IsCancellationRequested || DurableTaskScheduler.CloseSignalOf(runtime).Token.IsCancellationRequested) throw;
+            var invalid = ToolResults.HarnessError("invalid_park", $"Tool call {CallIdOf(call)} cannot wait at its gates: {DurableErrors.MessageOf(error)}");
+            await RejectAsync(runtime, input, call, tool, invalid, context).ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>
+    /// Whether a sleeping task is a tool call parked at its gates, before its intent (spec suspendable §5.2; upstream <c>gatedCall</c>): the
+    /// registry, and every open, wake it, so the gates installed then decide.
+    /// </summary>
+    internal static bool GatedCall(TaskRecord record) =>
+        record.Kind == HarnessTasks.ToolTask.Definition.Name && record.State is SleepingTaskState asleep && PhaseOf(asleep.Checkpoint) == "call";
+
+    /// <summary>
+    /// Whether a task's <c>abandonOnRestart</c> children survive a restart (spec suspendable §2.5; upstream <c>keepsChildren</c>): it is a
+    /// tool call that was not cut off while running, parked or not started yet, whatever its status.
+    /// </summary>
+    internal static bool KeepsChildren(TaskRecord record)
+    {
+        if (record.Kind != HarnessTasks.ToolTask.Definition.Name) return false;
+        // A tool task's checkpoint; absent once it holds or has its outcome.
+        return (record.State as LiveTaskState)?.Checkpoint is { } checkpoint && PhaseOf(checkpoint) is "call" or "parked";
+    }
+
+    private static string? PhaseOf(JsonValue checkpoint) =>
+        checkpoint is JsonObjectValue value && value.TryGetValue("phase", out var phase) && phase is JsonStringValue text ? text.Value : null;
+
+    private static string CallIdOf(JsonObjectValue call) => ((JsonStringValue)call["id"]).Value;
 
     /// <summary>Recovery after intent: rerun only when the stored and the current policy both say <c>safe</c>.</summary>
     public static async Task ExecuteAsync(RunningTask task, ITaskRuntime runtime, DurableContext context)
@@ -243,6 +358,8 @@ internal static class ToolPhases
         var checkpoint = (JsonObjectValue)task.Checkpoint;
         var args = checkpoint["arguments"];
         var replay = checkpoint["replay"] is JsonStringValue { Value: var stored } ? stored : null;
+        var wake = checkpoint.TryGetValue("wake", out var woke) ? WakeReason.FromJson(woke) : null;
+        var parked = checkpoint.TryGetValue("checkpoint", out var kept) ? kept : null;
         var call = await ReadCallAsync(runtime, input, context).ConfigureAwait(false);
         // Also before an interruption result: its afterTool hooks may be what cut the task off.
         if (Live.CutOffTooOften(task, runtime))
@@ -255,19 +372,23 @@ internal static class ToolPhases
         if (replay == "safe" && tool?.Replay == ToolReplay.Safe)
         {
             // The rerun reports from scratch: clear what the interrupted attempt published, and show the slot running with the arguments it
-            // runs with again, as the deferred commit that showed them may have been lost with the crash.
+            // runs with again, as the deferred commit that showed them may have been lost with the crash. A woken run keeps the details and
+            // diagnostics earlier runs left, as a park does.
             await runtime.CommitAsync(async (tx, _) =>
             {
                 if (Live.ToolSlot(await tx.DocAsync(Live.LiveDoc, runtime.ConversationId).ConfigureAwait(false), runtime.TaskId) is { } slot)
                 {
-                    Live.ClearProgress(slot);
+                    if (wake is null) Live.ClearProgress(slot);
+                    else Live.ClearOutput(slot);
                     slot.Set("status", "running");
                     if (Live.IsNested(slot)) slot.Set("arguments", args);
                 }
             }, context).ConfigureAwait(false);
-            await RunAsync(runtime, input, call, tool, args, context).ConfigureAwait(false);
+            await RunAsync(runtime, input, call, tool, args, new Resumed(wake, parked), context).ConfigureAwait(false);
             return;
         }
+        // A woken run may have restarted external work that nothing will collect now.
+        if (wake is not null && tool is not null) await CancelAsync(runtime, input, call, tool, args, parked, context).ConfigureAwait(false);
         var message = $"Tool {name} was interrupted and may have partially run";
         // `failed` records cancellation intent, so the call's owned conversations, left unsupervised, are aborted. Not cut off too often
         // (checked above), so the hooks run.
@@ -291,20 +412,33 @@ internal static class ToolPhases
         var input = ToolInput.Parse(task.Input);
         var call = await ReadCallAsync(runtime, input, context).ConfigureAwait(false);
         var name = Name(call);
+        var checkpoint = (JsonObjectValue)task.Checkpoint;
+        var phase = task.Phase;
         // Abandoned after a restart (TaskOptions.AbandonOnRestart): say whether the call may have run. An unoffered call could not run in any
         // case, and its result says so.
         var (code, message) = input.Unoffered
             ? ("tool_unavailable", $"Tool {name} is not available")
             : task.AbortReason != TaskAbortReason.Restart
                 ? ("aborted", $"Tool {name} was aborted")
-                : task.Phase == "execute"
+                : phase == "execute"
                     ? ("interrupted", $"Tool {name} was interrupted by a restart and may have partially run")
-                    : ("abandoned", $"Tool {name} was not started: its caller ended with a restart");
-        // The scheduler runs an abort handler only while its restarts are below the limit, and faults the task without a result when the last
-        // attempt is cut off. That attempt skips the hooks, which may be what cuts it off.
-        SlotHooks? hooks = (task.Restarts ?? 0) < runtime.Settings.RestartLimit - 1
-            ? new SlotHooks(await ToolForLimitsAsync(runtime, input, name, context).ConfigureAwait(false))
-            : null;
+                    : phase == "parked"
+                        ? ("abandoned", $"Tool {name} was parked: its caller ended with a restart")
+                        : ("abandoned", $"Tool {name} was not started: its caller ended with a restart");
+        var tool = await ToolForLimitsAsync(runtime, input, name, context).ConfigureAwait(false);
+        // External work may be live while no code of the tool runs: parked, or woken and cut off before it parked again. The scheduler ends
+        // an abort handler cut off restartLimit times itself, so Cancel cannot keep it from ending.
+        if (phase == "parked" || (phase == "execute" && checkpoint.ContainsKey("wake")))
+        {
+            if (tool is not null)
+                await CancelAsync(runtime, input, call, tool, checkpoint["arguments"],
+                    checkpoint.TryGetValue("checkpoint", out var parked) ? parked : null, context).ConfigureAwait(false);
+            else
+                runtime.Report(new InvalidOperationException($"Tool {name} is not available: its parked call {CallIdOf(call)} was not cancelled"));
+        }
+        // The scheduler faults the task without a result when its last abort attempt is cut off. That attempt skips the hooks, which may
+        // be what cuts it off.
+        SlotHooks? hooks = (task.Restarts ?? 0) < runtime.Settings.RestartLimit - 1 ? new SlotHooks(tool) : null;
         await SettleFromSlotAsync(runtime, input, call, hooks, Ending.Aborted, code, message, context).ConfigureAwait(false);
     }
 
@@ -437,69 +571,93 @@ internal static class ToolPhases
 
     // ─── Execution ──────────────────────────────────────────────────────────
 
-    /// <summary>Executes with the resolved implementation, then settles its result (upstream <c>run</c>).</summary>
-    private static async Task RunAsync(ITaskRuntime runtime, ToolInput input, JsonObjectValue call, ToolRegistration tool, JsonValue args,
-        DurableContext context)
+    /// <summary>What a run of <c>Execute</c> starts from after a park: why it woke, and what the call last parked with (upstream
+    /// <c>Resumed</c>).</summary>
+    internal readonly record struct Resumed(WakeReason? Wake, JsonValue? Checkpoint);
+
+    /// <summary>One run of a tool's code (<c>Execute</c> or <c>Cancel</c>): its api, what it reported, and its progress commits (upstream
+    /// <c>Attempt</c>).</summary>
+    private sealed class Attempt(ToolExecutionApi api, ToolReport reported, Progress progress, NestedCalls nested)
     {
-        var limits = OutputLimitsOf(tool);
-        var reported = new ToolReport(new OutputBuffer(limits), limits);
-        var streams = !input.Nested || input.Progress;
-        var progress = PublishProgress(runtime, reported, streams, context);
-        // A caller that can rerun reattaches to its nested calls and child tasks after a restart; any other caller never resumes, so they
-        // are abandoned (TaskOptions.AbandonOnRestart).
-        var nested = new NestedCalls(runtime, reported, ((JsonStringValue)call["id"]).Value, resumes: tool.Replay == ToolReplay.Safe);
-        ToolExecutionResult result;
+        public ToolExecutionApi Api { get; } = api;
+        public ToolReport Reported { get; } = reported;
+        public Progress Progress { get; } = progress;
+        public NestedCalls Nested { get; } = nested;
+
+        /// <summary>Ends the attempt: lets admitted nested calls commit, ends the output, and stops progress; returns its waiters.</summary>
+        public async Task<IReadOnlyList<TaskCompletionSource>> EndAsync()
+        {
+            Reported.MarkEnded();
+            // No admission starts after the attempt ended; let those underway commit, so settlement aborts and lists their calls.
+            await Nested.AdmissionsSettledAsync().ConfigureAwait(false);
+            Reported.End();
+            return await Progress.StopAsync().ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>Executes with the resolved implementation, then settles its result or parks the call (upstream <c>run</c>).</summary>
+    private static async Task RunAsync(ITaskRuntime runtime, ToolInput input, JsonObjectValue call, ToolRegistration tool, JsonValue args,
+        Resumed resumed, DurableContext context)
+    {
+        var attempt = await StartAttemptAsync(runtime, input, call, tool, resumed, context).ConfigureAwait(false);
+        ToolExecutionResult returned;
         var ending = Ending.Completed;
-        // Execution time of this attempt; a rerun after recovery measures only itself.
-        double? durationMs = null;
+        // Execution time of this attempt, for a record without startedAt (SettleAsync).
+        double? measured = null;
         try
         {
-            // Built for this call, so a rerun after recovery gets the conversation's environment at that time.
-            var env = await runtime.EnvAsync(context).ConfigureAwait(false);
-            var api = new ToolExecutionApi(runtime, nested.CallId, reported, progress, env, nested);
+            // Built for this run, so a rerun after recovery gets the conversation's environment at that time.
+            attempt.Api.Env = await runtime.EnvAsync(context).ConfigureAwait(false);
             var started = Stopwatch.GetTimestamp();
             try
             {
                 Task<ToolExecutionResult> executing;
-                nested.BeginPrefix();
+                attempt.Nested.BeginPrefix();
                 try
                 {
-                    executing = tool.Execute(args, api, context);
+                    executing = tool.Execute(args, attempt.Api, context);
                 }
                 finally
                 {
-                    nested.EndPrefix();
+                    attempt.Nested.EndPrefix();
                 }
-                result = await executing.ConfigureAwait(false);
+                returned = await executing.ConfigureAwait(false);
             }
             finally
             {
-                durationMs = Math.Floor(Stopwatch.GetElapsedTime(started).TotalMilliseconds + 0.5);
+                measured = Math.Floor(Stopwatch.GetElapsedTime(started).TotalMilliseconds + 0.5);
             }
         }
         catch (Exception error)
         {
             if (runtime.Signal.IsCancellationRequested)
             {
-                reported.MarkEnded();
-                foreach (var waiter in await progress.StopAsync().ConfigureAwait(false)) waiter.TrySetException(error);
+                attempt.Reported.MarkEnded();
+                foreach (var waiter in await attempt.Progress.StopAsync().ConfigureAwait(false)) waiter.TrySetException(error);
                 throw;
             }
-            result = new ToolExecutionResult { IsError = true, Diagnostics = [ToolResults.Diagnostic("tool_error", DurableErrors.MessageOf(error))] };
+            returned = new ToolExecutionResult { IsError = true, Diagnostics = [ToolResults.Diagnostic("tool_error", DurableErrors.MessageOf(error))] };
             // A throw, from Execute or from building the environment, ends the task `failed`, which cancels what the call owned; it no longer
             // supervises it. The error text is already in the result.
             ending = Ending.Failed($"Tool {Name(call)} threw");
         }
-        reported.MarkEnded();
-        // No admission starts after the call ended; let those underway commit, so settlement aborts and lists their calls.
-        await nested.AdmissionsSettledAsync().ConfigureAwait(false);
-        reported.End();
-        // Details still waiting for a progress commit settle with the terminal commit, the final flush.
-        var pending = await progress.StopAsync().ConfigureAwait(false);
+        // Details still waiting for a progress commit settle with the next commit, the park's or the result's.
+        var pending = await attempt.EndAsync().ConfigureAwait(false);
         try
         {
-            var settled = await FinalResultAsync(runtime, input, call, tool, result, reported, context).ConfigureAwait(false);
-            await SettleAsync(runtime, input, call, ending, settled, context, durationMs).ConfigureAwait(false);
+            if (Parks.IsPark(returned))
+            {
+                var invalid = await ParkAsync(runtime, input, call, tool, args, returned, attempt, context).ConfigureAwait(false);
+                if (invalid is null)
+                {
+                    foreach (var waiter in pending) waiter.TrySetResult();
+                    return;
+                }
+                returned = ToolResults.HarnessError("invalid_park", $"Tool {Name(call)} returned an invalid park: {invalid}");
+                ending = Ending.Failed($"Tool {Name(call)} returned an invalid park");
+            }
+            var settled = await FinalResultAsync(runtime, input, call, tool, returned, attempt.Reported, context).ConfigureAwait(false);
+            await SettleAsync(runtime, input, call, ending, settled, context, measured).ConfigureAwait(false);
         }
         catch (Exception error)
         {
@@ -509,12 +667,156 @@ internal static class ToolPhases
         foreach (var waiter in pending) waiter.TrySetResult();
     }
 
+    /// <summary>
+    /// Starts a run of the tool's code (upstream <c>startAttempt</c>). A woken run adds to the details and diagnostics earlier runs left in
+    /// the slot (spec suspendable §4.2), so it starts from them; a nested call without progress keeps none there.
+    /// </summary>
+    private static async Task<Attempt> StartAttemptAsync(ITaskRuntime runtime, ToolInput input, JsonObjectValue call, ToolRegistration tool,
+        Resumed resumed, DurableContext context)
+    {
+        var limits = OutputLimitsOf(tool);
+        var streams = !input.Nested || input.Progress;
+        var live = resumed.Wake is not null && streams
+            ? await runtime.SnapshotAsync(Live.LiveDoc, runtime.ConversationId, context).ConfigureAwait(false)
+            : null;
+        var kept = live is null ? null : Live.ToolSlotOf(live, runtime.TaskId);
+        var diagnostics = kept is not null && kept.TryGetValue("diagnostics", out var listed) && listed is JsonArrayValue stored
+            ? stored.Select(ToolResults.ParseDiagnostic)
+            : [];
+        var reported = new ToolReport(new OutputBuffer(limits), limits, diagnostics,
+            kept is not null && kept.TryGetValue("details", out var details) ? details : null);
+        var progress = PublishProgress(runtime, reported, streams, context);
+        // A caller that can rerun reattaches to its nested calls and child tasks after a restart; any other caller never resumes, so they
+        // are abandoned (TaskOptions.AbandonOnRestart). After a wake a position may mean another call, so default keys are refused.
+        var nested = new NestedCalls(runtime, reported, CallIdOf(call), resumes: tool.Replay == ToolReplay.Safe, keyed: resumed.Wake is not null);
+        return new Attempt(new ToolExecutionApi(runtime, nested.CallId, reported, progress, nested, resumed), reported, progress, nested);
+    }
+
+    /// <summary>
+    /// Parks the call (spec suspendable §4.2; upstream <c>park</c>). One commit persists the details and diagnostics the attempt reported,
+    /// shows the slot <c>sleeping</c> or <c>waiting</c> without output, and stores the <c>parked</c> checkpoint with the park's sleep or
+    /// wait; the call's live nested calls keep running. Returns why the park is invalid instead, when it is. When the commit is refused
+    /// because the call was abort-marked meanwhile, <c>Cancel</c> cleans up what the run started before the error ends the run.
+    /// </summary>
+    private static async Task<string?> ParkAsync(ITaskRuntime runtime, ToolInput input, JsonObjectValue call, ToolRegistration tool, JsonValue args,
+        ToolExecutionResult returned, Attempt attempt, DurableContext context)
+    {
+        if (Parks.ParkError(tool, returned, attempt.Api) is { } shape) return shape;
+        var park = returned.Park!;
+        var sleep = park.Sleep;
+        var wait = park.Wait;
+        if (wait is not null)
+        {
+            if (wait.On.IsDefault) return "a wait names the tasks it waits on";
+            foreach (var id in wait.On)
+                if ((await runtime.GetTaskAsync(id, context).ConfigureAwait(false))?.Owner != runtime.TaskId) return $"task {id} is not owned by the call";
+        }
+        var checkpoint = sleep is not null ? sleep.Checkpoint : wait!.Checkpoint;
+        var parked = new RecordJson.Writer()
+            .Add("phase", "parked")
+            .Add("arguments", args)
+            .Add("replay", WireName.Of(tool.Replay ?? ToolReplay.Unsafe))
+            .Add("checkpoint", checkpoint)
+            .Build();
+        var streams = !input.Nested || input.Progress;
+        var (_, details, diagnostics) = attempt.Reported.Final(false);
+        try
+        {
+            await runtime.CommitAsync(async (tx, _) =>
+            {
+                var slot = Live.ToolSlot(await tx.DocAsync(Live.LiveDoc, runtime.ConversationId).ConfigureAwait(false), runtime.TaskId);
+                if (slot is not null)
+                {
+                    if (streams && details is not null) HarnessJson.AssignJson(slot, "details", details);
+                    if (streams && diagnostics.Count > 0)
+                        HarnessJson.AssignJson(slot, "diagnostics", JsonValue.Array(diagnostics.Select(ToolResults.DiagnosticJson)));
+                    Live.ClearOutput(slot);
+                    slot.Set("status", sleep is not null ? "sleeping" : "waiting");
+                }
+                return (TaskState?)(sleep is not null
+                    ? new SleepingTaskState(parked, sleep.Until, sleep.Signals)
+                    : new WaitingTaskState(parked, wait!.On, wait.Policy));
+            }, context).ConfigureAwait(false);
+        }
+        catch (Exception error)
+        {
+            // The sleep or wait broke a rule the commit checks: a deadline, a used key, a missing task, a wait cycle. A close seals the
+            // Session before it signals the run.
+            var closing = DurableTaskScheduler.CloseSignalOf(runtime);
+            if (!runtime.Signal.IsCancellationRequested && !closing.Token.IsCancellationRequested) return DurableErrors.MessageOf(error);
+            // Abort-marked meanwhile, unlike a close, which leaves the run to recovery: the park is not stored, so clean up with its
+            // checkpoint now, in a context only the Harness's close cancels.
+            var cleanup = context.WithoutCancellation().WithSignal(closing);
+            if ((await runtime.GetTaskAsync(runtime.TaskId, cleanup).ConfigureAwait(false))?.AbortRequested == true)
+                await CancelAsync(runtime, input, call, tool, args, checkpoint, cleanup).ConfigureAwait(false);
+            throw;
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Runs the tool's <c>Cancel</c>, if it has one, to clean up the external work of a call that parked (spec suspendable §4.2; upstream
+    /// <c>cancel</c>): <c>api.Checkpoint</c> is the last park's, <c>api.Wake</c> null, and the api starts no nested calls or tasks. A throw is
+    /// reported; the call ends either way.
+    /// </summary>
+    private static async Task CancelAsync(ITaskRuntime runtime, ToolInput input, JsonObjectValue call, ToolRegistration tool, JsonValue args,
+        JsonValue? checkpoint, DurableContext context)
+    {
+        if (tool.Cancel is null) return;
+        var attempt = await StartAttemptAsync(runtime, input, call, tool, new Resumed(null, checkpoint), context).ConfigureAwait(false);
+        try
+        {
+            attempt.Api.Env = await runtime.EnvAsync(context).ConfigureAwait(false);
+            await tool.Cancel(args, new CancelApi(attempt.Api, Name(call)), context).ConfigureAwait(false);
+        }
+        catch (Exception error)
+        {
+            // Only the Harness's close cancels a cleanup.
+            if (context.IsCancellationRequested) throw;
+            await ReportToolErrorAsync(runtime, tool, error, context).ConfigureAwait(false);
+        }
+        foreach (var waiter in await attempt.EndAsync().ConfigureAwait(false)) waiter.TrySetResult();
+    }
+
+    /// <summary>The api of a <c>Cancel</c> run: the attempt's, refusing nested calls and tasks.</summary>
+    private sealed class CancelApi(IToolExecutionApi inner, string name) : DelegatingToolExecutionApi(inner)
+    {
+        private InvalidOperationException Refused() => new($"Tool {name} cannot start nested calls or tasks in cancel");
+
+        public override Task<NestedToolExecutionResult> ExecuteToolAsync(string name, JsonObjectValue arguments, DurableContext context,
+            NestedCallOptions? options = null) => throw Refused();
+        public override Task<NestedToolCall> StartToolAsync(string name, JsonObjectValue arguments, DurableContext context,
+            NestedCallOptions? options = null) => throw Refused();
+        public override Task<TaskId> CreateTaskAsync(DurableTask task, JsonValue input, TaskOptions options, DurableContext context) => throw Refused();
+        public override Task<TaskId> CreateTaskAsync(DurableTask task, JsonValue input, TaskOptions options, string key, DurableContext context) =>
+            throw Refused();
+    }
+
+    /// <summary>Reports a failure of the tool's code as an <c>extension_error</c>, naming its extension when the agent resolves (upstream
+    /// <c>reportToolError</c>).</summary>
+    private static async Task ReportToolErrorAsync(ITaskRuntime runtime, ToolRegistration tool, Exception error, DurableContext context)
+    {
+        // Only names the extension: a failed resolution leaves the report without the name.
+        string? extension;
+        try
+        {
+            extension = Agents.ToolExtension(await runtime.AgentAsync(context).ConfigureAwait(false), tool.Name);
+        }
+        catch (Exception)
+        {
+            extension = null;
+        }
+        runtime.Report(error, ReportFrom.FromExtension(extension));
+    }
+
     /// <summary>Throttled commits of what the tool reported into its slot, in <c>pi.live.tools</c> or <c>pi.live.nestedTools</c>, each
     /// writing only what changed since the last one, deferred (<see cref="Live.ProgressCommit"/>); none when <paramref name="enabled"/> is
     /// false (upstream <c>publishProgress</c>).</summary>
     private static Progress PublishProgress(ITaskRuntime runtime, ToolReport reported, bool enabled, DurableContext context)
     {
-        var written = (Text: "", Details: (JsonValue?)null, Diagnostics: 0);
+        // The slot holds what the attempt started from (StartAttemptAsync).
+        var (_, startDetails, _, startCount) = reported.Capture(0);
+        var written = (Text: "", Details: startDetails, Diagnostics: startCount);
         return new Progress(() =>
         {
             if (!enabled) return Task.FromResult(0L);
@@ -625,17 +927,7 @@ internal static class ToolPhases
             {
                 // The model never sees structured output, so its call stands; the host learns of the broken tool.
                 final = rest;
-                // Only names the extension: a failed resolution leaves the report without the name.
-                string? extension;
-                try
-                {
-                    extension = Agents.ToolExtension(await runtime.AgentAsync(context).ConfigureAwait(false), tool.Name);
-                }
-                catch (Exception)
-                {
-                    extension = null;
-                }
-                runtime.Report(new InvalidOperationException(broken), ReportFrom.FromExtension(extension));
+                await ReportToolErrorAsync(runtime, tool, new InvalidOperationException(broken), context).ConfigureAwait(false);
             }
         }
         // Programs get the tool's own value: without a schema, its output. The model reads only `output`, so model-issued calls skip both.
@@ -700,7 +992,7 @@ internal static class ToolPhases
     /// <c>pi.live</c>. <c>Control</c> applies only when the task completes.
     /// </summary>
     private static async Task SettleAsync(ITaskRuntime runtime, ToolInput input, JsonObjectValue call, Ending ending,
-        ToolExecutionResult result, DurableContext context, double? durationMs = null)
+        ToolExecutionResult result, DurableContext context, double? measured = null)
     {
         // A crash in between leaves the call in `execute`: a safe rerun reattaches to the calls, an interruption ends here. Every live nested
         // call the task owns, also those an earlier attempt made and this one never called again.
@@ -712,9 +1004,12 @@ internal static class ToolPhases
         // Mark them all before waiting for any: one may run until a sibling is cancelled.
         await Task.WhenAll(nestedIds.Select(id => runtime.AbortOwnedAsync(id, context))).ConfigureAwait(false);
         var name = Name(call);
-        await runtime.CommitAsync(async (tx, _) =>
+        await runtime.CommitAsync(async (tx, current) =>
         {
             var conversationId = runtime.ConversationId;
+            // The call's whole span, parks, reruns, and downtime included (spec suspendable §4.2); a record from before lifecycle times
+            // keeps the last attempt's execution time.
+            var durationMs = current.Record.StartedAt is { } startedAt ? runtime.Now() - startedAt : measured;
             var live = await tx.DocAsync(Live.LiveDoc, conversationId).ConfigureAwait(false);
             var slot = Live.ToolSlot(live, runtime.TaskId);
             JsonObjectValue settled;
@@ -812,7 +1107,10 @@ internal static class ToolPhases
             if (state.Get("taskId") is JsonNumberValue existing)
             {
                 var existingId = new TaskId((long)existing.Value);
-                var stored = (await tx.GetTaskAsync(existingId).ConfigureAwait(false))?.Input as JsonObjectValue;
+                // A member written before keyed tasks has no kind and is a nested call's.
+                var stored = state.Get("kind") is JsonStringValue { Value: "task" }
+                    ? null
+                    : (await tx.GetTaskAsync(existingId).ConfigureAwait(false))?.Input as JsonObjectValue;
                 var same = stored is not null && stored.TryGetValue("kind", out var kind) && kind is JsonStringValue { Value: "nested" } &&
                     stored["call"] is JsonObjectValue made && made["name"] is JsonStringValue { Value: var madeName } && madeName == name &&
                     JsonValue.DeepEquals(made["arguments"], args);
@@ -830,6 +1128,7 @@ internal static class ToolPhases
             if (progress == false) input.Add("progress", false);
             var created = await tx.CreateTaskAsync(HarnessTasks.ToolTask, input.Build(),
                 new TaskOptions(TaskOwnership.Task(runtime.TaskId)) { AbandonOnRestart = abandonOnRestart }).ConfigureAwait(false);
+            state.Set("kind", "nested");
             state.Set("taskId", created.ToJson());
             var live = await tx.DocAsync(Live.LiveDoc, runtime.ConversationId).ConfigureAwait(false);
             if (!live.ContainsKey("nestedTools")) live.Set("nestedTools", JsonArrayValue.Empty);
@@ -972,11 +1271,13 @@ internal static class ToolPhases
 
 /// <summary>What a running tool reported through its api: output, the last details and diagnostics, behind one lock (upstream
 /// <c>Reported</c>, plus the <c>ended</c> flag).</summary>
-internal sealed class ToolReport(OutputBuffer output, OutputLimits limits)
+internal sealed class ToolReport(OutputBuffer output, OutputLimits limits, IEnumerable<ToolDiagnostic>? startDiagnostics = null,
+    JsonValue? startDetails = null)
 {
     private readonly Lock gate = new();
-    private readonly List<ToolDiagnostic> diagnostics = [];
-    private JsonValue? details;
+    // A woken run starts from the diagnostics and details earlier runs left in the slot.
+    private readonly List<ToolDiagnostic> diagnostics = [.. startDiagnostics ?? []];
+    private JsonValue? details = startDetails;
     private bool ended;
 
     public OutputLimits Limits { get; } = limits;
@@ -1085,7 +1386,7 @@ internal sealed class ToolReport(OutputBuffer output, OutputLimits limits)
 /// returns its task (its synchronous prefix, on the invoking thread) are held and admitted together when it returns; admissions waiting
 /// for the memo are started together, in call order, under one lock, which also orders them before any admission made later.
 /// </summary>
-internal sealed class NestedCalls(ITaskRuntime runtime, ToolReport reported, string callId, bool resumes)
+internal sealed class NestedCalls(ITaskRuntime runtime, ToolReport reported, string callId, bool resumes, bool keyed = false)
 {
     private readonly Lock gate = new();
     private readonly List<Task> admissions = [];
@@ -1119,6 +1420,8 @@ internal sealed class NestedCalls(ITaskRuntime runtime, ToolReport reported, str
     public (string Key, Task<TaskId> Admission) Admit(string name, JsonValue args, NestedCallOptions? options, DurableContext context) =>
         reported.WhileLive(CallId, () =>
         {
+            // The next position, for a nested call made without a key; after a wake a position may mean another call.
+            if (options?.Key is null && keyed) throw NeedsKeys(CallId);
             var key = options?.Key ?? (++sequence).ToString(CultureInfo.InvariantCulture);
             if (options?.Key is not null) ToolPhases.CheckKey(options.Key);
             var admission = new Admission(name, args, key, options?.Progress, context);
@@ -1134,6 +1437,9 @@ internal sealed class NestedCalls(ITaskRuntime runtime, ToolReport reported, str
             Admit([admission]);
             return (key, admission.Admitted.Task);
         });
+
+    /// <summary>What a call without a key is refused with after a wake.</summary>
+    internal static InvalidOperationException NeedsKeys(string callId) => new($"Tool call {callId} needs explicit keys after a wake");
 
     /// <summary>Marks the start of the tool's synchronous prefix on this thread (see the class summary).</summary>
     public void BeginPrefix() => prefix = this;
@@ -1253,15 +1559,17 @@ internal sealed class ToolExecutionApi : IToolExecutionApi
     private readonly ToolReport reported;
     private readonly Progress progress;
     private readonly NestedCalls nested;
+    private readonly ToolPhases.Resumed resumed;
 
-    public ToolExecutionApi(ITaskRuntime runtime, string callId, ToolReport reported, Progress progress, IExecutionEnv? env, NestedCalls nested)
+    public ToolExecutionApi(ITaskRuntime runtime, string callId, ToolReport reported, Progress progress, NestedCalls nested,
+        ToolPhases.Resumed resumed)
     {
         this.runtime = runtime;
         this.reported = reported;
         this.progress = progress;
         this.nested = nested;
+        this.resumed = resumed;
         CallId = callId;
-        Env = env;
         Registry = runtime.Registry;
         OutputWindow = reported.Limits.Retain == ToolOutputRetention.Tail
             ? new ShellOutputWindow(reported.Limits.MaxBytes, reported.Limits.MaxLines, runtime.Settings.Progress.OutputIntervalMs,
@@ -1272,10 +1580,17 @@ internal sealed class ToolExecutionApi : IToolExecutionApi
     public TaskId TaskId => runtime.TaskId;
     public ConversationId ConversationId => runtime.ConversationId;
     public string CallId { get; }
+    public WakeReason? Wake => resumed.Wake;
+    public JsonValue? Checkpoint => resumed.Checkpoint;
     public IRegistrySnapshot Registry { get; }
     public IDurableModels Models => runtime.Models;
-    public IExecutionEnv? Env { get; }
+    /// <summary>Built for this run once the attempt exists (upstream's <c>attempt.env</c>, read by the api's getter).</summary>
+    public IExecutionEnv? Env { get; internal set; }
     public ShellOutputWindow? OutputWindow { get; }
+
+    /// <summary>The parks the wrapped base returned in this run (upstream's <c>BASE_PARKS</c> entry of the api); compared by reference and
+    /// guarded by itself.</summary>
+    internal HashSet<ToolPark> BaseParks { get; } = new(ReferenceEqualityComparer.Instance);
 
     public double Now() => runtime.Now();
 
@@ -1333,6 +1648,7 @@ internal sealed class ToolExecutionApi : IToolExecutionApi
 
     public Task<JsonValue?> MemoAsync(string name, DurableContext context) => runtime.MemoAsync(name, context);
     public Task<JsonValue> MemoAsync(string name, JsonValue candidate, DurableContext context) => runtime.MemoAsync(name, candidate, context);
+    public Task<SignalState?> ReadSignalAsync(SignalToken token, string key, DurableContext context) => runtime.ReadSignalAsync(token, key, context);
 
     /// <summary>
     /// Pi v1.2.0's default for <c>api.createTask()</c> (tool.ts): a child task of a tool that is not replay-safe gets
@@ -1345,10 +1661,40 @@ internal sealed class ToolExecutionApi : IToolExecutionApi
     public async Task<TaskId> CreateTaskAsync(DurableTask task, JsonValue input, TaskOptions options, DurableContext context)
     {
         ArgumentNullException.ThrowIfNull(options);
+        if (resumed.Wake is not null) throw NestedCalls.NeedsKeys(CallId);
         var child = ChildTaskOptions(options, nested.Resumes);
         TaskId id = default;
         await runtime.CommitAsync(async (tx, _) => { id = await tx.CreateTaskAsync(task, input, child).ConfigureAwait(false); }, context)
             .ConfigureAwait(false);
+        return id;
+    }
+
+    public async Task<TaskId> CreateTaskAsync(DurableTask task, JsonValue input, TaskOptions options, string key, DurableContext context)
+    {
+        ArgumentNullException.ThrowIfNull(task);
+        ArgumentNullException.ThrowIfNull(input);
+        ArgumentNullException.ThrowIfNull(options);
+        ArgumentNullException.ThrowIfNull(key);
+        ToolPhases.CheckKey(key);
+        var child = ChildTaskOptions(options, nested.Resumes);
+        TaskId id = default;
+        await runtime.CommitAsync(async (tx, _) =>
+        {
+            // Opened, or created empty for a key not used yet.
+            var member = await tx.DocAsync(HarnessTasks.NestedCallDoc, runtime.TaskId, key, JsonValue.Null).ConfigureAwait(false);
+            if (member.Get("taskId") is JsonNumberValue used)
+            {
+                var existingId = new TaskId((long)used.Value);
+                var existing = member.Get("kind") is JsonStringValue { Value: "task" } ? await tx.GetTaskAsync(existingId).ConfigureAwait(false) : null;
+                if (existing?.Kind != task.Definition.Name || !JsonValue.DeepEquals(existing.Input, input))
+                    throw new InvalidOperationException($"Key {key} of tool call {CallId} was already used for another call or task");
+                id = existingId;
+                return;
+            }
+            id = await tx.CreateTaskAsync(task, input, child).ConfigureAwait(false);
+            member.Set("kind", "task");
+            member.Set("taskId", id.ToJson());
+        }, context).ConfigureAwait(false);
         return id;
     }
 
@@ -1386,6 +1732,9 @@ internal sealed class ToolExecutionApi : IToolExecutionApi
     public Task<NestedToolExecutionResult> ExecuteToolAsync(string name, JsonObjectValue arguments, DurableContext context,
         NestedCallOptions? options = null) => ExecuteToolValueAsync(name, arguments, context, options);
 
+    public Task<NestedToolCall> StartToolAsync(string name, JsonObjectValue arguments, DurableContext context, NestedCallOptions? options = null) =>
+        StartToolValueAsync(name, arguments, context, options);
+
     /// <summary>
     /// <see cref="IToolExecutionApi.ExecuteToolAsync"/> with arguments of any JSON kind, as upstream's <c>executeTool()</c> passes whatever
     /// its caller gives: a code mode script's <c>tools.x("text")</c> reaches the nested call as is, where the tool's <c>prepareArguments</c>
@@ -1401,19 +1750,26 @@ internal sealed class ToolExecutionApi : IToolExecutionApi
         };
 
     private async Task<NestedToolExecutionResult> ExecuteToolValueAsync(string name, JsonValue arguments, DurableContext context,
-        NestedCallOptions? options)
+        NestedCallOptions? options) =>
+        await (await StartToolValueAsync(name, arguments, context, options).ConfigureAwait(false)).ResultAsync(context).ConfigureAwait(false);
+
+    /// <summary>Starts or finds the nested call and returns its handle (upstream <c>executeTool</c> up to its <c>nested</c> object).</summary>
+    private async Task<NestedToolCall> StartToolValueAsync(string name, JsonValue arguments, DurableContext context, NestedCallOptions? options)
     {
         ArgumentNullException.ThrowIfNull(name);
         ArgumentNullException.ThrowIfNull(arguments);
         ArgumentNullException.ThrowIfNull(context);
         var (key, admission) = nested.Admit(name, arguments, options, context);
         var id = await admission.ConfigureAwait(false);
-        var settled = await runtime.WaitForTaskAsync(id, context).ConfigureAwait(false);
-        var stored = await runtime.SnapshotAsync(HarnessTasks.NestedCallDoc, runtime.TaskId, key, context).ConfigureAwait(false);
-        // A nested call the scheduler faulted or orphaned stored no result.
-        return stored is not null && stored.TryGetValue("result", out var result)
-            ? NestedToolExecutionResult.FromJson(result)
-            : ToolPhases.FallbackResult(id, name, ((SettlingTaskState)settled.State).Outcome);
+        return new NestedToolCall(id, async resultContext =>
+        {
+            var settled = await runtime.WaitForTaskAsync(id, resultContext).ConfigureAwait(false);
+            var stored = await runtime.SnapshotAsync(HarnessTasks.NestedCallDoc, runtime.TaskId, key, resultContext).ConfigureAwait(false);
+            // A nested call the scheduler faulted or orphaned stored no result.
+            return stored is not null && stored.TryGetValue("result", out var result)
+                ? NestedToolExecutionResult.FromJson(result)
+                : ToolPhases.FallbackResult(id, name, ((SettlingTaskState)settled.State).Outcome);
+        });
     }
 
     public Task<JsonObjectValue?> SnapshotAsync(SessionDocToken token, DurableContext context) => runtime.SnapshotAsync(token, context);
@@ -1453,12 +1809,20 @@ public class DelegatingToolExecutionApi(IToolExecutionApi inner) : IToolExecutio
     /// <summary>The api this one forwards to.</summary>
     protected IToolExecutionApi Inner { get; } = inner ?? throw new ArgumentNullException(nameof(inner));
 
+    /// <summary>The api this one forwards to, for the Harness: the parks a wrapped base returns are recorded in its run's own api
+    /// (<see cref="Parks.CarrierOf"/>).</summary>
+    internal IToolExecutionApi InnerApi => Inner;
+
     /// <inheritdoc/>
     public virtual TaskId TaskId => Inner.TaskId;
     /// <inheritdoc/>
     public virtual ConversationId ConversationId => Inner.ConversationId;
     /// <inheritdoc/>
     public virtual string CallId => Inner.CallId;
+    /// <inheritdoc/>
+    public virtual WakeReason? Wake => Inner.Wake;
+    /// <inheritdoc/>
+    public virtual JsonValue? Checkpoint => Inner.Checkpoint;
     /// <inheritdoc/>
     public virtual IRegistrySnapshot Registry => Inner.Registry;
     /// <inheritdoc/>
@@ -1492,8 +1856,13 @@ public class DelegatingToolExecutionApi(IToolExecutionApi inner) : IToolExecutio
     /// <inheritdoc/>
     public virtual Task<JsonValue> MemoAsync(string name, JsonValue candidate, DurableContext context) => Inner.MemoAsync(name, candidate, context);
     /// <inheritdoc/>
+    public virtual Task<SignalState?> ReadSignalAsync(SignalToken token, string key, DurableContext context) => Inner.ReadSignalAsync(token, key, context);
+    /// <inheritdoc/>
     public virtual Task<TaskId> CreateTaskAsync(DurableTask task, JsonValue input, TaskOptions options, DurableContext context) =>
         Inner.CreateTaskAsync(task, input, options, context);
+    /// <inheritdoc/>
+    public virtual Task<TaskId> CreateTaskAsync(DurableTask task, JsonValue input, TaskOptions options, string key, DurableContext context) =>
+        Inner.CreateTaskAsync(task, input, options, key, context);
     /// <inheritdoc/>
     public virtual Task<TaskRecord?> GetTaskAsync(TaskId id, DurableContext context) => Inner.GetTaskAsync(id, context);
     /// <inheritdoc/>
@@ -1503,6 +1872,9 @@ public class DelegatingToolExecutionApi(IToolExecutionApi inner) : IToolExecutio
     /// <inheritdoc/>
     public virtual Task<NestedToolExecutionResult> ExecuteToolAsync(string name, JsonObjectValue arguments, DurableContext context,
         NestedCallOptions? options = null) => Inner.ExecuteToolAsync(name, arguments, context, options);
+    /// <inheritdoc/>
+    public virtual Task<NestedToolCall> StartToolAsync(string name, JsonObjectValue arguments, DurableContext context,
+        NestedCallOptions? options = null) => Inner.StartToolAsync(name, arguments, context, options);
     /// <inheritdoc/>
     public virtual Task<JsonObjectValue?> SnapshotAsync(SessionDocToken token, DurableContext context) => Inner.SnapshotAsync(token, context);
     /// <inheritdoc/>

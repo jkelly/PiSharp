@@ -400,7 +400,7 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
             // applied in memory and the file is not written; the next request records a loadout that differs from the recorded one.
             // Restored tools that are not registered yet, such as MCP tools whose server is still connecting, stay pending.
             opened.RestoreUnrecordedTools(loadout.RequiresRecord || !restored.SequenceEqual(opened.RecordedActiveToolNames(context, cancellationToken), StringComparer.Ordinal),
-                loadout.Pending);
+                loadout.Pending, loadout.Restored);
             return opened;
         }
         catch (Exception admission)

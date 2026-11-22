@@ -27,6 +27,11 @@
 // Pi v1.5.0 sync (area observers, 8b0caefc2): Harness.observeConversation() and observeTaskGraph() check the Harness is usable, then
 // attach through the view and graph mounts (ConversationViews.ObserveAsync, TaskGraphView.ObserveAsync); a refusal faults the task.
 // Pi v1.5.0 sync (area view, f3255de76): Conversation.watch() and Harness.observeConversation() pass their ConversationWindow on.
+// Pi v1.6.0 sync (faac585884ae2c013a6b1400f3e9e77f10b34bac): Harness.signal() (SignalAsync, tx.signal in a commit of its own, after
+// enabling scheduling); the scheduler learns which owners keep their abandonOnRestart children (ToolPhases.KeepsChildren) and which
+// sleeping calls are parked at gates (ToolPhases.GatedCall); an abort withdraws the queued inputs not submitted with onAbort keep
+// (Inbox.WithdrawAbortedInputsAsync); and close releases the provider session resources its tasks used once their invocations joined
+// (pi-ai's cleanupSessionResources, PiSharp.AI.SessionResources.Cleanup; a failure is reported host_error models).
 // Pi v1.5.0 sync (area restarts, b3a29f111): the scheduler learns which built-in kinds end themselves at settings.restartLimit
 // (Live.LimitsRestarts), and its join writes at close through Session.WriteAtCloseAsync; safeReport records task_interrupted's reason,
 // extension and task ID, as task_faulted's.
@@ -165,7 +170,7 @@ internal sealed class DurableHarness : Session, IHarness
             Report = report,
             Telemetry = options.Telemetry,
             SettleOutcome = (tx, record, outcome) => Live.SettleSchedulerOutcomeAsync(tx, record, outcome),
-            WithdrawInputs = (tx, id) => Inbox.WithdrawQueuedInputsAsync(tx, id),
+            WithdrawInputs = (tx, id) => Inbox.WithdrawAbortedInputsAsync(tx, id),
             Conversation = async (id, binding, callContext) =>
             {
                 var record = await ReadOnLineAsync(line => line.GetConversationAsync(id, callContext)).ConfigureAwait(false);
@@ -174,6 +179,8 @@ internal sealed class DurableHarness : Session, IHarness
             Context = context.WithoutCancellation(),
             ReadOnly = options.ReadOnly,
             LimitsRestarts = Live.LimitsRestarts.Contains,
+            KeepsAbandoned = ToolPhases.KeepsChildren,
+            Gated = ToolPhases.GatedCall,
         });
         submissions = new Submissions(this, Now, () => Agents.ResolveSettings(hostSettings()), () => scheduler.Resume(), options.Telemetry);
         views = new ConversationViews(this);
@@ -332,6 +339,14 @@ internal sealed class DurableHarness : Session, IHarness
 
     public Task<TaskAbortResult> AbortTaskAsync(TaskId id, DurableContext context) => scheduler.AbortAsync(id, context);
 
+    public async Task<SignalResult> SignalAsync(TaskId taskId, SignalToken token, string key, JsonValue value, DurableContext context)
+    {
+        ArgumentNullException.ThrowIfNull(token);
+        ArgumentNullException.ThrowIfNull(key);
+        scheduler.Resume();
+        return await CommitWithAsync(tx => tx.SignalAsync(taskId, token, key, value), context).ConfigureAwait(false);
+    }
+
     public async Task<TaskRecord> WaitForTaskAsync(TaskId id, DurableContext context)
     {
         scheduler.Resume();
@@ -393,8 +408,23 @@ internal sealed class DurableHarness : Session, IHarness
         return CreateAsync(CreateTarget.Independent(options.Ownership), options.Agent, options.Init, context);
     }
 
-    /// <summary>Signals and joins task invocations after the close listeners and before Storage closes; writes no task outcome.</summary>
-    internal override Task BeforeCloseAsync() => scheduler.JoinAsync();
+    /// <summary>Joins task invocations before releasing provider resources, so none close while in use or outlive the Harness; writes no
+    /// task outcome.</summary>
+    internal override async Task BeforeCloseAsync()
+    {
+        await scheduler.JoinAsync().ConfigureAwait(false);
+        foreach (var sessionId in scheduler.TakeProviderSessions())
+        {
+            try
+            {
+                PiSharp.AI.SessionResources.Cleanup(sessionId);
+            }
+            catch (Exception error)
+            {
+                report(error, ReportInfo.HostError(HostCallback.Models));
+            }
+        }
+    }
 
     /// <summary>The ownership memberships a commit's task changes write, from the scheduler's indexes (upstream <c>membershipKeys</c>).</summary>
     internal override ValueTask<IReadOnlyList<string>> MembershipKeysAsync(Transaction tx) => scheduler.MembershipKeysAsync(tx);

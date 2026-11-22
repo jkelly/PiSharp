@@ -25,6 +25,14 @@
 // entry and head marker come from the host (LatestEntryIdAsync is v1.5.0's tx.latestEntryId). Pi v1.5.0 sync (area publication-caches,
 // e5c6182ba): retiring a terminal task's documents takes them from the host's index of the documents of the tasks its Session created
 // (TaskDocuments, upstream host.taskDocuments) and scans only for a task it does not know; CreatedTaskIds feeds that index.
+// Pi v1.6.0 sync (faac585884ae2c013a6b1400f3e9e77f10b34bac): SignalAsync (tx.signal), a live task replacement keeps the memos an earlier
+// write of the transaction staged (StageTask), and a submission the commit settles delivers SubmissionSettled to its `notify` task
+// during assembly (NotifyAsync). One difference from upstream, where tx.signal() goes through the generic table read and so throws
+// ReadAfterWrite after any table write, a signal's own included: upstream's deliveries of one commit are started together
+// (Promise.all), each passing the check before the first one's await resumes and stages its write. A .NET task can complete
+// synchronously, so "started together" is not observable here: the first of Task.WhenAll's deliveries may have staged its write before
+// the second call is made. A delivery therefore passes after the table writes of earlier deliveries of the same transaction (it reads
+// the task's latest candidate, as upstream's does after its await) and throws ReadAfterWriteException after any other table write.
 using System.Collections.Immutable;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Chord.Delta;
@@ -126,6 +134,8 @@ internal sealed class Transaction : ITx
     private readonly HashSet<Task> pendingOperations = [];
     private volatile bool sealedState;
     private volatile bool hasTableWrite;
+    // A table write other than a signal delivery's own (see SignalAsync).
+    private volatile bool hasOtherTableWrite;
 
     // Atomic batch; conversation and entry writes stage eagerly, while task and document writes assemble later.
     private readonly List<StorageWrite> writes = [];
@@ -393,6 +403,7 @@ internal sealed class Transaction : ITx
         ArgumentNullException.ThrowIfNull(settlement);
         AssertOpen();
         hasTableWrite = true;
+        hasOtherTableWrite = true;
         lock (gate) submissionChanges.Add((id, new SubmissionChange(settlement, null)));
     }
 
@@ -400,15 +411,59 @@ internal sealed class Transaction : ITx
     {
         AssertOpen();
         hasTableWrite = true;
+        hasOtherTableWrite = true;
         lock (gate) submissionChanges.Add((id, new SubmissionChange(null, entry)));
     }
 
-    /// <summary>Internal: replaces one task record completely. Tasks change their own state through their runtime.</summary>
+    /// <summary>Delivers a signal to a task (spec suspendable §3.2; upstream <c>signal</c>): a read of the task, then a write of it when the
+    /// key changes.</summary>
+    public Task<SignalResult> SignalAsync(TaskId taskId, SignalToken token, string key, JsonValue value)
+    {
+        ArgumentNullException.ThrowIfNull(token);
+        ArgumentNullException.ThrowIfNull(key);
+        try
+        {
+            AssertOpen();
+            // After another delivery's write the task is still read consistently, from its candidate (see the file header).
+            if (hasOtherTableWrite) throw new ReadAfterWriteException("Tx.signal()");
+            return Track(DeliverAsync());
+        }
+        catch (Exception error)
+        {
+            return Task.FromException<SignalResult>(error);
+        }
+
+        async Task<SignalResult> DeliverAsync()
+        {
+            var committed = await CommittedTask(taskId).ConfigureAwait(false);
+            // Read after the await: a delivery started alongside may have staged the key since.
+            TaskRecord? record;
+            lock (gate) record = tasksById.GetValueOrDefault(taskId)?.Write?.Record ?? committed;
+            var delivered = Signals.Deliver(record, token, key, value, host.Now());
+            if (delivered.Record is not null)
+            {
+                AssertOpen();
+                hasTableWrite = true;
+                StageTask(delivered.Record);
+            }
+            return delivered.Result;
+        }
+    }
+
+    /// <summary>Internal: replaces one task record. Tasks change their own state through their runtime. A live replacement keeps the memos
+    /// an earlier write of this transaction staged, so no write erases another.</summary>
     public void SetTask(TaskRecord value)
     {
         AssertOpen();
         ArgumentNullException.ThrowIfNull(value);
         hasTableWrite = true;
+        hasOtherTableWrite = true;
+        StageTask(value);
+    }
+
+    /// <summary>Stages a task record over the transaction's candidate, also during assembly (upstream <c>#stageTask</c>).</summary>
+    private void StageTask(TaskRecord value)
+    {
         lock (gate)
         {
             var task = TaskEntry(value.Id);
@@ -417,8 +472,17 @@ internal sealed class Transaction : ITx
                 throw new InvalidOperationException($"Task {value.Id} already has a terminal candidate");
             if (candidate is not null && candidate.ConversationId != value.ConversationId)
                 throw new InvalidOperationException($"Task {value.Id} cannot change conversations");
+            // A live replacement keeps the memos an earlier write staged, such as a signal delivered to a task whose own commit then
+            // changes its state: no write erases another.
+            var composed = value;
+            if (candidate?.Memos is { } staged && value.State is not SettlingTaskState && !ReferenceEquals(staged, value.Memos))
+            {
+                var memos = staged;
+                foreach (var (name, memo) in value.Memos ?? JsonObjectValue.Empty) memos = memos.SetItem(name, memo);
+                composed = value with { Memos = memos };
+            }
             task.Write = new TaskWriteCandidate(task.Write?.Kind == TaskWriteKind.Create ? TaskWriteKind.Create : TaskWriteKind.Replace,
-                StampTimes(value.Validate(), candidate));
+                StampTimes(composed.Validate(), candidate));
         }
     }
 
@@ -907,13 +971,19 @@ internal sealed class Transaction : ITx
             plan.ConversationId = task.PublicationConversationId;
         }
 
+        // Created settled, or settled by a change: each one with `notify` signals its task (spec suspendable §4.5).
+        var settling = submissions.Values.Where(Signals.IsSettled).ToList();
         foreach (var (id, change) in submissionChanges)
         {
             var current = submissions.GetValueOrDefault(id) ?? await storage.GetSubmissionAsync(id, context).ConfigureAwait(false) ??
                 throw new InvalidOperationException($"Submission {id} does not exist");
             var next = ApplySubmissionChange(current, change);
-            if (!ReferenceEquals(next, current)) submissions[id] = next;
+            if (ReferenceEquals(next, current)) continue;
+            submissions[id] = next;
+            if (Signals.IsSettled(next)) settling.Add(next);
         }
+        foreach (var record in settling)
+            if (record.Notify is { } notify) await NotifyAsync(record, notify).ConfigureAwait(false);
 
         foreach (var value in submissions.Values) writes.Add(new SubmissionWrite(value));
         foreach (var task in tasksById.Values)
@@ -936,6 +1006,19 @@ internal sealed class Transaction : ITx
     }
 
     // ─── Helpers ────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Delivers <see cref="Signals.SubmissionSettled"/> for a submission this commit settles, against the transaction's latest candidate of
+    /// the task; a delivery the task refuses changes nothing and fails nothing (upstream <c>#notify</c>).
+    /// </summary>
+    private async Task NotifyAsync(SubmissionRecord record, SubmissionNotify notify)
+    {
+        var committed = await CommittedTask(notify.TaskId).ConfigureAwait(false);
+        TaskRecord? target;
+        lock (gate) target = tasksById.GetValueOrDefault(notify.TaskId)?.Write?.Record ?? committed;
+        var delivered = Signals.Deliver(target, Signals.SubmissionSettled, notify.Key, record.ToJson(), host.Now());
+        if (delivered.Record is not null) StageTask(delivered.Record);
+    }
 
     /// <summary>
     /// New owned work needs a live owner, judged on the owner's final candidate: not completing, terminal or abort-marked. A task therefore
@@ -1058,6 +1141,7 @@ internal sealed class Transaction : ITx
         {
             AssertOpen();
             hasTableWrite = true;
+            hasOtherTableWrite = true;
             return Track(write());
         }
         catch (Exception error)

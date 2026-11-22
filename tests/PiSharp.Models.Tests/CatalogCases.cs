@@ -99,7 +99,8 @@ internal static partial class Program
     {
         Names(["COPILOT_GITHUB_TOKEN"], ProviderEnvironmentKeys.GetApiKeyVariables("github-copilot")!, "copilot");
         Names(["ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_OAUTH_TOKEN", "ANTHROPIC_API_KEY"], ProviderEnvironmentKeys.GetApiKeyVariables("anthropic")!, "anthropic");
-        Names(["QWEN_TOKEN_PLAN_API_KEY"], ProviderEnvironmentKeys.GetApiKeyVariables("qwen-token-plan-individual")!, "qwen individual");
+        // Pi 1.6.0 (#11773): the per-plan variable first, then the region variable both plans used to share.
+        Names(["QWEN_TOKEN_PLAN_INDIVIDUAL_API_KEY", "QWEN_TOKEN_PLAN_API_KEY"], ProviderEnvironmentKeys.GetApiKeyVariables("qwen-token-plan-individual")!, "qwen individual");
         Names(["HF_TOKEN"], ProviderEnvironmentKeys.GetApiKeyVariables("huggingface")!, "huggingface");
         Names(["MOONSHOT_API_KEY"], ProviderEnvironmentKeys.GetApiKeyVariables("moonshotai-cn")!, "moonshot cn");
         Names(["CLOUDFLARE_API_KEY"], ProviderEnvironmentKeys.GetApiKeyVariables("cloudflare-ai-gateway")!, "cloudflare gateway");

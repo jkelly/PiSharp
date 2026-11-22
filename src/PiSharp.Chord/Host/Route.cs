@@ -1,4 +1,7 @@
-// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): next/host/route.ts.
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/chord/src/host/route.ts.
+// 1.6.0 here: a resolve's result may carry `opened` (the peer's incarnation at the handshake), and a route's path tells whether it is
+// suspended (references sharing one wire hold). A route with an admission (slice 14 §2.3, Host/RouteAdmission.cs) resolves an address
+// only for holds its decisions allow, and refuses a hold its own admission makes behind it (invalid/cycle).
 using System.Text.Json.Nodes;
 using PiSharp.Chord.Contracts;
 using PiSharp.Chord.Data;
@@ -8,11 +11,28 @@ using PiSharp.Telemetry;
 
 namespace PiSharp.Chord.Host;
 
-public sealed record ResolvedLink(ILink Link, LinkOptions Options);
+/// <summary>What a route's <c>Resolve</c> returns. <paramref name="Opened"/> (Pi 1.6.0) is called once, when the link's handshake
+/// completed, with the incarnation of the host at the other end: before anything else that host sent is handled and before this host sends
+/// on the link; never for a link that closes before its handshake. It must not throw.</summary>
+public sealed record ResolvedLink(ILink Link, LinkOptions Options, Action<string>? Opened = null);
 public sealed class RouteOptions
 {
     public required Func<JsonObject, Address, bool> Authorize { get; init; }
     public required Func<Address, ChordContext, Task<ResolvedLink>> Resolve { get; init; }
+    /// <summary>
+    /// The route's admission (Pi 1.6.0, slice 14 §2.3): asked once per principal and address with holds on the route, after
+    /// <see cref="Authorize"/>, before anything is resolved or forwarded for that principal. It declares what it reads (references,
+    /// registries, derives, live queries, acting as this host) and returns a watchable of <c>Admission.Allow()</c> or
+    /// <c>Admission.Deny(reason)</c>: until its first allow a hold is loading; a denial fails the principal's holds to the address
+    /// <c>failed</c> denied, releases them at the address's host and rejects their calls <c>forbidden/revoked</c>; a later allow shows them
+    /// loading and forwards them again. While what it reads has failed, the holds bound on the address's link stay, new ones wait, and a
+    /// new link of the address holds nothing until it can be read again (fail closed). It reads only contracts the app's API owns (a route
+    /// is base code: it never reloads and keeps the contracts it was built with) and may hold nothing placed behind this route
+    /// (<c>invalid/cycle</c>). With an admission, <see cref="Resolve"/> must return the link to the final provider that serves the
+    /// address, never to another relay: a hold released by a denial is forwarded again under its id once a ping sent on the allow was
+    /// answered, which proves the released hold's replies have all arrived only when the peer that answers is the one that sent them.
+    /// </summary>
+    public RouteAdmit? Admit { get; init; }
 }
 public sealed class RouteHandle
 {
@@ -49,21 +69,32 @@ internal sealed class HostRoute
     private readonly CancellationTokenSource stopped;
     private readonly Dictionary<string, Routed> addresses = new(StringComparer.Ordinal);
     private readonly Dictionary<HostLink, (Routed Routed, bool Greeted)> links = [];
+    // Its admission's decisions, when it has an Admit.
+    private readonly RouteAdmission? admission;
     internal HostRoute(ChordHost host, HostKind kind, RouteOptions options, ChordContext context)
     {
         this.host = host; this.kind = kind; this.options = options;
         stopped = CancellationTokenSource.CreateLinkedTokenSource(context.AbortSignal ?? CancellationToken.None);
         this.context = ChordContext.WithAbortSignal(stopped.Token, context);
+        if (options.Admit is { } admit) admission = new RouteAdmission(host, this, admit, ChordContext.WithoutAbortSignal(context));
     }
+    internal RouteAdmission? Admission => admission;
     internal IEnumerable<IUpstream> Holders => addresses.Values.SelectMany(x => x.Path.Holders);
-    internal RemotePath Path(JsonNode? parameters, JsonObject? principal)
+    /// <summary>The path to the address with <paramref name="parameters"/>, for a hold acting as <paramref name="principal"/>: the params
+    /// checked against the kind, then <c>Authorize</c> (<c>forbidden</c> when it refuses). A hold this route's own admission makes
+    /// (<paramref name="holding"/> is the context it binds under) is refused <c>invalid/cycle</c>: it would wait on itself.</summary>
+    internal RemotePath Path(JsonNode? parameters, JsonObject? principal, ChordContext? holding = null)
     {
         var address = DataInternal.CheckAddress(kind.Kind, ContractsInternal.KindParams(kind), parameters, context);
         if (principal is null || !options.Authorize(principal, address)) throw new ChordError("forbidden", $"{address.Key}: not authorized");
+        if (holding is not null && admission?.Admitting(holding) == true)
+            throw DataInternal.Invalid("cycle", $"{address.Key}: a route's admission holds a type placed behind its own route");
         if (!addresses.TryGetValue(address.Key, out var routed))
         {
             routed = new(address); var captured = routed;
-            routed.Path = new RemotePath((change, holder) => Changed(captured, change, holder)); addresses.Add(address.Key, routed);
+            routed.Path = new RemotePath((change, holder) => Changed(captured, change, holder), () => captured.Suspended,
+                admission is null ? null : path => admission.Gate(address, path));
+            addresses.Add(address.Key, routed);
         }
         return routed.Path;
     }
@@ -80,7 +111,8 @@ internal sealed class HostRoute
         else
         {
             routed.Suspended = false; routed.Failure = null;
-            if (routed.Path.Held && routed.Path.Link is null && !routed.Resolving) _ = Resolve(routed);
+            // Resolved only when a holder wants its link (one the route's admission allows; any without an admission).
+            if (routed.Path.Wanted && routed.Path.Link is null && !routed.Resolving) _ = Resolve(routed);
         }
     });
     internal void Opened(HostLink link) { if (links.TryGetValue(link, out var entry)) links[link] = (entry.Routed, true); }
@@ -107,6 +139,8 @@ internal sealed class HostRoute
             else if (routed.Span is { } resolving && holder?.Span is { } waiting) waiting.AddLink(new(resolving.Span));
         }
         else if (!routed.Path.Held) addresses.Remove(routed.Address.Key);
+        // Held only by holds its admission holds back: nothing resolves for them.
+        else if (!routed.Path.Wanted) return;
         else if (routed.Suspended) routed.Path.Unreachable(Suspended(routed));
         else if (routed.Failure is { } failure) routed.Path.Unreachable(failure);
         else _ = Resolve(routed);
@@ -129,7 +163,7 @@ internal sealed class HostRoute
             var resolved = await options.Resolve(routed.Address, traced);
             routed.Resolving = false;
             if (host.Closed) { resolved.Link.Close(); return; }
-            var link = host.MakeLink(resolved.Link, resolved.Options, LinkRole.Route, context);
+            var link = host.MakeLink(resolved.Link, resolved.Options, LinkRole.Route, context, resolved.Opened);
             if (!link.Open) { Settle(routed, new ChordError("unavailable", $"{routed.Address.Key}: the link closed before its handshake")); return; }
             routed.Failure = null; links.Add(link, (routed, link.Greeted)); routed.Path.Connected(link);
             span?.Span.SetAttributes(new SpanAttributes { ["outcome"] = "linked" });

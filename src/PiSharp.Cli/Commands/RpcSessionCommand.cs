@@ -424,6 +424,29 @@ public static class RpcSessionCommand
                 // agent-session-runtime.ts switchSession: SessionManager.open(sessionPath) for the Pi entry.
                 prepareSessionPath: pi is null ? null : (path, token) => PrepareSessionPathAsync(path, backend, profile.Workspace, token));
             profile.ConfigureLifecycleModeStop(() => { dispatcher.RequestShutdownWhenIdle(); return null; });
+            if (pi is not null && profile.Sessions is { AttachmentChanged: { } publishReplacement } replacing)
+            {
+                // Pi faac585884ae2c013a6b1400f3e9e77f10b34bac print-mode.ts/rpc-mode.ts setRebindSession and main.ts createRuntime: a
+                // session replacement collects the runtime's diagnostics again, and each one that was not reported yet is written
+                // to stderr (never stdout, which carries the RPC protocol and the JSON events). Interactive mode takes them from
+                // pi.RuntimeDiagnostics instead; they are collected before the replacement is published (session_switched).
+                var replacementProfile = profile; var replacementSelection = liveSelection; var replacementSettings = settings;
+                replacing.AttachmentChanged = async replacement =>
+                {
+                    var replaced = !ReferenceEquals(replacement.Previous.Session, replacement.Current.Session);
+                    if (replaced)
+                        try
+                        {
+                            pi.RuntimeDiagnostics.Replace(await ReplacementDiagnosticsAsync(pi, replacementProfile, replacementSelection, replacementSettings,
+                                replacement.Current.Session).ConfigureAwait(false));
+                        }
+                        catch (Exception) { } // Diagnostics never fail a replacement.
+                    await publishReplacement(replacement).ConfigureAwait(false);
+                    if (!replaced || pi.ExtensionMode == "tui") return;
+                    try { await PiSharp.Cli.Pi.PiDiagnosticsStderr.WriteAsync(stderr, pi.RuntimeDiagnostics.TakeUnreported(), pi.DiagnosticsColor).ConfigureAwait(false); }
+                    catch (Exception error) when (error is IOException or ObjectDisposedException) { }
+                };
+            }
             if (pi?.Extensions is { } compactingExtensions)
             {
                 var compactor = dispatcher;
@@ -564,6 +587,38 @@ public static class RpcSessionCommand
                 effectsMayHaveCompleted = true, cleanupFailureCount = cleanupFailures.Count }) + "\n").ConfigureAwait(false);
             await stderr.FlushAsync().ConfigureAwait(false); return result;
         }
+    }
+
+    /// <summary>Pi faac585884ae2c013a6b1400f3e9e77f10b34bac main.ts createRuntime, as it runs again for a session replacement: the
+    /// settings files' errors, the model scope warnings (<c>--models</c>, else the <c>enabledModels</c> the settings hold now, over
+    /// the models available now) and, when the replacement's branch names a model the session could not be opened on,
+    /// <c>Could not restore model &lt;provider&gt;/&lt;model&gt;. Using &lt;fallback&gt;</c> (sdk.ts modelFallbackMessage; not for a
+    /// session without any model, whose prompts are refused with login guidance).</summary>
+    internal static async Task<ImmutableArray<AgentSessionRuntimeDiagnostic>> ReplacementDiagnosticsAsync(PiSharp.Cli.Pi.PiEntryOptions pi,
+        OfflineSessionProfile profile, LiveSessionSelection? startupSelection, StartupSettingsSnapshot? startupSettings, PersistentAgentSession replacement)
+    {
+        var diagnostics = ImmutableArray.CreateBuilder<AgentSessionRuntimeDiagnostic>();
+        if (pi.CollectReplacementDiagnostics is { } collect)
+            diagnostics.AddRange((await collect(CancellationToken.None).ConfigureAwait(false)).Select(diagnostic => new AgentSessionRuntimeDiagnostic(diagnostic.Type, diagnostic.Message)));
+        var registry = profile.LiveModels?.CurrentRegistry;
+        if (registry is not null)
+        {
+            var current = pi.ReloadSettings is { } reload ? await reload(CancellationToken.None).ConfigureAwait(false) : startupSettings;
+            var patterns = pi.ModelPatterns ?? SettingsModelSelection.ReadPatterns(current);
+            if (!patterns.IsDefaultOrEmpty)
+                diagnostics.AddRange(PiSharp.Cli.Models.ModelResolver.ResolveModelScope(patterns, registry.GetAvailable()).Diagnostics
+                    .Select(diagnostic => new AgentSessionRuntimeDiagnostic("warning", diagnostic.Message)));
+        }
+        // main.ts buildSessionOptions: a model the run selected (--model) is the model of every session, so nothing is restored.
+        var snapshot = replacement.Snapshot; var model = snapshot.Agent.Model;
+        // sdk.ts createAgentSession: the branch's model is restored when it exists and its provider has configured auth.
+        if (registry is not null && startupSelection is not { FromCliModel: true } && model != LiveSessionSelection.UnselectedModel &&
+            SessionBranchSelection.Select(snapshot.Context.Ancestry, (provider, id) =>
+                registry.Find(provider, id) is { } known && PiSharp.Cli.Models.VirtualModels.IsVirtual(known)) is { } saved &&
+            (saved.Provider != model.Provider || saved.ModelId != model.Id) &&
+            !(registry.Find(saved.Provider, saved.ModelId) is { } restorable && registry.HasConfiguredAuth(restorable.Provider)))
+            diagnostics.Add(new("warning", $"Could not restore model {saved.Provider}/{saved.ModelId}. Using {model.Provider}/{model.Id}"));
+        return diagnostics.ToImmutable();
     }
 
     /// <summary>agent-session.ts prompt: a model whose provider has no configured auth (the registry read now: auth.json, models.json and

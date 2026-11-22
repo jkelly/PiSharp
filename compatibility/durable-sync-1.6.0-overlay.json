@@ -1,0 +1,2920 @@
+{
+  "schemaVersion": 1,
+  "status": "tested-with-limitations",
+  "source": {
+    "tag": "v1.6.0",
+    "commit": "faac585884ae2c013a6b1400f3e9e77f10b34bac",
+    "tree": "7b395e942aa81ffe0dba09ae2939184c200e4d3b"
+  },
+  "previous": {
+    "tag": "v1.5.2",
+    "commit": "b4afdddf44e059c67ccf5097e5317d913521b470",
+    "tree": "ed418d79cb44d3690f110e1077c4612db033f2c9"
+  },
+  "preservedMap": "compatibility/durable-port-map.v1.5.0.json",
+  "preservedMapSha256": "45fb24e89fb9d0c63ccc2fd8c05dd6e66f3b63fad0d7500f2964303380690ee2",
+  "previousOverlay": "compatibility/durable-sync-1.5.2-overlay.json",
+  "applicability": "compatibility/sync-1.6.0-applicability.json",
+  "scope": "Current changed Durable files and changed Chord files referenced by the historical Durable map or the previous overlay. Previous mapped locations are preserved as historical references, not assertions of completed 1.6.0 ports.",
+  "rows": [
+    {
+      "id": "sync160.file.1190",
+      "upstream": [
+        "packages/durable/CHANGELOG.md"
+      ],
+      "change": "M",
+      "workPackage": "durable-core",
+      "area": "durable",
+      "reports": [
+        "AI_DOCS/agent-reports/sync-1.6.0-durable-core.md"
+      ],
+      "status": "no-op",
+      "category": "upstream-documentation",
+      "reason": "Upstream prose is source reference, not runtime behavior. Candidate release/compatibility documentation is maintained separately; behavioral changes described here remain assigned to their area.",
+      "source": {
+        "before": {
+          "path": "packages/durable/CHANGELOG.md",
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "aa4c9d01ce2610d8c4d248cdb23dcf15ac6ffb33",
+          "sha256": "a8c64eeb0c26b964e17c071ed06042a063ed6b4123c79c7a48c40b64f671b08d",
+          "bytes": 80943,
+          "url": "https://github.com/earendil-works/pi/blob/b4afdddf44e059c67ccf5097e5317d913521b470/packages/durable/CHANGELOG.md"
+        },
+        "after": {
+          "path": "packages/durable/CHANGELOG.md",
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "289559709de72561f67d2dbd7fa6dd98cdd6641f",
+          "sha256": "9177cd3490bb306a740076f1d1250c55b7483783c99a83f5b331104df599a301",
+          "bytes": 89325,
+          "url": "https://github.com/earendil-works/pi/blob/faac585884ae2c013a6b1400f3e9e77f10b34bac/packages/durable/CHANGELOG.md"
+        }
+      }
+    },
+    {
+      "id": "sync160.file.1191",
+      "upstream": [
+        "packages/durable/README.md"
+      ],
+      "change": "M",
+      "workPackage": "durable-core",
+      "area": "durable",
+      "reports": [
+        "AI_DOCS/agent-reports/sync-1.6.0-durable-core.md"
+      ],
+      "status": "no-op",
+      "category": "upstream-documentation",
+      "reason": "Upstream prose is source reference, not runtime behavior. Candidate release/compatibility documentation is maintained separately; behavioral changes described here remain assigned to their area.",
+      "source": {
+        "before": {
+          "path": "packages/durable/README.md",
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "7f124608f32cb38b3416dcb3f4fc32e3a3c22a55",
+          "sha256": "13727074a006e73c8a54de4a280dec00bda103a3a6384fb30ca04a542cdc02e9",
+          "bytes": 84990,
+          "url": "https://github.com/earendil-works/pi/blob/b4afdddf44e059c67ccf5097e5317d913521b470/packages/durable/README.md"
+        },
+        "after": {
+          "path": "packages/durable/README.md",
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "3d21a80ca27e8afa095ef9b88621e516bc31dc70",
+          "sha256": "9abf565869e1168b1a88d0f2d480a86ec8b229fe821354d32be0b7e5291782de",
+          "bytes": 100018,
+          "url": "https://github.com/earendil-works/pi/blob/faac585884ae2c013a6b1400f3e9e77f10b34bac/packages/durable/README.md"
+        }
+      }
+    },
+    {
+      "id": "sync160.file.1192",
+      "upstream": [
+        "packages/durable/docs/spec.md"
+      ],
+      "change": "M",
+      "workPackage": "durable-core",
+      "area": "durable",
+      "reports": [
+        "AI_DOCS/agent-reports/sync-1.6.0-durable-core.md"
+      ],
+      "status": "no-op",
+      "category": "upstream-documentation",
+      "reason": "Upstream prose is source reference, not runtime behavior. Candidate release/compatibility documentation is maintained separately; behavioral changes described here remain assigned to their area.",
+      "source": {
+        "before": {
+          "path": "packages/durable/docs/spec.md",
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "9b03dd7403374ac8f81b6caf49c42b63e93eb903",
+          "sha256": "d1f07442ea0a4ed2ad7fa4d0eaab0cfd64bf38b4fbfd7a7fc45e88104f9c9096",
+          "bytes": 365860,
+          "url": "https://github.com/earendil-works/pi/blob/b4afdddf44e059c67ccf5097e5317d913521b470/packages/durable/docs/spec.md"
+        },
+        "after": {
+          "path": "packages/durable/docs/spec.md",
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "4e9ebae6b58d099df8b5356b3c993758a5d7dffe",
+          "sha256": "bfebe4222c27db51e45d0ccbd44abd3972468739fa64a47baa3ad4c9289da3c2",
+          "bytes": 409466,
+          "url": "https://github.com/earendil-works/pi/blob/faac585884ae2c013a6b1400f3e9e77f10b34bac/packages/durable/docs/spec.md"
+        }
+      }
+    },
+    {
+      "id": "sync160.file.1193",
+      "upstream": [
+        "packages/durable/package.json"
+      ],
+      "change": "M",
+      "workPackage": "meta",
+      "area": "durable",
+      "reports": [
+        "AI_DOCS/agent-reports/sync-1.6.0-meta.md"
+      ],
+      "status": "tested-with-limitations",
+      "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
+      "review": {
+        "finding": "ported"
+      },
+      "source": {
+        "before": {
+          "path": "packages/durable/package.json",
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "060a14d24136c467351cc2ff2f235629380a9351",
+          "sha256": "dd6d059528f02bf0f8780894972cb51ae81c2c3c4a01246aa4edc1bebdaa6937",
+          "bytes": 6184,
+          "url": "https://github.com/earendil-works/pi/blob/b4afdddf44e059c67ccf5097e5317d913521b470/packages/durable/package.json"
+        },
+        "after": {
+          "path": "packages/durable/package.json",
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "deded4390ac8e1ade04896920066e0392686dab1",
+          "sha256": "61c05222dff0046056105bd48ee3144405e5aa7cfe9aa371b1ccba1723d6c88d",
+          "bytes": 6357,
+          "url": "https://github.com/earendil-works/pi/blob/faac585884ae2c013a6b1400f3e9e77f10b34bac/packages/durable/package.json"
+        }
+      },
+      "validation": {
+        "record": "compatibility/sync-1.6.0-acceptance.json",
+        "workPackage": "meta"
+      }
+    },
+    {
+      "id": "sync160.file.1194",
+      "upstream": [
+        "packages/durable/src/codemode/codemode.ts"
+      ],
+      "change": "M",
+      "workPackage": "durable-edge",
+      "area": "durable",
+      "reports": [
+        "AI_DOCS/agent-reports/sync-1.6.0-durable-edge.md"
+      ],
+      "status": "tested-with-limitations",
+      "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
+      "review": {
+        "finding": "ported"
+      },
+      "source": {
+        "before": {
+          "path": "packages/durable/src/codemode/codemode.ts",
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "6a7a63d380acdef69589f5502891ce6ea66a8bad",
+          "sha256": "d255ea52f07cadb2c9be706be616f1c9f8833031a3117388ea080f3b86db40a7",
+          "bytes": 45478,
+          "url": "https://github.com/earendil-works/pi/blob/b4afdddf44e059c67ccf5097e5317d913521b470/packages/durable/src/codemode/codemode.ts"
+        },
+        "after": {
+          "path": "packages/durable/src/codemode/codemode.ts",
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "a20c7842406715ef9111cfbc4a74f42b68ca73aa",
+          "sha256": "70341f25134e8cb36e4b69abeeef633e39eb0d7aedcaee1c90a22b87d81cf5eb",
+          "bytes": 45251,
+          "url": "https://github.com/earendil-works/pi/blob/faac585884ae2c013a6b1400f3e9e77f10b34bac/packages/durable/src/codemode/codemode.ts"
+        }
+      },
+      "historicalMapping": {
+        "upstream": "packages/durable/src/codemode/codemode.ts",
+        "pisharp": "src/PiSharp.Durable.Tools/Codemode/Codemode.cs",
+        "status": "ported",
+        "blobSha1": "a2e7657792b24d63b40f668d1aa7d4a29e9e36fe"
+      },
+      "validation": {
+        "record": "compatibility/sync-1.6.0-acceptance.json",
+        "workPackage": "durable-edge"
+      }
+    },
+    {
+      "id": "sync160.file.1195",
+      "upstream": [
+        "packages/durable/src/codemode/describe.ts"
+      ],
+      "change": "M",
+      "workPackage": "durable-edge",
+      "area": "durable",
+      "reports": [
+        "AI_DOCS/agent-reports/sync-1.6.0-durable-edge.md"
+      ],
+      "status": "tested-with-limitations",
+      "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
+      "review": {
+        "finding": "ported"
+      },
+      "source": {
+        "before": {
+          "path": "packages/durable/src/codemode/describe.ts",
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "06d9d549c8babb0348a94415c64247caa2741445",
+          "sha256": "22f305f0d48cd8eb086dfcf20a6aa1e448680dc3e5383a8c47d4ca14167b37c2",
+          "bytes": 7670,
+          "url": "https://github.com/earendil-works/pi/blob/b4afdddf44e059c67ccf5097e5317d913521b470/packages/durable/src/codemode/describe.ts"
+        },
+        "after": {
+          "path": "packages/durable/src/codemode/describe.ts",
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "a419d25322171468124a8ed1df1823ea6f7d3368",
+          "sha256": "35e0da837573ab4fcd1523bbfb0462c46ea5c89c805c2fddb8d090f8733cf6dd",
+          "bytes": 8146,
+          "url": "https://github.com/earendil-works/pi/blob/faac585884ae2c013a6b1400f3e9e77f10b34bac/packages/durable/src/codemode/describe.ts"
+        }
+      },
+      "historicalMapping": {
+        "upstream": "packages/durable/src/codemode/describe.ts",
+        "pisharp": "src/PiSharp.Durable.Tools/Codemode/Describe.cs",
+        "status": "ported",
+        "blobSha1": "06d9d549c8babb0348a94415c64247caa2741445"
+      },
+      "nativeMapping": {
+        "workPackage": "durable-edge",
+        "pisharp": [
+          "src/PiSharp.Durable.Tools/Codemode/Describe.cs",
+          "src/PiSharp.Durable.Tools/Codemode/Codemode.cs"
+        ],
+        "tests": [
+          "tests/PiSharp.Durable.Tests/CodemodeDescribeCases.cs",
+          "tests/PiSharp.Durable.Tests/Sync160CodemodeCases.cs"
+        ],
+        "note": "namespacesOf is DurableCodemode.NamespacesOf; CodemodeNamespace, its prefix and namespaceOf are removed, as upstream."
+      },
+      "validation": {
+        "record": "compatibility/sync-1.6.0-acceptance.json",
+        "workPackage": "durable-edge"
+      }
+    },
+    {
+      "id": "sync160.file.1196",
+      "upstream": [
+        "packages/durable/src/codemode/index.ts"
+      ],
+      "change": "M",
+      "workPackage": "durable-edge",
+      "area": "durable",
+      "reports": [
+        "AI_DOCS/agent-reports/sync-1.6.0-durable-edge.md"
+      ],
+      "status": "tested-with-limitations",
+      "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
+      "review": {
+        "finding": "ported"
+      },
+      "source": {
+        "before": {
+          "path": "packages/durable/src/codemode/index.ts",
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "e3b91f6c1c276b5a525f801adac09accbbeea511",
+          "sha256": "0cc88b71767744c4b481b2319e40a5c0d5ae43ec3e0c498f0ecbc22ca244ce60",
+          "bytes": 361,
+          "url": "https://github.com/earendil-works/pi/blob/b4afdddf44e059c67ccf5097e5317d913521b470/packages/durable/src/codemode/index.ts"
+        },
+        "after": {
+          "path": "packages/durable/src/codemode/index.ts",
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "fc0762b28159a97967c01b901702c6929519b89d",
+          "sha256": "9f12640ffec0882a7f2e9c4d1c6037bb44ed833b139da2aa183c4fd79ac5ddff",
+          "bytes": 351,
+          "url": "https://github.com/earendil-works/pi/blob/faac585884ae2c013a6b1400f3e9e77f10b34bac/packages/durable/src/codemode/index.ts"
+        }
+      },
+      "historicalMapping": {
+        "upstream": "packages/durable/src/codemode/index.ts",
+        "pisharp": "src/PiSharp.Durable.Tools/Codemode/Codemode.cs",
+        "status": "ported",
+        "blobSha1": "e3b91f6c1c276b5a525f801adac09accbbeea511"
+      },
+      "validation": {
+        "record": "compatibility/sync-1.6.0-acceptance.json",
+        "workPackage": "durable-edge"
+      }
+    },
+    {
+      "id": "sync160.file.1197",
+      "upstream": [
+        "packages/durable/src/codemode/output.ts"
+      ],
+      "change": "M",
+      "workPackage": "durable-edge",
+      "area": "durable",
+      "reports": [
+        "AI_DOCS/agent-reports/sync-1.6.0-durable-edge.md"
+      ],
+      "status": "no-op",
+      "category": "no-native-delta",
+      "reason": "saveImages decodes through a shared fromBase64 helper: the same decode moved, no behavior change; Output.cs keeps Convert.FromBase64String (durable-edge).",
+      "review": {
+        "finding": "no-op"
+      },
+      "source": {
+        "before": {
+          "path": "packages/durable/src/codemode/output.ts",
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "98a0862885284539e9454baff93a5e2be8e9c20c",
+          "sha256": "eab0bcbb9ee871a5c686f6b0e12ff4549d28ee15fa640b0411eb56ff7933423d",
+          "bytes": 9255,
+          "url": "https://github.com/earendil-works/pi/blob/b4afdddf44e059c67ccf5097e5317d913521b470/packages/durable/src/codemode/output.ts"
+        },
+        "after": {
+          "path": "packages/durable/src/codemode/output.ts",
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "5f9048c0fe701428519635e0aa2367693828964b",
+          "sha256": "745d32d774cbc4ef58986e1c01061e2b8a3aca200104ae94de9de4330838ea54",
+          "bytes": 9272,
+          "url": "https://github.com/earendil-works/pi/blob/faac585884ae2c013a6b1400f3e9e77f10b34bac/packages/durable/src/codemode/output.ts"
+        }
+      },
+      "historicalMapping": {
+        "upstream": "packages/durable/src/codemode/output.ts",
+        "pisharp": "src/PiSharp.Durable.Tools/Codemode/Output.cs",
+        "status": "ported",
+        "blobSha1": "98a0862885284539e9454baff93a5e2be8e9c20c"
+      }
+    },
+    {
+      "id": "sync160.file.1198",
+      "upstream": [
+        "packages/durable/src/env/node.ts"
+      ],
+      "change": "M",
+      "workPackage": "durable-edge",
+      "area": "durable",
+      "reports": [
+        "AI_DOCS/agent-reports/sync-1.6.0-durable-edge.md"
+      ],
+      "status": "tested-with-limitations",
+      "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
+      "review": {
+        "finding": "ported"
+      },
+      "source": {
+        "before": {
+          "path": "packages/durable/src/env/node.ts",
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "e81293d98a1996a4f8fe3dd947cfeb9f28052ce8",
+          "sha256": "b4462fe3b5ee54f91220561d8a1f18ead5ff3f44abbbab7e57d29a063fe4f75e",
+          "bytes": 41196,
+          "url": "https://github.com/earendil-works/pi/blob/b4afdddf44e059c67ccf5097e5317d913521b470/packages/durable/src/env/node.ts"
+        },
+        "after": {
+          "path": "packages/durable/src/env/node.ts",
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "224a06261c6bb29abad21927a679024fb1f30368",
+          "sha256": "95840126f4b7010981a803e948603806b8726efc5ef8bb892efe1ceae4e3cdc3",
+          "bytes": 41343,
+          "url": "https://github.com/earendil-works/pi/blob/faac585884ae2c013a6b1400f3e9e77f10b34bac/packages/durable/src/env/node.ts"
+        }
+      },
+      "historicalMapping": {
+        "upstream": "packages/durable/src/env/node.ts",
+        "pisharp": "src/PiSharp.Durable.Tools/Env/LocalExecutionEnv.cs",
+        "status": "ported",
+        "blobSha1": "17825573154cda2495e081dccd7649616709cf62"
+      },
+      "nativeMapping": {
+        "workPackage": "durable-edge",
+        "pisharp": [
+          "src/PiSharp.Durable/Env/Local/LocalFileSystem.cs",
+          "src/PiSharp.Durable.Tools/Env/LocalExecutionEnv.cs"
+        ],
+        "tests": [
+          "tests/PiSharp.Durable.Tests/Sync160EnvListRaceCases.cs",
+          "tests/PiSharp.Durable.Tests/EnvNodeCases.cs"
+        ],
+        "note": "The file-system half of NodeExecutionEnv, listDir included, is LocalFileSystem; the historical map names the shell half."
+      },
+      "validation": {
+        "record": "compatibility/sync-1.6.0-acceptance.json",
+        "workPackage": "durable-edge"
+      }
+    },
+    {
+      "id": "sync160.file.1199",
+      "upstream": [
+        "packages/durable/src/harness/agent.ts"
+      ],
+      "change": "M",
+      "workPackage": "durable-core",
+      "area": "durable",
+      "reports": [
+        "AI_DOCS/agent-reports/sync-1.6.0-durable-core.md"
+      ],
+      "status": "tested-with-limitations",
+      "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
+      "review": {
+        "finding": "ported"
+      },
+      "source": {
+        "before": {
+          "path": "packages/durable/src/harness/agent.ts",
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "9bdacfe364567b87a5e79e43264586fda9171815",
+          "sha256": "4fbd036699eb30b7e2ad2dbf4e3dc5907a5f423de2900525c6d90216757686ad",
+          "bytes": 15810,
+          "url": "https://github.com/earendil-works/pi/blob/b4afdddf44e059c67ccf5097e5317d913521b470/packages/durable/src/harness/agent.ts"
+        },
+        "after": {
+          "path": "packages/durable/src/harness/agent.ts",
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "f8206a901e113b59d0ebfe5cd9e4229c0b63c956",
+          "sha256": "3977fec622c5a4c355d9050cbf09d410900671547da5d95fa6e7424ed0afc56b",
+          "bytes": 15885,
+          "url": "https://github.com/earendil-works/pi/blob/faac585884ae2c013a6b1400f3e9e77f10b34bac/packages/durable/src/harness/agent.ts"
+        }
+      },
+      "historicalMapping": {
+        "upstream": "packages/durable/src/harness/agent.ts",
+        "pisharp": "src/PiSharp.Durable/Harness/Agent.cs",
+        "status": "ported",
+        "blobSha1": "df15a9f133aef34c8e15a5e2600d8dd65deeb489"
+      },
+      "validation": {
+        "record": "compatibility/sync-1.6.0-acceptance.json",
+        "workPackage": "durable-core"
+      }
+    },
+    {
+      "id": "sync160.file.1200",
+      "upstream": [
+        "packages/durable/src/harness/define.ts"
+      ],
+      "change": "M",
+      "workPackage": "durable-core",
+      "area": "durable",
+      "reports": [
+        "AI_DOCS/agent-reports/sync-1.6.0-durable-core.md"
+      ],
+      "status": "tested-with-limitations",
+      "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
+      "review": {
+        "finding": "ported"
+      },
+      "source": {
+        "before": {
+          "path": "packages/durable/src/harness/define.ts",
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "21fff911f89857c39851f1b74d8f711d8ba44bff",
+          "sha256": "142d9cc01d7de5bc88fcb06f66f3dbcf72a388d93d512d19e34d3c60c6987928",
+          "bytes": 2100,
+          "url": "https://github.com/earendil-works/pi/blob/b4afdddf44e059c67ccf5097e5317d913521b470/packages/durable/src/harness/define.ts"
+        },
+        "after": {
+          "path": "packages/durable/src/harness/define.ts",
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "71851103001f406c5768bd3680d1557c4d716f31",
+          "sha256": "3afd2c63d3fc1d66345e60eb446945cff14d7f81318d796055479f9bd16d418b",
+          "bytes": 2337,
+          "url": "https://github.com/earendil-works/pi/blob/faac585884ae2c013a6b1400f3e9e77f10b34bac/packages/durable/src/harness/define.ts"
+        }
+      },
+      "historicalMapping": {
+        "upstream": "packages/durable/src/harness/define.ts",
+        "pisharp": "src/PiSharp.Durable/Harness/Define.cs",
+        "status": "ported",
+        "blobSha1": "f5e0df8be1d5e20d07482f0d594afaa2c78c4c93"
+      },
+      "validation": {
+        "record": "compatibility/sync-1.6.0-acceptance.json",
+        "workPackage": "durable-core"
+      }
+    },
+    {
+      "id": "sync160.file.1201",
+      "upstream": [
+        "packages/durable/src/harness/generation.ts"
+      ],
+      "change": "M",
+      "workPackage": "durable-core",
+      "area": "durable",
+      "reports": [
+        "AI_DOCS/agent-reports/sync-1.6.0-durable-core.md"
+      ],
+      "status": "tested-with-limitations",
+      "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
+      "review": {
+        "finding": "ported"
+      },
+      "source": {
+        "before": {
+          "path": "packages/durable/src/harness/generation.ts",
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "6e6e0f4fc5878da28c43e8d070a635d3e6d87273",
+          "sha256": "caecd292020029da02b3f14404b05f486f7c75d199f3273ab19dcd29a9bf2255",
+          "bytes": 55109,
+          "url": "https://github.com/earendil-works/pi/blob/b4afdddf44e059c67ccf5097e5317d913521b470/packages/durable/src/harness/generation.ts"
+        },
+        "after": {
+          "path": "packages/durable/src/harness/generation.ts",
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "0ba447c56ffa3d2c9fbe7705a8d1591102cb6245",
+          "sha256": "47adcdcff6b46a62a248f35395e8f6b272041b4e345d99b7c7fe1eb33241dae6",
+          "bytes": 62866,
+          "url": "https://github.com/earendil-works/pi/blob/faac585884ae2c013a6b1400f3e9e77f10b34bac/packages/durable/src/harness/generation.ts"
+        }
+      },
+      "historicalMapping": {
+        "upstream": "packages/durable/src/harness/generation.ts",
+        "pisharp": "src/PiSharp.Durable/Harness/Generation.cs",
+        "status": "ported",
+        "blobSha1": "17c28db4749f6dc7d1f56f7fe9a8c0cc8c2d14dc"
+      },
+      "validation": {
+        "record": "compatibility/sync-1.6.0-acceptance.json",
+        "workPackage": "durable-core"
+      }
+    },
+    {
+      "id": "sync160.file.1202",
+      "upstream": [
+        "packages/durable/src/harness/harness.ts"
+      ],
+      "change": "M",
+      "workPackage": "durable-core",
+      "area": "durable",
+      "reports": [
+        "AI_DOCS/agent-reports/sync-1.6.0-durable-core.md"
+      ],
+      "status": "tested-with-limitations",
+      "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
+      "review": {
+        "finding": "ported"
+      },
+      "source": {
+        "before": {
+          "path": "packages/durable/src/harness/harness.ts",
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "dbc06d8de4f09b28feaa28bb43421bc31379e7d0",
+          "sha256": "a9e92a3b10f45881fceeb169f156eed879d3e25cb1f6c5844d0bd498e04dad30",
+          "bytes": 23151,
+          "url": "https://github.com/earendil-works/pi/blob/b4afdddf44e059c67ccf5097e5317d913521b470/packages/durable/src/harness/harness.ts"
+        },
+        "after": {
+          "path": "packages/durable/src/harness/harness.ts",
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "579775c4ba683e7318b0f32cc711cf5161cddf92",
+          "sha256": "d110de27bb52366cd9b615bac5f701b10a89bc5bc24949a8ab811bdf3e55a4ca",
+          "bytes": 24020,
+          "url": "https://github.com/earendil-works/pi/blob/faac585884ae2c013a6b1400f3e9e77f10b34bac/packages/durable/src/harness/harness.ts"
+        }
+      },
+      "historicalMapping": {
+        "upstream": "packages/durable/src/harness/harness.ts",
+        "pisharp": "src/PiSharp.Durable/Harness/Harness.cs",
+        "status": "ported",
+        "blobSha1": "8fb91bcc0f25dcce8767fdd527b99550aaccca57"
+      },
+      "validation": {
+        "record": "compatibility/sync-1.6.0-acceptance.json",
+        "workPackage": "durable-core"
+      }
+    },
+    {
+      "id": "sync160.file.1203",
+      "upstream": [
+        "packages/durable/src/harness/inbox.ts"
+      ],
+      "change": "M",
+      "workPackage": "durable-core",
+      "area": "durable",
+      "reports": [
+        "AI_DOCS/agent-reports/sync-1.6.0-durable-core.md"
+      ],
+      "status": "tested-with-limitations",
+      "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
+      "review": {
+        "finding": "ported"
+      },
+      "source": {
+        "before": {
+          "path": "packages/durable/src/harness/inbox.ts",
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "a968f359b45d4924469ca271b50c94bdcac2856c",
+          "sha256": "cec1293688d069a5e95a78da6d35d6ae38350ad2c2c2c49655997c0c94d9bc5b",
+          "bytes": 7876,
+          "url": "https://github.com/earendil-works/pi/blob/b4afdddf44e059c67ccf5097e5317d913521b470/packages/durable/src/harness/inbox.ts"
+        },
+        "after": {
+          "path": "packages/durable/src/harness/inbox.ts",
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "c1eb6e06e182aa7eeebfcaabef29dbeb3f7de799",
+          "sha256": "6e10d1ba5a1e27c73990eb21e5091fd62abbe42135978630583276686dd175c1",
+          "bytes": 8774,
+          "url": "https://github.com/earendil-works/pi/blob/faac585884ae2c013a6b1400f3e9e77f10b34bac/packages/durable/src/harness/inbox.ts"
+        }
+      },
+      "historicalMapping": {
+        "upstream": "packages/durable/src/harness/inbox.ts",
+        "pisharp": "src/PiSharp.Durable/Harness/Inbox.cs",
+        "status": "ported",
+        "blobSha1": "3469e8e79e63a14255825c24184b4fe405c55bd9"
+      },
+      "validation": {
+        "record": "compatibility/sync-1.6.0-acceptance.json",
+        "workPackage": "durable-core"
+      }
+    },
+    {
+      "id": "sync160.file.1204",
+      "upstream": [
+        "packages/durable/src/harness/live.ts"
+      ],
+      "change": "M",
+      "workPackage": "durable-core",
+      "area": "durable",
+      "reports": [
+        "AI_DOCS/agent-reports/sync-1.6.0-durable-core.md"
+      ],
+      "status": "tested-with-limitations",
+      "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
+      "review": {
+        "finding": "ported"
+      },
+      "source": {
+        "before": {
+          "path": "packages/durable/src/harness/live.ts",
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "f9113cf965d3cc3f63faecb9c61440f6802145f1",
+          "sha256": "d0a575ee7ed01b493523e290aaf41b4c318f7f2d424af148256dcbeba7f25924",
+          "bytes": 20509,
+          "url": "https://github.com/earendil-works/pi/blob/b4afdddf44e059c67ccf5097e5317d913521b470/packages/durable/src/harness/live.ts"
+        },
+        "after": {
+          "path": "packages/durable/src/harness/live.ts",
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "6d701d8b90dc6db086a7256c21f1dd7fe6c4b719",
+          "sha256": "5e2fddb37a0a088aa526283d8131c9a94acdb1553f6d24413c4164f314bc5c81",
+          "bytes": 21412,
+          "url": "https://github.com/earendil-works/pi/blob/faac585884ae2c013a6b1400f3e9e77f10b34bac/packages/durable/src/harness/live.ts"
+        }
+      },
+      "historicalMapping": {
+        "upstream": "packages/durable/src/harness/live.ts",
+        "pisharp": "src/PiSharp.Durable/Harness/Live.cs",
+        "status": "ported",
+        "blobSha1": "9888a402e7998603e0d7539263ed13f5f0d81334"
+      },
+      "validation": {
+        "record": "compatibility/sync-1.6.0-acceptance.json",
+        "workPackage": "durable-core"
+      }
+    },
+    {
+      "id": "sync160.file.1205",
+      "upstream": [
+        "packages/durable/src/harness/parks.ts"
+      ],
+      "change": "A",
+      "workPackage": "durable-core",
+      "area": "durable",
+      "reports": [
+        "AI_DOCS/agent-reports/sync-1.6.0-durable-core.md"
+      ],
+      "status": "tested-with-limitations",
+      "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
+      "review": {
+        "finding": "ported"
+      },
+      "source": {
+        "before": null,
+        "after": {
+          "path": "packages/durable/src/harness/parks.ts",
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "5b9406b643388595253f7eabff7e4cf0e11f1e66",
+          "sha256": "14039bdf176c118dd454b7090522d95b58aa1dba82a42ca0eee5e20f55c014e9",
+          "bytes": 2808,
+          "url": "https://github.com/earendil-works/pi/blob/faac585884ae2c013a6b1400f3e9e77f10b34bac/packages/durable/src/harness/parks.ts"
+        }
+      },
+      "nativeMapping": {
+        "workPackage": "durable-core",
+        "pisharp": [
+          "src/PiSharp.Durable/Harness/Parks.cs"
+        ],
+        "tests": [
+          "tests/PiSharp.Durable.Tests/Sync160ToolParksCases.cs",
+          "tests/PiSharp.Durable.Tests/Sync160ParkChildrenCases.cs"
+        ],
+        "note": "A park is ToolExecutionResult.Park (ToolPark.Sleeping, ToolPark.Waiting; Harness/Types.cs); BASE_PARKS is ToolExecutionApi.BaseParks."
+      },
+      "validation": {
+        "record": "compatibility/sync-1.6.0-acceptance.json",
+        "workPackage": "durable-core"
+      }
+    },
+    {
+      "id": "sync160.file.1206",
+      "upstream": [
+        "packages/durable/src/harness/provider.ts"
+      ],
+      "change": "M",
+      "workPackage": "durable-core",
+      "area": "durable",
+      "reports": [
+        "AI_DOCS/agent-reports/sync-1.6.0-durable-core.md"
+      ],
+      "status": "tested-with-limitations",
+      "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
+      "review": {
+        "finding": "ported"
+      },
+      "source": {
+        "before": {
+          "path": "packages/durable/src/harness/provider.ts",
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "6b161432b4ada6f5f502bf849d473e78893e6419",
+          "sha256": "77788b6bbd9d025fabc6bfb25f3857e320f1dfc488b99ffadacceba7f4bcfdde",
+          "bytes": 1487,
+          "url": "https://github.com/earendil-works/pi/blob/b4afdddf44e059c67ccf5097e5317d913521b470/packages/durable/src/harness/provider.ts"
+        },
+        "after": {
+          "path": "packages/durable/src/harness/provider.ts",
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "40b70833aba7f07f89c46a9be0e0d833fbfcd263",
+          "sha256": "6d871eb18b7900dec29ed8d98ed1ec646ed763411aa1cf8eb0957e99bc3123a5",
+          "bytes": 1701,
+          "url": "https://github.com/earendil-works/pi/blob/faac585884ae2c013a6b1400f3e9e77f10b34bac/packages/durable/src/harness/provider.ts"
+        }
+      },
+      "historicalMapping": {
+        "upstream": "packages/durable/src/harness/provider.ts",
+        "pisharp": "src/PiSharp.Durable/Harness/Provider.cs",
+        "status": "ported",
+        "blobSha1": "b838982a686d3eb49c64324d91d281c9f55fb407"
+      },
+      "validation": {
+        "record": "compatibility/sync-1.6.0-acceptance.json",
+        "workPackage": "durable-core"
+      }
+    },
+    {
+      "id": "sync160.file.1207",
+      "upstream": [
+        "packages/durable/src/harness/scheduler.ts"
+      ],
+      "change": "M",
+      "workPackage": "durable-core",
+      "area": "durable",
+      "reports": [
+        "AI_DOCS/agent-reports/sync-1.6.0-durable-core.md"
+      ],
+      "status": "tested-with-limitations",
+      "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
+      "review": {
+        "finding": "ported"
+      },
+      "source": {
+        "before": {
+          "path": "packages/durable/src/harness/scheduler.ts",
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "dad8921b92673ee06eb57c40372330e231db638b",
+          "sha256": "b010242866714c6f038e5158399dbc9ca788928467562c1a8a098372b6d6a58b",
+          "bytes": 139673,
+          "url": "https://github.com/earendil-works/pi/blob/b4afdddf44e059c67ccf5097e5317d913521b470/packages/durable/src/harness/scheduler.ts"
+        },
+        "after": {
+          "path": "packages/durable/src/harness/scheduler.ts",
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "be1e4d98082e494e373b3e982174453ac1380dce",
+          "sha256": "2fbc1348572879fb6ec7054dfde9b23b65f5c0d9aa3c78221ccccf750b84e30e",
+          "bytes": 148215,
+          "url": "https://github.com/earendil-works/pi/blob/faac585884ae2c013a6b1400f3e9e77f10b34bac/packages/durable/src/harness/scheduler.ts"
+        }
+      },
+      "historicalMapping": {
+        "upstream": "packages/durable/src/harness/scheduler.ts",
+        "pisharp": "src/PiSharp.Durable/Harness/Scheduler.cs",
+        "status": "ported",
+        "blobSha1": "63cbe89acf0e457b13f867ac74a8ce8e32eb0f93"
+      },
+      "validation": {
+        "record": "compatibility/sync-1.6.0-acceptance.json",
+        "workPackage": "durable-core"
+      }
+    },
+    {
+      "id": "sync160.file.1208",
+      "upstream": [
+        "packages/durable/src/harness/submissions.ts"
+      ],
+      "change": "M",
+      "workPackage": "durable-core",
+      "area": "durable",
+      "reports": [
+        "AI_DOCS/agent-reports/sync-1.6.0-durable-core.md"
+      ],
+      "status": "tested-with-limitations",
+      "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
+      "review": {
+        "finding": "ported"
+      },
+      "source": {
+        "before": {
+          "path": "packages/durable/src/harness/submissions.ts",
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "335cd6fae2b9259a8c7e5428277de21a7327bc96",
+          "sha256": "88f6f9f3c469391fcba0321a4a59aa8a80f9055664976d08c4425489fb86b6e8",
+          "bytes": 14033,
+          "url": "https://github.com/earendil-works/pi/blob/b4afdddf44e059c67ccf5097e5317d913521b470/packages/durable/src/harness/submissions.ts"
+        },
+        "after": {
+          "path": "packages/durable/src/harness/submissions.ts",
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "a49f36a3c32dc7a19192ac31cfae489a590e750d",
+          "sha256": "2e16071ee80af2d799d2596cf8fdb7057a3bfb8b8e89e24048ca723cae3076a3",
+          "bytes": 14022,
+          "url": "https://github.com/earendil-works/pi/blob/faac585884ae2c013a6b1400f3e9e77f10b34bac/packages/durable/src/harness/submissions.ts"
+        }
+      },
+      "historicalMapping": {
+        "upstream": "packages/durable/src/harness/submissions.ts",
+        "pisharp": "src/PiSharp.Durable/Harness/Submissions.cs",
+        "status": "ported",
+        "blobSha1": "bac428f448f21098a73711927562e3b46d7d3169"
+      },
+      "validation": {
+        "record": "compatibility/sync-1.6.0-acceptance.json",
+        "workPackage": "durable-core"
+      }
+    },
+    {
+      "id": "sync160.file.1209",
+      "upstream": [
+        "packages/durable/src/harness/task-graph.ts"
+      ],
+      "change": "M",
+      "workPackage": "durable-core",
+      "area": "durable",
+      "reports": [
+        "AI_DOCS/agent-reports/sync-1.6.0-durable-core.md"
+      ],
+      "status": "tested-with-limitations",
+      "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
+      "review": {
+        "finding": "ported"
+      },
+      "source": {
+        "before": {
+          "path": "packages/durable/src/harness/task-graph.ts",
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "eea1549e76593b186d42649e82328621aaf02f5b",
+          "sha256": "31deb191cf968f7f5787b5e1746dccab32a4e1dc59c1b6fac17b2570e799e424",
+          "bytes": 11944,
+          "url": "https://github.com/earendil-works/pi/blob/b4afdddf44e059c67ccf5097e5317d913521b470/packages/durable/src/harness/task-graph.ts"
+        },
+        "after": {
+          "path": "packages/durable/src/harness/task-graph.ts",
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "5fa0037d359a51d12a82bbbd240279ca6bd5f3c4",
+          "sha256": "bc7086ccbf41bb0516dea4cc9c9696e490fd61b4ba5e08a0306997de04a27836",
+          "bytes": 12274,
+          "url": "https://github.com/earendil-works/pi/blob/faac585884ae2c013a6b1400f3e9e77f10b34bac/packages/durable/src/harness/task-graph.ts"
+        }
+      },
+      "historicalMapping": {
+        "upstream": "packages/durable/src/harness/task-graph.ts",
+        "pisharp": "src/PiSharp.Durable/Harness/TaskGraph.cs",
+        "status": "ported",
+        "blobSha1": "c7fbcb824d0ddf4c57b12322a0e4bf712fdda97a"
+      },
+      "validation": {
+        "record": "compatibility/sync-1.6.0-acceptance.json",
+        "workPackage": "durable-core"
+      }
+    },
+    {
+      "id": "sync160.file.1210",
+      "upstream": [
+        "packages/durable/src/harness/tool.ts"
+      ],
+      "change": "M",
+      "workPackage": "durable-core",
+      "area": "durable",
+      "reports": [
+        "AI_DOCS/agent-reports/sync-1.6.0-durable-core.md"
+      ],
+      "status": "tested-with-limitations",
+      "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
+      "review": {
+        "finding": "ported"
+      },
+      "source": {
+        "before": {
+          "path": "packages/durable/src/harness/tool.ts",
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "9fe1d2279337b729e4a1f648b5db9c314fca743c",
+          "sha256": "9297213fa365032ec61923806a73618672ee3e4588b730996e147f58e5732fb5",
+          "bytes": 49215,
+          "url": "https://github.com/earendil-works/pi/blob/b4afdddf44e059c67ccf5097e5317d913521b470/packages/durable/src/harness/tool.ts"
+        },
+        "after": {
+          "path": "packages/durable/src/harness/tool.ts",
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "7e9326a128ec0c3ab6da123425156d2b873730ca",
+          "sha256": "394fa454bc3d36c3f37bbd5bdada43decd43e2ffb5ce2cb5efec31bf96b9e28a",
+          "bytes": 63907,
+          "url": "https://github.com/earendil-works/pi/blob/faac585884ae2c013a6b1400f3e9e77f10b34bac/packages/durable/src/harness/tool.ts"
+        }
+      },
+      "historicalMapping": {
+        "upstream": "packages/durable/src/harness/tool.ts",
+        "pisharp": "src/PiSharp.Durable/Harness/Tool.cs",
+        "status": "ported",
+        "blobSha1": "dc9e72ca28badbddac6b41c7643836a5a56a60a2"
+      },
+      "validation": {
+        "record": "compatibility/sync-1.6.0-acceptance.json",
+        "workPackage": "durable-core"
+      }
+    },
+    {
+      "id": "sync160.file.1211",
+      "upstream": [
+        "packages/durable/src/harness/types.ts"
+      ],
+      "change": "M",
+      "workPackage": "durable-core",
+      "area": "durable",
+      "reports": [
+        "AI_DOCS/agent-reports/sync-1.6.0-durable-core.md"
+      ],
+      "status": "tested-with-limitations",
+      "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
+      "review": {
+        "finding": "ported"
+      },
+      "source": {
+        "before": {
+          "path": "packages/durable/src/harness/types.ts",
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "fe73573ee56a2c8037d9dd534abbf13c0b459493",
+          "sha256": "73dad587aaff7ba24b7ae071cd4104e502f2ff6916f0b928013e653a51fd2be9",
+          "bytes": 56203,
+          "url": "https://github.com/earendil-works/pi/blob/b4afdddf44e059c67ccf5097e5317d913521b470/packages/durable/src/harness/types.ts"
+        },
+        "after": {
+          "path": "packages/durable/src/harness/types.ts",
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "9ec73483ccc6db8a684943ef46228cbeb598cab0",
+          "sha256": "c49d257edf7dec2280ce8d7f1c5dd271ab0a061a7bd2f09743ba33a87fdbb9b9",
+          "bytes": 63722,
+          "url": "https://github.com/earendil-works/pi/blob/faac585884ae2c013a6b1400f3e9e77f10b34bac/packages/durable/src/harness/types.ts"
+        }
+      },
+      "historicalMapping": {
+        "upstream": "packages/durable/src/harness/types.ts",
+        "pisharp": "src/PiSharp.Durable/Harness/Types.cs",
+        "status": "ported",
+        "blobSha1": "e312758b95c5b3579587a3cd3877b2adf290a9f9"
+      },
+      "validation": {
+        "record": "compatibility/sync-1.6.0-acceptance.json",
+        "workPackage": "durable-core"
+      }
+    },
+    {
+      "id": "sync160.file.1212",
+      "upstream": [
+        "packages/durable/src/harness/util.ts"
+      ],
+      "change": "M",
+      "workPackage": "durable-core",
+      "area": "durable",
+      "reports": [
+        "AI_DOCS/agent-reports/sync-1.6.0-durable-core.md"
+      ],
+      "status": "tested-with-limitations",
+      "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
+      "review": {
+        "finding": "ported"
+      },
+      "source": {
+        "before": {
+          "path": "packages/durable/src/harness/util.ts",
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "d56899fd6e29bb7f859be647fe82a3b9da8e9126",
+          "sha256": "8974925a5f56584a0456a33f0c3e73bc3c96f672813ac6289a97beb66cea5167",
+          "bytes": 2917,
+          "url": "https://github.com/earendil-works/pi/blob/b4afdddf44e059c67ccf5097e5317d913521b470/packages/durable/src/harness/util.ts"
+        },
+        "after": {
+          "path": "packages/durable/src/harness/util.ts",
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "f64acb1eed297c782d9a1651cd652ab73393ca56",
+          "sha256": "6c66e255b633030d527c2a6b0e8ef717954763e9b540b2c71dd20dc8e01c9556",
+          "bytes": 3168,
+          "url": "https://github.com/earendil-works/pi/blob/faac585884ae2c013a6b1400f3e9e77f10b34bac/packages/durable/src/harness/util.ts"
+        }
+      },
+      "historicalMapping": {
+        "upstream": "packages/durable/src/harness/util.ts",
+        "pisharp": "src/PiSharp.Durable/Harness/Util.cs",
+        "status": "ported",
+        "blobSha1": "f3c8ea3747cc34e8f4ccf4bdd4635bf6cb178687"
+      },
+      "validation": {
+        "record": "compatibility/sync-1.6.0-acceptance.json",
+        "workPackage": "durable-core"
+      }
+    },
+    {
+      "id": "sync160.file.1213",
+      "upstream": [
+        "packages/durable/src/images/fit.ts"
+      ],
+      "change": "A",
+      "workPackage": "durable-edge",
+      "area": "durable",
+      "reports": [
+        "AI_DOCS/agent-reports/sync-1.6.0-durable-edge.md"
+      ],
+      "status": "tested-with-limitations",
+      "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
+      "review": {
+        "finding": "ported"
+      },
+      "source": {
+        "before": null,
+        "after": {
+          "path": "packages/durable/src/images/fit.ts",
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "d94a2dc9994b2226de1e94d03a4f201089c299af",
+          "sha256": "37bf47153d40af332a42d24f62df0ce7bd8575344f08916cec2015696ba1db5f",
+          "bytes": 6071,
+          "url": "https://github.com/earendil-works/pi/blob/faac585884ae2c013a6b1400f3e9e77f10b34bac/packages/durable/src/images/fit.ts"
+        }
+      },
+      "nativeMapping": {
+        "workPackage": "durable-edge",
+        "pisharp": [
+          "src/PiSharp.Durable.Tools/Images/Fit.cs"
+        ],
+        "tests": [
+          "tests/PiSharp.Durable.Tests/Sync160ImagesFitCases.cs"
+        ],
+        "note": "fitImage, fitImages and createFitImagesExtension are FitImages.FitImageAsync, FitAsync and CreateExtension."
+      },
+      "validation": {
+        "record": "compatibility/sync-1.6.0-acceptance.json",
+        "workPackage": "durable-edge"
+      }
+    },
+    {
+      "id": "sync160.file.1214",
+      "upstream": [
+        "packages/durable/src/index.ts"
+      ],
+      "change": "M",
+      "workPackage": "durable-core",
+      "area": "durable",
+      "reports": [
+        "AI_DOCS/agent-reports/sync-1.6.0-durable-core.md"
+      ],
+      "status": "no-op",
+      "category": "typescript-only",
+      "reason": "Barrel exports only: C# has no barrel file and the new types are public in PiSharp.Durable (durable-core, durable-edge).",
+      "review": {
+        "finding": "no-op"
+      },
+      "source": {
+        "before": {
+          "path": "packages/durable/src/index.ts",
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "1a3babbeee69ac0b5f9224add73316a9b59c7c02",
+          "sha256": "d4bb495315dac506808b05d20a6b256f77fab0e9ccd0c5acb1b63a01df8b4fd4",
+          "bytes": 4984,
+          "url": "https://github.com/earendil-works/pi/blob/b4afdddf44e059c67ccf5097e5317d913521b470/packages/durable/src/index.ts"
+        },
+        "after": {
+          "path": "packages/durable/src/index.ts",
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "01600a017d5b7a36c79bdf9b997c9899605297e1",
+          "sha256": "d117cb06252d15837b78420f54789b0c542111f0d46b2585724d11fe5f05d4ba",
+          "bytes": 5259,
+          "url": "https://github.com/earendil-works/pi/blob/faac585884ae2c013a6b1400f3e9e77f10b34bac/packages/durable/src/index.ts"
+        }
+      },
+      "historicalMapping": {
+        "upstream": "packages/durable/src/index.ts",
+        "pisharp": "src/PiSharp.Durable/DurableUpstream.cs",
+        "status": "ported",
+        "blobSha1": "9d35a93785197f0026d6bc36e05f0119614e5c98"
+      }
+    },
+    {
+      "id": "sync160.file.1215",
+      "upstream": [
+        "packages/durable/src/session/transaction.ts"
+      ],
+      "change": "M",
+      "workPackage": "durable-core",
+      "area": "durable",
+      "reports": [
+        "AI_DOCS/agent-reports/sync-1.6.0-durable-core.md"
+      ],
+      "status": "tested-with-limitations",
+      "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
+      "review": {
+        "finding": "ported"
+      },
+      "source": {
+        "before": {
+          "path": "packages/durable/src/session/transaction.ts",
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "534807a8457a3103e9e581fdd787c354678db6df",
+          "sha256": "0c6e1093b99c289f33d3261e303d6aca5752f740a2a10349ea9a5428d6c06c64",
+          "bytes": 52747,
+          "url": "https://github.com/earendil-works/pi/blob/b4afdddf44e059c67ccf5097e5317d913521b470/packages/durable/src/session/transaction.ts"
+        },
+        "after": {
+          "path": "packages/durable/src/session/transaction.ts",
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "548a7ad16279ea4a69724d1e6032e8cd512f46dc",
+          "sha256": "eee356ce487b2c9bf1a6d60bb72f7497e567a149d1320bfe0b21a5c24d92eb17",
+          "bytes": 55296,
+          "url": "https://github.com/earendil-works/pi/blob/faac585884ae2c013a6b1400f3e9e77f10b34bac/packages/durable/src/session/transaction.ts"
+        }
+      },
+      "historicalMapping": {
+        "upstream": "packages/durable/src/session/transaction.ts",
+        "pisharp": "src/PiSharp.Durable/Session/Transaction.cs",
+        "status": "ported",
+        "blobSha1": "a25197a74ea630c029e6ec35a51ca82f672e5dee"
+      },
+      "validation": {
+        "record": "compatibility/sync-1.6.0-acceptance.json",
+        "workPackage": "durable-core"
+      }
+    },
+    {
+      "id": "sync160.file.1216",
+      "upstream": [
+        "packages/durable/src/signals.ts"
+      ],
+      "change": "A",
+      "workPackage": "durable-core",
+      "area": "durable",
+      "reports": [
+        "AI_DOCS/agent-reports/sync-1.6.0-durable-core.md"
+      ],
+      "status": "tested-with-limitations",
+      "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
+      "review": {
+        "finding": "ported"
+      },
+      "source": {
+        "before": null,
+        "after": {
+          "path": "packages/durable/src/signals.ts",
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "10a3ce3d690585b5d8c9ce920cbbee1dd1eb0f10",
+          "sha256": "ffd91c21769dd43769b6bb56170bc515e73ec4f1adce998a5d894e230ffe2486",
+          "bytes": 13238,
+          "url": "https://github.com/earendil-works/pi/blob/faac585884ae2c013a6b1400f3e9e77f10b34bac/packages/durable/src/signals.ts"
+        }
+      },
+      "nativeMapping": {
+        "workPackage": "durable-core",
+        "pisharp": [
+          "src/PiSharp.Durable/Signals.cs"
+        ],
+        "tests": [
+          "tests/PiSharp.Durable.Tests/Sync160SignalsCases.cs"
+        ],
+        "note": "defineSignal, SignalToken, SignalKey, SignalState, SignalResult and SubmissionSettled; harness.signal and tx.signal are IHarness.SignalAsync and ITx.SignalAsync (Harness/Harness.cs, Session/Transaction.cs)."
+      },
+      "validation": {
+        "record": "compatibility/sync-1.6.0-acceptance.json",
+        "workPackage": "durable-core"
+      }
+    },
+    {
+      "id": "sync160.file.1217",
+      "upstream": [
+        "packages/durable/src/testing/storage-conformance.ts"
+      ],
+      "change": "M",
+      "workPackage": "durable-core",
+      "area": "durable",
+      "reports": [
+        "AI_DOCS/agent-reports/sync-1.6.0-durable-core.md"
+      ],
+      "status": "tested-with-limitations",
+      "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
+      "review": {
+        "finding": "ported",
+        "note": "The new conformance case did not run against SQL Server (no PISHARP_DURABLE_MSSQL_CONNECTION_STRING)."
+      },
+      "source": {
+        "before": {
+          "path": "packages/durable/src/testing/storage-conformance.ts",
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "073ca5c765b3b633836b36fcab8f8b6ebe579269",
+          "sha256": "9d0b03380f00d6e1428aca703e0bd8131209f14cc2f4885f5810c7883b75edcb",
+          "bytes": 75885,
+          "url": "https://github.com/earendil-works/pi/blob/b4afdddf44e059c67ccf5097e5317d913521b470/packages/durable/src/testing/storage-conformance.ts"
+        },
+        "after": {
+          "path": "packages/durable/src/testing/storage-conformance.ts",
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "75a7324537c4981e6283ec64885947030380e79f",
+          "sha256": "193597633583dffe88c370fbc5786d6157c2f6e1c40b9a29a739d3505e571f5d",
+          "bytes": 77663,
+          "url": "https://github.com/earendil-works/pi/blob/faac585884ae2c013a6b1400f3e9e77f10b34bac/packages/durable/src/testing/storage-conformance.ts"
+        }
+      },
+      "historicalMapping": {
+        "upstream": "packages/durable/src/testing/storage-conformance.ts",
+        "pisharp": "src/PiSharp.Durable/Testing/StorageConformance.cs",
+        "status": "ported",
+        "blobSha1": "70f295454b3d91a19dbcc9321334413109dab6e0"
+      },
+      "validation": {
+        "record": "compatibility/sync-1.6.0-acceptance.json",
+        "workPackage": "durable-core"
+      }
+    },
+    {
+      "id": "sync160.file.1218",
+      "upstream": [
+        "packages/durable/src/tools/image-processor.ts"
+      ],
+      "change": "M",
+      "workPackage": "durable-edge",
+      "area": "durable",
+      "reports": [
+        "AI_DOCS/agent-reports/sync-1.6.0-durable-edge.md"
+      ],
+      "status": "tested-with-limitations",
+      "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
+      "review": {
+        "finding": "ported"
+      },
+      "source": {
+        "before": {
+          "path": "packages/durable/src/tools/image-processor.ts",
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "442cd677f433789eee3d2277bc699f748fef2c3d",
+          "sha256": "fff645e119dba4660513dc7e8eef8b230186a8a51f9332dd0cccbcbb53c5493b",
+          "bytes": 2496,
+          "url": "https://github.com/earendil-works/pi/blob/b4afdddf44e059c67ccf5097e5317d913521b470/packages/durable/src/tools/image-processor.ts"
+        },
+        "after": {
+          "path": "packages/durable/src/tools/image-processor.ts",
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "12220e3c04f9d51ad91d324e6585f38c17e245a8",
+          "sha256": "aeaaee843a5ddb2d91d6643922044c5983285567d56998c4011dd074d7226a35",
+          "bytes": 3922,
+          "url": "https://github.com/earendil-works/pi/blob/faac585884ae2c013a6b1400f3e9e77f10b34bac/packages/durable/src/tools/image-processor.ts"
+        }
+      },
+      "historicalMapping": {
+        "upstream": "packages/durable/src/tools/image-processor.ts",
+        "pisharp": "src/PiSharp.Durable.Tools/Tools/ImageProcessor.cs",
+        "status": "ported",
+        "blobSha1": "442cd677f433789eee3d2277bc699f748fef2c3d"
+      },
+      "nativeMapping": {
+        "workPackage": "durable-edge",
+        "pisharp": [
+          "src/PiSharp.Durable.Tools/Tools/ImageProcessor.cs",
+          "src/PiSharp.Durable.Tools/Tools/Tools.cs"
+        ],
+        "tests": [
+          "tests/PiSharp.Durable.Tests/Sync160ImagesFitCases.cs",
+          "tests/PiSharp.Durable.Tests/ToolsImagesCases.cs"
+        ],
+        "note": "imageLimits is ImageLimits.Of and CodingTools.ImageLimitsOf; preparedNotes and fromBase64 are ImageFormats.PreparedNotes and FromBase64."
+      },
+      "validation": {
+        "record": "compatibility/sync-1.6.0-acceptance.json",
+        "workPackage": "durable-edge"
+      }
+    },
+    {
+      "id": "sync160.file.1219",
+      "upstream": [
+        "packages/durable/src/tools/index.ts"
+      ],
+      "change": "M",
+      "workPackage": "durable-edge",
+      "area": "durable",
+      "reports": [
+        "AI_DOCS/agent-reports/sync-1.6.0-durable-edge.md"
+      ],
+      "status": "tested-with-limitations",
+      "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
+      "review": {
+        "finding": "ported"
+      },
+      "source": {
+        "before": {
+          "path": "packages/durable/src/tools/index.ts",
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "adf06d188ff1b4eb8cad3824eefb396d3ef36489",
+          "sha256": "b5b01979671afd1b7d300ac8149919ac00bb248caa88a7fb98b7ada3aab9e960",
+          "bytes": 1403,
+          "url": "https://github.com/earendil-works/pi/blob/b4afdddf44e059c67ccf5097e5317d913521b470/packages/durable/src/tools/index.ts"
+        },
+        "after": {
+          "path": "packages/durable/src/tools/index.ts",
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "6b1e786578af2efb9495f59a15de72431ee0c87f",
+          "sha256": "b9a9b0d2faa5b9ebece7d7283307e4d685ccb905bcc24bd53d89668b04a68f2a",
+          "bytes": 1417,
+          "url": "https://github.com/earendil-works/pi/blob/faac585884ae2c013a6b1400f3e9e77f10b34bac/packages/durable/src/tools/index.ts"
+        }
+      },
+      "historicalMapping": {
+        "upstream": "packages/durable/src/tools/index.ts",
+        "pisharp": "src/PiSharp.Durable.Tools/Tools/Tools.cs",
+        "status": "ported",
+        "blobSha1": "adf06d188ff1b4eb8cad3824eefb396d3ef36489"
+      },
+      "validation": {
+        "record": "compatibility/sync-1.6.0-acceptance.json",
+        "workPackage": "durable-edge"
+      }
+    },
+    {
+      "id": "sync160.file.1220",
+      "upstream": [
+        "packages/durable/src/tools/read.ts"
+      ],
+      "change": "M",
+      "workPackage": "durable-edge",
+      "area": "durable",
+      "reports": [
+        "AI_DOCS/agent-reports/sync-1.6.0-durable-edge.md"
+      ],
+      "status": "tested-with-limitations",
+      "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
+      "review": {
+        "finding": "ported"
+      },
+      "source": {
+        "before": {
+          "path": "packages/durable/src/tools/read.ts",
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "9dd8c58afca2e6dffeeed51a658d97dfc6511103",
+          "sha256": "8d35081e9ada6156f374596ef77ff48c06785d1655789186a26acfcd15a5e785",
+          "bytes": 14553,
+          "url": "https://github.com/earendil-works/pi/blob/b4afdddf44e059c67ccf5097e5317d913521b470/packages/durable/src/tools/read.ts"
+        },
+        "after": {
+          "path": "packages/durable/src/tools/read.ts",
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "047be4b868a139fa3fcfccd20b4343d6b89a35a3",
+          "sha256": "5b5e50f7651489c4fa39828673d546d64194b42c836572fbe91a10e2e38e0638",
+          "bytes": 14289,
+          "url": "https://github.com/earendil-works/pi/blob/faac585884ae2c013a6b1400f3e9e77f10b34bac/packages/durable/src/tools/read.ts"
+        }
+      },
+      "historicalMapping": {
+        "upstream": "packages/durable/src/tools/read.ts",
+        "pisharp": "src/PiSharp.Durable.Tools/Tools/Read.cs",
+        "status": "ported",
+        "blobSha1": "de84a2b2f18dcaf623fce4f17625c89b3da9df11"
+      },
+      "validation": {
+        "record": "compatibility/sync-1.6.0-acceptance.json",
+        "workPackage": "durable-edge"
+      }
+    },
+    {
+      "id": "sync160.file.1221",
+      "upstream": [
+        "packages/durable/src/types.ts"
+      ],
+      "change": "M",
+      "workPackage": "durable-core",
+      "area": "durable",
+      "reports": [
+        "AI_DOCS/agent-reports/sync-1.6.0-durable-core.md"
+      ],
+      "status": "tested-with-limitations",
+      "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
+      "review": {
+        "finding": "ported"
+      },
+      "source": {
+        "before": {
+          "path": "packages/durable/src/types.ts",
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "583c02d9f31fe6c6804723089726889040f3bdc2",
+          "sha256": "7fa5d80183a7878d6f3e315fe79c0cdfb4b95abf0a915c8d451d538183bddf1c",
+          "bytes": 63252,
+          "url": "https://github.com/earendil-works/pi/blob/b4afdddf44e059c67ccf5097e5317d913521b470/packages/durable/src/types.ts"
+        },
+        "after": {
+          "path": "packages/durable/src/types.ts",
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "ee103e18098e353c1ffbd34cc557fb74b5fed339",
+          "sha256": "d9233152bb681deaad6b0481ad7165309c03c5932272243f3524ec51027408a9",
+          "bytes": 65861,
+          "url": "https://github.com/earendil-works/pi/blob/faac585884ae2c013a6b1400f3e9e77f10b34bac/packages/durable/src/types.ts"
+        }
+      },
+      "historicalMapping": {
+        "upstream": "packages/durable/src/types.ts",
+        "pisharp": "src/PiSharp.Durable/Types.cs",
+        "status": "ported",
+        "blobSha1": "02783256833732bcf89146f5f817c43870dbfb3d"
+      },
+      "validation": {
+        "record": "compatibility/sync-1.6.0-acceptance.json",
+        "workPackage": "durable-core"
+      }
+    },
+    {
+      "id": "sync160.file.1222",
+      "upstream": [
+        "packages/durable/test/codemode-describe.test.ts"
+      ],
+      "change": "M",
+      "workPackage": "durable-edge",
+      "area": "durable",
+      "reports": [
+        "AI_DOCS/agent-reports/sync-1.6.0-durable-edge.md"
+      ],
+      "status": "tested-with-limitations",
+      "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
+      "review": {
+        "finding": "ported"
+      },
+      "source": {
+        "before": {
+          "path": "packages/durable/test/codemode-describe.test.ts",
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "85dfdbe99b1b184a60ea4e859f77270658f0d866",
+          "sha256": "dbcd0ca6a05773f3af8e8cf83ef4f9303a25e9ff0a470c598d6c3843635afaea",
+          "bytes": 5001,
+          "url": "https://github.com/earendil-works/pi/blob/b4afdddf44e059c67ccf5097e5317d913521b470/packages/durable/test/codemode-describe.test.ts"
+        },
+        "after": {
+          "path": "packages/durable/test/codemode-describe.test.ts",
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "e172fcffe22dc38755d97dbbd86298dc69487e96",
+          "sha256": "9b16f48a954ba3b99ef7ea0867eacccde1fbf9ac05235f8f4ecae1baf88ca9d9",
+          "bytes": 6993,
+          "url": "https://github.com/earendil-works/pi/blob/faac585884ae2c013a6b1400f3e9e77f10b34bac/packages/durable/test/codemode-describe.test.ts"
+        }
+      },
+      "historicalMapping": {
+        "upstream": "packages/durable/test/codemode-describe.test.ts",
+        "pisharp": "tests/PiSharp.Durable.Tests/CodemodeDescribeCases.cs",
+        "status": "ported",
+        "blobSha1": "85dfdbe99b1b184a60ea4e859f77270658f0d866"
+      },
+      "nativeMapping": {
+        "workPackage": "durable-edge",
+        "tests": [
+          "tests/PiSharp.Durable.Tests/CodemodeDescribeCases.cs",
+          "tests/PiSharp.Durable.Tests/Sync160CodemodeCases.cs"
+        ],
+        "note": "The cases v1.6.0 rewrote are in CodemodeDescribeCases.cs; the ones it added are in Sync160CodemodeCases.cs."
+      },
+      "validation": {
+        "record": "compatibility/sync-1.6.0-acceptance.json",
+        "workPackage": "durable-edge"
+      }
+    },
+    {
+      "id": "sync160.file.1223",
+      "upstream": [
+        "packages/durable/test/codemode.test.ts"
+      ],
+      "change": "M",
+      "workPackage": "durable-edge",
+      "area": "durable",
+      "reports": [
+        "AI_DOCS/agent-reports/sync-1.6.0-durable-edge.md"
+      ],
+      "status": "tested-with-limitations",
+      "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
+      "review": {
+        "finding": "ported"
+      },
+      "source": {
+        "before": {
+          "path": "packages/durable/test/codemode.test.ts",
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "61da4e7c4b42c77289410769a872fc481af9ff54",
+          "sha256": "e6266a8517742be4bbd53b18e72e11a00f1d2fa14132fd93c25714c3b3b9d38d",
+          "bytes": 47213,
+          "url": "https://github.com/earendil-works/pi/blob/b4afdddf44e059c67ccf5097e5317d913521b470/packages/durable/test/codemode.test.ts"
+        },
+        "after": {
+          "path": "packages/durable/test/codemode.test.ts",
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "feda583a45ba7d9c97a5d3e375863e87cdab8606",
+          "sha256": "55453420e8773f75caa8f2167c1965e50553e8934c399d352e53555fe1e9662d",
+          "bytes": 47853,
+          "url": "https://github.com/earendil-works/pi/blob/faac585884ae2c013a6b1400f3e9e77f10b34bac/packages/durable/test/codemode.test.ts"
+        }
+      },
+      "historicalMapping": {
+        "upstream": "packages/durable/test/codemode.test.ts",
+        "pisharp": "tests/PiSharp.Durable.Tests/CodemodeCases.cs",
+        "status": "ported",
+        "blobSha1": "c12eba6d276ed61b3e6d6a9a4e3385beb5f6113c"
+      },
+      "validation": {
+        "record": "compatibility/sync-1.6.0-acceptance.json",
+        "workPackage": "durable-edge"
+      }
+    },
+    {
+      "id": "sync160.file.1224",
+      "upstream": [
+        "packages/durable/test/env-node-list-race.test.ts"
+      ],
+      "change": "A",
+      "workPackage": "durable-edge",
+      "area": "durable",
+      "reports": [
+        "AI_DOCS/agent-reports/sync-1.6.0-durable-edge.md"
+      ],
+      "status": "tested-with-limitations",
+      "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
+      "review": {
+        "finding": "ported"
+      },
+      "source": {
+        "before": null,
+        "after": {
+          "path": "packages/durable/test/env-node-list-race.test.ts",
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "07bce2cd37119858f0a339ba8c06713d7d90fb88",
+          "sha256": "df8c9c44f217d38f9cc56e8c8484ed3018d02959b937fa24ec844f576385fd35",
+          "bytes": 2372,
+          "url": "https://github.com/earendil-works/pi/blob/faac585884ae2c013a6b1400f3e9e77f10b34bac/packages/durable/test/env-node-list-race.test.ts"
+        }
+      },
+      "nativeMapping": {
+        "workPackage": "durable-edge",
+        "tests": [
+          "tests/PiSharp.Durable.Tests/Sync160EnvListRaceCases.cs"
+        ]
+      },
+      "validation": {
+        "record": "compatibility/sync-1.6.0-acceptance.json",
+        "workPackage": "durable-edge"
+      }
+    },
+    {
+      "id": "sync160.file.1225",
+      "upstream": [
+        "packages/durable/test/examples/32-tests-after-edits.ts"
+      ],
+      "change": "M",
+      "workPackage": "durable-edge",
+      "area": "durable",
+      "reports": [
+        "AI_DOCS/agent-reports/sync-1.6.0-durable-core.md",
+        "AI_DOCS/agent-reports/sync-1.6.0-durable-edge.md"
+      ],
+      "status": "tested-with-limitations",
+      "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
+      "review": {
+        "finding": "ported",
+        "owners": [
+          "durable-core",
+          "durable-edge"
+        ],
+        "note": "durable-core made the edit (runEndTask to hookTask in ExamplesTestsAfterEdits.cs)."
+      },
+      "source": {
+        "before": {
+          "path": "packages/durable/test/examples/32-tests-after-edits.ts",
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "240bfec31f13bba569715345ed9b122fd6450f37",
+          "sha256": "1357eb15c6fe0164c2025e3739d2379affddfae5c98a8ae3271d31c9b24d9e85",
+          "bytes": 6123,
+          "url": "https://github.com/earendil-works/pi/blob/b4afdddf44e059c67ccf5097e5317d913521b470/packages/durable/test/examples/32-tests-after-edits.ts"
+        },
+        "after": {
+          "path": "packages/durable/test/examples/32-tests-after-edits.ts",
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "3c4d23e1971411085561df9a6515e5d8a2fb0e30",
+          "sha256": "ea68bc965cd7d386ad546e98ca001e9ace5f116880a8f1e20911538bcc6e661c",
+          "bytes": 6119,
+          "url": "https://github.com/earendil-works/pi/blob/faac585884ae2c013a6b1400f3e9e77f10b34bac/packages/durable/test/examples/32-tests-after-edits.ts"
+        }
+      },
+      "historicalMapping": {
+        "upstream": "packages/durable/test/examples/32-tests-after-edits.ts",
+        "pisharp": "samples/Durable.Examples/ExamplesTestsAfterEdits.cs",
+        "status": "ported",
+        "blobSha1": "240bfec31f13bba569715345ed9b122fd6450f37"
+      },
+      "validation": {
+        "record": "compatibility/sync-1.6.0-acceptance.json",
+        "workPackage": "durable-edge"
+      }
+    },
+    {
+      "id": "sync160.file.1226",
+      "upstream": [
+        "packages/durable/test/examples/38-signals.ts"
+      ],
+      "change": "A",
+      "workPackage": "durable-edge",
+      "area": "durable",
+      "reports": [
+        "AI_DOCS/agent-reports/sync-1.6.0-durable-edge.md"
+      ],
+      "status": "tested-with-limitations",
+      "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
+      "review": {
+        "finding": "ported",
+        "note": "Ported as a sample under samples/Durable.Examples; expected output is authored from source, not captured under Node (durable-edge)."
+      },
+      "source": {
+        "before": null,
+        "after": {
+          "path": "packages/durable/test/examples/38-signals.ts",
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "2968ff862dbb11db692462dee40677dd8aff47b4",
+          "sha256": "bdce4097abaf5deb3d8efd740a7585def88d48c73c6ea1477eec7b36c7145fda",
+          "bytes": 4122,
+          "url": "https://github.com/earendil-works/pi/blob/faac585884ae2c013a6b1400f3e9e77f10b34bac/packages/durable/test/examples/38-signals.ts"
+        }
+      },
+      "nativeMapping": {
+        "workPackage": "durable-edge",
+        "pisharp": [
+          "samples/Durable.Examples/ExamplesSignals.cs"
+        ],
+        "tests": [
+          "tests/PiSharp.Durable.Tests/ExamplesCases.cs"
+        ]
+      },
+      "validation": {
+        "record": "compatibility/sync-1.6.0-acceptance.json",
+        "workPackage": "durable-edge"
+      }
+    },
+    {
+      "id": "sync160.file.1227",
+      "upstream": [
+        "packages/durable/test/examples/39-ask-a-person.ts"
+      ],
+      "change": "A",
+      "workPackage": "durable-edge",
+      "area": "durable",
+      "reports": [
+        "AI_DOCS/agent-reports/sync-1.6.0-durable-edge.md"
+      ],
+      "status": "tested-with-limitations",
+      "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
+      "review": {
+        "finding": "ported",
+        "note": "Ported as a sample under samples/Durable.Examples; expected output is authored from source, not captured under Node (durable-edge)."
+      },
+      "source": {
+        "before": null,
+        "after": {
+          "path": "packages/durable/test/examples/39-ask-a-person.ts",
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "b4639cd31bdf1dfc7b174ab0c2b011d0555ef28c",
+          "sha256": "08da40dbb39986ee6adc8bf69710ebb4128ab8e57f13d385ba92a9166113cdef",
+          "bytes": 4487,
+          "url": "https://github.com/earendil-works/pi/blob/faac585884ae2c013a6b1400f3e9e77f10b34bac/packages/durable/test/examples/39-ask-a-person.ts"
+        }
+      },
+      "nativeMapping": {
+        "workPackage": "durable-edge",
+        "pisharp": [
+          "samples/Durable.Examples/ExamplesSignals.cs"
+        ],
+        "tests": [
+          "tests/PiSharp.Durable.Tests/ExamplesCases.cs"
+        ]
+      },
+      "validation": {
+        "record": "compatibility/sync-1.6.0-acceptance.json",
+        "workPackage": "durable-edge"
+      }
+    },
+    {
+      "id": "sync160.file.1228",
+      "upstream": [
+        "packages/durable/test/examples/40-tool-waits-for-webhook.ts"
+      ],
+      "change": "A",
+      "workPackage": "durable-edge",
+      "area": "durable",
+      "reports": [
+        "AI_DOCS/agent-reports/sync-1.6.0-durable-edge.md"
+      ],
+      "status": "tested-with-limitations",
+      "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
+      "review": {
+        "finding": "ported",
+        "note": "Ported as a sample under samples/Durable.Examples; expected output is authored from source, not captured under Node (durable-edge)."
+      },
+      "source": {
+        "before": null,
+        "after": {
+          "path": "packages/durable/test/examples/40-tool-waits-for-webhook.ts",
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "deead58007068970eb71cf6e82d6df73ea07d9c7",
+          "sha256": "0392381b369df6e35fa7b13eefe1da17e2ca652cd7b2d04d69f3b219fba39ffa",
+          "bytes": 9100,
+          "url": "https://github.com/earendil-works/pi/blob/faac585884ae2c013a6b1400f3e9e77f10b34bac/packages/durable/test/examples/40-tool-waits-for-webhook.ts"
+        }
+      },
+      "nativeMapping": {
+        "workPackage": "durable-edge",
+        "pisharp": [
+          "samples/Durable.Examples/ExamplesToolParks.cs"
+        ],
+        "tests": [
+          "tests/PiSharp.Durable.Tests/ExamplesCases.cs"
+        ]
+      },
+      "validation": {
+        "record": "compatibility/sync-1.6.0-acceptance.json",
+        "workPackage": "durable-edge"
+      }
+    },
+    {
+      "id": "sync160.file.1229",
+      "upstream": [
+        "packages/durable/test/examples/41-tool-polls.ts"
+      ],
+      "change": "A",
+      "workPackage": "durable-edge",
+      "area": "durable",
+      "reports": [
+        "AI_DOCS/agent-reports/sync-1.6.0-durable-edge.md"
+      ],
+      "status": "tested-with-limitations",
+      "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
+      "review": {
+        "finding": "ported",
+        "note": "Ported as a sample under samples/Durable.Examples; expected output is authored from source, not captured under Node (durable-edge)."
+      },
+      "source": {
+        "before": null,
+        "after": {
+          "path": "packages/durable/test/examples/41-tool-polls.ts",
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "eaabb80cfedfae6d534229dd1dac615307d43da0",
+          "sha256": "5ed983f581e21a8e59bd15a1cc3a9bc7e2d98e7ef5b050d8e64dd2d653761484",
+          "bytes": 4184,
+          "url": "https://github.com/earendil-works/pi/blob/faac585884ae2c013a6b1400f3e9e77f10b34bac/packages/durable/test/examples/41-tool-polls.ts"
+        }
+      },
+      "nativeMapping": {
+        "workPackage": "durable-edge",
+        "pisharp": [
+          "samples/Durable.Examples/ExamplesToolParks.cs"
+        ],
+        "tests": [
+          "tests/PiSharp.Durable.Tests/ExamplesCases.cs"
+        ]
+      },
+      "validation": {
+        "record": "compatibility/sync-1.6.0-acceptance.json",
+        "workPackage": "durable-edge"
+      }
+    },
+    {
+      "id": "sync160.file.1230",
+      "upstream": [
+        "packages/durable/test/examples/42-parallel-children.ts"
+      ],
+      "change": "A",
+      "workPackage": "durable-edge",
+      "area": "durable",
+      "reports": [
+        "AI_DOCS/agent-reports/sync-1.6.0-durable-edge.md"
+      ],
+      "status": "tested-with-limitations",
+      "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
+      "review": {
+        "finding": "ported",
+        "note": "Ported as a sample under samples/Durable.Examples; expected output is authored from source, not captured under Node (durable-edge)."
+      },
+      "source": {
+        "before": null,
+        "after": {
+          "path": "packages/durable/test/examples/42-parallel-children.ts",
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "70d030c4130bd5bfab04714d05629fb613944df0",
+          "sha256": "4481e39435081ab69323cb7e0c4fd033d9d72f3853a990aa442dea5a1d66cd76",
+          "bytes": 5025,
+          "url": "https://github.com/earendil-works/pi/blob/faac585884ae2c013a6b1400f3e9e77f10b34bac/packages/durable/test/examples/42-parallel-children.ts"
+        }
+      },
+      "nativeMapping": {
+        "workPackage": "durable-edge",
+        "pisharp": [
+          "samples/Durable.Examples/ExamplesToolParks.cs"
+        ],
+        "tests": [
+          "tests/PiSharp.Durable.Tests/ExamplesCases.cs"
+        ]
+      },
+      "validation": {
+        "record": "compatibility/sync-1.6.0-acceptance.json",
+        "workPackage": "durable-edge"
+      }
+    },
+    {
+      "id": "sync160.file.1231",
+      "upstream": [
+        "packages/durable/test/examples/43-subagent-waits.ts"
+      ],
+      "change": "A",
+      "workPackage": "durable-edge",
+      "area": "durable",
+      "reports": [
+        "AI_DOCS/agent-reports/sync-1.6.0-durable-edge.md"
+      ],
+      "status": "tested-with-limitations",
+      "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
+      "review": {
+        "finding": "ported",
+        "note": "Ported as a sample under samples/Durable.Examples; expected output is authored from source, not captured under Node (durable-edge)."
+      },
+      "source": {
+        "before": null,
+        "after": {
+          "path": "packages/durable/test/examples/43-subagent-waits.ts",
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "0b2172ee15ead026e90e4ff42056b450d30b4f51",
+          "sha256": "2cd2ba061292886b68d7f7dc1a2c73d309596dde8a802fb881fbb06de9f6fe6e",
+          "bytes": 5730,
+          "url": "https://github.com/earendil-works/pi/blob/faac585884ae2c013a6b1400f3e9e77f10b34bac/packages/durable/test/examples/43-subagent-waits.ts"
+        }
+      },
+      "nativeMapping": {
+        "workPackage": "durable-edge",
+        "pisharp": [
+          "samples/Durable.Examples/ExamplesToolParks.cs"
+        ],
+        "tests": [
+          "tests/PiSharp.Durable.Tests/ExamplesCases.cs"
+        ]
+      },
+      "validation": {
+        "record": "compatibility/sync-1.6.0-acceptance.json",
+        "workPackage": "durable-edge"
+      }
+    },
+    {
+      "id": "sync160.file.1232",
+      "upstream": [
+        "packages/durable/test/examples/44-approval-gate.ts"
+      ],
+      "change": "A",
+      "workPackage": "durable-edge",
+      "area": "durable",
+      "reports": [
+        "AI_DOCS/agent-reports/sync-1.6.0-durable-edge.md"
+      ],
+      "status": "tested-with-limitations",
+      "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
+      "review": {
+        "finding": "ported",
+        "note": "Ported as a sample under samples/Durable.Examples; expected output is authored from source, not captured under Node (durable-edge)."
+      },
+      "source": {
+        "before": null,
+        "after": {
+          "path": "packages/durable/test/examples/44-approval-gate.ts",
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "cef493c8fb9904a8c4cdad0f0002bde71be453b2",
+          "sha256": "7a766a3b62ff508e1bc9363c5f8ba4713551d8acfa949d9cef10e9f74dc2eba7",
+          "bytes": 6204,
+          "url": "https://github.com/earendil-works/pi/blob/faac585884ae2c013a6b1400f3e9e77f10b34bac/packages/durable/test/examples/44-approval-gate.ts"
+        }
+      },
+      "nativeMapping": {
+        "workPackage": "durable-edge",
+        "pisharp": [
+          "samples/Durable.Examples/ExamplesGates.cs"
+        ],
+        "tests": [
+          "tests/PiSharp.Durable.Tests/ExamplesCases.cs"
+        ]
+      },
+      "validation": {
+        "record": "compatibility/sync-1.6.0-acceptance.json",
+        "workPackage": "durable-edge"
+      }
+    },
+    {
+      "id": "sync160.file.1233",
+      "upstream": [
+        "packages/durable/test/examples/45-review-on-yield.ts"
+      ],
+      "change": "A",
+      "workPackage": "durable-edge",
+      "area": "durable",
+      "reports": [
+        "AI_DOCS/agent-reports/sync-1.6.0-durable-edge.md"
+      ],
+      "status": "tested-with-limitations",
+      "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
+      "review": {
+        "finding": "ported",
+        "note": "Ported as a sample under samples/Durable.Examples; expected output is authored from source, not captured under Node (durable-edge)."
+      },
+      "source": {
+        "before": null,
+        "after": {
+          "path": "packages/durable/test/examples/45-review-on-yield.ts",
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "be2a8a93e1d349a8d05cfa887ff325340e82b8c5",
+          "sha256": "e2ba7ea7fa8670732ab05b230945387f4f12f4078b94dd08faccdfa0fa39a1c5",
+          "bytes": 4394,
+          "url": "https://github.com/earendil-works/pi/blob/faac585884ae2c013a6b1400f3e9e77f10b34bac/packages/durable/test/examples/45-review-on-yield.ts"
+        }
+      },
+      "nativeMapping": {
+        "workPackage": "durable-edge",
+        "pisharp": [
+          "samples/Durable.Examples/ExamplesGates.cs"
+        ],
+        "tests": [
+          "tests/PiSharp.Durable.Tests/ExamplesCases.cs"
+        ]
+      },
+      "validation": {
+        "record": "compatibility/sync-1.6.0-acceptance.json",
+        "workPackage": "durable-edge"
+      }
+    },
+    {
+      "id": "sync160.file.1234",
+      "upstream": [
+        "packages/durable/test/examples/46-after-tools-terminate.ts"
+      ],
+      "change": "A",
+      "workPackage": "durable-edge",
+      "area": "durable",
+      "reports": [
+        "AI_DOCS/agent-reports/sync-1.6.0-durable-edge.md"
+      ],
+      "status": "tested-with-limitations",
+      "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
+      "review": {
+        "finding": "ported",
+        "note": "Ported as a sample under samples/Durable.Examples; expected output is authored from source, not captured under Node (durable-edge)."
+      },
+      "source": {
+        "before": null,
+        "after": {
+          "path": "packages/durable/test/examples/46-after-tools-terminate.ts",
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "c97f1cfa8059e01d4b85eaf7ef71a8dd83c745c7",
+          "sha256": "828897220c35e2afa41aad6cbe069d72e450e5db991d573a0f8351e0ab22a104",
+          "bytes": 4718,
+          "url": "https://github.com/earendil-works/pi/blob/faac585884ae2c013a6b1400f3e9e77f10b34bac/packages/durable/test/examples/46-after-tools-terminate.ts"
+        }
+      },
+      "nativeMapping": {
+        "workPackage": "durable-edge",
+        "pisharp": [
+          "samples/Durable.Examples/ExamplesGates.cs"
+        ],
+        "tests": [
+          "tests/PiSharp.Durable.Tests/ExamplesCases.cs"
+        ]
+      },
+      "validation": {
+        "record": "compatibility/sync-1.6.0-acceptance.json",
+        "workPackage": "durable-edge"
+      }
+    },
+    {
+      "id": "sync160.file.1235",
+      "upstream": [
+        "packages/durable/test/examples/47-fit-images.ts"
+      ],
+      "change": "A",
+      "workPackage": "durable-edge",
+      "area": "durable",
+      "reports": [
+        "AI_DOCS/agent-reports/sync-1.6.0-durable-edge.md"
+      ],
+      "status": "tested-with-limitations",
+      "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
+      "review": {
+        "finding": "ported",
+        "note": "Ported as a sample under samples/Durable.Examples; expected output is authored from source, not captured under Node (durable-edge)."
+      },
+      "source": {
+        "before": null,
+        "after": {
+          "path": "packages/durable/test/examples/47-fit-images.ts",
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "a86e8f0a1bfc30964a984b120ef0e390c94f573f",
+          "sha256": "1d122088e71a98022ab7515760bf51c4d85cdcc9782dfe368f2078e19c850ee6",
+          "bytes": 5400,
+          "url": "https://github.com/earendil-works/pi/blob/faac585884ae2c013a6b1400f3e9e77f10b34bac/packages/durable/test/examples/47-fit-images.ts"
+        }
+      },
+      "nativeMapping": {
+        "workPackage": "durable-edge",
+        "pisharp": [
+          "samples/Durable.Examples/ExamplesFitImages.cs"
+        ],
+        "tests": [
+          "tests/PiSharp.Durable.Tests/ExamplesCases.cs"
+        ]
+      },
+      "validation": {
+        "record": "compatibility/sync-1.6.0-acceptance.json",
+        "workPackage": "durable-edge"
+      }
+    },
+    {
+      "id": "sync160.file.1236",
+      "upstream": [
+        "packages/durable/test/harness-after-run.test.ts"
+      ],
+      "change": "M",
+      "workPackage": "durable-core",
+      "area": "durable",
+      "reports": [
+        "AI_DOCS/agent-reports/sync-1.6.0-durable-core.md"
+      ],
+      "status": "tested-with-limitations",
+      "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
+      "review": {
+        "finding": "ported"
+      },
+      "source": {
+        "before": {
+          "path": "packages/durable/test/harness-after-run.test.ts",
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "295cb773ac0352155482a8fc3fc05b88cdafdf20",
+          "sha256": "a5139218d51a01a5035b351fe8f9af768d618b11ba4c2dac821fb36d675eb590",
+          "bytes": 46971,
+          "url": "https://github.com/earendil-works/pi/blob/b4afdddf44e059c67ccf5097e5317d913521b470/packages/durable/test/harness-after-run.test.ts"
+        },
+        "after": {
+          "path": "packages/durable/test/harness-after-run.test.ts",
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "593ad5f8c70c503c65d0624593f36a4eda21bef7",
+          "sha256": "4540fd57ec9013846d2f405aa12b8d339253a3298e953eeade046baf98fbd47b",
+          "bytes": 46935,
+          "url": "https://github.com/earendil-works/pi/blob/faac585884ae2c013a6b1400f3e9e77f10b34bac/packages/durable/test/harness-after-run.test.ts"
+        }
+      },
+      "historicalMapping": {
+        "upstream": "packages/durable/test/harness-after-run.test.ts",
+        "pisharp": "tests/PiSharp.Durable.Tests/HarnessAfterRunCases.cs",
+        "status": "ported",
+        "blobSha1": "7201fe6af60821659f831f927bf3d21254412d14"
+      },
+      "validation": {
+        "record": "compatibility/sync-1.6.0-acceptance.json",
+        "workPackage": "durable-core"
+      }
+    },
+    {
+      "id": "sync160.file.1237",
+      "upstream": [
+        "packages/durable/test/harness-hook-tasks.test.ts"
+      ],
+      "change": "A",
+      "workPackage": "durable-core",
+      "area": "durable",
+      "reports": [
+        "AI_DOCS/agent-reports/sync-1.6.0-durable-core.md"
+      ],
+      "status": "tested-with-limitations",
+      "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
+      "review": {
+        "finding": "ported"
+      },
+      "source": {
+        "before": null,
+        "after": {
+          "path": "packages/durable/test/harness-hook-tasks.test.ts",
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "996141fd6a210757a17b0e3241b36a99bcab1287",
+          "sha256": "efc785543f1a2d338b51c2ced36b6609fb957c098c3bbfb5a550a951ea72c976",
+          "bytes": 17571,
+          "url": "https://github.com/earendil-works/pi/blob/faac585884ae2c013a6b1400f3e9e77f10b34bac/packages/durable/test/harness-hook-tasks.test.ts"
+        }
+      },
+      "nativeMapping": {
+        "workPackage": "durable-core",
+        "tests": [
+          "tests/PiSharp.Durable.Tests/Sync160HookTasksCases.cs"
+        ]
+      },
+      "validation": {
+        "record": "compatibility/sync-1.6.0-acceptance.json",
+        "workPackage": "durable-core"
+      }
+    },
+    {
+      "id": "sync160.file.1238",
+      "upstream": [
+        "packages/durable/test/harness-idle-scopes.test.ts"
+      ],
+      "change": "M",
+      "workPackage": "durable-core",
+      "area": "durable",
+      "reports": [
+        "AI_DOCS/agent-reports/sync-1.6.0-durable-core.md"
+      ],
+      "status": "tested-with-limitations",
+      "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
+      "review": {
+        "finding": "ported"
+      },
+      "source": {
+        "before": {
+          "path": "packages/durable/test/harness-idle-scopes.test.ts",
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "b034150b0ec6150bf44b0ed62d0dd961067dd79d",
+          "sha256": "a35c49e3cde839151be10b09347248b9c6217db527a52e2f57e9079dc2a0b4ff",
+          "bytes": 25378,
+          "url": "https://github.com/earendil-works/pi/blob/b4afdddf44e059c67ccf5097e5317d913521b470/packages/durable/test/harness-idle-scopes.test.ts"
+        },
+        "after": {
+          "path": "packages/durable/test/harness-idle-scopes.test.ts",
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "1f8b4be6f5a74df2c8266f6b1c7565791625c24c",
+          "sha256": "452113d29266ef929d1821c61b29f0c2e3c2aa55ed07a6cfd9f029f8c320b30e",
+          "bytes": 27446,
+          "url": "https://github.com/earendil-works/pi/blob/faac585884ae2c013a6b1400f3e9e77f10b34bac/packages/durable/test/harness-idle-scopes.test.ts"
+        }
+      },
+      "historicalMapping": {
+        "upstream": "packages/durable/test/harness-idle-scopes.test.ts",
+        "pisharp": "tests/PiSharp.Durable.Tests/HarnessIdleScopesCases.cs",
+        "status": "ported",
+        "blobSha1": "b034150b0ec6150bf44b0ed62d0dd961067dd79d"
+      },
+      "validation": {
+        "record": "compatibility/sync-1.6.0-acceptance.json",
+        "workPackage": "durable-core"
+      }
+    },
+    {
+      "id": "sync160.file.1239",
+      "upstream": [
+        "packages/durable/test/harness-input-entries.test.ts"
+      ],
+      "change": "M",
+      "workPackage": "durable-core",
+      "area": "durable",
+      "reports": [
+        "AI_DOCS/agent-reports/sync-1.6.0-durable-core.md"
+      ],
+      "status": "tested-with-limitations",
+      "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
+      "review": {
+        "finding": "ported"
+      },
+      "source": {
+        "before": {
+          "path": "packages/durable/test/harness-input-entries.test.ts",
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "ce6baa468da6418227967a0fb12a0768bd5283a0",
+          "sha256": "aa2014cafb0206b43d88db21ce76f1aa0dbadca6d7ce757addc7fcb67e557b32",
+          "bytes": 20126,
+          "url": "https://github.com/earendil-works/pi/blob/b4afdddf44e059c67ccf5097e5317d913521b470/packages/durable/test/harness-input-entries.test.ts"
+        },
+        "after": {
+          "path": "packages/durable/test/harness-input-entries.test.ts",
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "c460360d5b876613cf99572fb57ef243e5895f66",
+          "sha256": "576cb9f8347b45287a468a55e6e45972d983edc09904e9e38c0e3e76952e29bf",
+          "bytes": 22410,
+          "url": "https://github.com/earendil-works/pi/blob/faac585884ae2c013a6b1400f3e9e77f10b34bac/packages/durable/test/harness-input-entries.test.ts"
+        }
+      },
+      "historicalMapping": {
+        "upstream": "packages/durable/test/harness-input-entries.test.ts",
+        "pisharp": "tests/PiSharp.Durable.Tests/HarnessInputEntriesCases.cs",
+        "status": "ported",
+        "blobSha1": "ce6baa468da6418227967a0fb12a0768bd5283a0"
+      },
+      "validation": {
+        "record": "compatibility/sync-1.6.0-acceptance.json",
+        "workPackage": "durable-core"
+      }
+    },
+    {
+      "id": "sync160.file.1240",
+      "upstream": [
+        "packages/durable/test/harness-lifecycle.test.ts"
+      ],
+      "change": "M",
+      "workPackage": "durable-core",
+      "area": "durable",
+      "reports": [
+        "AI_DOCS/agent-reports/sync-1.6.0-durable-core.md"
+      ],
+      "status": "tested-with-limitations",
+      "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
+      "review": {
+        "finding": "ported"
+      },
+      "source": {
+        "before": {
+          "path": "packages/durable/test/harness-lifecycle.test.ts",
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "be5bc432fdd00db7d485ff1893166aa54f8fc267",
+          "sha256": "ed0a3bd2725a64ad77a004b2202c0f4565a8f92dbdc9e235bffa676c6e406283",
+          "bytes": 23342,
+          "url": "https://github.com/earendil-works/pi/blob/b4afdddf44e059c67ccf5097e5317d913521b470/packages/durable/test/harness-lifecycle.test.ts"
+        },
+        "after": {
+          "path": "packages/durable/test/harness-lifecycle.test.ts",
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "9ef2063f0185bc551791c0fd7ac4534736de31da",
+          "sha256": "1200987a0f39edfcdf5da4d2566aabd575de0267575a7dc4b4c7b36e8edcd9c8",
+          "bytes": 28082,
+          "url": "https://github.com/earendil-works/pi/blob/faac585884ae2c013a6b1400f3e9e77f10b34bac/packages/durable/test/harness-lifecycle.test.ts"
+        }
+      },
+      "historicalMapping": {
+        "upstream": "packages/durable/test/harness-lifecycle.test.ts",
+        "pisharp": "tests/PiSharp.Durable.Tests/Harness/HarnessLifecycleCases.cs",
+        "status": "ported",
+        "blobSha1": "bf044120b09e43037143845553bbb902439374f6"
+      },
+      "validation": {
+        "record": "compatibility/sync-1.6.0-acceptance.json",
+        "workPackage": "durable-core"
+      }
+    },
+    {
+      "id": "sync160.file.1241",
+      "upstream": [
+        "packages/durable/test/harness-nested-tools.test.ts"
+      ],
+      "change": "M",
+      "workPackage": "durable-core",
+      "area": "durable",
+      "reports": [
+        "AI_DOCS/agent-reports/sync-1.6.0-durable-core.md"
+      ],
+      "status": "tested-with-limitations",
+      "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
+      "review": {
+        "finding": "ported"
+      },
+      "source": {
+        "before": {
+          "path": "packages/durable/test/harness-nested-tools.test.ts",
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "da617e4945a31781cd36a396aa56e2d39d0cbef1",
+          "sha256": "d16b5719851e89d329cf2a46ecd82857b59e17ae5cf77448afc7951a0b558503",
+          "bytes": 51401,
+          "url": "https://github.com/earendil-works/pi/blob/b4afdddf44e059c67ccf5097e5317d913521b470/packages/durable/test/harness-nested-tools.test.ts"
+        },
+        "after": {
+          "path": "packages/durable/test/harness-nested-tools.test.ts",
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "a7577601b70ffa6afdcc5fb95d21143252409e80",
+          "sha256": "6f99bdf934f6fe865d60dcad419197ffa87a2004defedc542410a8bd968f690e",
+          "bytes": 51433,
+          "url": "https://github.com/earendil-works/pi/blob/faac585884ae2c013a6b1400f3e9e77f10b34bac/packages/durable/test/harness-nested-tools.test.ts"
+        }
+      },
+      "historicalMapping": {
+        "upstream": "packages/durable/test/harness-nested-tools.test.ts",
+        "pisharp": "tests/PiSharp.Durable.Tests/HarnessNestedToolsCases.cs",
+        "status": "ported",
+        "blobSha1": "66de32766878296cb742e9e8e128270e3e8e1f6d"
+      },
+      "validation": {
+        "record": "compatibility/sync-1.6.0-acceptance.json",
+        "workPackage": "durable-core"
+      }
+    },
+    {
+      "id": "sync160.file.1242",
+      "upstream": [
+        "packages/durable/test/harness-park-children.test.ts"
+      ],
+      "change": "A",
+      "workPackage": "durable-core",
+      "area": "durable",
+      "reports": [
+        "AI_DOCS/agent-reports/sync-1.6.0-durable-core.md"
+      ],
+      "status": "tested-with-limitations",
+      "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
+      "review": {
+        "finding": "ported"
+      },
+      "source": {
+        "before": null,
+        "after": {
+          "path": "packages/durable/test/harness-park-children.test.ts",
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "bcb1e1c2fa200afdd122c976e198fdcf89a33111",
+          "sha256": "ac4a029ffd666ef6018092cc79b953e2a2ee8a77083d3b0ead75a34dc6cd0451",
+          "bytes": 20338,
+          "url": "https://github.com/earendil-works/pi/blob/faac585884ae2c013a6b1400f3e9e77f10b34bac/packages/durable/test/harness-park-children.test.ts"
+        }
+      },
+      "nativeMapping": {
+        "workPackage": "durable-core",
+        "tests": [
+          "tests/PiSharp.Durable.Tests/Sync160ParkChildrenCases.cs"
+        ]
+      },
+      "validation": {
+        "record": "compatibility/sync-1.6.0-acceptance.json",
+        "workPackage": "durable-core"
+      }
+    },
+    {
+      "id": "sync160.file.1243",
+      "upstream": [
+        "packages/durable/test/harness-signals.test.ts"
+      ],
+      "change": "A",
+      "workPackage": "durable-core",
+      "area": "durable",
+      "reports": [
+        "AI_DOCS/agent-reports/sync-1.6.0-durable-core.md"
+      ],
+      "status": "tested-with-limitations",
+      "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
+      "review": {
+        "finding": "ported",
+        "deferred": "One assertion is not ported: the NaN delivery inside \"answers not_found, invalid, ...\" (a JsonValue cannot hold NaN) (durable-core)."
+      },
+      "source": {
+        "before": null,
+        "after": {
+          "path": "packages/durable/test/harness-signals.test.ts",
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "f807c34494a163c08f5ad25451553930de826e8c",
+          "sha256": "6d8d316ccf9ca0c6e13d0bf85d345ac2210362ae5c34d1c9952791f2bdb9cd6f",
+          "bytes": 29710,
+          "url": "https://github.com/earendil-works/pi/blob/faac585884ae2c013a6b1400f3e9e77f10b34bac/packages/durable/test/harness-signals.test.ts"
+        }
+      },
+      "nativeMapping": {
+        "workPackage": "durable-core",
+        "tests": [
+          "tests/PiSharp.Durable.Tests/Sync160SignalsCases.cs"
+        ]
+      },
+      "validation": {
+        "record": "compatibility/sync-1.6.0-acceptance.json",
+        "workPackage": "durable-core",
+        "limitations": [
+          "packages/durable/test/harness-signals.test.ts: One assertion is not ported: the NaN delivery inside \"answers not_found, invalid, ...\" (a JsonValue cannot hold NaN) (durable-core)."
+        ]
+      }
+    },
+    {
+      "id": "sync160.file.1244",
+      "upstream": [
+        "packages/durable/test/harness-submissions.test.ts"
+      ],
+      "change": "M",
+      "workPackage": "durable-core",
+      "area": "durable",
+      "reports": [
+        "AI_DOCS/agent-reports/sync-1.6.0-durable-core.md"
+      ],
+      "status": "tested-with-limitations",
+      "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
+      "review": {
+        "finding": "ported"
+      },
+      "source": {
+        "before": {
+          "path": "packages/durable/test/harness-submissions.test.ts",
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "5ee8eac225b2c3fd0dca8d62b96b1b30d548054b",
+          "sha256": "8096a5827e609e6e92b4c1c3202894afea55931c8bcd5daff178aa610e99ec75",
+          "bytes": 13957,
+          "url": "https://github.com/earendil-works/pi/blob/b4afdddf44e059c67ccf5097e5317d913521b470/packages/durable/test/harness-submissions.test.ts"
+        },
+        "after": {
+          "path": "packages/durable/test/harness-submissions.test.ts",
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "a8bb8e30ebf14d5ede177f26f6fc72cbf8b13d26",
+          "sha256": "21aa063f7733cea866476a515124a303711b0dbc9a20a0f118989f2573ae8c11",
+          "bytes": 15350,
+          "url": "https://github.com/earendil-works/pi/blob/faac585884ae2c013a6b1400f3e9e77f10b34bac/packages/durable/test/harness-submissions.test.ts"
+        }
+      },
+      "historicalMapping": {
+        "upstream": "packages/durable/test/harness-submissions.test.ts",
+        "pisharp": "tests/PiSharp.Durable.Tests/Harness/HarnessSubmissionsCases.cs",
+        "status": "ported",
+        "blobSha1": "5ee8eac225b2c3fd0dca8d62b96b1b30d548054b"
+      },
+      "validation": {
+        "record": "compatibility/sync-1.6.0-acceptance.json",
+        "workPackage": "durable-core"
+      }
+    },
+    {
+      "id": "sync160.file.1245",
+      "upstream": [
+        "packages/durable/test/harness-tool-gates.test.ts"
+      ],
+      "change": "A",
+      "workPackage": "durable-core",
+      "area": "durable",
+      "reports": [
+        "AI_DOCS/agent-reports/sync-1.6.0-durable-core.md"
+      ],
+      "status": "tested-with-limitations",
+      "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
+      "review": {
+        "finding": "ported"
+      },
+      "source": {
+        "before": null,
+        "after": {
+          "path": "packages/durable/test/harness-tool-gates.test.ts",
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "75e3566104e1991e8e0d56f2c359e8ac75fe3f04",
+          "sha256": "1f9be407e6e02bb8a05d336f2c06054572cc959bef76a54929728265bc953c27",
+          "bytes": 13883,
+          "url": "https://github.com/earendil-works/pi/blob/faac585884ae2c013a6b1400f3e9e77f10b34bac/packages/durable/test/harness-tool-gates.test.ts"
+        }
+      },
+      "nativeMapping": {
+        "workPackage": "durable-core",
+        "tests": [
+          "tests/PiSharp.Durable.Tests/Sync160ToolGatesCases.cs"
+        ]
+      },
+      "validation": {
+        "record": "compatibility/sync-1.6.0-acceptance.json",
+        "workPackage": "durable-core"
+      }
+    },
+    {
+      "id": "sync160.file.1246",
+      "upstream": [
+        "packages/durable/test/harness-tool-hooks.test.ts"
+      ],
+      "change": "M",
+      "workPackage": "durable-core",
+      "area": "durable",
+      "reports": [
+        "AI_DOCS/agent-reports/sync-1.6.0-durable-core.md"
+      ],
+      "status": "tested-with-limitations",
+      "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
+      "review": {
+        "finding": "ported"
+      },
+      "source": {
+        "before": {
+          "path": "packages/durable/test/harness-tool-hooks.test.ts",
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "e9fdb62be103f2aafb47f01fae395ab7f8f0fcd5",
+          "sha256": "2bfa027a92ffdff6b3740711db496d58d3285883340f1988d5e1cde1c79dfe59",
+          "bytes": 32005,
+          "url": "https://github.com/earendil-works/pi/blob/b4afdddf44e059c67ccf5097e5317d913521b470/packages/durable/test/harness-tool-hooks.test.ts"
+        },
+        "after": {
+          "path": "packages/durable/test/harness-tool-hooks.test.ts",
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "80cfbf182fb90ffacafffa41791aed3b768866a5",
+          "sha256": "a2fdc36eb7ffd4d27e00b3023d5ba8ffeb1b5ba376036b0470f1438eadc54ce4",
+          "bytes": 32005,
+          "url": "https://github.com/earendil-works/pi/blob/faac585884ae2c013a6b1400f3e9e77f10b34bac/packages/durable/test/harness-tool-hooks.test.ts"
+        }
+      },
+      "historicalMapping": {
+        "upstream": "packages/durable/test/harness-tool-hooks.test.ts",
+        "pisharp": "tests/PiSharp.Durable.Tests/HarnessToolHooksCases.cs",
+        "status": "ported",
+        "blobSha1": "beca471e1f8d1eb4e4755969563cc91edd251ee6"
+      },
+      "validation": {
+        "record": "compatibility/sync-1.6.0-acceptance.json",
+        "workPackage": "durable-core"
+      }
+    },
+    {
+      "id": "sync160.file.1247",
+      "upstream": [
+        "packages/durable/test/harness-tool-parks.test.ts"
+      ],
+      "change": "A",
+      "workPackage": "durable-core",
+      "area": "durable",
+      "reports": [
+        "AI_DOCS/agent-reports/sync-1.6.0-durable-core.md"
+      ],
+      "status": "tested-with-limitations",
+      "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
+      "review": {
+        "finding": "ported"
+      },
+      "source": {
+        "before": null,
+        "after": {
+          "path": "packages/durable/test/harness-tool-parks.test.ts",
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "ba52249caf7f7eb652b5126d81dd475c22265a66",
+          "sha256": "ebc466c10eafa660eadffc3ea01a736bba8ecc2d2aeda5de324107b53e1bd128",
+          "bytes": 27725,
+          "url": "https://github.com/earendil-works/pi/blob/faac585884ae2c013a6b1400f3e9e77f10b34bac/packages/durable/test/harness-tool-parks.test.ts"
+        }
+      },
+      "nativeMapping": {
+        "workPackage": "durable-core",
+        "tests": [
+          "tests/PiSharp.Durable.Tests/Sync160ToolParksCases.cs"
+        ]
+      },
+      "validation": {
+        "record": "compatibility/sync-1.6.0-acceptance.json",
+        "workPackage": "durable-core"
+      }
+    },
+    {
+      "id": "sync160.file.1248",
+      "upstream": [
+        "packages/durable/test/harness-tools.test.ts"
+      ],
+      "change": "M",
+      "workPackage": "durable-core",
+      "area": "durable",
+      "reports": [
+        "AI_DOCS/agent-reports/sync-1.6.0-durable-core.md"
+      ],
+      "status": "tested-with-limitations",
+      "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
+      "review": {
+        "finding": "ported"
+      },
+      "source": {
+        "before": {
+          "path": "packages/durable/test/harness-tools.test.ts",
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "f162053787c8aefd25c25d65ba32725f96b3fade",
+          "sha256": "a52bf251b091be766000210bbda10bc42c8b7f9c2021f4063d01451e4490ae6f",
+          "bytes": 51720,
+          "url": "https://github.com/earendil-works/pi/blob/b4afdddf44e059c67ccf5097e5317d913521b470/packages/durable/test/harness-tools.test.ts"
+        },
+        "after": {
+          "path": "packages/durable/test/harness-tools.test.ts",
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "3dc7b00df09f484b8a53244927c335e7b57012bf",
+          "sha256": "8450007f7ea63b67073008b7fe11c15a20f3f780ad73f0bb93dacdd82d1d3b99",
+          "bytes": 51680,
+          "url": "https://github.com/earendil-works/pi/blob/faac585884ae2c013a6b1400f3e9e77f10b34bac/packages/durable/test/harness-tools.test.ts"
+        }
+      },
+      "historicalMapping": {
+        "upstream": "packages/durable/test/harness-tools.test.ts",
+        "pisharp": "tests/PiSharp.Durable.Tests/Harness/HarnessToolsCases.cs",
+        "status": "ported",
+        "blobSha1": "92aec1cf6c1c908d21394cd09d04f671ed169410"
+      },
+      "validation": {
+        "record": "compatibility/sync-1.6.0-acceptance.json",
+        "workPackage": "durable-core"
+      }
+    },
+    {
+      "id": "sync160.file.1249",
+      "upstream": [
+        "packages/durable/test/image-fixtures.ts"
+      ],
+      "change": "A",
+      "workPackage": "durable-edge",
+      "area": "durable",
+      "reports": [
+        "AI_DOCS/agent-reports/sync-1.6.0-durable-edge.md"
+      ],
+      "status": "tested-with-limitations",
+      "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
+      "review": {
+        "finding": "ported"
+      },
+      "source": {
+        "before": null,
+        "after": {
+          "path": "packages/durable/test/image-fixtures.ts",
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "fcadf5de5b5facc29d798ec6ca33e539a0c91989",
+          "sha256": "23f6666f26e55c412de5dcdb2472c4e629215ab4244aadd6aad69082d23c6ce6",
+          "bytes": 5761,
+          "url": "https://github.com/earendil-works/pi/blob/faac585884ae2c013a6b1400f3e9e77f10b34bac/packages/durable/test/image-fixtures.ts"
+        }
+      },
+      "nativeMapping": {
+        "workPackage": "durable-edge",
+        "tests": [
+          "tests/PiSharp.Durable.Tests/ToolsImagesCases.cs"
+        ],
+        "note": "The fixtures v1.6.0 moved out of tools-images.test.ts stay in ToolsImagesCases.cs, as private members of the suite's partial Program class that Sync160ImagesFitCases.cs shares."
+      },
+      "validation": {
+        "record": "compatibility/sync-1.6.0-acceptance.json",
+        "workPackage": "durable-edge"
+      }
+    },
+    {
+      "id": "sync160.file.1250",
+      "upstream": [
+        "packages/durable/test/images-fit.test.ts"
+      ],
+      "change": "A",
+      "workPackage": "durable-edge",
+      "area": "durable",
+      "reports": [
+        "AI_DOCS/agent-reports/sync-1.6.0-durable-edge.md"
+      ],
+      "status": "tested-with-limitations",
+      "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
+      "review": {
+        "finding": "ported"
+      },
+      "source": {
+        "before": null,
+        "after": {
+          "path": "packages/durable/test/images-fit.test.ts",
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "023422a8d72d03bf8e9fe61a77f1e990f39f978e",
+          "sha256": "5822be2d2febd24d64c29ee55a9c1898b79955c03a0f73e42ec2eec687ade9ee",
+          "bytes": 9354,
+          "url": "https://github.com/earendil-works/pi/blob/faac585884ae2c013a6b1400f3e9e77f10b34bac/packages/durable/test/images-fit.test.ts"
+        }
+      },
+      "nativeMapping": {
+        "workPackage": "durable-edge",
+        "tests": [
+          "tests/PiSharp.Durable.Tests/Sync160ImagesFitCases.cs"
+        ]
+      },
+      "validation": {
+        "record": "compatibility/sync-1.6.0-acceptance.json",
+        "workPackage": "durable-edge"
+      }
+    },
+    {
+      "id": "sync160.file.1251",
+      "upstream": [
+        "packages/durable/test/spec-usage.test.ts"
+      ],
+      "change": "M",
+      "workPackage": "durable-core",
+      "area": "durable",
+      "reports": [
+        "AI_DOCS/agent-reports/sync-1.6.0-durable-core.md"
+      ],
+      "status": "tested-with-limitations",
+      "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
+      "review": {
+        "finding": "ported"
+      },
+      "source": {
+        "before": {
+          "path": "packages/durable/test/spec-usage.test.ts",
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "ee42b0eb0be1bda3908caf81802d729b40077fc3",
+          "sha256": "b83baf391825d0e65207d7ad6c8078d77375f0fe0afd843f56a884343bb139d4",
+          "bytes": 16559,
+          "url": "https://github.com/earendil-works/pi/blob/b4afdddf44e059c67ccf5097e5317d913521b470/packages/durable/test/spec-usage.test.ts"
+        },
+        "after": {
+          "path": "packages/durable/test/spec-usage.test.ts",
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "7e5341c1038fbec097f8d69fbb02c832cb65cf39",
+          "sha256": "f74955f631f22896409b7dfc52abe4dce770fac9193119603f8b517677c3247d",
+          "bytes": 26774,
+          "url": "https://github.com/earendil-works/pi/blob/faac585884ae2c013a6b1400f3e9e77f10b34bac/packages/durable/test/spec-usage.test.ts"
+        }
+      },
+      "historicalMapping": {
+        "upstream": "packages/durable/test/spec-usage.test.ts",
+        "pisharp": "tests/PiSharp.Durable.Tests/SpecUsageCases.cs",
+        "status": "ported",
+        "blobSha1": "b1896bf66c8bbd6a427a4d2c7defe3e4d1207d46"
+      },
+      "validation": {
+        "record": "compatibility/sync-1.6.0-acceptance.json",
+        "workPackage": "durable-core"
+      }
+    },
+    {
+      "id": "sync160.file.1252",
+      "upstream": [
+        "packages/durable/test/tools-images.test.ts"
+      ],
+      "change": "M",
+      "workPackage": "durable-edge",
+      "area": "durable",
+      "reports": [
+        "AI_DOCS/agent-reports/sync-1.6.0-durable-edge.md"
+      ],
+      "status": "tested-with-limitations",
+      "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
+      "review": {
+        "finding": "ported"
+      },
+      "source": {
+        "before": {
+          "path": "packages/durable/test/tools-images.test.ts",
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "f893c7dbe6df28b23245d9120fdccaf9a82b674a",
+          "sha256": "5587d0f92d75de10cdfb3fe4b227f51c5238040c34318c20584499c4ad9d6a7c",
+          "bytes": 24765,
+          "url": "https://github.com/earendil-works/pi/blob/b4afdddf44e059c67ccf5097e5317d913521b470/packages/durable/test/tools-images.test.ts"
+        },
+        "after": {
+          "path": "packages/durable/test/tools-images.test.ts",
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "38a371fa6396e2665e363d65b9ced0520f6b2886",
+          "sha256": "ae800f074a9c959b8be69afb10950f6d6a1fc8f3d0aea254d040e186c21790aa",
+          "bytes": 19947,
+          "url": "https://github.com/earendil-works/pi/blob/faac585884ae2c013a6b1400f3e9e77f10b34bac/packages/durable/test/tools-images.test.ts"
+        }
+      },
+      "historicalMapping": {
+        "upstream": "packages/durable/test/tools-images.test.ts",
+        "pisharp": "tests/PiSharp.Durable.Tests/ToolsImagesCases.cs",
+        "status": "ported",
+        "blobSha1": "f893c7dbe6df28b23245d9120fdccaf9a82b674a"
+      },
+      "validation": {
+        "record": "compatibility/sync-1.6.0-acceptance.json",
+        "workPackage": "durable-edge"
+      }
+    },
+    {
+      "id": "sync160.file.1253",
+      "upstream": [
+        "packages/durable/test/tools.test.ts"
+      ],
+      "change": "M",
+      "workPackage": "durable-edge",
+      "area": "durable",
+      "reports": [
+        "AI_DOCS/agent-reports/sync-1.6.0-durable-edge.md"
+      ],
+      "status": "no-op",
+      "category": "typescript-only",
+      "reason": "A TypeScript cast (as ToolExecutionResult); no case changed (durable-edge).",
+      "review": {
+        "finding": "no-op"
+      },
+      "source": {
+        "before": {
+          "path": "packages/durable/test/tools.test.ts",
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "32243c991f21ce6e9ac625b237ed6bcb74a844b8",
+          "sha256": "44265beb50c2e905ac87d635b17ad7c1e7569c4b25a18e7e3ba1f38afb93e4f7",
+          "bytes": 30314,
+          "url": "https://github.com/earendil-works/pi/blob/b4afdddf44e059c67ccf5097e5317d913521b470/packages/durable/test/tools.test.ts"
+        },
+        "after": {
+          "path": "packages/durable/test/tools.test.ts",
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "6fb283e250e8b4d8682cdf44ecdd107567c46397",
+          "sha256": "8d664a5856ac3d9a3c34b0c4e8f973ae4d0d320c63aeadf89629f4b977242eb1",
+          "bytes": 30394,
+          "url": "https://github.com/earendil-works/pi/blob/faac585884ae2c013a6b1400f3e9e77f10b34bac/packages/durable/test/tools.test.ts"
+        }
+      },
+      "historicalMapping": {
+        "upstream": "packages/durable/test/tools.test.ts",
+        "pisharp": "tests/PiSharp.Durable.Tests/ToolsCases.cs",
+        "status": "ported",
+        "blobSha1": "dba4d7c9d83d56c1fb5dda4dcf1e7ad832068f8a"
+      }
+    }
+  ],
+  "acceptance": "compatibility/sync-1.6.0-acceptance.json"
+}

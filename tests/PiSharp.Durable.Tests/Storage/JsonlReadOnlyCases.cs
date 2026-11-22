@@ -1,4 +1,4 @@
-// Pi b4afdddf44e059c67ccf5097e5317d913521b470 (MIT): packages/durable/test/jsonl-storage.test.ts read-only cases.
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/durable/test/jsonl-storage.test.ts read-only cases.
 // Additional native checks cover snapshot lifetime, the five-attempt limit and every mutating filesystem entry point.
 using System.Text;
 using PiSharp.Durable;

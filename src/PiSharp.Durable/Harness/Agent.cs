@@ -280,7 +280,9 @@ public static class Agents
             foreach (var wrap in extension.Wraps ?? [])
             {
                 void WrapReport(Exception error) => report(error, extension.Name);
-                if (wrap is ToolWrap tool) ApplyWrap(composed, tool.Tool, tool.Apply, item => item.Name, WrapReport);
+                // Pi v1.6.0: the wrapped base records the parks it returns, so a composite's own park is told apart (Parks.WrapComposite).
+                if (wrap is ToolWrap tool)
+                    ApplyWrap(composed, tool.Tool, item => Parks.WrapComposite(item, tool.Apply), item => item.Name, WrapReport);
                 else if (wrap is SectionWrap section) ApplyWrap(sections, section.Section, section.Apply, item => item.Key, WrapReport);
             }
         }

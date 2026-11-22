@@ -49,7 +49,8 @@ internal static class OfflineCases
             var value = await Responses(new(MaxOutputTokens: 17));
             var clamped = await Responses(new(MaxOutputTokens: 1));
             var disabled = await Responses(new(MaxOutputTokens: 17), Metadata(extras: new() { ["compat"] = new JsonObject { ["supportsMaxOutputTokens"] = false } }));
-            var resource = await Responses(new(MaxOutputTokens: 1_000_001));
+            // The token bound is a configured one since the Pi 1.6.0 sync: the default admits every 32-bit count (1,000,000 before).
+            var resource = await Responses(new(MaxOutputTokens: 1_000_001, MaximumOutputTokens: 1_000_000));
             var invalid = await Responses(new(), Metadata(extras: new() { ["compat"] = new JsonObject { ["supportsMaxOutputTokens"] = "invalid" } }));
             return Json(new { sent = value.Payload is not null, max = Field(value.Payload, "max_output_tokens"), clamped = Field(clamped.Payload, "max_output_tokens"),
                 disabledSent = disabled.Payload is not null, disabledMax = Field(disabled.Payload, "max_output_tokens"), resourceBlocked = resource.Payload is null, invalidCompatBlocked = invalid.Payload is null }); }),
@@ -80,7 +81,7 @@ internal static class OfflineCases
             var request = await Responses(new(Temperature: 0.25) { SamplingParams = JsonData.Parse("{\"temperature\":0.75,\"fixture_sampling\":null}"),
                 OnPayload = (payload, _, _) => { hookTemperature = Field(payload, "temperature"); return ValueTask.FromResult<JsonData?>(null); } },
                 Metadata(extras: new() { ["samplingParams"] = new JsonObject { ["temperature"] = 0.5, ["fixture_sampling"] = true } }));
-            var resource = await Responses(new() { SamplingParams = JsonData.Parse("{\"max_output_tokens\":1000001}") });
+            var resource = await Responses(new(MaximumOutputTokens: 1_000_000) { SamplingParams = JsonData.Parse("{\"max_output_tokens\":1000001}") });
             return Json(new { temperature = Field(value.Payload, "temperature"), extension = Field(value.Payload, "fixture_sampling"), requestTemperature = Field(request.Payload, "temperature"),
                 requestExtension = Field(request.Payload, "fixture_sampling"), hookTemperature, resourceBlocked = resource.Payload is null }); }),
         new("responses-http-error-ascii-and-hook-order", "utils/error-body.ts formatProviderError over the openai SDK APIError message; api/openai-responses.ts response hook after successful acquisition", "openai SDK makeMessage keeps the untrimmed text body (captured from pi-ai 1.1.0)", Json(new { stop = "Error", starts = 0, responseHooks = 0, error = "OpenAI API error (503): 503  denied " }), async () => ErrorView(await Responses(new(), status: HttpStatusCode.ServiceUnavailable, body: " denied "))),

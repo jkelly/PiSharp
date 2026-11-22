@@ -77,7 +77,7 @@ internal static class WorkerSnapshotCases
         await using var host = NewHost();
         await using var workers = new ProcessWorkers("snapshot.failed", host, Kind, new()
         {
-            Executable = Path.Combine(root, "missing.exe"), BaseDirectory = cache, LockDirectory = root,
+            Executable = Path.Combine(root, "missing.exe"), BaseDirectory = cache, LockDirectory = root, Store = null,
             Authorize = (_, _) => true, Principal = _ => new() { ["kind"] = "worker" }, OnError = (_, _) => { },
             Plugins = (_, _) => { Interlocked.Increment(ref starts); return Task.FromResult(new PluginBuildSet([], [])); },
         }, Context);
@@ -103,7 +103,7 @@ internal static class WorkerSnapshotCases
         var cache = Path.Combine(root, "cache"); await using var host = NewHost();
         await using var workers = new ProcessWorkers("snapshot.closing", host, Kind, new()
         {
-            Executable = executable, BaseDirectory = cache, LockDirectory = root, Authorize = (_, _) => true,
+            Executable = executable, BaseDirectory = cache, LockDirectory = root, Store = null, Authorize = (_, _) => true,
             Principal = _ => new() { ["kind"] = "worker" }, OnError = (_, _) => { }, Plugins = (_, _) => Task.FromResult(new PluginBuildSet([], [])),
         }, Context);
         var build = workers.BuildAsync(); await workers.CloseAsync();
@@ -188,7 +188,7 @@ internal static class WorkerSnapshotCases
         Func<Address, JsonNode?>? data = null, ConcurrentQueue<Exception>? errors = null, TimeProvider? time = null) => new("snapshot", host, Kind, new()
         {
             Executable = Sdk, Arguments = [Path.Combine(source, Path.GetFileName(Assembly.GetExecutingAssembly().Location)), "--worker-snapshot-fixture"],
-            BaseDirectory = cache, LockDirectory = locks, Authorize = (_, _) => true, Principal = _ => new() { ["kind"] = "worker" },
+            BaseDirectory = cache, LockDirectory = locks, Store = null, Authorize = (_, _) => true, Principal = _ => new() { ["kind"] = "worker" },
             Plugins = (_, _) => Task.FromResult(new PluginBuildSet([], [])), Data = data,
             OnError = (_, error) => errors?.Enqueue(error), CloseTimeout = TimeSpan.FromSeconds(8), TimeProvider = time ?? TimeProvider.System,
         }, Context);

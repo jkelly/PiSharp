@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): coding-agent/src/modes/interactive/interactive-mode.ts (InteractiveMode: fields,
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): coding-agent/src/modes/interactive/interactive-mode.ts (InteractiveMode: fields,
 // constructor, init, run, the startup header, loaded resources, status/error/warning lines, shutdown). The session is driven through
 // the in-process RPC host (RpcSessionClient); live host objects come from InteractiveStartup.Host where the protocol has no command.
 using System.Text.Json.Nodes;
@@ -23,7 +23,7 @@ internal class ExpandableText : Text, IExpandable
     { collapsed = getCollapsedText; this.expanded = getExpandedText; isExpanded = expanded; }
     public void SetExpanded(bool value) { isExpanded = value; Invalidate(); }
     public override void Invalidate() { base.Invalidate(); stale = true; }
-    public override List<string> Render(int width)
+    public override IReadOnlyList<string> Render(int width)
     {
         if (stale) { stale = false; SetText(isExpanded ? expanded() : collapsed()); }
         return base.Render(width);
@@ -294,6 +294,7 @@ internal sealed partial class InteractiveMode
         var nextUi = CreateRenderer(mode, showHardwareCursor, terminal);
         nextUi.ClearOnShrink = clearOnShrink;
         nextUi.OnDebug = onDebug;
+        nextUi.SetSuspendSignalHandler(HandleCtrlZ);
         if (nextUi is TuiMainScreen nextMain && mainScreenRenderState is not null) nextMain.RestoreRenderState(mainScreenRenderState);
         renderer = nextUi;
         MountInteractiveTui(nextUi, components);
@@ -329,6 +330,8 @@ internal sealed partial class InteractiveMode
         defaultEditor.OnSubmit = HandleStartupSubmit;
         ui.SetFocus(editor);
 
+        // An external SIGTSTP (kill -TSTP) restores the terminal like Ctrl+Z (#12272).
+        ui.SetSuspendSignalHandler(HandleCtrlZ);
         ui.Start();
         isInitialized = true;
         programStatus.Report();
@@ -445,12 +448,9 @@ internal sealed partial class InteractiveMode
         _ = CheckForPackageUpdatesAsync();
         _ = CheckTmuxKeyboardSetupAsync();
 
-        foreach (var (type, message) in options.StartupDiagnostics)
-        {
-            if (type == "error") ShowError(message);
-            else if (type == "warning") ShowWarning(message);
-            else ShowStatus(message);
-        }
+        // main.ts took the runtime's startup diagnostics into the options; one the runtime found since then is taken here.
+        ShowRuntimeDiagnostics(options.StartupDiagnostics);
+        ShowRuntimeDiagnostics(context.TakeUnreportedRuntimeDiagnostics());
         foreach (var warning in options.DeprecationWarnings) ShowWarning(warning);
         if (options.MigratedProviders.Count > 0) ShowWarning($"Migrated credentials to auth.json: {string.Join(", ", options.MigratedProviders)}");
         if (options.ModelFallbackMessage is { } fallback) ShowWarning(fallback);
@@ -601,6 +601,17 @@ internal sealed partial class InteractiveMode
     {
         editor.SetText("");
         ui.RequestRender();
+    }
+
+    /// <summary>Source showRuntimeDiagnostics: problems the session runtime found, in the chat (never written over the TUI).</summary>
+    private void ShowRuntimeDiagnostics(IReadOnlyList<(string Type, string Message)> diagnostics)
+    {
+        foreach (var (type, message) in diagnostics)
+        {
+            if (type == "error") ShowError(message);
+            else if (type == "warning") ShowWarning(message);
+            else ShowStatus(message);
+        }
     }
 
     public void ShowError(string errorMessage)

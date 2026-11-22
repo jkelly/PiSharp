@@ -149,7 +149,7 @@ internal sealed class ExtensionRowsComponent : IComponent
 
     public void Invalidate() { }
 
-    public List<string> Render(int width)
+    public IReadOnlyList<string> Render(int width)
     {
         List<string>? lines;
         lock (gate)

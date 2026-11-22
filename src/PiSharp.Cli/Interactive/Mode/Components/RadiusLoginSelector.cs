@@ -1,4 +1,4 @@
-// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): coding-agent/src/modes/interactive/components/radius-login-selector.ts.
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): coding-agent/src/modes/interactive/components/radius-login-selector.ts.
 // The `/login` menu with the animated "Sign in with Radius" option. Internal to the interactive mode: the shimmer
 // is shared with the provider selector through ProviderBrand. Upstream subclasses ExtensionSelectorComponent; here
 // RadiusLoginMenuComponent wraps one (its Dispose is not virtual, so a subclass could not stop the animation timer when
@@ -50,9 +50,10 @@ internal sealed class RadiusLoginMenuComponent : IComponent, IInputHandler, IMou
     /// <summary>Color <paramref name="text"/> with the Radius logo colors flowing left to right; <paramref name="elapsedMs"/> is the animation time.</summary>
     internal static string RadiusShimmer(string text, double elapsedMs) => ProviderBrand.RadiusShimmer(text, elapsedMs);
 
-    public List<string> Render(int width)
+    public IReadOnlyList<string> Render(int width)
     {
-        var lines = selector.Render(width);
+        // Container output is shared across frames; copy before replacing the animated line.
+        var lines = new List<string>(selector.Render(width));
         var (label, text) = radiusOption;
         var selectedRendered = new Text(theme.Fg("accent", "→ ") + theme.Fg("accent", label), 1, 0).Render(width);
         var index = selectedRendered.Count == 0 ? -1 : lines.IndexOf(selectedRendered[0]);

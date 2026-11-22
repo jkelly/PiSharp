@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/core/tools/find.ts.
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/coding-agent/src/core/tools/find.ts.
 using System.Collections.Immutable;
 using System.Text.Json;
 using System.Text;
@@ -19,7 +19,7 @@ public sealed class PiFindTool : IToolArgumentSchemaAdapter
     public string Name => "find";
     /// <summary>Source TypeBox parameters, checked by validateToolArguments before the tool runs.</summary>
     public ToolArgumentSchema? ArgumentSchema => ToolArgumentSchema.FromDeclaration(Declaration, ToolSchemaOrigin.TypeBox);
-    public JsonData Declaration { get; } = JsonData.Parse("""{"name":"find","description":"Search for files by glob pattern. Returns matching file paths relative to the search directory. Respects .gitignore. Output is truncated to 1000 results or 50KB (whichever is hit first).","parameters":{"type":"object","required":["pattern"],"properties":{"pattern":{"type":"string","description":"Glob pattern to match files, e.g. '*.ts', '**/*.json', or 'src/**/*.spec.ts'"},"path":{"type":"string","description":"Directory to search in (default: current directory)"},"limit":{"type":"number","description":"Maximum number of results (default: 1000)"}}}}""");
+    public JsonData Declaration { get; } = JsonData.Parse("""{"name":"find","description":"Search for files by glob pattern. Returns matching file paths relative to the search directory. Respects .gitignore. Output is truncated to 1000 results or 50KB (whichever is hit first).","parameters":{"type":"object","required":["pattern"],"properties":{"pattern":{"type":"string","description":"Glob pattern relative to the search directory, e.g. 'src/**/*.ts'. Without '/', e.g. '*.ts', it matches file names at any depth"},"path":{"type":"string","description":"Directory to search in (default: current directory)"},"limit":{"type":"number","description":"Maximum number of results (default: 1000)"}}}}""");
 
     /// <param name="fd">ensureTool("fd"): the fd executable, or null when it is not available and could not be downloaded.</param>
     public PiFindTool(string workingDirectory, string homeDirectory, Func<CancellationToken, ValueTask<string?>> fd,
@@ -83,6 +83,10 @@ public sealed class PiFindTool : IToolArgumentSchemaAdapter
         var fd = await _fd(token).ConfigureAwait(false) ?? throw new PiSearchException("fd is not available and could not be downloaded");
         var args = Arguments(input, searchPath, token);
         var pattern = EffectivePattern(input.Pattern);
+        var ignoreCase = IgnoreCase(pattern);
+        // A relative path pattern is anchored at the search path, like grep's glob (#12066); an absolute one is matched as given.
+        var relativePathPattern = pattern.Contains('/') && !IsAbsolutePattern(pattern);
+        // minimatch's 'src/**' also matches 'src' itself and fd's does not, so a trailing '/**' becomes '/**/*'.
         var windowsPathPattern = OperatingSystem.IsWindows() && pattern.Contains('/');
         if (windowsPathPattern && pattern.EndsWith("/**", StringComparison.Ordinal)) pattern += "/*";
         // Source spawn(fd, args): Node rejects an argument with a NUL byte.
@@ -96,9 +100,11 @@ public sealed class PiFindTool : IToolArgumentSchemaAdapter
             outcome = await PiSearchProcess.RunAsync(fd, args, _paths.WorkingDirectory, _environment, raw =>
             {
                 var line = raw.TrimEnd('\r').Trim();
-                if (line.Length == 0 || windowsPathPattern && !WindowsFindGlob.Match(line, pattern, pattern == pattern.ToLowerInvariant())) return false;
-                if (resultCount == effectiveLimit) { resultCount++; return true; }
+                if (line.Length == 0) return false;
                 var relative = Relativize(line, searchPath);
+                // Windows matches fd's listing itself: the path relative to the search path, or the absolute path for an absolute pattern.
+                if (windowsPathPattern && !WindowsFindGlob.Match(relativePathPattern ? relative : line, pattern, ignoreCase)) return false;
+                if (resultCount == effectiveLimit) { resultCount++; return true; }
                 if (outputBytes - 1 <= 51200) relativized.Add(relative);
                 outputBytes += Encoding.UTF8.GetByteCount(relative) + 1L;
                 resultCount++;
@@ -136,27 +142,69 @@ public sealed class PiFindTool : IToolArgumentSchemaAdapter
             current = parent;
         }
         if (!insideGitRepo) args.Add("--no-require-git");
-        var effectivePattern = EffectivePattern(input.Pattern);
-        if (OperatingSystem.IsWindows() && effectivePattern.Contains('/'))
-        {
-            // fd versions disagree about native Windows full-path globs. Match enumerated paths ourselves.
-            args.Add("--"); args.Add(""); args.Add(searchPath);
-        }
-        else
-        {
-            args.Add("--glob"); args.Add("--max-results"); args.Add(PiGrepTool.JsNumber(effectiveLimit + 1));
-            if (effectivePattern.Contains('/')) args.Add("--full-path");
-            args.Add("--"); args.Add(effectivePattern); args.Add(searchPath);
-        }
+        args.AddRange(PatternArguments(input.Pattern, searchPath, effectiveLimit, OperatingSystem.IsWindows()));
         token.ThrowIfCancellationRequested();
         return args;
     }
 
-    private static string EffectivePattern(string pattern)
+    /// <summary>find.ts's fd arguments after the ignore flags: how the pattern is handed to fd on Windows and elsewhere.</summary>
+    internal static List<string> PatternArguments(string pattern, string searchPath, int effectiveLimit, bool windows)
     {
-        if (OperatingSystem.IsWindows()) pattern = pattern.Replace('\\', '/');
-        return pattern.Contains('/') && !pattern.StartsWith('/') && !pattern.StartsWith("**/", StringComparison.Ordinal) && pattern != "**"
-            ? "**/" + pattern : pattern;
+        var args = new List<string>();
+        var effectivePattern = EffectivePattern(pattern, windows);
+        var isPathPattern = effectivePattern.Contains('/');
+        if (windows && isPathPattern)
+        {
+            // fd before 10.5.1 never matches --full-path globs on Windows, and workarounds for that break on fd 10.5.1 (sharkdp/fd#2067),
+            // so fd lists every entry and WindowsFindGlob matches path patterns (SearchAsync).
+            args.Add("--"); args.Add(""); args.Add(searchPath);
+            return args;
+        }
+        // One result past the limit tells "exactly N matches" apart from "more than N" (#7121).
+        args.Add("--glob"); args.Add("--max-results"); args.Add(PiGrepTool.JsNumber(effectiveLimit + 1d));
+        // fd --glob matches against the basename unless --full-path is set; in --full-path mode it matches the absolute path.
+        if (isPathPattern) args.Add("--full-path");
+        if (isPathPattern && !IsAbsolutePattern(effectivePattern, windows))
+        {
+            // The pattern is prefixed with the glob-escaped search path, so 'src/*.ts' finds 'src/a.ts' but not 'pkg/src/b.ts', and no
+            // folder above the search path can match (#12066). Smart case is decided by the user's pattern, not by the search
+            // path's letters, so it is set explicitly.
+            if (IgnoreCase(effectivePattern)) args.Add("--ignore-case");
+            effectivePattern = EscapeGlob(searchPath.TrimEnd('/')) + "/" + effectivePattern;
+        }
+        args.Add("--"); args.Add(effectivePattern); args.Add(searchPath);
+        return args;
+    }
+
+    /// <summary>find.ts effectivePattern before anchoring. On Windows <c>\</c> is a path separator, so native patterns like
+    /// <c>src\**\*.ts</c> are normalized to <c>/</c> (#9262); on POSIX <c>\</c> stays a glob escape character. fd's full paths never
+    /// contain <c>/./</c>, so <c>./src/*.ts</c> would find nothing: every leading <c>./</c> is dropped (#12020).</summary>
+    internal static string EffectivePattern(string pattern) => EffectivePattern(pattern, OperatingSystem.IsWindows());
+    internal static string EffectivePattern(string pattern, bool windows)
+    {
+        if (windows) pattern = pattern.Replace('\\', '/');
+        while (pattern.StartsWith("./", StringComparison.Ordinal)) pattern = pattern[2..];
+        return pattern;
+    }
+
+    /// <summary>fd's smart case: an all-lowercase pattern matches case-insensitively.</summary>
+    internal static bool IgnoreCase(string effectivePattern) => effectivePattern == effectivePattern.ToLowerInvariant();
+
+    /// <summary>Node path.isAbsolute over a pattern whose separators are already <c>/</c> on Windows.</summary>
+    internal static bool IsAbsolutePattern(string pattern) => IsAbsolutePattern(pattern, OperatingSystem.IsWindows());
+    internal static bool IsAbsolutePattern(string pattern, bool windows) => pattern.Length > 0 && (pattern[0] == '/' ||
+        windows && (pattern[0] == '\\' || pattern.Length > 2 && char.IsAsciiLetter(pattern[0]) && pattern[1] == ':' && pattern[2] is '/' or '\\'));
+
+    /// <summary>find.ts escapedRoot: the glob characters of the search path match literally.</summary>
+    internal static string EscapeGlob(string path)
+    {
+        var builder = new StringBuilder(path.Length + 8);
+        foreach (var c in path)
+        {
+            if (c is '\\' or '*' or '?' or '[' or ']' or '{' or '}') builder.Append('\\');
+            builder.Append(c);
+        }
+        return builder.ToString();
     }
 
     internal static int NormalizeLimit(double? value, double fallback) => (int)Math.Clamp(Math.Floor(value ?? fallback), 1, int.MaxValue - 1);

@@ -191,7 +191,14 @@ internal static partial class Program
                 // The manifest, the table write, and the first put of a page of 100 rows of 8 KB each.
                 for (var i = 0; i < 3; i++) await iterator.MoveNextAsync();
                 cancel();
+                // The abort releases the page from a callback the store's queue runs on another thread; on a loaded runner one
+                // settled read can come before it. A page that is kept stays (800 KB), so wait for the release, with a bound.
                 var after = await ChordSupport.SettledHeap();
+                for (var attempt = 0; attempt < 20 && after - before >= 200 * 1024; attempt++)
+                {
+                    await Task.Delay(50);
+                    after = await ChordSupport.SettledHeap();
+                }
                 Check(after - before < 200 * 1024, $"the heap grew {after - before} bytes");
                 Rejected(await StoreRejection(iterator.MoveNextAsync().AsTask()), "aborted", null, "a later next()");
             }),

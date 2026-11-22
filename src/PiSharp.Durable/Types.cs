@@ -19,6 +19,10 @@
 // Pi v1.5.0 sync (area admission, fb524dd2e, #11043): SubmissionRecord gains the continue variant (SubmissionType.Continue: placed without
 // an entry, done with an answer, unanswered with a reason), so a record's status alone no longer says whether it has an entry: check its
 // type too. Its JSON writes `type` as every record does (`"continue"`); input and write records are unchanged.
+//
+// Pi v1.6.0 sync (faac585884ae2c013a6b1400f3e9e77f10b34bac, area signals): JoinPolicy.Any; WakeReason and the `wake` of a pending or
+// running state; a sleeping state's `until` is optional and it may list `signals` (SignalKey, Signals.cs); SubmissionRecord.Notify
+// (SubmissionNotify), written after `trace` as upstream's admission builds its fields.
 using System.Collections.Immutable;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Internal;
@@ -311,6 +315,9 @@ public interface ISubmissionFields
     string? RequestId { get; }
     /// <summary>The adapter-owned carrier of the admission span (upstream <c>trace</c>); absent without propagation.</summary>
     IReadOnlyDictionary<string, string>? Trace { get; }
+    /// <summary>The task to deliver <see cref="Signals.SubmissionSettled"/> to under its key when the submission settles (upstream
+    /// <c>notify</c>); otherwise absent.</summary>
+    SubmissionNotify? Notify { get; }
     /// <summary>Input, passive write or continue.</summary>
     SubmissionType Type { get; }
     /// <summary>The lifecycle status.</summary>
@@ -344,6 +351,8 @@ public sealed record SubmissionRecord : ISubmissionFields
     /// <inheritdoc/>
     public IReadOnlyDictionary<string, string>? Trace { get; init; }
     /// <inheritdoc/>
+    public SubmissionNotify? Notify { get; init; }
+    /// <inheritdoc/>
     public required SubmissionType Type { get; init; }
     /// <inheritdoc/>
     public required SubmissionStatus Status { get; init; }
@@ -371,7 +380,7 @@ public sealed record SubmissionRecord : ISubmissionFields
     {
         const string what = "submission record";
         var value = RecordJson.Object(json, what);
-        RecordJson.OnlyKeys(value, what, "id", "conversationId", "requestId", "trace", "type", "status", "entry", "answer", "reason", "detail");
+        RecordJson.OnlyKeys(value, what, "id", "conversationId", "requestId", "trace", "notify", "type", "status", "entry", "answer", "reason", "detail");
         var create = SubmissionShape.Read(value, what);
         return (create.WithId(RecordJson.Id<SubmissionId>(value, "id", what)) with { KeyOrder = RecordJson.KeysOf(value) }).Validate();
     }
@@ -394,6 +403,8 @@ public sealed record SubmissionCreate : ISubmissionFields
     /// <inheritdoc/>
     public IReadOnlyDictionary<string, string>? Trace { get; init; }
     /// <inheritdoc/>
+    public SubmissionNotify? Notify { get; init; }
+    /// <inheritdoc/>
     public required SubmissionType Type { get; init; }
     /// <inheritdoc/>
     public required SubmissionStatus Status { get; init; }
@@ -412,7 +423,7 @@ public sealed record SubmissionCreate : ISubmissionFields
     /// <summary>The record with <paramref name="id"/>: upstream's <c>{ ...create, id }</c>, whose later fields follow <c>id</c>.</summary>
     public SubmissionRecord WithId(SubmissionId id) => new()
     {
-        Id = id, ConversationId = ConversationId, RequestId = RequestId, Trace = Trace, Type = Type, Status = Status, Entry = Entry, Answer = Answer,
+        Id = id, ConversationId = ConversationId, RequestId = RequestId, Trace = Trace, Notify = Notify, Type = Type, Status = Status, Entry = Entry, Answer = Answer,
         Reason = Reason, Detail = Detail, KeyOrder = [.. ToJson().Keys, "id"],
     };
 
@@ -424,7 +435,7 @@ public sealed record SubmissionCreate : ISubmissionFields
     {
         const string what = "submission create";
         var value = RecordJson.Object(json, what);
-        RecordJson.OnlyKeys(value, what, "conversationId", "requestId", "trace", "type", "status", "entry", "answer", "reason", "detail");
+        RecordJson.OnlyKeys(value, what, "conversationId", "requestId", "trace", "notify", "type", "status", "entry", "answer", "reason", "detail");
         return SubmissionShape.Read(value, what).Validate();
     }
 
@@ -432,6 +443,23 @@ public sealed record SubmissionCreate : ISubmissionFields
     public bool Equals(SubmissionCreate? other) => other is not null && JsonValue.DeepEquals(ToJson(), other.ToJson());
     /// <inheritdoc/>
     public override int GetHashCode() => ConversationId.GetHashCode();
+}
+
+/// <summary>Where a settling submission delivers <see cref="Signals.SubmissionSettled"/>: a task, and the key it sleeps on (upstream
+/// <c>SubmissionNotify</c>). JSON key order: <c>taskId, key</c>.</summary>
+public sealed record SubmissionNotify(TaskId TaskId, string Key)
+{
+    /// <summary><c>{taskId, key}</c>.</summary>
+    public JsonObjectValue ToJson() => new RecordJson.Writer().Add("taskId", TaskId.ToJson()).Add("key", Key).Build();
+
+    /// <summary>Decodes <see cref="ToJson"/>.</summary>
+    public static SubmissionNotify FromJson(JsonValue json)
+    {
+        const string what = "submission notify";
+        var value = RecordJson.Object(json, what);
+        RecordJson.OnlyKeys(value, what, "taskId", "key");
+        return new(RecordJson.Id<TaskId>(value, "taskId", what), RecordJson.String(value, "key", what));
+    }
 }
 
 /// <summary>Terminal status staged for a submission; identity, type and entry come from its current record.</summary>
@@ -467,7 +495,7 @@ internal static class SubmissionShape
 {
     public static RecordJson.Writer Write(RecordJson.Writer writer, ISubmissionFields value) => writer
         .Add("conversationId", value.ConversationId.ToJson()).Add("requestId", value.RequestId).Add("trace", RecordJson.Carrier(value.Trace))
-        .Add("type", WireName.Of(value.Type))
+        .Add("notify", value.Notify?.ToJson()).Add("type", WireName.Of(value.Type))
         .Add("status", WireName.Of(value.Status)).Add("entry", value.Entry?.ToJson()).Add("answer", value.Answer?.ToJson())
         .Add("reason", value.Reason).Add("detail", value.Detail);
 
@@ -476,6 +504,7 @@ internal static class SubmissionShape
         ConversationId = RecordJson.Id<ConversationId>(value, "conversationId", what),
         RequestId = RecordJson.OptionalString(value, "requestId", what),
         Trace = RecordJson.OptionalCarrier(value, "trace", what),
+        Notify = RecordJson.Optional(value, "notify") is { } notify ? SubmissionNotify.FromJson(notify) : null,
         Type = RecordJson.Enum<SubmissionType>(value, "type", what),
         Status = RecordJson.Enum<SubmissionStatus>(value, "status", what),
         Entry = RecordJson.OptionalId<EntryId>(value, "entry", what),
@@ -679,17 +708,97 @@ public enum DurableTaskStatus
     Terminal,
 }
 
-/// <summary>How a waiting task treats the tasks it waits on (spec §5.5).</summary>
+/// <summary>How a waiting task treats the tasks it waits on (spec §5.5): <c>allSettled</c> resumes once every task in <c>on</c> is terminal,
+/// <c>failFast</c> too but aborts the others once one fails, <c>any</c> once at least one is terminal.</summary>
 public enum JoinPolicy
 {
     /// <summary><c>"failFast"</c>.</summary>
     FailFast,
     /// <summary><c>"allSettled"</c>.</summary>
     AllSettled,
+    /// <summary><c>"any"</c>: resume once at least one task in <c>on</c> is terminal (Pi v1.6.0).</summary>
+    Any,
+}
+
+/// <summary>Which kind of <see cref="WakeReason"/> ended a wait or a sleep.</summary>
+public enum WakeReasonKind
+{
+    /// <summary><c>"time"</c>: the sleep's <c>until</c> came, and it listed no signals.</summary>
+    Time,
+    /// <summary><c>"expired"</c>: <c>until</c> came before any listed signal.</summary>
+    Expired,
+    /// <summary><c>"signal"</c>: the key whose value woke the sleep; read the value with <c>ReadSignalAsync</c>.</summary>
+    Signal,
+    /// <summary><c>"tasks"</c>: the terminal tasks of the wait's <c>on</c> at the reservation.</summary>
+    Tasks,
+}
+
+/// <summary>
+/// Why parked work runs again, as the reservation that woke it recorded (upstream <c>WakeReason</c>). Kept until the task commits another
+/// checkpoint, parks, or ends. JSON: <c>{reason: "time"}</c>, <c>{reason: "expired"}</c>, <c>{reason: "signal", signal, key}</c> or
+/// <c>{reason: "tasks", ended}</c>.
+/// </summary>
+public sealed class WakeReason : DurableValue
+{
+    private WakeReason(WakeReasonKind reason, string? signal, string? key, ImmutableArray<TaskId> ended)
+    {
+        Reason = reason; Signal = signal; Key = key; Ended = ended;
+    }
+
+    /// <summary><c>{reason: "time"}</c>.</summary>
+    public static WakeReason Time { get; } = new(WakeReasonKind.Time, null, null, []);
+    /// <summary><c>{reason: "expired"}</c>.</summary>
+    public static WakeReason Expired { get; } = new(WakeReasonKind.Expired, null, null, []);
+    /// <summary><c>{reason: "signal", signal, key}</c>.</summary>
+    public static WakeReason OfSignal(string signal, string key) =>
+        new(WakeReasonKind.Signal, signal ?? throw new ArgumentNullException(nameof(signal)), key ?? throw new ArgumentNullException(nameof(key)), []);
+    /// <summary><c>{reason: "tasks", ended}</c>.</summary>
+    public static WakeReason Tasks(IEnumerable<TaskId> ended) => new(WakeReasonKind.Tasks, null, null, [.. ended]);
+
+    /// <summary>The reason.</summary>
+    public WakeReasonKind Reason { get; }
+    /// <summary>For <see cref="WakeReasonKind.Signal"/>: the signal's name.</summary>
+    public string? Signal { get; }
+    /// <summary>For <see cref="WakeReasonKind.Signal"/>: the key.</summary>
+    public string? Key { get; }
+    /// <summary>For <see cref="WakeReasonKind.Tasks"/>: the terminal tasks of the wait's <c>on</c>; otherwise empty.</summary>
+    public ImmutableArray<TaskId> Ended { get; }
+
+    /// <inheritdoc/>
+    public override JsonObjectValue ToJson()
+    {
+        var writer = new RecordJson.Writer().Add("reason", WireName.Of(Reason)).Add("signal", Signal).Add("key", Key);
+        if (Reason == WakeReasonKind.Tasks) writer.Add("ended", JsonValue.Array(Ended.Select(id => (JsonValue)id.ToJson())));
+        return writer.Build();
+    }
+
+    /// <summary>Decodes <see cref="ToJson"/>.</summary>
+    public static WakeReason FromJson(JsonValue json)
+    {
+        const string what = "wake reason";
+        var value = RecordJson.Object(json, what);
+        switch (RecordJson.Enum<WakeReasonKind>(value, "reason", what))
+        {
+            case WakeReasonKind.Time:
+                RecordJson.OnlyKeys(value, what, "reason");
+                return Time;
+            case WakeReasonKind.Expired:
+                RecordJson.OnlyKeys(value, what, "reason");
+                return Expired;
+            case WakeReasonKind.Signal:
+                RecordJson.OnlyKeys(value, what, "reason", "signal", "key");
+                return OfSignal(RecordJson.String(value, "signal", what), RecordJson.String(value, "key", what));
+            default:
+                RecordJson.OnlyKeys(value, what, "reason", "ended");
+                return Tasks(RecordJson.Array(RecordJson.Required(value, "ended", what), "ended", what)
+                    .Select(id => TaskId.FromNumber(RecordJson.Integer(id, "ended", what))));
+        }
+    }
 }
 
 /// <summary>Complete durable execution state of a task (upstream <c>TaskState</c>): a live state carries a checkpoint, a settling state
-/// an outcome. JSON key order: <c>status, checkpoint, on, policy</c>, <c>status, checkpoint, until</c> or <c>status, outcome</c>.</summary>
+/// an outcome. JSON key order: <c>status, checkpoint, wake</c>, <c>status, checkpoint, on, policy</c>, <c>status, checkpoint, until,
+/// signals</c> or <c>status, outcome</c>.</summary>
 public abstract class TaskState : DurableValue
 {
     private protected TaskState() { }
@@ -707,9 +816,10 @@ public abstract class TaskState : DurableValue
         {
             case DurableTaskStatus.Pending or DurableTaskStatus.Running:
             {
-                RecordJson.OnlyKeys(value, what, "status", "checkpoint");
+                RecordJson.OnlyKeys(value, what, "status", "checkpoint", "wake");
                 var checkpoint = RecordJson.Required(value, "checkpoint", what);
-                return status == DurableTaskStatus.Pending ? new PendingTaskState(checkpoint) : new RunningTaskState(checkpoint);
+                var wake = RecordJson.Optional(value, "wake") is { } woke ? WakeReason.FromJson(woke) : null;
+                return status == DurableTaskStatus.Pending ? new PendingTaskState(checkpoint, wake) : new RunningTaskState(checkpoint, wake);
             }
             case DurableTaskStatus.Waiting:
                 RecordJson.OnlyKeys(value, what, "status", "checkpoint", "on", "policy");
@@ -717,9 +827,11 @@ public abstract class TaskState : DurableValue
                     [.. RecordJson.Array(RecordJson.Required(value, "on", what), "on", what).Select(id => TaskId.FromNumber(RecordJson.Integer(id, "on", what)))],
                     RecordJson.Enum<JoinPolicy>(value, "policy", what));
             case DurableTaskStatus.Sleeping:
-                RecordJson.OnlyKeys(value, what, "status", "checkpoint", "until");
-                return new SleepingTaskState(RecordJson.Required(value, "checkpoint", what),
-                    RecordJson.OptionalNumber(value, "until", what) ?? throw RecordJson.Invalid(what, "missing field \"until\""));
+                RecordJson.OnlyKeys(value, what, "status", "checkpoint", "until", "signals");
+                return new SleepingTaskState(RecordJson.Required(value, "checkpoint", what), RecordJson.OptionalNumber(value, "until", what),
+                    RecordJson.Optional(value, "signals") is { } signals
+                        ? [.. RecordJson.Array(signals, "signals", what).Select(SignalKey.FromJson)]
+                        : null);
             default:
             {
                 RecordJson.OnlyKeys(value, what, "status", "outcome");
@@ -748,25 +860,33 @@ public abstract class SettlingTaskState : TaskState
     public override JsonObjectValue ToJson() => new RecordJson.Writer().Add("status", WireName.Of(Status)).Add("outcome", Outcome.ToJson()).Build();
 }
 
-/// <summary><c>{status: "pending", checkpoint}</c>: eligible for scheduling.</summary>
-public sealed class PendingTaskState(JsonValue checkpoint) : LiveTaskState(checkpoint)
+/// <summary><c>{status: "pending", checkpoint, wake?}</c>: eligible for scheduling.</summary>
+public sealed class PendingTaskState(JsonValue checkpoint, WakeReason? wake = null) : LiveTaskState(checkpoint)
 {
     /// <inheritdoc/>
     public override DurableTaskStatus Status => DurableTaskStatus.Pending;
+    /// <summary>Why the task woke from its last wait or sleep, kept while it runs at the checkpoint it woke at (upstream <c>wake</c>).</summary>
+    public WakeReason? Wake { get; } = wake;
     /// <inheritdoc/>
-    public override JsonObjectValue ToJson() => new RecordJson.Writer().Add("status", "pending").Add("checkpoint", Checkpoint).Build();
+    public override JsonObjectValue ToJson() =>
+        new RecordJson.Writer().Add("status", "pending").Add("checkpoint", Checkpoint).Add("wake", Wake?.ToJson()).Build();
 }
 
-/// <summary><c>{status: "running", checkpoint}</c>: reserved by one in-memory invocation.</summary>
-public sealed class RunningTaskState(JsonValue checkpoint) : LiveTaskState(checkpoint)
+/// <summary><c>{status: "running", checkpoint, wake?}</c>: reserved by one in-memory invocation.</summary>
+public sealed class RunningTaskState(JsonValue checkpoint, WakeReason? wake = null) : LiveTaskState(checkpoint)
 {
     /// <inheritdoc/>
     public override DurableTaskStatus Status => DurableTaskStatus.Running;
+    /// <summary>Why the task woke from its last wait or sleep, kept while it runs at the checkpoint it woke at (upstream <c>wake</c>). A
+    /// task never writes its own: a commit of the same checkpoint keeps it, any other state drops it.</summary>
+    public WakeReason? Wake { get; } = wake;
     /// <inheritdoc/>
-    public override JsonObjectValue ToJson() => new RecordJson.Writer().Add("status", "running").Add("checkpoint", Checkpoint).Build();
+    public override JsonObjectValue ToJson() =>
+        new RecordJson.Writer().Add("status", "running").Add("checkpoint", Checkpoint).Add("wake", Wake?.ToJson()).Build();
 }
 
-/// <summary><c>{status: "waiting", checkpoint, on, policy}</c>: parked until every task in <see cref="On"/> is terminal.</summary>
+/// <summary><c>{status: "waiting", checkpoint, on, policy}</c>: parked until every task in <see cref="On"/> is terminal, or, with
+/// <see cref="JoinPolicy.Any"/>, until one is.</summary>
 public sealed class WaitingTaskState(JsonValue checkpoint, ImmutableArray<TaskId> on, JoinPolicy policy) : LiveTaskState(checkpoint)
 {
     /// <inheritdoc/>
@@ -780,17 +900,21 @@ public sealed class WaitingTaskState(JsonValue checkpoint, ImmutableArray<TaskId
         .Add("on", JsonValue.Array(On.Select(id => (JsonValue)id.ToJson()))).Add("policy", WireName.Of(Policy)).Build();
 }
 
-/// <summary><c>{status: "sleeping", checkpoint, until}</c>: parked without an invocation until the Harness clock reaches <see cref="Until"/>,
-/// then resumes at its checkpoint. An abort mark does not wait for it.</summary>
-public sealed class SleepingTaskState(JsonValue checkpoint, double until) : LiveTaskState(checkpoint)
+/// <summary><c>{status: "sleeping", checkpoint, until?, signals?}</c>: parked without an invocation until the Harness clock reaches
+/// <see cref="Until"/>, or one of <see cref="Signals"/> holds a value no wake used, whichever comes first; then resumes at its checkpoint.
+/// Needs <see cref="Until"/> or a non-empty <see cref="Signals"/>. An abort mark does not wait for it.</summary>
+public sealed class SleepingTaskState(JsonValue checkpoint, double? until, ImmutableArray<SignalKey>? signals = null) : LiveTaskState(checkpoint)
 {
     /// <inheritdoc/>
     public override DurableTaskStatus Status => DurableTaskStatus.Sleeping;
-    /// <summary>Milliseconds on the <see cref="HarnessOptions.Now"/> clock.</summary>
-    public double Until { get; } = until;
+    /// <summary>Milliseconds on the <see cref="HarnessOptions.Now"/> clock; null for a sleep that waits for signals only (Pi v1.6.0).</summary>
+    public double? Until { get; } = until;
+    /// <summary>The signal keys the sleep waits for (upstream <c>signals</c>); null when it waits for its time only.</summary>
+    public ImmutableArray<SignalKey>? Signals { get; } = signals is { IsDefault: true } ? null : signals;
     /// <inheritdoc/>
     public override JsonObjectValue ToJson() => new RecordJson.Writer().Add("status", "sleeping").Add("checkpoint", Checkpoint)
-        .Number("until", Until).Build();
+        .Number("until", Until)
+        .Add("signals", Signals is { } listed ? JsonValue.Array(listed.Select(key => (JsonValue)key.ToJson())) : null).Build();
 }
 
 /// <summary><c>{status: "completing", outcome}</c>: outcome decided, terminal once no ordinary owned work below is live.</summary>

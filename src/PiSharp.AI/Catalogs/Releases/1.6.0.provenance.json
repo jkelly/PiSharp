@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "package": "@earendil-works/pi-ai",
+  "version": "1.6.0",
+  "sourceCommit": "faac585884ae2c013a6b1400f3e9e77f10b34bac",
+  "tarball": {
+    "url": "https://registry.npmjs.org/@earendil-works/pi-ai/-/pi-ai-1.6.0.tgz",
+    "integrity": "sha512-9hL+eygFDEiFp//cydeUfmFsKmEqpmvsNPb10Y1W8+m5K9O+sx1hMStfu6nukrBD5sl6mP4RykCYBBNEgsVLfw==",
+    "sha256": "d68312ec574bc959cb7fee26da4f4876d067aed9bbbe76e876359e60d2294747"
+  },
+  "manifestSha256": "cc46553f3f008788e667600a873d3d83a4df8fe46c67b06c65b16fd828450e8b",
+  "providerCount": 43,
+  "generatedAt": "2026-11-20T10:48:49.496Z",
+  "entries": {
+    "chat": 1698,
+    "image": 74,
+    "classifier": 81
+  },
+  "previousRelease": {
+    "version": "1.5.2",
+    "providersAdded": 0,
+    "providersRemoved": 0,
+    "entriesAdded": 129,
+    "entriesRemoved": 49,
+    "entriesChanged": 651
+  },
+  "verification": "Every copied provider shard and the manifest match the members of the exact SRI-verified package archive byte for byte; all provider digests match the package manifest. The archive was read as bytes and nothing from it was executed. The 1.5.2 release directory and the historical native shards are unchanged."
+}

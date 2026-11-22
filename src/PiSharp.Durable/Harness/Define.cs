@@ -1,7 +1,8 @@
 // Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/src/harness/define.ts. Upstream's identity functions exist for
 // TypeScript inference; here they are plain constructors. Pi v1.5.0 sync (area run-end, 7e15f9601): runEndTask, the request an afterRun hook
 // returns; upstream types its input by the task, which a C# DurableTask erases. Area tools-schema's TSchema to object change of defineTool
-// is TypeScript typing only.
+// is TypeScript typing only. Pi v1.6.0 sync (faac585884ae2c013a6b1400f3e9e77f10b34bac): runEndTask is hookTask (Define.HookTask), as
+// afterTools and onYield hooks ask for tasks too; defineTool's park checkpoint type parameter is TypeScript typing only.
 using PiSharp.Durable.Chord;
 
 namespace PiSharp.Durable;
@@ -32,8 +33,9 @@ public static class Define
         return new(task.Definition.Name, handlers);
     }
 
-    /// <summary>A task a <see cref="GenerationHooks.AfterRun"/> hook asks for, with its input (upstream <c>runEndTask</c>, spec §8.3).</summary>
-    public static RunEndTask RunEndTask(DurableTask task, JsonValue input)
+    /// <summary>A task a hook (<see cref="GenerationHooks.AfterTools"/>, <see cref="GenerationHooks.OnYield"/>,
+    /// <see cref="GenerationHooks.AfterRun"/>) asks for, with its input (upstream <c>hookTask</c>; <c>runEndTask</c> before Pi v1.6.0).</summary>
+    public static HookTask HookTask(DurableTask task, JsonValue input)
     {
         ArgumentNullException.ThrowIfNull(task);
         ArgumentNullException.ThrowIfNull(input);
@@ -41,7 +43,9 @@ public static class Define
     }
 
     /// <summary>Wraps the tool named like <paramref name="tool"/> wherever the wrapping extension is selected (upstream
-    /// <c>wrapTool</c>).</summary>
+    /// <c>wrapTool</c>). Wrappers never park: one passes its api to its base unchanged or through a
+    /// <see cref="DelegatingToolExecutionApi"/> and returns the base's park unchanged; a park of its own ends the call
+    /// <c>invalid_park</c>.</summary>
     public static Wrap WrapTool(ToolRegistration tool, Func<ToolRegistration, ToolRegistration> wrapper)
     {
         ArgumentNullException.ThrowIfNull(tool);

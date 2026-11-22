@@ -167,7 +167,23 @@
 // - AddScopesAboveLocked also stops at a task an earlier walk of the same publication passed, not only at a conversation already
 //   collected, with the same scopes: upstream's walks are quadratic in the depth of a chain that one publication creates or ends. With
 //   upstream's walk, harness.ownership.tracks-ownership-chains-deeper-than-the-call-stack (20,000 tasks) took 17 s here instead of 2 s,
-//   and scheduler-scale's 20,000-deep chain 7.9 to 8.4 s instead of 2.1 s (docs/durable-benchmarks.md).
+//   and scheduler-scale's 20,000-deep chain 7.9 to 8.4 s instead of 2.1 s (docs/durable-benchmarks.md). Superseded by Pi v1.6.0, whose
+//   walk starts at the owner's conversation (below); the `walked` set is gone.
+//
+// Pi v1.6.0 sync (faac585884ae2c013a6b1400f3e9e77f10b34bac): signals, waits on any task, wakes, gates and parks.
+// - A sleep may wait for signals, with or without a time (Signals.SleepDue; Asleep, upstream asleep()): a delivery's commit makes the task
+//   a candidate, as any change of its record does, and the reservation that wakes parked work records why in the running state's `wake`
+//   (WokeLocked, Reserved) and marks the signal memos consumed or expired. A task written back as pending keeps the wake (PendingAgain),
+//   and a commit of the same checkpoint keeps it (CommitStateAsync). A wait with policy `any` runs once one of its tasks ended.
+// - A sleeping tool call parked at its gates (options.Gated) is woken by every registry publication, by open, and when its sleep was
+//   committed under a snapshot the registry has since replaced (gateWakes, WakeGateLocked, the publication count a run keeps).
+// - Open keeps the abandonOnRestart children of an owner that was not cut off while running (options.KeepsAbandoned).
+// - Kept contexts count a conversation whose live work is all parked as inactive (InactiveLocked over QuietLocked), and a task that parks
+//   or wakes settles the idle periods of the conversations above it.
+// - AddScopesAboveLocked starts at the task's own conversation and goes from conversation to owning conversation: a child task lives in
+//   its owner's conversation, so the owner chain between costs nothing (upstream's fix of the O(n²) walk).
+// - runtime.ReadSignalAsync; the close signal a task's cleanup runs under (CloseSignalOf, upstream closeSignal), aborted at the seal; the
+//   provider session IDs the Harness cleans up at close (ProviderSessions, upstream providerSessionIds).
 using System.Collections;
 using System.Collections.Immutable;
 using PiSharp.Durable.Chord;
@@ -243,6 +259,23 @@ internal sealed record DurableTaskSchedulerOptions
     /// <summary>Task kinds whose run phases end the task themselves once it was cut off <c>settings.RestartLimit</c> times (the built-in
     /// tasks, from <see cref="TaskRecord.Restarts"/>); the scheduler ends a task of any other kind <c>faulted</c> instead. Null: none.</summary>
     public Func<string, bool>? LimitsRestarts { get; init; }
+    /// <summary>Whether the <c>abandonOnRestart</c> children of an owner are kept after a restart (spec suspendable §2.5): its record says
+    /// it was not cut off while running, as a tool call parked or not started yet. Wins over the child's flag. Null: none.</summary>
+    public Func<TaskRecord, bool>? KeepsAbandoned { get; init; }
+    /// <summary>Whether a sleeping task is parked at gates its phase asks again on every wake (spec suspendable §5.2), as a tool call
+    /// before its intent: a registry publication, open, and a sleep committed under an outdated snapshot wake it. Null: none.</summary>
+    public Func<TaskRecord, bool>? Gated { get; init; }
+}
+
+/// <summary>What the Harness reads of the runtime of a task its scheduler runs (upstream's <c>closeSignals</c> and
+/// <c>providerSessionsByRuntime</c> WeakMaps, keyed by the runtime).</summary>
+internal interface ISchedulerRuntime
+{
+    /// <summary>Aborted once the Harness running the task closes, or its Session fails, unlike the runtime's own signal, which an abort
+    /// mark aborts too: for cleanup a run does after its own abort mark, such as a tool's <c>Cancel</c> (upstream <c>closeSignal</c>).</summary>
+    CancellationSignal CloseSignal { get; }
+    /// <summary>Records a provider session ID the task used, which the Harness cleans up at close.</summary>
+    void UseProviderSession(string sessionId);
 }
 
 /// <summary>
@@ -301,6 +334,12 @@ internal sealed class DurableTaskScheduler
     private readonly DurableContext context;
     private readonly bool readOnly;
     private readonly Func<string, bool> limitsRestarts;
+    private readonly Func<TaskRecord, bool> keepsAbandoned;
+    private readonly Func<TaskRecord, bool> parkedAtGate;
+    /// <summary>Provider session IDs the tasks of this Harness used (upstream <c>providerSessionIds</c>); guarded by itself.</summary>
+    private readonly HashSet<string> providerSessions = new(StringComparer.Ordinal);
+    /// <summary>Aborted at the seal: cancels the cleanups an abort must not cancel (<see cref="CloseSignalOf"/>).</summary>
+    private readonly CancellationSignal closed = new();
 
     private readonly Lock gate = new();
     // Insertion-ordered like a JavaScript Map: replacing a record keeps its position.
@@ -382,6 +421,11 @@ internal sealed class DurableTaskScheduler
     private readonly OrderedSet<TaskId> abandoned;
     /// <summary>Sleeping live tasks, due or not: the candidates of <see cref="WakeDueLocked"/>.</summary>
     private readonly OrderedSet<TaskId> sleeping;
+    /// <summary>Registry publications so far: a phase that took its snapshot at an older count ran under a replaced registry. Guarded by
+    /// the lock.</summary>
+    private long publications;
+    /// <summary>Sleeping calls parked at a gate that the registry or open wakes before their time (<see cref="WakeGateLocked"/>).</summary>
+    private readonly OrderedSet<TaskId> gateWakes;
     /// <summary>The latest clock a reservation pass made due sleeps candidates at (<see cref="WakeDueLocked"/>): a sleep due after it
     /// needs another pass.</summary>
     private double lastPassAt = double.NegativeInfinity;
@@ -445,6 +489,8 @@ internal sealed class DurableTaskScheduler
         context = options.Context;
         readOnly = options.ReadOnly;
         limitsRestarts = options.LimitsRestarts ?? (static _ => false);
+        keepsAbandoned = options.KeepsAbandoned ?? (static _ => false);
+        parkedAtGate = options.Gated ?? (static _ => false);
         dropQueue = new(iterations);
         roots = new(iterations);
         unloaded = new(iterations);
@@ -454,7 +500,25 @@ internal sealed class DurableTaskScheduler
         failFastChecks = new(iterations);
         abandoned = new(iterations);
         sleeping = new(iterations);
+        gateWakes = new(iterations);
     }
+
+    /// <summary>The provider session IDs the tasks of this Harness used, taken: the Harness cleans them up once its invocations joined.</summary>
+    internal List<string> TakeProviderSessions()
+    {
+        lock (providerSessions)
+        {
+            List<string> taken = [.. providerSessions];
+            providerSessions.Clear();
+            return taken;
+        }
+    }
+
+    /// <summary>The signal of the close of the Harness running <paramref name="runtime"/>'s task (upstream <c>closeSignal</c>); a runtime
+    /// of another kind, such as a test's, has one that never aborts.</summary>
+    internal static CancellationSignal CloseSignalOf(ITaskRuntime runtime) => runtime is ISchedulerRuntime own ? own.CloseSignal : NeverClosed;
+
+    private static readonly CancellationSignal NeverClosed = new();
 
     /// <summary>Test probe: members iterated over the scheduler's sets so far (see <see cref="iterations"/>).</summary>
     internal long SetEntries => Interlocked.Read(ref iterations.Entries);
@@ -488,6 +552,13 @@ internal sealed class DurableTaskScheduler
         session.SubscribeClose(Seal);
         registrySubscription = registry.Subscribe(() =>
         {
+            lock (gate)
+            {
+                publications++;
+                // Calls parked at a gate are asked again: the gates installed now decide (spec suspendable §5.2).
+                foreach (var id in sleeping)
+                    if (live.TryGetValue(id, out var parked)) WakeGateLocked(parked);
+            }
             NotifyBlocked();
             Kick();
         });
@@ -507,9 +578,11 @@ internal sealed class DurableTaskScheduler
                         TrackLocked(null, record);
                         resumed.Add(record.Id);
                         if (readOnly) continue;
+                        // The registry may differ from the one a call parked at its gates under.
+                        WakeGateLocked(record);
                         if (record.AbandonOnRestart) abandoned.Add(record.Id);
                         if (record.State is RunningTaskState running)
-                            tx.SetTask(WithState(record, new PendingTaskState(running.Checkpoint)) with { Restarts = (record.Restarts ?? 0) + 1 });
+                            tx.SetTask(PendingAgain(record, running) with { Restarts = (record.Restarts ?? 0) + 1 });
                         if (record.State is WaitingTaskState { Policy: JoinPolicy.FailFast }) failFastChecks.Add(record.Id);
                     }
                 }
@@ -587,7 +660,7 @@ internal sealed class DurableTaskScheduler
                 foreach (var (conversationId, kept) in contexts)
                 {
                     if (kept.IdleSince is not null) idle++;
-                    if ((kept.IdleSince is not null) != IdleLocked(conversationId)) mismatches++;
+                    if ((kept.IdleSince is not null) != InactiveLocked(conversationId)) mismatches++;
                     if ((idleOrder.TryGetValue(conversationId, out var since) ? since : (double?)null) != kept.IdleSince) mismatches++;
                 }
                 var previous = double.NegativeInfinity;
@@ -692,12 +765,16 @@ internal sealed class DurableTaskScheduler
         lock (gate)
         {
             active = invocations.Count > 0 || reconcilingWork > 0 || ReconcileWorkLocked() || RunsNowLocked(at, check);
-            // The earliest sleep not yet due: only `sleeping` holds sleeping tasks.
+            // The earliest sleep not yet due: only `sleeping` holds sleeping tasks. A sleep without `until` waits only for signals, which
+            // a delivery's commit wakes.
             foreach (var id in sleeping)
             {
-                if (live.GetValueOrDefault(id) is not { AbortRequested: false, State: SleepingTaskState asleep }) continue;
-                if (asleep.Until > at) earliest = earliest is { } other ? Math.Min(other, asleep.Until) : asleep.Until;
-                else if (asleep.Until > lastPassAt) dueSincePass = true;
+                if (live.GetValueOrDefault(id) is not { AbortRequested: false, State: SleepingTaskState asleep } record) continue;
+                if (AsleepLocked(record, at))
+                {
+                    if (asleep.Until is { } until) earliest = earliest is { } other ? Math.Min(other, until) : until;
+                }
+                else if (asleep.Until is { } due && due <= at && due > lastPassAt) dueSincePass = true;
             }
         }
         if (!active && check.Count > 0) active = RunsNow(check);
@@ -716,8 +793,8 @@ internal sealed class DurableTaskScheduler
         {
             var state = record.State;
             if (state.Status == DurableTaskStatus.Completing) continue;
-            if (state is WaitingTaskState waiting && !record.AbortRequested && waiting.On.Any(live.ContainsKey)) continue;
-            if (state is SleepingTaskState asleep && !record.AbortRequested && asleep.Until > at) continue;
+            if (state is WaitingTaskState && !record.AbortRequested && WaitingOnLocked(record, first: true).Count > 0) continue;
+            if (AsleepLocked(record, at)) continue;
             // An abort invocation waits for the live work below it, which counts itself.
             if (record.AbortRequested && WaitingOnLocked(record, first: true).Count > 0) continue;
             if (record.AbortRequested && record.AbortReason is null) return true;
@@ -777,7 +854,7 @@ internal sealed class DurableTaskScheduler
                     foreach (var invocation in signal)
                     {
                         if (live.GetValueOrDefault(invocation.TaskId) is not { State: RunningTaskState running } record) continue;
-                        writes.Add(new TaskWrite(WithState(record, new PendingTaskState(running.Checkpoint))));
+                        writes.Add(new TaskWrite(PendingAgain(record, running)));
                     }
                 }
                 return writes;
@@ -1014,8 +1091,6 @@ internal sealed class DurableTaskScheduler
             var failed = new List<TaskId>();
             // The conversations whose idleness the commit's task changes can change; null when a chain is not known.
             HashSet<ConversationId>? scopes = [];
-            // The tasks those walks passed, so one publication walks each node once (see AddScopesAboveLocked).
-            HashSet<TaskId> walked = [];
             // Edges first, so the tasks a commit creates in a new conversation hang from it.
             foreach (var change in publication.Changes)
                 if (change is ConversationWrite created && !edges.ContainsKey(created.Value.Id)) SetEdgeLocked(created.Value.Id, created.Value.Owner?.TaskId);
@@ -1027,10 +1102,10 @@ internal sealed class DurableTaskScheduler
                 var previous = live.GetValueOrDefault(record.Id);
                 if (FailedOutcome(record) && (previous is null || !FailedOutcome(previous))) failed.Add(record.Id);
                 TrackLocked(previous, record);
-                // Idleness counts live tasks, so only a task that became live or ended can change it. Collected before SweepLocked, which
-                // may forget the chain of a task that ended.
-                var liveness = previous is null || record.State.Status == DurableTaskStatus.Terminal;
-                if (liveness && scopes is not null && !AddScopesAboveLocked(record, scopes, walked)) scopes = null;
+                // Idleness counts live tasks, so only a task that became live or ended can change it, and the inactivity of kept contexts
+                // also a task that parked or woke. Collected before SweepLocked, which may forget the chain of a task that ended.
+                var liveness = previous is null || record.State.Status == DurableTaskStatus.Terminal || Parked(previous) != Parked(record);
+                if (liveness && scopes is not null && !AddScopesAboveLocked(record, scopes)) scopes = null;
                 if (record.State.Status == DurableTaskStatus.Terminal)
                 {
                     failedMigrations.Remove(record.Id);
@@ -1116,23 +1191,20 @@ internal sealed class DurableTaskScheduler
 
     /// <summary>
     /// Adds the conversations above <paramref name="record"/> to <paramref name="scopes"/>: those whose idleness a change of it can change
-    /// (upstream <c>#addScopesAbove</c>). False when a node on the way up is not known. A conversation already in <paramref name="scopes"/>
-    /// has everything above it there too, and so does a task in <paramref name="walked"/>, which an earlier walk of the same publication
-    /// passed (a deliberate difference: upstream stops at a conversation only, so the walks of one publication that creates or ends a
-    /// chain of N tasks in one conversation take N²/2 steps; here N). Owners and conversation edges never change, and a walk that met
-    /// an unknown node ended the collection, so the scopes are upstream's.
+    /// (upstream <c>#addScopesAbove</c>). False when an owner edge or owner task on the way up is not known. A conversation already in
+    /// <paramref name="scopes"/> has everything above it there too. A child task lives in its owner's conversation, so the first
+    /// conversation above a task is its own: the walk skips the owner chain between, which made a change deep in a long chain cost its
+    /// depth (Pi v1.6.0).
     /// </summary>
-    private bool AddScopesAboveLocked(TaskRecord record, HashSet<ConversationId> scopes, HashSet<TaskId> walked)
+    private bool AddScopesAboveLocked(TaskRecord record, HashSet<ConversationId> scopes)
     {
-        foreach (var step in AboveLocked(ParentOf(record), null))
+        var conversation = record.ConversationId;
+        while (scopes.Add(conversation))
         {
-            if (step.Kind == StepKind.Unknown) return false;
-            if (step.Kind == StepKind.Task)
-            {
-                if (!walked.Add(step.Task)) return true;
-                continue;
-            }
-            if (!scopes.Add(step.Conversation)) return true;
+            if (!EdgeLocked(conversation, null, out var owner)) return false;
+            if (owner is not { } task) return true;
+            if (NodeLocked(task, null) is not { } node) return false;
+            conversation = node.ConversationId;
         }
         return true;
     }
@@ -1219,7 +1291,7 @@ internal sealed class DurableTaskScheduler
         foreach (var conversationId in checks)
         {
             if (!contexts.TryGetValue(conversationId, out var kept)) continue;
-            if (!IdleLocked(conversationId))
+            if (!InactiveLocked(conversationId))
             {
                 if (kept.IdleSince is null) continue;
                 kept.IdleSince = null;
@@ -1961,6 +2033,7 @@ internal sealed class DurableTaskScheduler
             var node = NodeOf(record);
             live.Remove(id);
             sleeping.Remove(id);
+            gateWakes.Remove(id);
             intent.Remove(id);
             runnable.Remove(id);
             finalizeChecks.Remove(id);
@@ -1992,7 +2065,11 @@ internal sealed class DurableTaskScheduler
         }
         if (record.State is WaitingTaskState waitingState) foreach (var on in waitingState.On) AddTo(waiters, on, id);
         if (record.State.Status == DurableTaskStatus.Sleeping) sleeping.Add(id);
-        else sleeping.Remove(id);
+        else
+        {
+            sleeping.Remove(id);
+            gateWakes.Remove(id);
+        }
     }
 
     /// <summary>The nearest live task above ended ordinary work may be free now: one holding its outcome, or an aborting one.</summary>
@@ -2339,6 +2416,15 @@ internal sealed class DurableTaskScheduler
             idleWaiters.RejectAll(error);
         }
         CountActive();
+        // Outside the lock, as its listeners run synchronously: the cleanups an abort mark must not cancel end with the Harness.
+        try
+        {
+            closed.Cancel(HarnessUtil.ClosedError(session));
+        }
+        catch (Exception error)
+        {
+            report(error, ReportInfo.ListenerError);
+        }
         try
         {
             registrySubscription?.Dispose();
@@ -2465,16 +2551,60 @@ internal sealed class DurableTaskScheduler
         }
     }
 
-    /// <summary>Makes every sleeping task whose time has come by <paramref name="at"/> a reservation candidate.</summary>
+    /// <summary>Makes every sleeping task whose time has come by <paramref name="at"/>, or that a signal or a gate wake can run, a
+    /// reservation candidate.</summary>
     private void WakeDueLocked(double at)
     {
         foreach (var id in sleeping)
-            if (live.TryGetValue(id, out var record) && !NotDue(record, at)) runnable.Add(id);
+            if (live.TryGetValue(id, out var record) && !AsleepLocked(record, at)) runnable.Add(id);
     }
 
-    /// <summary>A sleep whose time the clock has not reached at <paramref name="at"/>; an abort mark ends a sleep.</summary>
-    private static bool NotDue(TaskRecord record, double at) =>
-        record.State is SleepingTaskState asleep && !record.AbortRequested && asleep.Until > at;
+    /// <summary>A sleeping record that cannot wake yet (<see cref="Asleep"/>), unless a gate wake runs it before its time (upstream
+    /// <c>#asleep</c>).</summary>
+    private bool AsleepLocked(TaskRecord record, double at) => Asleep(record, at) && !gateWakes.Contains(record.Id);
+
+    /// <summary>
+    /// Wakes a call parked at a gate, so its gates are asked again; a sleep whose deadline passed takes the deadline path when reserved
+    /// (<see cref="WokeLocked"/>). Other records are left alone (upstream <c>#wakeGate</c>).
+    /// </summary>
+    private void WakeGateLocked(TaskRecord record)
+    {
+        if (!parkedAtGate(record)) return;
+        gateWakes.Add(record.Id);
+        runnable.Add(record.Id);
+    }
+
+    /// <summary>A sleeping record that cannot wake yet: no abort mark, no listed key with an unused value, <c>until</c> not reached
+    /// (upstream <c>asleep</c>).</summary>
+    private static bool Asleep(TaskRecord record, double at) =>
+        record.State is SleepingTaskState asleep && !record.AbortRequested && !Signals.SleepDue(asleep, record.Memos, at);
+
+    /// <summary>A live task that holds no invocation while it waits: sleeping, waiting, or holding its outcome (upstream <c>parked</c>).</summary>
+    private static bool Parked(TaskRecord record) =>
+        record.State.Status is DurableTaskStatus.Sleeping or DurableTaskStatus.Waiting or DurableTaskStatus.Completing;
+
+    /// <summary>
+    /// The record a reservation writes (upstream <c>reserved</c>): <c>running</c> at the checkpoint, with the wake that ends its wait or
+    /// sleep and the signal memos it marks; a task written back as <c>pending</c> keeps the wake it woke with.
+    /// </summary>
+    private static TaskRecord Reserved(TaskRecord record, Woke? woke)
+    {
+        var state = (LiveTaskState)record.State;
+        if (woke is { } ended)
+        {
+            // As upstream's `{ ...record.memos, ...woke.memos }`: a woken record has memos, empty when it had none and none is marked.
+            var memos = record.Memos ?? JsonObjectValue.Empty;
+            foreach (var (name, memo) in ended.Memos) memos = memos.SetItem(name, memo);
+            return WithState(record with { Memos = memos }, new RunningTaskState(state.Checkpoint, ended.Wake));
+        }
+        var kept = state switch { PendingTaskState pending => pending.Wake, RunningTaskState running => running.Wake, _ => null };
+        return WithState(record, new RunningTaskState(state.Checkpoint, kept));
+    }
+
+    /// <summary>The record written back as <c>pending</c> (open, close, handover): its checkpoint, and the wake it woke with, if any
+    /// (upstream <c>pendingAgain</c>).</summary>
+    private static TaskRecord PendingAgain(TaskRecord record, RunningTaskState running) =>
+        WithState(record, new PendingTaskState(running.Checkpoint, running.Wake));
 
     /// <summary>Schedules a reservation pass on the thread pool (upstream <c>#kick</c>).</summary>
     private void Kick() => Kick(onLine: false);
@@ -2652,8 +2782,13 @@ internal sealed class DurableTaskScheduler
                 }
                 if (pending.Count > 0)
                 {
-                    var unmarked = await RegionAsync(() => pending.Select(LiveRecordLocked).Where(record => record is { AbortRequested: false }).ToList())
-                        .ConfigureAwait(false);
+                    var unmarked = await RegionAsync(() => pending.Select(LiveRecordLocked).Where(record =>
+                    {
+                        if (record is not { AbortRequested: false }) return false;
+                        // An owner that was not cut off while running keeps them (spec suspendable §2.5).
+                        var owner = record.Owner is { } ownerId ? LiveRecordLocked(ownerId) : null;
+                        return owner is null || !keepsAbandoned(owner);
+                    }).ToList()).ConfigureAwait(false);
                     foreach (var record in unmarked) tx.SetTask(WithAbortMark(record!, restart: true));
                     marked = pending;
                     return true;
@@ -2680,7 +2815,8 @@ internal sealed class DurableTaskScheduler
                 }).ConfigureAwait(false);
                 // Taken once per pass, and only when some task is a candidate.
                 IRegistrySnapshot? snapshot = null;
-                foreach (var record in plan.Ready)
+                long publication = 0;
+                foreach (var (record, woke) in plan.Ready)
                 {
                     var id = record.Id;
                     var mode = record.AbortRequested ? InvocationMode.Abort : InvocationMode.Run;
@@ -2695,7 +2831,11 @@ internal sealed class DurableTaskScheduler
                         faulted.Add((record, message));
                         continue;
                     }
-                    snapshot ??= registry.Snapshot();
+                    if (snapshot is null)
+                    {
+                        lock (gate) publication = publications;
+                        snapshot = registry.Snapshot();
+                    }
                     var resolution = Resolve(record, snapshot);
                     if (resolution.Blocked is { } reason)
                     {
@@ -2706,11 +2846,11 @@ internal sealed class DurableTaskScheduler
                     }
                     var resolved = resolution.Record!;
                     if (!ReferenceEquals(resolved, record) || record.State.Status != DurableTaskStatus.Running)
-                        tx.SetTask(WithState(resolved, new RunningTaskState(((LiveTaskState)resolved.State).Checkpoint)));
+                        tx.SetTask(Reserved(resolved, woke));
                     // Registered on the line, so marks and later reservations see it and close joins it; End makes it a candidate again.
                     lock (gate) runnable.Remove(id);
                     var invocation = CreateInvocation(record, mode, InstallerOf(snapshot, resolution.Task));
-                    reservations.Add(new Reservation(invocation, resolution.Task!, snapshot));
+                    reservations.Add(new Reservation(invocation, resolution.Task!, snapshot, publication));
                 }
                 return true;
             }, context, inline: !linePass).ConfigureAwait(false);
@@ -2750,7 +2890,7 @@ internal sealed class DurableTaskScheduler
     private ReservationPlan PlanReservationLocked(double at)
     {
         var dropped = new List<TaskId>();
-        var ready = new List<TaskRecord>();
+        var ready = new List<(TaskRecord Record, Woke? Woke)>();
         var cascade = false;
         foreach (var id in runnable)
         {
@@ -2763,7 +2903,7 @@ internal sealed class DurableTaskScheduler
             // It returns once what it waits for ends, its record changes, or the work below it ends; a sleep at the first pass after its time
             // comes, which the timer, Resume(), or any change starts.
             if (record is null || record.State.Status == DurableTaskStatus.Completing || WaitingOnLocked(record, first: true).Count > 0 ||
-                NotDue(record, at))
+                AsleepLocked(record, at))
             {
                 dropped.Add(id);
                 continue;
@@ -2773,19 +2913,39 @@ internal sealed class DurableTaskScheduler
                 cascade = true;
                 continue;
             }
-            ready.Add(record);
+            ready.Add((record, WokeLocked(record, at)));
         }
         return new ReservationPlan(dropped, cascade, ready);
     }
 
     /// <summary>
+    /// How a run-mode reservation ends a record's wait or sleep (spec suspendable §2.4; upstream <c>#woke</c>): a wait's wake names the
+    /// terminal tasks of its <c>on</c> (all of them unless <c>any</c>), read as task records; a sleep's, the key that woke it, consumed, or
+    /// its deadline, with the keys that hold nothing expired. None for an abort, or for a record that neither waits nor sleeps.
+    /// </summary>
+    private Woke? WokeLocked(TaskRecord record, double at)
+    {
+        if (record.AbortRequested) return null;
+        if (record.State is WaitingTaskState waiting)
+        {
+            var ended = waiting.Policy == JoinPolicy.Any ? [.. waiting.On.Where(id => LiveRecordLocked(id) is null)] : waiting.On;
+            return new Woke(WakeReason.Tasks(ended), []);
+        }
+        // Not asleep: due, or woken at its gates, which needs no wake unless its deadline passed.
+        return record.State is SleepingTaskState asleep && Signals.SleepWake(asleep, record.Memos, at) is { } woke
+            ? new Woke(woke.Wake, woke.Memos)
+            : null;
+    }
+
+    /// <summary>
     /// Live tasks a task waits for before its next invocation: its live ordinary owned work when abort-marked, since abort runs bottom-up,
-    /// otherwise the live part of the <c>on</c> of a wait.
+    /// otherwise the live part of the <c>on</c> of a wait; none for an <c>any</c> wait one of whose tasks ended.
     /// </summary>
     private List<TaskId> WaitingOnLocked(TaskRecord record, bool first = false)
     {
         if (record.AbortRequested) return OwnedLiveLocked(record.Id, null, first, null);
         if (record.State is not WaitingTaskState waiting) return [];
+        if (waiting.Policy == JoinPolicy.Any && !waiting.On.All(live.ContainsKey)) return [];
         if (!first) return [.. waiting.On.Where(live.ContainsKey)];
         foreach (var id in waiting.On) if (live.ContainsKey(id)) return [id];
         return [];
@@ -2807,9 +2967,9 @@ internal sealed class DurableTaskScheduler
             TaskState next = state switch
             {
                 WaitingTaskState waiting => new WaitingTaskState(migrated.Checkpoint, waiting.On, waiting.Policy),
-                SleepingTaskState asleep => new SleepingTaskState(migrated.Checkpoint, asleep.Until),
-                RunningTaskState => new RunningTaskState(migrated.Checkpoint),
-                _ => new PendingTaskState(migrated.Checkpoint),
+                SleepingTaskState asleep => new SleepingTaskState(migrated.Checkpoint, asleep.Until, asleep.Signals),
+                RunningTaskState running => new RunningTaskState(migrated.Checkpoint, running.Wake),
+                _ => new PendingTaskState(migrated.Checkpoint, (state as PendingTaskState)?.Wake),
             };
             return new Resolution(fit.Task, record with { Version = definition.Version, Input = migrated.Input, State = next }, null);
         }
@@ -2861,7 +3021,7 @@ internal sealed class DurableTaskScheduler
         if (record.State.Status == DurableTaskStatus.Completing) return new TaskInspectionState(TaskInspectionKind.Completing);
         var on = WaitingOnLocked(record);
         if (on.Count > 0) return new TaskInspectionState(TaskInspectionKind.Waiting) { On = [.. on] };
-        if (NotDue(record, at)) return new TaskInspectionState(TaskInspectionKind.Sleeping) { Until = ((SleepingTaskState)record.State).Until };
+        if (AsleepLocked(record, at)) return new TaskInspectionState(TaskInspectionKind.Sleeping) { Until = ((SleepingTaskState)record.State).Until };
         var fit = Fit(record, snapshot.GetTask(record.Kind));
         if (fit.Reason is { } reason) return new TaskInspectionState(TaskInspectionKind.Blocked) { Reason = reason, Error = fit.Error };
         if (fit.Migrates && fit.Task!.Definition.Migrate is null)
@@ -2924,7 +3084,7 @@ internal sealed class DurableTaskScheduler
     private async Task RunAsync(Reservation reservation)
     {
         var invocation = reservation.Invocation;
-        var state = new RunState(reservation.Task, reservation.Snapshot);
+        var state = new RunState(reservation.Task, reservation.Snapshot) { Publication = reservation.Publication };
         var phase = new Phase(() => state.Snapshot, () => state.Task);
         var runtime = new Runtime(this, invocation, phase);
         bool Progress(Transaction tx, RunningTask task) => ProgressOf(tx, invocation, task, state);
@@ -2934,7 +3094,7 @@ internal sealed class DurableTaskScheduler
             // Close may seal between the decision and dispatch.
             bool closingNow;
             lock (gate) closingNow = closing;
-            if (current is null || closingNow) return;
+            if (current is null || closingNow) break;
             var task = current;
             current = await PhaseAsync(invocation, task, async () =>
             {
@@ -2957,6 +3117,15 @@ internal sealed class DurableTaskScheduler
                 return await StepAsync(invocation, next => RulesLocked(next, previous), Progress).ConfigureAwait(false);
             }).ConfigureAwait(false);
         }
+        // A gate's sleep committed under a snapshot the registry has since replaced: the phase could not take a fresh one, so it is woken
+        // as a publication would have woken it.
+        bool stale;
+        lock (gate)
+        {
+            stale = live.TryGetValue(invocation.TaskId, out var record) && publications != state.Publication;
+            if (stale) WakeGateLocked(record!);
+        }
+        if (stale) Kick();
     }
 
     /// <summary>
@@ -3067,12 +3236,13 @@ internal sealed class DurableTaskScheduler
     /// </summary>
     private bool ProgressOf(Transaction tx, Invocation invocation, RunningTask current, RunState state)
     {
+        lock (gate) state.Publication = publications;
         state.Snapshot = registry.Snapshot();
         var next = state.Snapshot.GetTask(current.Kind);
         if (ReferenceEquals(next, state.Task)) return true;
         if (next is not null && CanReserve(next, current.Record))
         {
-            tx.SetTask(WithState(current.Record, new PendingTaskState(current.Checkpoint)));
+            tx.SetTask(PendingAgain(current.Record, current.State));
             return false;
         }
         if (state.Reported is null || !ReferenceEquals(state.Reported.Task, next))
@@ -3194,7 +3364,7 @@ internal sealed class DurableTaskScheduler
     {
         NextTaskState.Check(next);
         if (next is WaitingTaskState waiting) await ValidateWaitAsync(tx, invocation, current, waiting.On, waiting.Policy).ConfigureAwait(false);
-        if (next is SleepingTaskState asleep) ValidateSleep(invocation, current.Id, asleep.Until);
+        if (next is SleepingTaskState asleep) ValidateSleep(invocation, current, asleep);
         if (next is TerminalTaskState terminal)
         {
             var overlay = OverlayOf(tx);
@@ -3207,9 +3377,10 @@ internal sealed class DurableTaskScheduler
             }
         }
         // A state the task committed that differs from its current one is progress: its restart count starts over. The same checkpoint
-        // committed again, for example as intent before an effect, is not.
-        var same = JsonValue.DeepEquals(current.State.ToJson(), next.ToJson());
-        tx.SetTask(WithState(same ? current.Record : Progressed(current.Record), next));
+        // committed again, for example as intent before an effect, is not, and keeps the wake.
+        var was = current.State.Wake is null ? current.State : new RunningTaskState(current.State.Checkpoint);
+        var same = JsonValue.DeepEquals(was.ToJson(), next.ToJson());
+        tx.SetTask(WithState(same ? current.Record : Progressed(current.Record), same ? current.State : next));
     }
 
     /// <summary>
@@ -3359,18 +3530,27 @@ internal sealed class DurableTaskScheduler
     }
 
     /// <summary>No live non-background task in the scope; a task whose owner edges are not loaded yet counts as inside.</summary>
-    private bool IdleLocked(ConversationId? conversationId)
+    private bool IdleLocked(ConversationId? conversationId) => QuietLocked(conversationId, null);
+
+    /// <summary>Whether a kept context's conversation is inactive (spec suspendable §8; upstream <c>#inactive</c>): idle, or with all its
+    /// live work parked (<see cref="Parked"/>), which holds no invocation however long it waits.</summary>
+    private bool InactiveLocked(ConversationId conversationId) => QuietLocked(conversationId, static record => !Parked(record));
+
+    /// <summary>No live non-background task in the scope that <paramref name="counts"/> (null: every one); one whose owner edges are not
+    /// loaded yet counts as inside (upstream <c>#quiet</c>).</summary>
+    private bool QuietLocked(ConversationId? conversationId, Func<TaskRecord, bool>? counts)
     {
         var scope = conversationId is { } id ? Scope.Of(id) : Scope.Roots;
         // In a decision region, global idle reads the roots it starts from.
         if (conversationId is null) Record(LineKeys.Roots);
         // Tasks whose chain is not loaded are not listed below their scope yet; one counts as inside unless its walk up decides otherwise.
         foreach (var taskId in unloaded)
-            if (live.TryGetValue(taskId, out var record) && !record.Background && InScopeLocked(ParentOf(record), scope) != false) return false;
+            if (live.TryGetValue(taskId, out var record) && !record.Background && (counts is null || counts(record)) &&
+                InScopeLocked(ParentOf(record), scope) != false) return false;
         IEnumerable<ConversationId> starts = conversationId is { } only ? [only] : roots;
         foreach (var start in starts)
             foreach (var (_, node, record) in WalkDownLocked(Node.Of(start), null, false, null))
-                if (record is not null && !node.Background) return false;
+                if (record is not null && !node.Background && (counts is null || counts(record))) return false;
         return true;
     }
 
@@ -3611,13 +3791,16 @@ internal sealed class DurableTaskScheduler
     {
         public DurableTask Task { get; set; } = task;
         public IRegistrySnapshot Snapshot { get; set; } = snapshot;
+        /// <summary>Registry publications seen when <see cref="Snapshot"/> was taken.</summary>
+        public long Publication { get; set; }
         public ReportedTask? Reported { get; set; }
     }
 
     /// <summary>Replacement definition already reported as unable to take over, per invocation.</summary>
     private sealed record ReportedTask(DurableTask? Task);
 
-    private sealed record Reservation(Invocation Invocation, DurableTask Task, IRegistrySnapshot Snapshot)
+    /// <param name="Publication">Registry publications seen when <paramref name="Snapshot"/> was taken.</param>
+    private sealed record Reservation(Invocation Invocation, DurableTask Task, IRegistrySnapshot Snapshot, long Publication)
     {
         /// <summary>An abort invocation's committed record, read when its pass's invocations start (upstream's <c>#runAbort</c> reads it
         /// first thing).</summary>
@@ -3654,7 +3837,11 @@ internal sealed class DurableTaskScheduler
     private sealed record RoundPlan(List<(TaskRecord Record, TaskRecord Terminal)> Finalized, List<TaskId> Next, List<TaskId> Checked);
 
     /// <summary><see cref="PlanReservationLocked"/>'s result.</summary>
-    private sealed record ReservationPlan(List<TaskId> Dropped, bool Cascade, List<TaskRecord> Ready);
+    private sealed record ReservationPlan(List<TaskId> Dropped, bool Cascade, List<(TaskRecord Record, Woke? Woke)> Ready);
+
+    /// <summary>How a reservation in run mode ends a wait or a sleep: its wake, and the signal memos it marks consumed or expired (upstream
+    /// <c>Woke</c>).</summary>
+    private readonly record struct Woke(WakeReason Wake, ImmutableArray<KeyValuePair<string, JsonValue>> Memos);
 
     /// <summary>A definition that can take a record, or why none can; deciding it runs no task code.</summary>
     private readonly record struct FitResult(DurableTask? Task, bool Migrates, BlockedReason? Reason, Exception? Error);
@@ -3854,8 +4041,15 @@ internal sealed class DurableTaskScheduler
     // ─── Invocation runtime ──────────────────────────────────────────────────
 
     /// <summary>The task runtime of one invocation (upstream <c>#runtime</c>).</summary>
-    private sealed class Runtime(DurableTaskScheduler scheduler, Invocation invocation, Phase phase) : ITaskRuntime, IHookRunner
+    private sealed class Runtime(DurableTaskScheduler scheduler, Invocation invocation, Phase phase) : ITaskRuntime, IHookRunner, ISchedulerRuntime
     {
+        public CancellationSignal CloseSignal => scheduler.closed;
+
+        public void UseProviderSession(string sessionId)
+        {
+            lock (scheduler.providerSessions) scheduler.providerSessions.Add(sessionId);
+        }
+
         public TaskId TaskId => invocation.TaskId;
         public ConversationId ConversationId => invocation.ConversationId;
         public CancellationToken Signal => invocation.Controller.Token;
@@ -3968,6 +4162,19 @@ internal sealed class DurableTaskScheduler
                 tx.SetTask(current.Record with { Memos = (current.Memos ?? JsonObjectValue.Empty).SetItem(name, candidate) });
                 return Task.FromResult(candidate);
             }, context);
+        }
+
+        public Task<SignalState?> ReadSignalAsync(SignalToken token, string key, DurableContext context)
+        {
+            ArgumentNullException.ThrowIfNull(token);
+            ArgumentNullException.ThrowIfNull(key);
+            return Read(() =>
+            {
+                JsonObjectValue? memos;
+                lock (scheduler.gate) memos = scheduler.live.GetValueOrDefault(invocation.TaskId)?.Memos;
+                // A migration is host code: outside the lock.
+                return Task.FromResult(Signals.Read(memos, token, key));
+            });
         }
 
         public Task SleepUntilAsync(double until, JsonValue checkpoint, DurableContext context)
@@ -4100,7 +4307,7 @@ internal sealed class DurableTaskScheduler
                 if (range is not null && !scheduler.closing && !ended && (kept is null || kept.Range.Bounds.Tail.Value <= range.Bounds.Tail.Value))
                 {
                     // A read of another, idle conversation starts or continues its retention period.
-                    if (!scheduler.IdleLocked(conversationId))
+                    if (!scheduler.InactiveLocked(conversationId))
                     {
                         scheduler.contexts[conversationId] = new KeptContext(range, null);
                         scheduler.idleOrder.Remove(conversationId);
@@ -4271,11 +4478,15 @@ internal sealed class DurableTaskScheduler
         }
     }
 
-    /// <summary>A sleep's <c>until</c> is a time on the Harness clock; an abort handler cannot sleep (upstream <c>validateSleep</c>).</summary>
-    private static void ValidateSleep(Invocation invocation, TaskId task, double until)
+    /// <summary>A sleep's <c>until</c>, when set, is a time on the Harness clock; it waits for <c>until</c> or a non-empty <c>signals</c>,
+    /// none of whose keys served a wait (<see cref="Signals.CheckSleep"/>); an abort handler cannot sleep (upstream
+    /// <c>validateSleep</c>).</summary>
+    private static void ValidateSleep(Invocation invocation, RunningTask current, SleepingTaskState next)
     {
+        var task = current.Id;
         if (invocation.Mode == InvocationMode.Abort) throw new InvalidOperationException($"Abort handler of task {task} cannot sleep");
-        if (!double.IsFinite(until) || until < 0)
+        if (next.Until is { } until && (!double.IsFinite(until) || until < 0))
             throw new ArgumentException($"Task {task} cannot sleep until {Internal.PiAi.Validation.Js.NumberToString(until)}: not a time in milliseconds");
+        Signals.CheckSleep(next, current.Memos, task);
     }
 }

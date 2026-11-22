@@ -1,4 +1,8 @@
-// Pi v1.5.2: every affected live object restarts; old work retains the open old attempt.
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/chord/src/host/object.ts (what a reload does to an object).
+// Every affected live object restarts; old work retains the open old attempt. 1.6.0 (slice 14 §2.5): an admitted type's successor
+// admits while the old attempt drains (only its factory waits for the old attempt's close), a change of the old attempt's admission
+// seals it at once and the restart goes on without its drain, and the readiness of the recorded requests does not overwrite what the
+// successor's admission shows while it has not allowed.
 using PiSharp.Chord.Contracts;
 using PiSharp.Chord.Data;
 
@@ -34,6 +38,8 @@ internal sealed partial class ChordObject
             ready.Changed += () =>
             {
                 if (!ReferenceEquals(Current, next) || OpenOldAttempt is null) return;
+                // An admitted successor that has not allowed yet shows what its admission parks on.
+                if (next.Deciding) return;
                 SetState(ready.Cause is { } cause ? RefState.Failed(cause) : RefState.Loading);
                 Host.ReloadCycles.Recheck();
             };
@@ -59,8 +65,21 @@ internal sealed partial class ChordObject
 
     private async Task RetryReloadAsync(Attempt? old, Attempt next)
     {
-        if (old is not null)
+        if (next.Served.Admission is not null)
         {
+            // Admits at once (in a later turn); its factory waits for the old attempt's close, as every later attempt's does.
+            var closing = Close();
+            previousClose = Task.WhenAll(Settled(previousClose), closing);
+            Activate(next);
+            await closing;
+            if (ending || Host.Closed || !ReferenceEquals(Current, next)) { next.Seal(Reloaded(), "reload"); next.Checked.TrySetResult(null); return; }
+            await next.Checked.Task;
+            return;
+        }
+        await Close();
+        async Task Close()
+        {
+            if (old is null) return;
             try { await old.CloseAsync(NativeCloseReason.Reload); }
             catch (Exception error) { Host.Report(new("close_failed", error, Label)); }
         }
@@ -76,16 +95,19 @@ internal sealed partial class ChordObject
     {
         try
         {
-            await ready.WaitAsync(due);
-            await old.DrainCallsAsync(due);
-            old.Seal(Reloaded(), "reload", keepSources: true, keepContributions: !old.OpensNatives);
-            await Documents.SettledAsync();
-            StopFollowing(old);
-            try { await old.CloseAsync(NativeCloseReason.Reload); }
-            catch (Exception error) { Host.Report(new("close_failed", error, Label)); }
+            var admitted = next.Served.Admission is not null;
+            var retiring = RetireAsync(old, ready, due);
+            if (admitted)
+            {
+                // The successor admits while the old attempt drains (slice 14 §2.5); its factory, and every later attempt's, waits for
+                // the old attempt's close.
+                previousClose = Task.WhenAll(Settled(previousClose), Settled(retiring));
+                Activate(next);
+            }
+            await retiring;
             if (ending || Host.Closed || !ReferenceEquals(Current, next))
             { next.Seal(Reloaded(), "reload"); next.Checked.TrySetResult(null); return; }
-            _ = next.ActivateAsync();
+            if (!admitted) _ = next.ActivateAsync();
             await next.Checked.Task;
             old.Self.ReleaseReferences(); ready.Release();
             if (ReferenceEquals(readiness, ready)) readiness = null;
@@ -96,6 +118,28 @@ internal sealed partial class ChordObject
             old.Self.ReleaseReferences(); ready.Release();
             if (ReferenceEquals(readiness, ready)) readiness = null;
         }
+    }
+    // The old attempt's end in a restart: once its successor's requests are ready and its old work drained it is sealed, then closed. A
+    // change of its admission seals it before that (SealDraining): the wait ends at once, with no drain.
+    private async Task RetireAsync(Attempt old, ReloadReadiness ready, DateTimeOffset due)
+    {
+        if (old.Served.Admission is null) await ready.WaitAsync(due);
+        else await Task.WhenAny(ready.WaitAsync(due), old.CutTask);
+        await old.DrainCallsAsync(due);
+        old.Seal(Reloaded(), "reload", keepSources: true, keepContributions: !old.OpensNatives);
+        // Sealed: a later attempt's admission that bound its requests lets this one's go.
+        ReleaseSuperseded();
+        await Documents.SettledAsync();
+        StopFollowing(old);
+        try { await old.CloseAsync(NativeCloseReason.Reload); }
+        catch (Exception error) { Host.Report(new("close_failed", error, Label)); }
+    }
+    /// <summary>The admission of <paramref name="attempt"/> allowed: while it is a restart's successor waiting for the old attempt, the
+    /// object shows what the readiness of its recorded requests says again.</summary>
+    internal void AdmissionAllowed(Attempt attempt)
+    {
+        if (!ReferenceEquals(Current, attempt) || OpenOldAttempt is null || readiness is not { } ready) return;
+        SetState(ready.Cause is { } cause ? RefState.Failed(cause) : RefState.Loading);
     }
     private void TrackRetirement(Attempt attempt, Task work)
     {
@@ -132,6 +176,7 @@ internal sealed partial class ChordObject
                 else holder.End(new ChordError("unavailable", $"{Served.Contract.Name} is not served here"));
         }
         finally { ending = false; }
+        UnbindSets();
         Host.TrackReloadWork(EndAsync(new ChordError("released", $"{Label}: removed", "ended"), NativeCloseReason.End), Label);
     }
 }

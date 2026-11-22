@@ -1,4 +1,4 @@
-// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/ai/src/env-api-keys.ts and packages/ai/src/providers/anthropic.ts.
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/ai/src/env-api-keys.ts and packages/ai/src/providers/anthropic.ts.
 using System.Collections.Immutable;
 
 namespace PiSharp.AI.Authentication;
@@ -14,12 +14,18 @@ public static class InjectedAuthenticationResolver
     public const string AnthropicServiceAccountId = "ANTHROPIC_SERVICE_ACCOUNT_ID";
     public const string AnthropicIdentityTokenFile = "ANTHROPIC_IDENTITY_TOKEN_FILE";
     public const string AnthropicWorkspaceId = "ANTHROPIC_WORKSPACE_ID";
+    // Qwen Token Plan: the per-plan variable first, then the region variable both plans used to share.
+    private static readonly ImmutableDictionary<string, ImmutableArray<string>> PlanApiKeyNames = new Dictionary<string, ImmutableArray<string>>(StringComparer.Ordinal)
+    {
+        ["qwen-token-plan"] = ["QWEN_TOKEN_PLAN_TEAM_API_KEY", "QWEN_TOKEN_PLAN_API_KEY"],
+        ["qwen-token-plan-cn"] = ["QWEN_TOKEN_PLAN_TEAM_CN_API_KEY", "QWEN_TOKEN_PLAN_CN_API_KEY"],
+        ["qwen-token-plan-individual"] = ["QWEN_TOKEN_PLAN_INDIVIDUAL_API_KEY", "QWEN_TOKEN_PLAN_API_KEY"],
+        ["qwen-token-plan-individual-cn"] = ["QWEN_TOKEN_PLAN_INDIVIDUAL_CN_API_KEY", "QWEN_TOKEN_PLAN_CN_API_KEY"],
+    }.ToImmutableDictionary(StringComparer.Ordinal);
     private static readonly ImmutableDictionary<string, string> ApiKeyNames = new Dictionary<string, string>(StringComparer.Ordinal)
     {
         ["github-copilot"] = "COPILOT_GITHUB_TOKEN",
-        ["ant-ling"] = "ANT_LING_API_KEY", ["qwen-token-plan"] = "QWEN_TOKEN_PLAN_API_KEY",
-        ["qwen-token-plan-cn"] = "QWEN_TOKEN_PLAN_CN_API_KEY", ["qwen-token-plan-individual"] = "QWEN_TOKEN_PLAN_API_KEY",
-        ["qwen-token-plan-individual-cn"] = "QWEN_TOKEN_PLAN_CN_API_KEY",
+        ["ant-ling"] = "ANT_LING_API_KEY",
         ["openai"] = "OPENAI_API_KEY", ["azure"] = "AZURE_OPENAI_API_KEY", // Pi 06a46693 env-api-keys.ts: renamed from azure-openai-responses in 1.0.3.
         ["nvidia"] = "NVIDIA_API_KEY", ["deepseek"] = "DEEPSEEK_API_KEY", ["google"] = "GEMINI_API_KEY",
         ["google-vertex"] = "GOOGLE_CLOUD_API_KEY", ["groq"] = "GROQ_API_KEY", ["cerebras"] = "CEREBRAS_API_KEY",
@@ -40,6 +46,7 @@ public static class InjectedAuthenticationResolver
     {
         ArgumentNullException.ThrowIfNull(environment);
         IEnumerable<string> names = provider == "anthropic" ? [AnthropicAuthToken, AnthropicOAuthToken, AnthropicApiKey]
+            : provider is not null && PlanApiKeyNames.TryGetValue(provider, out var planNames) ? planNames
             : provider is not null && ApiKeyNames.TryGetValue(provider, out var mappedName) ? [mappedName] : [];
         return names.Where(name => environment.GetValue(name) is not null).ToImmutableArray();
     }
@@ -56,7 +63,7 @@ public static class InjectedAuthenticationResolver
         }
         // The original probes ADC/AWS here. This slice explicitly does not acquire ambient credentials.
         if (provider is "google-vertex" or "amazon-bedrock") return new(AuthenticationDiagnostic.AmbientAuthenticationUnsupported);
-        return new(provider == "anthropic" || provider is not null && ApiKeyNames.ContainsKey(provider)
+        return new(provider == "anthropic" || provider is not null && (ApiKeyNames.ContainsKey(provider) || PlanApiKeyNames.ContainsKey(provider))
             ? AuthenticationDiagnostic.Missing : AuthenticationDiagnostic.UnknownProvider);
     }
 

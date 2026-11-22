@@ -1,4 +1,20 @@
 {
+  "pi160Candidate": {
+    "status": "tested-with-limitations",
+    "sourceVersion": "1.6.0",
+    "sourceCommit": "faac585884ae2c013a6b1400f3e9e77f10b34bac",
+    "sourceTree": "7b395e942aa81ffe0dba09ae2939184c200e4d3b",
+    "released": false,
+    "publishedVersion": "1.5.2",
+    "publishedSourceVersion": "1.5.2",
+    "applicability": "compatibility/sync-1.6.0-applicability.json",
+    "durableOverlay": "compatibility/durable-sync-1.6.0-overlay.json",
+    "releaseNotes": "docs/release-notes/1.6.0.md",
+    "decision": "docs/decisions/0015-pi-1.6.0-sync.md",
+    "historicalRecordsPreserved": true,
+    "runtimeAcceptance": "Current-source local suite acceptance; no whole-product, hosted, live-provider, cross-platform or publication claim.",
+    "acceptance": "compatibility/sync-1.6.0-acceptance.json"
+  },
   "pi152Candidate": {
     "status": "tested-with-limitations",
     "sourceVersion": "1.5.2",

@@ -1,6 +1,7 @@
-// Pi b4afdddf44e059c67ccf5097e5317d913521b470 (MIT): packages/chord/src/telemetry-ingest/recorder.ts, packages/chord/src/telemetry-ingest/sender.ts, packages/chord/src/telemetry-ingest/facet.ts.
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/chord/src/telemetry-ingest/recorder.ts, packages/chord/src/telemetry-ingest/sender.ts, packages/chord/src/telemetry-ingest/facet.ts.
 // Authored native regression; not an upstream execution capture.
-// Authored from Pi 1.5.2 telemetry-ingest tests and the reviewed native port contract; offline only.
+// Authored from Pi 1.5.2 telemetry-ingest tests and the reviewed native port contract; offline only. The admission case is authored from
+// Pi 1.6.0 packages/chord/test/telemetry-ingest/facet.test.ts ("admitting pages").
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using PiSharp.Chord;
@@ -202,7 +203,7 @@ internal static partial class Program
             await using var host = Hosts.Create(new() { Address = new HostKind("server").Address(), Principal = new() { ["kind"] = "user" }, OnError = _ => { } });
             await host.LoadAsync([new("telemetry", TelemetryIngest.CreateFacet(new()
             {
-                Target = recorder, WorkerHost = _ => null, TimeProvider = clock,
+                Target = recorder, Admit = _ => true, WorkerHost = _ => null, TimeProvider = clock,
                 PrincipalAttributes = _ => { hooks++; return new() { ["chord.principal"] = "trusted" }; }
             }))], ChordContext.Background);
             using var reference = await host.GetAsync(TelemetryIngest.PageTelemetry, new(), ChordContext.Background);
@@ -220,13 +221,69 @@ internal static partial class Program
             clock.Advance(60_000); receipt = (JsonObject)(await reference.CallAsync("ingest", IngestPage(span), ChordContext.Background))!;
             Equal(1, receipt["written"]!.GetValue<int>(), "minute budget resets");
         }),
+        Case("telemetry-ingest.160.export-surface-is-public", () =>
+        {
+            // package.json exports `./telemetry-ingest` at 1.6.0 (src/telemetry-ingest/index.ts): the recorder, the page and worker
+            // batches and objects, the ingest facet and the senders. Natively that is the public namespace PiSharp.Chord.TelemetryIngest.
+            foreach (var type in new[] { typeof(TelemetryIngest), typeof(TelemetryIngestOptions), typeof(ITelemetryIngestTarget), typeof(TelemetryBatch),
+                typeof(TelemetryRecorder), typeof(TelemetrySender), typeof(TelemetrySenders) })
+                Check(type.IsPublic && type.Namespace == "PiSharp.Chord.TelemetryIngest", type.Name + " is not public in PiSharp.Chord.TelemetryIngest");
+            Equal(100, TelemetryIngest.PageBatchSpans, "PAGE_BATCH_SPANS"); Equal(1000, TelemetryIngest.WorkerBatchRows, "WORKER_BATCH_ROWS");
+            Equal(1200, TelemetryIngest.PageSpansPerMinute, "PAGE_SPANS_PER_MINUTE");
+            Equal("chord.telemetry.page", TelemetryIngest.PageTelemetry.Name, "PageTelemetry"); Equal("chord.telemetry.worker", TelemetryIngest.WorkerTelemetry.Name, "WorkerTelemetry");
+            Check(TelemetryIngest.PageBatch["type"] is not null && TelemetryIngest.WorkerBatch["type"] is not null, "the batch schemas are exported");
+            foreach (var member in new[] { nameof(TelemetryIngest.CreateFacet), nameof(TelemetrySenders.SendPageTelemetry), nameof(TelemetrySenders.SendWorkerTelemetry) })
+                Check(typeof(TelemetryIngest).GetMethod(member)?.IsPublic == true || typeof(TelemetrySenders).GetMethod(member)?.IsPublic == true, member + " is not public");
+            // `admit` is required: an options record without it does not compile, and a null one is refused.
+            Throws<ArgumentNullException>(() => TelemetryIngest.CreateFacet(new()
+            { Target = new TelemetryRecorder(() => "x", 1), Admit = null!, WorkerHost = _ => null, PrincipalAttributes = _ => new() }), "admit is required");
+        }),
+        Case("telemetry-ingest.facet.160.refuses-page-of-unadmitted-principal", async () =>
+        {
+            // facet.test.ts "refuses the page of a principal the app does not admit: its hold fails forbidden, nothing is written".
+            async Task<(ChordHost Server, ChordHost Client, List<TelemetryBatch> Batches)> Ingesting(JsonObject principal)
+            {
+                var batches = new List<TelemetryBatch>();
+                var server = Hosts.Create(new() { Address = new HostKind("server").Address(), Principal = new() { ["kind"] = "server" }, OnError = _ => { } });
+                var loaded = await server.LoadAsync([new("telemetry", TelemetryIngest.CreateFacet(new()
+                {
+                    Target = new IngestBatches(batches), Admit = who => who?["kind"]?.GetValue<string>() == "owner",
+                    WorkerHost = _ => null, PrincipalAttributes = _ => new()
+                }))], ChordContext.Background);
+                Equal(0, loaded.Failed.Count, "page ingest facet served");
+                var client = Hosts.Create(new() { OnError = _ => { } }); await client.LoadAsync([], ChordContext.Background);
+                var pair = MemoryLinkPair.Create();
+                server.Accept(pair.First, new() { Principal = principal }, ChordContext.Background);
+                client.Connect(pair.Second, new() { Principal = new() { ["kind"] = "server" } }, ChordContext.Background);
+                return (server, client, batches);
+            }
+            async Task<JsonObject> Ingest(ChordHost client)
+            {
+                using var page = await client.GetAsync(TelemetryIngest.PageTelemetry, new(), ChordContext.Background);
+                return (JsonObject)(await page.CallAsync("ingest", IngestPage(IngestSpan("browser:" + client.Incarnation + ":1")), ChordContext.Background))!;
+            }
+            var guest = await Ingesting(new() { ["kind"] = "guest" });
+            await using (guest.Server) await using (guest.Client)
+            {
+                var refused = await ChordSupport.Rejection(Ingest(guest.Client));
+                Check(refused is JsonObject failure && failure["code"]?.GetValue<string>() == "forbidden", "an unadmitted principal's hold fails forbidden: " + refused);
+                Equal(0, guest.Batches.Count, "nothing is written for a refused page");
+            }
+            var owner = await Ingesting(new() { ["kind"] = "owner" });
+            await using (owner.Server) await using (owner.Client)
+            {
+                var receipt = await Ingest(owner.Client);
+                Equal(1, receipt["written"]!.GetValue<int>(), "an admitted principal's page writes"); Equal(0, receipt["dropped"]!.GetValue<int>(), "nothing dropped");
+                Equal(1, owner.Batches.Single().Spans.Count, "the admitted page's span reached the target");
+            }
+        }),
         Case("telemetry-ingest.facet.worker-authorized-variant-stamps-host-and-forwards-metrics", async () =>
         {
             var recorder = new TelemetryRecorder(() => "server", 10);
             await using var host = Hosts.Create(new() { Address = new HostKind("server").Address(), Principal = new() { ["kind"] = "server" }, OnError = _ => { } });
             var loaded = await host.LoadAsync([new("telemetry", TelemetryIngest.CreateFacet(new()
             {
-                Target = recorder, WorkerHost = p => p?["kind"]?.GetValue<string>() == "worker" ? "worker|7" : null,
+                Target = recorder, Admit = _ => true, WorkerHost = p => p?["kind"]?.GetValue<string>() == "worker" ? "worker|7" : null,
                 PrincipalAttributes = _ => new()
             }))], ChordContext.Background);
             Equal(0, loaded.Failed.Count, "worker ingest facet served");
@@ -262,7 +319,7 @@ internal static partial class Program
             await using var server = Hosts.Create(new() { Address = new HostKind("server").Address(), Principal = new() { ["kind"] = "server" }, Telemetry = serverTelemetry, OnError = _ => { } });
             var loaded = await server.LoadAsync([new("telemetry", TelemetryIngest.CreateFacet(new()
             {
-                Target = stored, WorkerHost = _ => null, PrincipalAttributes = _ => new()
+                Target = stored, Admit = _ => true, WorkerHost = _ => null, PrincipalAttributes = _ => new()
             }))], ChordContext.Background);
             Equal(0, loaded.Failed.Count, "page ingest facet served");
             await using var client = Hosts.Create(new() { OnError = _ => { } }); await client.LoadAsync([], ChordContext.Background);
@@ -313,6 +370,10 @@ internal static partial class Program
             Equal(1, recorder.Ingest(new([IngestSpan("worker:2")], [])), "stopped remote call releases taken capacity");
         }),
     ];
+    private sealed class IngestBatches(List<TelemetryBatch> batches) : ITelemetryIngestTarget
+    {
+        public int Ingest(TelemetryBatch batch) { batches.Add(batch); return batch.Spans.Count; }
+    }
     private sealed class IngestClock : TimeProvider
     {
         private long ticks;

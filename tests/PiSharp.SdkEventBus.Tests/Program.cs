@@ -23,6 +23,7 @@ var cases = new (string Name, Func<Task> Run)[]
     ("retired held listener remains charged until its original callback returns", RetiredCharge),
     ("loading listeners stage with initialization and stay out of public catalogs", InitializationPublication)
 };
+cases = [.. cases, .. Sync160EventBusCases.All]; // Pi 1.6.0 sync (#11264): owner listener failures are extension errors.
 var failures = 0;
 var evidence = new List<object>();
 for (var ordinal = 0; ordinal < cases.Length; ordinal++)

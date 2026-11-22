@@ -185,7 +185,7 @@ internal static partial class Program
         {
             var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "src", "PiSharp.Codemode", "Runtime", "codemode-prelude.js");
             var text = File.ReadAllText(path).Replace("\r\n", "\n", StringComparison.Ordinal);
-            Check(text.StartsWith("// Pi b4afdddf44e059c67ccf5097e5317d913521b470 (MIT): packages/codemode/src/runtime/prelude-source.ts", StringComparison.Ordinal), "attribution line");
+            Check(text.StartsWith("// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/codemode/src/runtime/prelude-source.ts", StringComparison.Ordinal), "attribution line");
             var body = text[(text.IndexOf('\n') + 1)..];
             // Evaluated from frozen Pi v1.5.2 packages/codemode/src/runtime/prelude-source.ts (nonfinite primitive formatting).
             Equal("e64ad1a6afffbfb8f75a0d08434a9a3fec88d1e54206b03953bfc7b5820cc119", Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(body))), "evaluated upstream PRELUDE_SOURCE hash");

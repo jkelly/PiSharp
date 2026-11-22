@@ -61,11 +61,11 @@ internal static partial class ModelResolver
     internal const string DefaultThinkingLevel = "medium";
     internal static readonly ImmutableArray<string> ThinkingLevels = ["off", "minimal", "low", "medium", "high", "xhigh", "max"];
 
-    /// <summary>Source defaultModelPerProvider at 7d073328e44337d3292a7db9b0f0308f679c5e97, in declaration order.</summary>
+    /// <summary>Source defaultModelPerProvider at faac585884ae2c013a6b1400f3e9e77f10b34bac (Pi 1.6.0), in declaration order.</summary>
     internal static readonly ImmutableArray<(string Provider, string Model)> DefaultModelPerProvider =
     [
         ("amazon-bedrock", "us.anthropic.claude-opus-5-5"), ("ant-ling", "Ring-2.6-1T"), ("anthropic", "claude-opus-5-5"),
-        ("openai", "gpt-6.1-sol"), ("azure", "gpt-6.1-sol"), ("openai-codex", "gpt-6.1-sol"), ("radius", "balanced"),
+        ("openai", "gpt-6.2-sol"), ("azure", "gpt-6.2-sol"), ("openai-codex", "gpt-6.2-sol"), ("radius", "balanced"),
         ("nvidia", "nvidia/nemotron-3.5-super-vl-120b-a12b"), ("deepseek", "deepseek-v4-pro"), ("google", "gemini-4-argon"),
         ("google-vertex", "gemini-4-argon"), ("github-copilot", "gpt-6.1-sol"), ("openrouter", "moonshotai/kimi-k2.7-code"),
         ("vercel-ai-gateway", "zai/glm-5.3"), ("xai", "grok-4.7"), ("groq", "openai/gpt-oss-120b"), ("cerebras", "gpt-oss-120b"),
@@ -368,20 +368,8 @@ internal static partial class ModelResolver
         return null;
     }
 
-    /// <summary>Source restoreModelFromSession (without console output; the messages are returned).</summary>
-    internal static (RegistryModel? Model, string? FallbackMessage) RestoreModelFromSession(string savedProvider, string savedModelId,
-        RegistryModel? currentModel, ModelRegistry registry)
-    {
-        var restored = registry.Find(savedProvider, savedModelId);
-        if (restored is not null && registry.HasConfiguredAuth(restored.Provider)) return (restored, null);
-        var reason = restored is null ? "model no longer exists" : "no auth configured";
-        if (currentModel is not null)
-            return (currentModel, $"Could not restore model {savedProvider}/{savedModelId} ({reason}). Using {currentModel.Provider}/{currentModel.Id}.");
-        var models = registry.GetAvailable();
-        if (models.Count == 0) return (null, null);
-        var fallback = FirstDefault(models) ?? models[0];
-        return (fallback, $"Could not restore model {savedProvider}/{savedModelId} ({reason}). Using {fallback.Provider}/{fallback.Id}.");
-    }
+    // Pi faac585884ae2c013a6b1400f3e9e77f10b34bac: model-resolver.ts no longer has restoreModelFromSession, and the native copy had
+    // no caller, so it is gone too (with its resolver.restore-model-from-session case).
 
     [GeneratedRegex("-\\d{8}$")]
     private static partial Regex DateSuffix();

@@ -46,7 +46,8 @@ public static class McpServersSection
         var perServer = kept == 0 ? 0 : Math.Min(MaxServerDescriptionChars, (int)Math.Floor((MaxSectionChars - Size(kept)) / (double)kept) - 2);
         var lines = listed.Take(kept).Select((server, index) =>
         {
-            var summary = perServer > 0 ? Truncate(Summary(server), perServer) : "";
+            // Pi faac585884ae2c013a6b1400f3e9e77f10b34bac: the library's mcpServerSummary replaces the extension's own serverSummary.
+            var summary = perServer > 0 ? Truncate(McpCatalogPlanner.ServerSummary(server.Entry.Config.Description, server.Instructions), perServer) : "";
             return summary.Length > 0 ? $"{heads[index]}: {summary}" : heads[index];
         });
         return string.Join("\n", lines.Prepend(intro).Concat(Omitted(listed.Length - kept)));
@@ -61,14 +62,6 @@ public static class McpServersSection
     {
         var desired = rendered is null ? null : Tag(rendered);
         return string.Equals(current, desired, StringComparison.Ordinal) ? null : new(Name, desired);
-    }
-
-    /// <summary>First line of the configured description, or of the server instructions once connected.</summary>
-    private static string Summary(McpServerListing server)
-    {
-        var configured = server.Entry.Config.Description is { } text ? McpJson.JsTrim(text) : "";
-        var source = configured.Length > 0 ? configured : server.Instructions ?? "";
-        return McpJson.JsTrim(source.Split('\n', 2)[0]);
     }
 
     private static string Truncate(string text, int max)

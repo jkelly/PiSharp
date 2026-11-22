@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): coding-agent/src/modes/interactive/interactive-mode.ts (showSettingsSelector,
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): coding-agent/src/modes/interactive/interactive-mode.ts (showSettingsSelector,
 // handleThinkingCommand, showThinkingSelector, handleModelCommand, findExactModelMatch, showTrustSelector, showModelSelector,
 // showModelsSelector, showUserMessageSelector, showTreeSelector, showSessionSelector, handleResumeSession).
 using System.Collections.Immutable;
@@ -646,13 +646,21 @@ internal sealed partial class InteractiveMode
         }
     }
 
+    /// <summary>The /resume selector's loaders (SessionManager.list and listAll with the selector's abort signal): the cwd's sessions
+    /// and every project's. The token reaches the listing, so a reload after a delete or a rename, or a scope the user left, stops
+    /// reading session files instead of finishing a listing nobody waits for.</summary>
+    internal static (SessionsLoader Current, SessionsLoader All) SessionLoaders(string cwd, string? sessionDir, string agentDir) => (
+        (_, token) => Task.Run(() => (IReadOnlyList<PiSharp.Cli.Pi.PiSessionInfo>)PiSharp.Cli.Pi.PiSessions.List(cwd, sessionDir, agentDir, token), token),
+        (_, token) => Task.Run(() => (IReadOnlyList<PiSharp.Cli.Pi.PiSessionInfo>)PiSharp.Cli.Pi.PiSessions.ListAll(sessionDir, agentDir, token), token));
+
     private void ShowSessionSelector()
     {
         ShowSelector(done =>
         {
+            var (currentSessions, allSessions) = SessionLoaders(Cwd, context.Startup.SessionDir, context.Startup.AgentDir);
             var selector = new SessionSelectorComponent(
-                (progress, token) => Task.Run(() => (IReadOnlyList<PiSharp.Cli.Pi.PiSessionInfo>)PiSharp.Cli.Pi.PiSessions.List(Cwd, context.Startup.SessionDir, context.Startup.AgentDir), token),
-                (progress, token) => Task.Run(() => (IReadOnlyList<PiSharp.Cli.Pi.PiSessionInfo>)PiSharp.Cli.Pi.PiSessions.ListAll(context.Startup.SessionDir, context.Startup.AgentDir), token),
+                currentSessions,
+                allSessions,
                 sessionPath => Run(async () => { done(); await HandleResumeSessionAsync(sessionPath); }),
                 () => { done(); ui.RequestRender(); },
                 () => Run(() => ShutdownAsync()),

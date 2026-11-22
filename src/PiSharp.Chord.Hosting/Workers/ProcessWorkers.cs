@@ -1,3 +1,10 @@
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/chord/src/node/workers/workers.ts, packages/chord/src/node/workers/process.ts.
+// Native process workers (slice 10) over named pipes instead of Node IPC. 1.6.0: the server host's store is a required option and a
+// worker's exit is published only after its link's work ended (decision "A worker's exit is published after its link's work ended"): its
+// link is ended at the exit, which aborts the calls it made and drops what it sent, then the commits those calls queued in the store
+// settle, and only then does State drop the entry (or show it failed), StopAsync return and the address's next start go on. The route's
+// admission is passed through (no worker starts for a denied principal), and a worker's State carries its host's incarnation from its
+// link's handshake on.
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.IO.Pipes;
@@ -8,6 +15,7 @@ using PiSharp.Chord.Host;
 using PiSharp.Chord.Legacy;
 using PiSharp.Chord.Hosting.Plugins;
 using PiSharp.Chord.Link;
+using PiSharp.Chord.Store;
 using PiSharp.Tools.Processes;
 
 namespace PiSharp.Chord.Hosting.Workers;
@@ -22,11 +30,19 @@ public sealed class ProcessWorkerOptions
     public string? BaseDirectory { get; init; }
     public required Func<Address, ChordContext, Task<PluginBuildSet>> Plugins { get; init; }
     public required Func<JsonObject, Address, bool> Authorize { get; init; }
+    /// <summary>The route's admission (<see cref="RouteOptions.Admit"/>, Pi 1.6.0, slice 14 §2.3), passed through: no worker starts for a
+    /// principal its decision does not allow. It reads only contracts the app's API owns (base code never reloads). The route resolves to
+    /// the worker's own link, the final provider of its address, as an admission requires.</summary>
+    public RouteAdmit? Admit { get; init; }
     public required Func<Address, JsonObject> Principal { get; init; }
     public JsonObject ParentPrincipal { get; init; } = new() { ["kind"] = "server" };
     public Func<Address, JsonNode?>? Data { get; init; }
     public Func<Address, ChordContext, Task<JsonNode?>>? StartData { get; init; }
     public required string LockDirectory { get; init; }
+    /// <summary>The server host's store, the one its <see cref="HostOptions.Store"/> got (Pi 1.6.0): a worker's exit is published once the
+    /// commits queued in it before the exit settled (<see cref="ChordStore.SettledAsync"/>). Required, so it is not forgotten: <c>null</c>
+    /// only for a host without a store (nothing is waited for then). A store not opened by <see cref="Tables.OpenStoreAsync"/> is refused.</summary>
+    public required IStore? Store { get; init; }
     public TimeSpan StartTimeout { get; init; } = TimeSpan.FromSeconds(60);
     public TimeSpan CloseTimeout { get; init; } = TimeSpan.FromSeconds(5);
     public TimeSpan IdleTimeout { get; init; } = TimeSpan.FromMinutes(5);
@@ -34,7 +50,12 @@ public sealed class ProcessWorkerOptions
     public Action<Address, string, string>? OnOutput { get; init; }
     public required Action<Address, Exception> OnError { get; init; }
 }
-public sealed record ProcessWorkerState(string Status, int? ProcessId = null, string? Error = null, DateTimeOffset? StartedAt = null);
+/// <summary>One address's worker: <c>starting</c>, <c>running</c> or <c>stopping</c> with its process, or <c>failed</c> with a public error
+/// (until <see cref="ProcessWorkers.Retry"/> or a rollout); no entry when stopped. <paramref name="Incarnation"/> (Pi 1.6.0) is this run of
+/// the worker's host, the <see cref="CallContext.Incarnation"/> of every call it makes: there from its link's handshake on, so before its
+/// first call is handled (also one its startup makes, long before <c>running</c>); null before it and for a failed address.</summary>
+public sealed record ProcessWorkerState(string Status, int? ProcessId = null, string? Error = null, DateTimeOffset? StartedAt = null,
+    string? Incarnation = null);
 public sealed class WorkerProcessException(string message, string standardErrorTail, Exception? inner = null) : IOException(message, inner)
 {
     public string StandardErrorTail { get; } = standardErrorTail;
@@ -91,6 +112,13 @@ public sealed class ProcessWorkers : IAsyncDisposable, IPluginRolloutStep
         internal int RolloutOwners;
         internal bool LinkClosed;
         internal bool Lost;
+        // Its host's incarnation, from its link's handshake on (the resolved link's Opened); under the component's lock.
+        internal string? Incarnation;
+        // Why it failed, recorded as its events happen (a fatal, a lost link before ready, a control pipe that closed while it lived on)
+        // and published with its exit: the public message and the full error for OnError. Under the component's lock.
+        internal string? Cause;
+        internal Exception? CauseError;
+        internal bool Fatal;
         internal Task? StoppingTask;
         internal TaskCompletionSource Finished { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private readonly object handleGate = new();
@@ -113,6 +141,8 @@ public sealed class ProcessWorkers : IAsyncDisposable, IPluginRolloutStep
     private readonly object sync = new();
     private readonly Dictionary<string, Entry> entries = [];
     private readonly ProcessWorkerOptions options;
+    // The server host's store, if it has one: what a worker's exit waits to settle.
+    private readonly ChordStore? store;
     private readonly string lockDirectory;
     private readonly CancellationTokenSource closing = new();
     private long nextReload;
@@ -150,10 +180,17 @@ public sealed class ProcessWorkers : IAsyncDisposable, IPluginRolloutStep
     public ProcessWorkers(string name, ChordHost host, HostKind kind, ProcessWorkerOptions options, ChordContext context)
     {
         Name = name; this.options = options; lockDirectory = Path.GetFullPath(options.LockDirectory);
+        store = options.Store switch
+        {
+            null => null,
+            ChordStore opened => opened,
+            _ => throw new ArgumentException("the workers' store must be one Tables.OpenStoreAsync opened (the server host's)", nameof(options)),
+        };
         Route = host.Route(kind, new()
         {
             Authorize = (principal, address) => { try { return options.Authorize(principal, address); } catch (Exception error) { Report(address, error); return false; } },
             Resolve = ResolveAsync,
+            Admit = options.Admit,
         }, context);
         var lifetime = Contract.Local(name + ".workers", new() { Version = 1, Params = [], Members = [] });
         Facet = PiSharp.Chord.Host.Facet.Define((facet, _) => facet.Serve(lifetime, (_, _, self) =>
@@ -161,9 +198,14 @@ public sealed class ProcessWorkers : IAsyncDisposable, IPluginRolloutStep
         if (context.AbortSignal is { } token) token.Register(() => _ = CloseAsync());
         _ = CheckIdleAsync();
     }
+    /// <summary>Per address key its <see cref="ProcessWorkerState"/>; no entry when stopped or never started. A worker's entry goes (or turns
+    /// <c>failed</c>) only after its link's work ended: its link is closed first, which aborts the calls it made (a transaction under a
+    /// call's context not yet at its commit is refused) and drops what it sent and was not handled yet, and the commits those calls had
+    /// queued in <see cref="ProcessWorkerOptions.Store"/> settled. So nothing an exited worker reported is handled or lands after its exit
+    /// shows here, and its successor starts after that: an app needs no check of its own against reports of a worker that is gone.</summary>
     public IReadOnlyDictionary<string, ProcessWorkerState> State
     {
-        get { lock (sync) return entries.ToDictionary(x => x.Key, x => x.Value.Failure is { } error ? new ProcessWorkerState("failed", Error: error) : new ProcessWorkerState(x.Value.Child is null ? "starting" : x.Value.Child.Stopping ? "stopping" : x.Value.Child.IsReady ? "running" : "starting", x.Value.Child?.Process.Id, StartedAt: x.Value.Child?.StartedAt)); }
+        get { lock (sync) return entries.ToDictionary(x => x.Key, x => x.Value.Failure is { } error ? new ProcessWorkerState("failed", Error: error) : new ProcessWorkerState(x.Value.Child is null ? "starting" : x.Value.Child.Stopping ? "stopping" : x.Value.Child.IsReady ? "running" : "starting", x.Value.Child?.Process.Id, StartedAt: x.Value.Child?.StartedAt, Incarnation: x.Value.Child?.Incarnation)); }
     }
     private async Task<ResolvedLink> ResolveAsync(Address address, ChordContext context)
     {
@@ -177,21 +219,33 @@ public sealed class ProcessWorkers : IAsyncDisposable, IPluginRolloutStep
         }
         // The child remains admitted if the reference which initiated startup has disappeared.
         var child = await start.ConfigureAwait(false);
-        return new(child.Link, new LinkOptions { Principal = child.Principal, Trusted = true });
+        // Told on the host's dispatcher at the handshake, before anything else the worker sent is handled: a handler of its first call
+        // finds its incarnation in State.
+        return new(child.Link, new LinkOptions { Principal = child.Principal, Trusted = true }, incarnation => { lock (sync) child.Incarnation = incarnation; });
     }
     private async Task<Child> StartAsync(Entry entry)
     {
         await Task.Yield();
+        // This start's own task: ResolveAsync assigned it under the lock before this continuation could take it.
+        Task<Child>? self; lock (sync) self = entry.Starting;
         OwnedChildProcess? process = null; NamedPipeServerStream? data = null; WorkerControl? control = null; NamedPipeServerStream? controlPipe = null;
         PrivatePipeDirectory? addresses = null;
         var tail = new OutputTail();
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(closing.Token);
+        var recorded = false;
         try
         {
-            // A disconnected child's process and original cleanup finish before its successor starts.
+            // A disconnected child's process and original cleanup finish before its successor starts: after its exit was published (its
+            // link closes before, which may have asked for this start). A crash recorded meanwhile rejects this start, reported once already.
             if (entry.IdleLease is { } lease) await lease.Task.WaitAsync(closing.Token).ConfigureAwait(false);
             if (entry.Previous is { } previous) await previous.WaitAsync(closing.Token).ConfigureAwait(false);
-            lock (sync) if (entry.Failure is { } failure) throw new IOException(failure);
+            lock (sync)
+                if (entry.Failure is { } failure)
+                {
+                    // As a failed address's resolve does at once: nothing stays starting (an idle archive lock may take the address).
+                    recorded = true; if (ReferenceEquals(entry.Starting, self)) entry.Starting = null;
+                    throw new IOException(failure);
+                }
             var baseOutcome = await BuildAsync().WaitAsync(closing.Token).ConfigureAwait(false);
             if (baseOutcome.Kind != "built") throw new IOException("worker base build failed", baseOutcome.Error);
             timeout.CancelAfter(options.StartTimeout);
@@ -244,7 +298,8 @@ public sealed class ProcessWorkers : IAsyncDisposable, IPluginRolloutStep
                 failure = entry.Failure ?? "worker failed to start";
                 if (closing.IsCancellationRequested) entries.Remove(entry.Address.Key); else entry.Failure = failure;
             }
-            if (!closing.IsCancellationRequested) Report(entry.Address, new WorkerProcessException(error.Message, tail.Value, failures.Count == 1 ? error : new AggregateException(failures))); throw new IOException(failure);
+            if (!closing.IsCancellationRequested && !recorded) Report(entry.Address, new WorkerProcessException(error.Message, tail.Value, failures.Count == 1 ? error : new AggregateException(failures)));
+            throw new IOException(failure);
         }
     }
     private async Task ReadOutput(StreamReader reader, Address address, string stream, OutputTail tail)
@@ -260,10 +315,27 @@ public sealed class ProcessWorkers : IAsyncDisposable, IPluginRolloutStep
         }
         catch (Exception error) when (error is IOException or ObjectDisposedException) { }
     }
+    /// <summary><paramref name="child"/> exited (its tree is stopped then). Its link is ended first, before anyone hears of the exit (its
+    /// pipe may close by itself only later): what it sent and was not handled yet is dropped and the calls it made are aborted, so a
+    /// transaction of theirs not yet at its commit is refused. Its waiters end now; its exit is published once the commits queued in the
+    /// server's store before now settled (the only changes of its calls that can still land: a queued commit ignores its caller's abort).
+    /// Until then State still shows it, and its address's next start waits (its <c>Finished</c>).</summary>
     private async Task WatchExit(Entry entry, Child child)
     {
         Exception? cleanupFailure = null;
         try { await child.Process.WaitForExitAsync().ConfigureAwait(false); } catch (Exception error) { cleanupFailure = error; }
+        lock (sync)
+        {
+            // A routed holder that asks for a replacement when the link ends starts one after this exit was published. A link the child
+            // closed first (or this side lost) did this already, and its replacement may be starting.
+            if (ReferenceEquals(entry.Child, child) && !child.LinkClosed) { entry.Starting = null; entry.Previous = child.Finished.Task; }
+        }
+        child.Link.End();
+        await child.Link.Ended.ConfigureAwait(false);
+        foreach (var reply in child.Replies.Values) reply.TrySetException(new IOException("worker exited"));
+        child.Ready.TrySetException(new IOException("worker exited before becoming ready"));
+        // SettledAsync never faults.
+        if (store is not null) await store.SettledAsync().ConfigureAwait(false);
         bool current, recovered = false;
         lock (sync)
         {
@@ -272,7 +344,6 @@ public sealed class ProcessWorkers : IAsyncDisposable, IPluginRolloutStep
             {
                 entry.Child = null;
                 entry.Previous = child.Finished.Task;
-                if (!child.LinkClosed) entry.Starting = null;
                 if (child.Lost && !closing.IsCancellationRequested)
                 {
                     var now = options.TimeProvider.GetUtcNow();
@@ -281,18 +352,19 @@ public sealed class ProcessWorkers : IAsyncDisposable, IPluginRolloutStep
                     else entry.Failure = "worker lost its link";
                 }
                 else if (child.Stopping && !child.Faulted || closing.IsCancellationRequested)
-                { if (entries.TryGetValue(entry.Address.Key, out var registered) && ReferenceEquals(registered, entry)) entries.Remove(entry.Address.Key); }
-                else entry.Failure ??= cleanupFailure is null ? $"worker exited (code {child.Process.ExitCode})" : "worker cleanup failed";
+                {
+                    // A holder that asked for a replacement when the link ended keeps the entry: its start waits for this.
+                    if ((entry.Starting is null || closing.IsCancellationRequested) && entries.TryGetValue(entry.Address.Key, out var registered) && ReferenceEquals(registered, entry))
+                        entries.Remove(entry.Address.Key);
+                }
+                else entry.Failure ??= child.Cause ?? (cleanupFailure is null ? $"worker exited (code {child.Process.ExitCode})" : "worker cleanup failed");
             }
         }
-        child.Link.Close();
         if (current && !closing.IsCancellationRequested)
         {
             if (recovered) Report(entry.Address, new WorkerProcessException("worker: link lost", child.Tail.Value) { Kind = "worker_link_lost" });
-            else if (!child.Stopping || child.Faulted) ReportChild(entry.Address, child, cleanupFailure ?? new IOException(entry.Failure));
+            else if (!child.Stopping || child.Faulted) ReportChild(entry.Address, child, cleanupFailure ?? child.CauseError ?? new IOException(entry.Failure));
         }
-        foreach (var reply in child.Replies.Values) reply.TrySetException(new IOException("worker exited"));
-        child.Ready.TrySetException(new IOException("worker exited before becoming ready"));
         try { await child.CloseHandlesAsync().ConfigureAwait(false); } catch (Exception error) { if (current) ReportChild(entry.Address, child, error); }
         finally
         {
@@ -318,7 +390,8 @@ public sealed class ProcessWorkers : IAsyncDisposable, IPluginRolloutStep
         {
             if (child.Stopping || closing.IsCancellationRequested || child.Process.LeaderExit.IsCompleted || !ReferenceEquals(entry.Child, child)) return;
             child.Faulted = true; child.Lost = child.IsReady;
-            if (!child.Lost) entry.Failure = "worker failed to start";
+            // Published with its exit.
+            if (!child.Lost) child.Cause ??= "worker failed to start";
         }
         foreach (var reply in child.Replies.Values) reply.TrySetException(new IOException("worker: its link is gone"));
         child.Ready.TrySetException(new IOException("worker: its link is gone"));
@@ -337,13 +410,11 @@ public sealed class ProcessWorkers : IAsyncDisposable, IPluginRolloutStep
                 else if (message.Kind == "reloaded" && child.Replies.TryRemove(message.Id, out var reply)) reply.TrySetResult(message);
                 else if (message.Kind == "fatal")
                 {
+                    // Recorded on the child (public as the child redacted it) and published with its exit, which the kill below causes.
                     var failure = message.Error ?? "worker failed";
-                    lock (sync)
-                    {
-                        child.Faulted = true;
-                        if (ReferenceEquals(entry.Child, child)) { entry.Failure = failure; entry.Previous = child.Finished.Task; }
-                    }
-                    throw new IOException(failure);
+                    var fatal = new IOException(failure);
+                    lock (sync) { child.Faulted = true; child.Fatal = true; child.Cause = failure; child.CauseError = fatal; }
+                    throw fatal;
                 }
                 else throw new IOException("unexpected worker control message");
             }
@@ -352,16 +423,21 @@ public sealed class ProcessWorkers : IAsyncDisposable, IPluginRolloutStep
         {
             foreach (var reply in child.Replies.Values) reply.TrySetException(new IOException("worker control disconnected", error));
             child.Ready.TrySetException(new IOException("worker control disconnected", error));
-            if (!child.Stopping && !closing.IsCancellationRequested && !child.LinkClosed)
+            if (child.Stopping || closing.IsCancellationRequested) return;
+            bool fatal; lock (sync) fatal = child.Fatal;
+            if (!fatal)
             {
+                // A closed data link is LinkLostAsync's. The control pipe closes at a crash too: an exit within the grace is the exit's to
+                // publish; a child that lives on is killed, its exit a control failure.
+                if (child.LinkClosed) return;
+                if (await Task.WhenAny(child.Process.LeaderExit, Task.Delay(options.CloseTimeout)).ConfigureAwait(false) == child.Process.LeaderExit) return;
                 lock (sync)
                 {
-                    child.Faulted = true;
-                    if (ReferenceEquals(entry.Child, child))
-                    { entry.Failure ??= "worker control disconnected"; entry.Previous = child.Finished.Task; }
+                    if (child.Stopping || closing.IsCancellationRequested || child.LinkClosed || child.Process.LeaderExit.IsCompleted) return;
+                    child.Faulted = true; child.Cause ??= "worker control disconnected"; child.CauseError ??= error;
                 }
-                ReportChild(entry.Address, child, error); await KillAsync(child.Process).ConfigureAwait(false);
             }
+            await KillAsync(child.Process).ConfigureAwait(false);
         }
     }
     private async Task CheckIdleAsync()
@@ -440,6 +516,7 @@ public sealed class ProcessWorkers : IAsyncDisposable, IPluginRolloutStep
         Route.Suspend(address); Entry? entry; lock (sync) entries.TryGetValue(address.Key, out entry);
         if (entry?.Starting is not { } start) return;
         Child child; try { child = await start.ConfigureAwait(false); } catch (IOException) { return; }
+        // Resolves once the exit was published, after the commits its worker queued.
         await StopChildAsync(child).ConfigureAwait(false);
         lock (sync) if (entries.TryGetValue(address.Key, out var current) && ReferenceEquals(current, entry)) entries.Remove(address.Key);
     }
@@ -453,6 +530,8 @@ public sealed class ProcessWorkers : IAsyncDisposable, IPluginRolloutStep
         try { await child.Control.SendAsync(new("shutdown"), deadline.Token).ConfigureAwait(false); await child.Process.WaitForExitAsync(deadline.Token).ConfigureAwait(false); }
         catch (Exception error) when (error is IOException or OperationCanceledException or InvalidOperationException) { await KillAsync(child.Process).ConfigureAwait(false); }
         await child.CloseHandlesAsync().ConfigureAwait(false);
+        // A stop ends once its exit was published (WatchExit), so its address's next start and the stop's caller see it gone.
+        await child.Finished.Task.ConfigureAwait(false);
     }
     public async Task<PluginRolloutStepReport> RolloutAsync(PluginBuildSet build, ChordContext context)
     {

@@ -5,6 +5,7 @@
 // takes CommitOptions. Area run-end (65fba65b2): TaskRuntime.entries(), the raw history read hooks share; ITaskRuntime inherits it and the
 // entry reads from IHookApi, which declares them for hooks (upstream declares them on both). Area sleep (f75b3240a): TaskRuntime.sleepUntil
 // and setTimer. Area harness-options (7ec1f648e): TaskRuntime.models is read at each use.
+// Pi v1.6.0 sync (faac585884ae2c013a6b1400f3e9e77f10b34bac): TaskRuntime.readSignal, declared with now() on IHookApi, which hooks share.
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Env;
 
@@ -90,8 +91,6 @@ public interface ITaskRuntime : IDocumentObserver, IDocumentReader, IHookApi
     Task<IConversationHandle?> ConversationAsync(ConversationId id, DurableContext context);
     /// <summary>Committed raw active transcript and model context, optionally cut off at the visible entry <paramref name="at"/>.</summary>
     Task<ContextView> ContextAsync(ConversationId conversationId, DurableContext context, EntryId? at = null);
-    /// <summary>The Harness clock, in milliseconds.</summary>
-    double Now();
     /// <summary>
     /// Calls <paramref name="callback"/> once after about <paramref name="delayMs"/> on the Harness's timer (<see cref="HarnessOptions.SetTimer"/>),
     /// for pacing work inside a phase, such as throttled progress commits. Not durable: the invocation's end disarms it, and after its end

@@ -1,4 +1,9 @@
-// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/chord/src/next/host/attempt.ts
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/chord/src/host/{attempt,dependencies}.ts
+// 1.6.0 here: the reusable park step (ParkAsync, upstream #park) that the dependency check, the readers of named queries and an
+// admission's decision drive; the readers awaited after the tables are prepared and before the natives (slice 14 §3.2); and the admission
+// phase of an admitted type's attempt, before the wait for the previous instance's teardown and before the factory (slice 14 §2.2; the
+// phase itself is a partial of Attempt in Host/Admission.cs). The declarations of named queries, readers and lists are partials of Self
+// in Host/ReadDeclarations.cs.
 using System.Text.Json.Nodes;
 using PiSharp.Chord.Contracts;
 using PiSharp.Chord.Data;
@@ -58,7 +63,9 @@ internal sealed partial class Attempt : IOldWorkSource
         if (!adapted.TryGetValue(version, out var value))
         {
             value = new(Served, Implementation?.Variant, Owner.Label, Owner.Host.Batch,
-                name => Members[name]!, (name, error) => Owner.Host.Report(new("derive_failed", error, Owner.Label, name))) { Version = version };
+                name => Members[name]!, (name, error) => Owner.Host.Report(new("derive_failed", error, Owner.Label, name)))
+                { Version = version, EventOf = name => eventNodes?.GetValueOrDefault(name), Metrics = Owner.Host.Events.Metrics,
+                  ReportEvent = (name, error) => Owner.Host.Report(new("event_mapping_failed", error, Owner.Label, name, Version: version)) };
             adapted.Add(version, value);
         }
         return value;
@@ -77,94 +84,57 @@ internal sealed partial class Attempt : IOldWorkSource
     internal Task<FailureCause?> Check => Checked.Task;
     private TaskCompletionSource changed = NewSignal();
     private Task? closing;
-    internal Attempt(ChordObject owner, ServedType served) { Owner = owner; Served = served; Self = new(this); }
+    // Its seal's token, taken once: its source is disposed at its close, and a step of a parked attempt may end after that.
+    private readonly CancellationToken sealing;
+    internal Attempt(ChordObject owner, ServedType served) { Owner = owner; Served = served; Self = new(this); sealing = Cancellation.Token; }
     private static TaskCompletionSource NewSignal() => new(TaskCreationOptions.RunContinuationsAsynchronously);
     internal void Wake() { var before = changed; changed = NewSignal(); before.TrySetResult(); }
-    internal async Task ActivateAsync()
+    /// <summary>Activates it. <paramref name="ending"/> is the previous instance's teardown, for an admitted type only (slice 14 §2.2):
+    /// its admission runs before that wait, only its factory waits for it; an attempt of any other type is started once the teardown
+    /// finished, as before.</summary>
+    internal async Task ActivateAsync(Func<Task>? ending = null)
     {
         StartActivation();
         try
         {
+            if (Served.Admission is { } admission)
+            {
+                await RunAdmissionAsync(admission);
+                if (activation is { Ended: false } allowing) ChordTelemetry.Admitted(allowing.Span, true);
+                Owner.AdmissionAllowed(this);
+                if (ending is not null) await ending().WaitAsync(sealing);
+                sealing.ThrowIfCancellationRequested();
+            }
             try
             {
-                using var factoryLease = Owner.Host.RetainCallback(Served.Factory, Served.DeclaringFacet);
-                Implementation = Served.Factory(Owner.Parameters.Value, Served.Contract.Kind == ContractKind.Local ? null : Owner.Caller.Principal, Self);
-                PluginStaging.ValidateImplementation(Served.Contract, Implementation);
+                if (Served.Admission is { } admittedType)
+                {
+                    using var admittedLease = Owner.Host.RetainCallback(admittedType.Factory, Served.DeclaringFacet);
+                    // A remote object's identity has its principal; an admitted one's factory gets what its admission allowed.
+                    Implementation = admittedType.Factory(Owner.Parameters.Value, Owner.Caller.Principal!, admitted!.Value?.DeepClone(), Self);
+                }
+                else
+                {
+                    using var factoryLease = Owner.Host.RetainCallback(Served.Factory, Served.DeclaringFacet);
+                    Implementation = Served.Factory(Owner.Parameters.Value, Served.Contract.Kind == ContractKind.Local ? null : Owner.Caller.Principal, Self);
+                }
+                PluginStaging.ValidateImplementation(Served.Contract, Implementation, this);
             }
             catch (Exception error) { throw new ActivationException(new(FailureKind.Broken, DataInternal.AsChordError(error, Owner.Label))); }
             finally { Self.Declaring = false; }
             Owner.InstallRetrySources(Self.RetrySources);
             foreach (var (name, member) in Implementation.Members) Members.Add(name, member);
+            BindEventMembers();
             foreach (var derive in Self.Derives) derive.Attach((source, _) => ChordHost.ResolveSource(source) ?? throw new ArgumentException("not a Chord source"),
                 error => Owner.Host.Report(new("derive_failed", error, Owner.Label)));
             // Dependency waits do not consume the object's own activation deadline.
-            DateTimeOffset? parkedSince = null;
-            var parkedReported = false;
-            while (true)
-            {
-                Cancellation.Token.ThrowIfCancellationRequested();
-                FailureCause? wait = null; bool pending = false, blocks = false;
-                var blocker = "a dependency"; var blockerState = "loading";
-                foreach (var dependency in Self.Dependencies)
-                {
-                    var target = dependency.Target;
-                    if (target?.Reaches(Owner, new(ReferenceEqualityComparer.Instance)) == true ||
-                        target?.ActivationId is { } activationId && Owner.ChainContains(activationId))
-                        throw new ActivationException(new(FailureKind.Broken, DataInternal.Invalid("cycle", $"{Owner.Label}: dependency cycle")));
-                    var state = dependency.RefState;
-                    if (state.Kind == "ended") throw new ActivationException(new(FailureKind.Broken, state.Error!));
-                    if (state.Kind == "live") continue;
-                    if (state.Cause is { } cause)
-                    {
-                        if (cause.Error.Code == "forbidden" || cause.Error.Reason == "cycle") throw new ActivationException(new(FailureKind.Broken, cause.Error));
-                        wait ??= DataInternal.WaitingFor(dependency.Label, cause.Error);
-                    }
-                    if (!pending) { blocker = dependency.Label; blockerState = state.Kind == "failed" ? "failed" : "loading"; }
-                    pending = true; blocks |= target?.BlocksFirstPass == true;
-                }
-                foreach (var registry in Self.RegistryDependencies)
-                {
-                    var error = registry.Error();
-                    if (error is null) continue;
-                    if (!pending) { blocker = $"registry {registry.Name}"; blockerState = "failed"; }
-                    wait ??= DataInternal.WaitingFor(registry.Name, DataInternal.AsChordError(error, registry.Name)); pending = true;
-                }
-                if (!pending) break;
-                if (parkedAt is null) parkedAt = Owner.Host.Options.TimeProvider.GetUtcNow();
-                if (activation is { Ended: false } parking)
-                {
-                    parking.Span.AddEvent("chord.park", new SpanAttributes { ["cause"] = wait?.Error.Message ?? "loading" });
-                    Activated("parked");
-                }
-            Owner.SetState(wait is null ? RefState.Loading : RefState.Failed(wait));
-            Owner.Host.ReloadCycles.Recheck();
-                Owner.FirstChecked(!blocks); Checked.TrySetResult(wait);
-                parkedSince ??= Owner.Host.Options.TimeProvider.GetUtcNow();
-                var wake = changed.Task;
-                if (!parkedReported)
-                {
-                    var remaining = Owner.Host.Options.ReadyTimeout - (Owner.Host.Options.TimeProvider.GetUtcNow() - parkedSince.Value);
-                    if (remaining > TimeSpan.Zero)
-                    {
-                        using var timer = CancellationTokenSource.CreateLinkedTokenSource(Cancellation.Token);
-                        var deadline = Task.Delay(remaining, Owner.Host.Options.TimeProvider, timer.Token);
-                        var signaled = await Task.WhenAny(wake, deadline);
-                        timer.Cancel();
-                        Cancellation.Token.ThrowIfCancellationRequested();
-                        if (ReferenceEquals(signaled, wake)) continue;
-                    }
-                    parkedReported = true;
-                    Owner.Host.Report(new("parked_long", Object: Owner.Label, WaitingFor: blocker, State: blockerState,
-                        Since: parkedSince.Value.ToUnixTimeMilliseconds()));
-                }
-                await wake.WaitAsync(Cancellation.Token);
-            }
-            if (parkedAt is { } parked)
-            {
-                ChordTelemetry.Metrics(Owner.Host.Telemetry.Metrics).Histogram("chord.park.duration").Record((Owner.Host.Options.TimeProvider.GetUtcNow() - parked).TotalMilliseconds);
-                parkedAt = null; StartActivation();
-            }
-            await ActivateOwnAsync().WaitAsync(Owner.Host.Options.ReadyTimeout, Owner.Host.Options.TimeProvider, Cancellation.Token);
+            await ParkAsync(CheckDependencies);
+            var deadline = new ActivationDeadline(Owner.Host.Options.ReadyTimeout, Owner.Host.Options.TimeProvider);
+            await deadline.RunAsync(LoadOwnAsync, Cancellation.Token);
+            // Before the natives: an attempt that waits on a reader holds none (design §6), as one parked on a dependency. Awaited only
+            // with readers: an attempt without any takes no extra turn before its natives open.
+            if (Self.Readers.Count > 0) await AwaitReadersAsync();
+            await deadline.RunAsync(OpenOwnAsync, Cancellation.Token);
             if (Sealed) return;
             Live = true;
             foreach (var registry in Self.RegistryDependencies) registry.Read();
@@ -193,7 +163,112 @@ internal sealed partial class Attempt : IOldWorkSource
             Checked.TrySetResult(cause); Owner.Failed(this, cause);
         }
     }
-    private async Task ActivateOwnAsync()
+    /// <summary>
+    /// The park step (Pi 1.6.0 <c>#park</c>, dependency model §3): parks until <paramref name="step"/> finds nothing to wait for, with no
+    /// deadline (the <c>parked_long</c> report is the only clock). <paramref name="step"/> runs at once and again after every
+    /// <see cref="Wake"/> (a dependency's state, a registry's value, a reader's adoption, a retry; one check for however many came before
+    /// it ran); what it finds is shown on the object. Returns once the attempt may go on. A broken check throws the attempt's failure
+    /// (<c>broken</c>), the attempt's seal an <see cref="OperationCanceledException"/>. Its users: the dependency check
+    /// (<see cref="CheckDependencies"/>), the readers of named queries (<see cref="AwaitReadersAsync"/>) and an admission's decision.
+    /// </summary>
+    internal async Task ParkAsync(Func<IBlocked, Task<Parking>> step)
+    {
+        var episode = new ParkedLong(this);
+        for (;;)
+        {
+            sealing.ThrowIfCancellationRequested();
+            // Taken before the check: a change while it runs (a key loaded, a run adopted) checks again.
+            var wake = changed.Task;
+            var parking = await step(episode);
+            sealing.ThrowIfCancellationRequested();
+            if (parking is Parking.Broken broken) throw new ActivationException(new(FailureKind.Broken, broken.Error));
+            if (parking is Parking.Ready && !wake.IsCompleted) { Unparked(); return; }
+            if (parking is Parking.Parked parked) ParkedOn(parked);
+            await episode.NextChangeAsync(wake);
+        }
+    }
+    // Its check found something to wait for: shown on its object, told to a reload's report (its first check), counted as parked time.
+    private void ParkedOn(Parking.Parked parked)
+    {
+        parkedAt ??= Owner.Host.Options.TimeProvider.GetUtcNow();
+        if (activation is { Ended: false } parking)
+        {
+            parking.Span.AddEvent("chord.park", new SpanAttributes { ["cause"] = parked.Cause?.Error.Message ?? "loading" });
+            Activated("parked");
+        }
+        Owner.SetState(parked.Shown);
+        Owner.Host.ReloadCycles.Recheck();
+        Owner.FirstChecked(parked.FirstPass); Checked.TrySetResult(parked.Cause);
+    }
+    // It leaves parking for its next steps, which run in a new activation span linked to the parked one.
+    private void Unparked()
+    {
+        if (parkedAt is not { } parked) return;
+        ChordTelemetry.Metrics(Owner.Host.Telemetry.Metrics).Histogram("chord.park.duration").Record((Owner.Host.Options.TimeProvider.GetUtcNow() - parked).TotalMilliseconds);
+        parkedAt = null; StartActivation();
+        // Its own steps follow: loading until its outcome (a failure shows as the failure, not as what it waited for).
+        Owner.SetState(RefState.Loading);
+    }
+    /// <summary>One check of its factory's dependencies (<c>self.Get</c> references and <c>self.Registry</c> values) in declaration order:
+    /// ready once all are live; parked showing <c>loading</c>, or <c>failed</c> waiting on the first that failed; broken for a cycle,
+    /// authority or an ended dependency.</summary>
+    private Task<Parking> CheckDependencies(IBlocked episode)
+    {
+        FailureCause? wait = null; bool pending = false, blocks = false, named = false;
+        var blocker = "a dependency"; var blockerState = "loading";
+        foreach (var dependency in Self.Dependencies)
+        {
+            var target = dependency.Target;
+            if (target?.Reaches(Owner, new(ReferenceEqualityComparer.Instance)) == true ||
+                target?.ActivationId is { } activationId && Owner.ChainContains(activationId))
+                return Task.FromResult<Parking>(new Parking.Broken(DataInternal.Invalid("cycle", $"{Owner.Label}: dependency cycle")));
+            var state = dependency.RefState;
+            if (state.Kind == "ended") return Task.FromResult<Parking>(new Parking.Broken(state.Error!));
+            if (state.Kind == "live") continue;
+            if (state.Cause is { } cause)
+            {
+                // Before the authority check: a dependency an admission denied is no failure that never heals (its error is forbidden);
+                // the attempt shows the denial and goes on when the dependency is admitted (slice 14 §2.2). It names no blocker: a denial
+                // is no parked_long report.
+                if (cause.Kind == FailureKind.Denied) { wait ??= cause; pending = true; continue; }
+                if (cause.Error.Code == "forbidden" || cause.Error.Reason == "cycle") return Task.FromResult<Parking>(new Parking.Broken(cause.Error));
+                wait ??= DataInternal.WaitingFor(dependency.Label, cause.Error);
+            }
+            if (!named) { blocker = dependency.Label; blockerState = state.Kind == "failed" ? "failed" : "loading"; named = true; }
+            pending = true; blocks |= target?.BlocksFirstPass == true;
+        }
+        foreach (var registry in Self.RegistryDependencies)
+        {
+            var error = registry.Error();
+            if (error is null) continue;
+            if (!named) { blocker = $"registry {registry.Name}"; blockerState = "failed"; named = true; }
+            wait ??= DataInternal.WaitingFor(registry.Name, DataInternal.AsChordError(error, registry.Name)); pending = true;
+        }
+        if (!pending) return Parking.GoNow;
+        episode.BlockedBy(named ? new(blocker, blockerState) : null);
+        return Task.FromResult<Parking>(new Parking.Parked(wait is null ? RefState.Loading : RefState.Failed(wait), !blocks, wait));
+    }
+    /// <summary>
+    /// Opens its readers of named queries and waits until each has a value (slice 14 §3.2): after its tables are prepared and its own
+    /// queries ran (a reader may read its own object's named query), before its natives. A reader that cannot read yet, or whose first run
+    /// failed, parks the attempt on it (<c>loading</c>, or <c>failed</c> waiting): its next adoption or a move of what it reads checks
+    /// again. Arguments its provider refuses and a builder that throws fail the attempt <c>broken</c>.
+    /// </summary>
+    private async Task AwaitReadersAsync()
+    {
+        var label = $"{Owner.Label}: a live query";
+        // Follows a reader this attempt is parked on: its next adoption (a good run heals it) checks again.
+        var wake = new ReaderWake(this);
+        try { await ParkAsync(episode => ReadDeclarations.OpenReadersAsync(Self.Readers, wake, episode, label, Self.Context)); }
+        finally { foreach (var reader in Self.Readers) reader.Source.Dependents.Remove(wake); }
+    }
+    private sealed class ReaderWake(Attempt attempt) : IDependent
+    {
+        public void Invalidate() => attempt.Wake();
+        public void SourceRetired(ReferenceSet<IDependent> visited) { }
+    }
+    // The load phase of its own steps: its documents, its tables brought to their definitions, its sets bound, its own queries run.
+    private async Task LoadOwnAsync()
     {
         var entering = Owner.Host.HostDataGate.Enter();
         if (entering is not null) await entering;
@@ -201,17 +276,29 @@ internal sealed partial class Attempt : IOldWorkSource
         {
         Owner.Documents.Hydrate(Self.Definitions, Self.Pins, Owner.Context);
         if (Self.Tables.Count > 0)
+        {
+            Self.HoldTables();
             await StoreInternal.PrepareTablesAsync(Self.Tables.Select(t => new DeclaredTable(t.Definition, t.Sql.Table)).ToArray(), Owner.Host.Store!,
                 new(() => !Token.Sealed, (_, _) => { }), Owner.Label, Self.Context);
+        }
+        Self.BindSets();
         if (Owner.Documents.Load(Self.Context) is { } loading) await loading;
-        foreach (var query in Self.Queries) await query.LoadAsync(Self.Context);
+        await Self.LoadQueriesAsync();
         }
         finally { Owner.Host.HostDataGate.Leave(); }
         foreach (var job in Self.Jobs) await job.LoadAsync(Self.Context);
+    }
+    // The steps that open what it holds while live: its natives one after another, its followed sources, then its members' first values.
+    private async Task OpenOwnAsync()
+    {
         foreach (var native in Self.Natives) { Cancellation.Token.ThrowIfCancellationRequested(); await native.OpenAsync(Self.Context); }
         foreach (var follow in Self.Follows) { Cancellation.Token.ThrowIfCancellationRequested(); await follow.AttachAsync(); }
         foreach (var member in Members.Values)
-            if (ChordHost.ResolveSource(member) is Source source) _ = source.Value;
+        {
+            // A reader's member that failed after its first value is a failed member of a live object, not a failed activation.
+            if (ChordHost.ResolveSource(member) is not Source source || source is FramedSource { Failure: not null }) continue;
+            _ = source.Value;
+        }
     }
     internal Task<object?> CallAsync(string method, object? args, ChordContext context, Caller caller, long version)
     {
@@ -241,7 +328,15 @@ internal sealed partial class Attempt : IOldWorkSource
         // Account for the call before plugin code executes (it may synchronously end this object).
         Admit(completion.Task, () => Owner.Host.CountCall(-1));
         _ = Invoke();
-        return completion.Task.WaitAsync(waitingToken);
+        var aborted = context.AbortSignal;
+        return Served.Admission is null ? completion.Task.WaitAsync(waitingToken) : Cuttable();
+        // A change of its admission seals an admitted type's attempt under its running calls: their callers get what the cut rejects them
+        // with (unavailable, or forbidden/revoked for a denial), not the cancellation of their wait.
+        async Task<object?> Cuttable()
+        {
+            try { return await completion.Task.WaitAsync(waitingToken); }
+            catch (OperationCanceledException) when (cut is not null && aborted?.IsCancellationRequested != true) { throw cut; }
+        }
         async Task Invoke()
         {
             try
@@ -286,10 +381,12 @@ internal sealed partial class Attempt : IOldWorkSource
         {
             // Cleanup continuations may still be queued on the dispatcher after the originals settled.
             var work = Work.Keys.Where(work => !work.IsCompleted).ToArray();
-            if (work.Length == 0) return;
+            // A change of its admission sealed it (ChordObject.SealDraining): no drain on a seal, its calls were rejected.
+            if (work.Length == 0 || WasCut) return;
             var remaining = due - Owner.Host.Options.TimeProvider.GetUtcNow();
             if (remaining <= TimeSpan.Zero) { Owner.Host.Report(new("drain_timeout", Object: Owner.Label)); return; }
-            try { await Task.WhenAll(work).WaitAsync(remaining, Owner.Host.Options.TimeProvider); }
+            var settled = Served.Admission is null ? Task.WhenAll(work) : Task.WhenAny(Task.WhenAll(work), CutTask);
+            try { await settled.WaitAsync(remaining, Owner.Host.Options.TimeProvider); }
             catch (TimeoutException) { Owner.Host.Report(new("drain_timeout", Object: Owner.Label)); return; }
             catch { }
         }
@@ -321,7 +418,7 @@ internal sealed partial class Attempt : IOldWorkSource
     internal void DetachSources(ChordError error)
     {
         if (sourcesDetached) return;
-        sourcesDetached = true; Self.Detach(error);
+        sourcesDetached = true; Self.Detach(error); DetachEvents();
         foreach (var value in adapted.Values) value.Detach(error);
         adapted.Clear();
     }
@@ -347,6 +444,9 @@ internal sealed partial class Attempt : IOldWorkSource
         await Owner.Documents.SettledAsync();
         Owner.StopFollowing(this);
         if (!PreserveSourcesAtClose) DetachSources(sealedError ?? new("released", $"{Owner.Label}: attempt ended", "ended"));
+        // The named queries it offered are offered no more (slice 14 §3.2), also while a restart keeps its sources for its successor's
+        // first check: their readers' reads leave the store's index before the successor prepares the tables.
+        else Self.RetireOffered();
         var failures = new List<Exception>();
         foreach (var job in Self.Jobs) try { await job.WriteAtCloseAsync(Owner.Context); } catch (Exception error) { failures.Add(error); }
         foreach (var native in Self.Natives.AsEnumerable().Reverse()) try { await native.CloseAsync(reason); } catch (Exception error) { failures.Add(error); }
@@ -358,6 +458,56 @@ internal sealed partial class Attempt : IOldWorkSource
         finally { RetirementEnded.TrySetResult(); }
     }
     private sealed class ActivationException(FailureCause cause) : Exception(cause.Error.Message) { internal FailureCause Cause => cause; }
+
+    /// <summary>The <c>parked_long</c> report of one parking episode (dependency model §7): once, when the attempt has been parked longer
+    /// than <c>ReadyTimeout</c>, whatever its blocker; nothing fails or retries. The clock and the report's <c>since</c> start with the
+    /// episode's first parked check; the report names the blocker of the latest check.</summary>
+    private sealed class ParkedLong(Attempt attempt) : IBlocked
+    {
+        private DateTimeOffset? since;
+        private bool reported;
+        // The blocker the latest check found; null when it is parked on a denial alone (no report for one).
+        private Blocker? blocker = new("a dependency", "loading");
+        public void BlockedBy(Blocker? next) => blocker = next;
+        /// <summary>Waits for <paramref name="wake"/> (at once when the change came during the check); the attempt's seal ends the wait.</summary>
+        internal async Task NextChangeAsync(Task wake)
+        {
+            var host = attempt.Owner.Host; var token = attempt.Cancellation.Token;
+            if (wake.IsCompleted) return;
+            since ??= host.Options.TimeProvider.GetUtcNow();
+            if (!reported)
+            {
+                var remaining = host.Options.ReadyTimeout - (host.Options.TimeProvider.GetUtcNow() - since.Value);
+                if (remaining > TimeSpan.Zero)
+                {
+                    using var timer = CancellationTokenSource.CreateLinkedTokenSource(token);
+                    var deadline = Task.Delay(remaining, host.Options.TimeProvider, timer.Token);
+                    var signaled = await Task.WhenAny(wake, deadline);
+                    timer.Cancel();
+                    token.ThrowIfCancellationRequested();
+                    if (ReferenceEquals(signaled, wake)) return;
+                }
+                reported = true;
+                if (blocker is { } blocking)
+                    host.Report(new("parked_long", Object: attempt.Owner.Label, WaitingFor: blocking.Label, State: blocking.State,
+                        Since: since.Value.ToUnixTimeMilliseconds()));
+            }
+            await wake.WaitAsync(token);
+        }
+    }
+
+    /// <summary>The budget of its own steps (<c>ReadyTimeout</c>), paused while it is parked: each stretch of steps runs under what is
+    /// left, and takes what it used.</summary>
+    private sealed class ActivationDeadline(TimeSpan budget, TimeProvider time)
+    {
+        private TimeSpan left = budget;
+        internal async Task RunAsync(Func<Task> steps, CancellationToken token)
+        {
+            var started = time.GetUtcNow();
+            try { await steps().WaitAsync(left < TimeSpan.Zero ? TimeSpan.Zero : left, time, token); }
+            finally { left -= time.GetUtcNow() - started; }
+        }
+    }
 }
 
 internal sealed partial class Self : IStoreSelf, IKeyDeclarer, IJobOwner, IWritableOwner
@@ -375,7 +525,7 @@ internal sealed partial class Self : IStoreSelf, IKeyDeclarer, IJobOwner, IWrita
     internal readonly List<FollowSource> Follows = [];
     internal readonly List<IHostedJob> Jobs = [];
     internal readonly List<TableHandle> Tables = [];
-    internal readonly List<LiveQuery> Queries = [];
+    internal readonly List<(LiveQuery Live, LiveTarget Target)> Queries = [];
     internal readonly List<ContributionDeclaration> Contributions = [];
     internal readonly List<RegistryContribution> PublishedContributions = [];
     private readonly List<Action<Exception>> detach = [];
@@ -471,6 +621,7 @@ internal sealed partial class Self : IStoreSelf, IKeyDeclarer, IJobOwner, IWrita
     {
         Declare("table"); if (Store is not { } storage) throw new ArgumentException("tables need a local empty-param object and store");
         if (Tables.Any(t => t.Definition.Name == definition.Name)) throw new ArgumentException("table declared twice");
+        StoreInternal.CheckExposedOnce(definition, Tables.Select(t => t.Definition), Attempt.Owner.Label);
         var name = StoreInternal.TableSqlName(storage.Owner, definition.Name);
         storage.Store.Claims.Table(name, Attempt.Owner);
         var table = new TableHandle(definition, name, storage.Store, Attempt.Owner); Tables.Add(table); return table;
@@ -483,14 +634,16 @@ internal sealed partial class Self : IStoreSelf, IKeyDeclarer, IJobOwner, IWrita
     }
     internal IHostedJob DeclareJob(string name, Func<IJobOwner, IHostedJob> create)
     {
-        Declare("job"); if (!jobNames.Add(name)) throw new ArgumentException($"job {name} declared twice");
+        Declare("job"); AdmissionInternal.RefuseAdmittedJob(Attempt.Served, Attempt.Owner.Label);
+        if (!jobNames.Add(name)) throw new ArgumentException($"job {name} declared twice");
         var job = create(this); Jobs.Add(job); return job;
     }
     internal void Detach(Exception error)
     {
         foreach (var action in detach) action(error); detach.Clear();
         foreach (var derive in Derives) derive.Detach(error);
-        foreach (var query in Queries) query.Detach(error);
+        CloseReaders(error);
+        RetireReads(error);
         foreach (var follow in Follows)
             try { follow.Detach(); } catch (Exception failure) { Report(new("follow_detach_failed", failure, Attempt.Owner.Label)); }
     }

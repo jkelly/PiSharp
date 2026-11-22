@@ -1,4 +1,4 @@
-// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/tui/src/tui-alt-screen.ts.
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/tui/src/tui-alt-screen.ts.
 using System.Diagnostics;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -114,11 +114,11 @@ public sealed partial class TuiAltScreen : TuiBase, IViewportTui
 
     private sealed class ImplicitDocument(TuiAltScreen owner) : IComponent, IMouseHandler
     {
-        public List<string> Render(int width) => owner.RenderChildren(width);
+        public IReadOnlyList<string> Render(int width) => owner.RenderChildren(width);
         public TuiMouseEventResult? HandleMouse(TuiMouseEvent mouseEvent) => owner.HandleChildrenMouse(mouseEvent);
         public void Invalidate() { foreach (var child in owner.Children.ToArray()) child.Invalidate(); }
     }
-    private List<string> RenderChildren(int width) => base.Render(width);
+    private IReadOnlyList<string> RenderChildren(int width) => base.Render(width);
     private TuiMouseEventResult? HandleChildrenMouse(TuiMouseEvent mouseEvent) => base.HandleMouse(mouseEvent);
 
     public int ViewportTop => PrimaryScrollView.ScrollTop;
@@ -134,7 +134,7 @@ public sealed partial class TuiAltScreen : TuiBase, IViewportTui
         if (layoutRoot == component) return;
         layoutRoot = component; currentLayout = null; RequestRender();
     }
-    public override List<string> Render(int width) => layoutRoot?.Render(width) ?? base.Render(width);
+    public override IReadOnlyList<string> Render(int width) => layoutRoot?.Render(width) ?? base.Render(width);
     protected override IReadOnlyList<IComponent> GetMountedRoots() => layoutRoot is not null ? [layoutRoot] : Children;
     private ScrollView PrimaryScrollView => currentLayout?.PrimaryScrollView ?? implicitScrollView;
 
@@ -222,9 +222,9 @@ public sealed partial class TuiAltScreen : TuiBase, IViewportTui
 
     protected override void ResetRenderState() { previousScreen = []; previousScreenWidth = 0; previousScreenHeight = 0; currentLayout = null; }
 
-    public void ScrollBy(int lines) { PrimaryScrollView.ScrollBy(lines); RequestRender(); }
-    public void ScrollToTop() { PrimaryScrollView.ScrollToStart(); RequestRender(); }
-    public void ScrollToBottom() { PrimaryScrollView.ScrollToEnd(); RequestRender(); }
+    public void ScrollBy(int lines) { PrimaryScrollView.ScrollBy(lines); RequestViewRender(); }
+    public void ScrollToTop() { PrimaryScrollView.ScrollToStart(); RequestViewRender(); }
+    public void ScrollToBottom() { PrimaryScrollView.ScrollToEnd(); RequestViewRender(); }
 
     private void ScrollToPrompt(int direction)
     {
@@ -234,7 +234,7 @@ public sealed partial class TuiAltScreen : TuiBase, IViewportTui
         for (var row = view.ScrollTop + direction; row >= 0 && row < lines.Count; row += direction)
         {
             if (!PromptStart().IsMatch(lines[row])) continue;
-            view.ScrollTo(row); RequestRender(); return;
+            view.ScrollTo(row); RequestViewRender(); return;
         }
     }
 
@@ -510,7 +510,9 @@ public sealed partial class TuiAltScreen : TuiBase, IViewportTui
         var primary = PrimaryScrollView;
         if (remaining != 0 && !seen.Contains(primary)) primary.ScrollBy(remaining);
         UpdateScrollbarHover(x, y);
-        RequestRender();
+        // Scrolling moves the viewport only. Reusing the previous component output keeps a wheel frame O(viewport); re-rendering
+        // a long transcript on every wheel event saturated a core.
+        RequestViewRender();
     }
 
     private static SgrMouseEvent? ParseSgrMouse(string data)
@@ -659,7 +661,8 @@ public sealed partial class TuiAltScreen : TuiBase, IViewportTui
         var remaining = view.ScrollBy(selectionAutoScrollDirection);
         if (remaining == selectionAutoScrollDirection) { StopSelectionAutoScroll(); return; }
         if (ScrollSelectionPoint(view, pointer.X, pointer.Y) is { } point) UpdateSelectionFocus(point);
-        RequestRender();
+        // Selection is painted onto the screen after layout, so it needs no new component output.
+        RequestViewRender();
     }
     private void StopSelectionAutoScroll() { selectionAutoScrollTimer?.Dispose(); selectionAutoScrollTimer = null; selectionAutoScrollDirection = 0; selectionDragPointer = null; }
 
@@ -915,8 +918,9 @@ public sealed partial class TuiAltScreen : TuiBase, IViewportTui
         if (stopped || !altScreenActive) return;
         var width = Math.Max(1, Terminal.Columns); var height = Math.Max(1, Terminal.Rows);
         IComponent root = layoutRoot ?? implicitScrollView;
-        var next = LayoutEngine.RenderFrame(root, width, height, () => RequestRender());
-        if (RefreshSearch(next)) next = LayoutEngine.RenderFrame(root, width, height, () => RequestRender());
+        var reusableOutput = ConsumeContentChanged() ? null : currentLayout?.RenderCache;
+        var next = LayoutEngine.RenderFrame(root, width, height, RequestViewRender, reusableOutput);
+        if (RefreshSearch(next)) next = LayoutEngine.RenderFrame(root, width, height, RequestViewRender, next.RenderCache);
         // Resolve fake cursors before highlighting and compositing, which only track SGR codes
         var screen = ResolveFakeCursors(next.Lines.Select(line => LayoutEngine.Osc133ZonePrefix().Replace(line, "")).ToList());
         screen = ApplySearchHighlights(screen, next);
@@ -946,8 +950,10 @@ public sealed partial class TuiAltScreen : TuiBase, IViewportTui
         if (fullRedraw)
         {
             fullRedrawCount++;
-            buffer.Append(imageProtocol == ImageProtocol.Kitty && hadUploaded ? TerminalImage.DeleteAllKittyPlacements() : imageProtocol == ImageProtocol.Kitty ? TerminalImage.DeleteAllKittyImages() : "");
-            buffer.Append("\u001b[2J");
+            // Kitty frees image data without placements on ED 2, which would break placement-only reuse. Every row is cleared
+            // with EL 2 below, so keep the uploads and skip the screen clear.
+            if (imageProtocol == ImageProtocol.Kitty && hadUploaded) buffer.Append(TerminalImage.DeleteAllKittyPlacements());
+            else buffer.Append(imageProtocol == ImageProtocol.Kitty ? TerminalImage.DeleteAllKittyImages() : "").Append("\u001b[2J");
         }
         else if (imagesRedraw)
         {

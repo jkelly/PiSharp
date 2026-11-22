@@ -55,7 +55,56 @@ internal static class RealDaemonTests
         }
         await RandomTraceAsync(connection, shell);
         await ToolTraceAsync(connection, shell);
+        await InvalidUtf8NameAsync(connection);
     }
+
+    // Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/env/src/remote-env.ts listDir, packages/env/CHANGELOG.md [1.6.0]
+    // (#11994). A name that is not valid UTF-8 cannot be addressed through the protocol: the daemon's lstat of its
+    // replacement-decoded name reports it missing, and the listing and the directory reader leave it out instead of failing.
+    private static async Task InvalidUtf8NameAsync(Connection connection)
+    {
+        // Linux file systems store name bytes as given; Windows names are UTF-16 and APFS refuses bytes that are not UTF-8.
+        // Elsewhere the approved SKIP line comes first and then the case's own PASS line, as in Env.Daemon: the CI registry
+        // (tools/ci/gap-suites.json allowedSkips) records the case as skipped with its reason, never as run.
+        if (!OperatingSystem.IsLinux())
+        {
+            Console.WriteLine("SKIP real daemon listDir leaves out a name that is not valid UTF-8: needs a file system that stores raw name bytes (Linux)");
+            Console.WriteLine("PASS real daemon listDir leaves out a name that is not valid UTF-8");
+            return;
+        }
+        var directory = Directory.CreateTempSubdirectory("pisharp-env-names-").FullName;
+        byte[] raw = [.. Encoding.UTF8.GetBytes(directory + "/"), 0x62, 0x61, 0x64, 0xff, 0];
+        var env = new RemoteExecutionEnv(new() { Connection = connection, Id = "names", Cwd = directory });
+        try
+        {
+            var descriptor = open(raw, 0x41 /* O_WRONLY | O_CREAT */, 0x1a4 /* 0644 */);
+            if (descriptor < 0) throw new InvalidOperationException("Cannot create a file whose name is not valid UTF-8: errno " + Marshal.GetLastPInvokeError());
+            close(descriptor);
+            await File.WriteAllTextAsync(Path.Combine(directory, "ok.txt"), "ok");
+            var context = DurableContext.Background;
+            var listed = (await env.ListDirAsync(".", context)).GetOrThrow();
+            if (!listed.Select(entry => entry.Name).SequenceEqual(["ok.txt"]))
+                throw new InvalidOperationException("listDir did not leave out the name that is not valid UTF-8: " + string.Join(",", listed.Select(entry => entry.Name)));
+            var reader = (await env.OpenDirReaderAsync(".", context)).GetOrThrow();
+            try
+            {
+                var page = (await reader.NextAsync(10, context)).GetOrThrow();
+                if (!page.Done || !page.Entries.Select(entry => entry.Name).SequenceEqual(["ok.txt"]))
+                    throw new InvalidOperationException("The directory reader did not leave out the name that is not valid UTF-8");
+            }
+            finally { await reader.CloseAsync(context); }
+            Console.WriteLine("PASS real daemon listDir leaves out a name that is not valid UTF-8");
+        }
+        finally
+        {
+            await env.CleanupAsync(DurableContext.Background);
+            unlink(raw);
+            Directory.Delete(directory, true);
+        }
+    }
+    [DllImport("libc", SetLastError = true)] private static extern int open(byte[] path, int flags, int mode);
+    [DllImport("libc")] private static extern int close(int descriptor);
+    [DllImport("libc")] private static extern int unlink(byte[] path);
 
     private static async Task RandomTraceAsync(Connection connection, string shell)
     {

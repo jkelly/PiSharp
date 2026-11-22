@@ -1,0 +1,2502 @@
+{
+  "schemaVersion": 1,
+  "target": "Pi/Pi Durable 1.6.0",
+  "generatedUtc": "2026-11-22T02:16:17.936Z",
+  "status": "source-validation-complete",
+  "policy": "Only a passing full-suite receipt with an unchanged project-reference source fingerprint is accepted. Passing with console skips retains explicit limitations. No live provider or SQL Server service tests are implied.",
+  "sourceCommit": "faac585884ae2c013a6b1400f3e9e77f10b34bac",
+  "receipts": "artifacts/gap-validation",
+  "requiredSuites": [
+    "Models",
+    "ExtensionParity",
+    "Agent",
+    "CliParity",
+    "CodingAgent",
+    "Codemode",
+    "Durable",
+    "InteractiveParity",
+    "SessionParity",
+    "ProviderApis",
+    "ProviderSync",
+    "Classifiers",
+    "Chord",
+    "NativeModelCatalog",
+    "ModelRuntime",
+    "Authentication",
+    "ClassifierConfig",
+    "CliSync",
+    "Durable.Hosting",
+    "Durable.Server",
+    "DurableCli",
+    "WebAgent",
+    "OpenAICompatibilityGap",
+    "AnthropicThreads",
+    "AnthropicResolved",
+    "AnthropicSimple",
+    "AnthropicProfile",
+    "AnthropicAuthSync",
+    "AzureResponses",
+    "AzureSimple",
+    "MistralConversations",
+    "ResponsesPublicMetadata",
+    "ResponsesTranscriptTools",
+    "Transport",
+    "WireSync",
+    "Compatibility",
+    "ProviderOfflineDifferential",
+    "SimpleOutputBudget",
+    "ToolSearch",
+    "McpSync",
+    "Env.Adapter",
+    "Env.Connection",
+    "Env.Daemon",
+    "Env.Process",
+    "Env.Ssh",
+    "Env.Terminal",
+    "Env.Watch",
+    "Rpc",
+    "Extensions.ContractTests",
+    "Tui",
+    "Tui.Editor",
+    "Tui.NativeModifiers",
+    "McpParity",
+    "Tools",
+    "Sessions",
+    "SdkEventBus",
+    "SdkAsyncEventBus",
+    "ExtensionHost",
+    "DurableMessages",
+    "CustomAgents",
+    "Chord.Durable.Integration",
+    "Chord.Hosting",
+    "Durable150.Capture",
+    "Durable.Web",
+    "Chord.Legacy.Cluster",
+    "Telemetry"
+  ],
+  "pendingSuites": [],
+  "additionalPending": [],
+  "fullSolution": {
+    "waived": "Run-Tests fingerprints a solution file's whole directory, artifacts included, so it cannot give a source-stable PiSharp.slnx receipt. PiSharp.slnx built in Release with the pinned SDK 10.0.401 at ee1c8341 with a clean tracked tree, 0 warnings and 0 errors (2026-11-22, outside the receipt owner), and every required suite built its own project closure in its receipt."
+  },
+  "latest": [
+    {
+      "project": "tests/PiSharp.Agent.Tests/PiSharp.Agent.Tests.csproj",
+      "receipt": "artifacts/gap-validation/sync160-agent-final-35798cab8a92434e9aa7691cd3cdac17/receipt.json",
+      "result": "passed",
+      "selectedCount": 244,
+      "fullSuite": true,
+      "stableDuringRun": true,
+      "currentSourceMatches": true,
+      "accepted": true,
+      "failures": [],
+      "skippedCases": [],
+      "consoleSkips": []
+    },
+    {
+      "project": "tests/PiSharp.AnthropicAuthSync.Tests/PiSharp.AnthropicAuthSync.Tests.csproj",
+      "receipt": "artifacts/gap-validation/sync160-anthropicauthsync-final-caf2deadc16c4a4ea2ceefec67f50f4c/receipt.json",
+      "result": "passed",
+      "selectedCount": 30,
+      "fullSuite": true,
+      "stableDuringRun": true,
+      "currentSourceMatches": true,
+      "accepted": true,
+      "failures": [],
+      "skippedCases": [],
+      "consoleSkips": []
+    },
+    {
+      "project": "tests/PiSharp.AnthropicProfile.Tests/PiSharp.AnthropicProfile.Tests.csproj",
+      "receipt": "artifacts/gap-validation/sync160-anthropicprofile-final-918380736c7e44e6af1f2e20b176731b/receipt.json",
+      "result": "passed",
+      "selectedCount": 6,
+      "fullSuite": true,
+      "stableDuringRun": true,
+      "currentSourceMatches": true,
+      "accepted": true,
+      "failures": [],
+      "skippedCases": [],
+      "consoleSkips": []
+    },
+    {
+      "project": "tests/PiSharp.AnthropicResolved.Tests/PiSharp.AnthropicResolved.Tests.csproj",
+      "receipt": "artifacts/gap-validation/sync160-anthropicresolved-final-54a5d8dc569f4c2ba2eb48e44b22cb54/receipt.json",
+      "result": "passed",
+      "selectedCount": 18,
+      "fullSuite": true,
+      "stableDuringRun": true,
+      "currentSourceMatches": true,
+      "accepted": true,
+      "failures": [],
+      "skippedCases": [],
+      "consoleSkips": []
+    },
+    {
+      "project": "tests/PiSharp.AnthropicSimple.Tests/PiSharp.AnthropicSimple.Tests.csproj",
+      "receipt": "artifacts/gap-validation/sync160-anthropicsimple-final-7c9cee3f94a543d5bda5f89d6fcf45c7/receipt.json",
+      "result": "passed",
+      "selectedCount": 13,
+      "fullSuite": true,
+      "stableDuringRun": true,
+      "currentSourceMatches": true,
+      "accepted": true,
+      "failures": [],
+      "skippedCases": [],
+      "consoleSkips": []
+    },
+    {
+      "project": "tests/PiSharp.AnthropicThreads.Tests/PiSharp.AnthropicThreads.Tests.csproj",
+      "receipt": "artifacts/gap-validation/sync160-anthropicthreads-final-c1eb48925ab840558253d4e693fab3dc/receipt.json",
+      "result": "passed",
+      "selectedCount": 4,
+      "fullSuite": true,
+      "stableDuringRun": true,
+      "currentSourceMatches": true,
+      "accepted": true,
+      "failures": [],
+      "skippedCases": [],
+      "consoleSkips": []
+    },
+    {
+      "project": "tests/PiSharp.Authentication.Tests/PiSharp.Authentication.Tests.csproj",
+      "receipt": "artifacts/gap-validation/sync160-authentication-final-29b5289c0cd043faa4aab0c559e862b4/receipt.json",
+      "result": "passed",
+      "selectedCount": 42,
+      "fullSuite": true,
+      "stableDuringRun": true,
+      "currentSourceMatches": true,
+      "accepted": true,
+      "failures": [],
+      "skippedCases": [],
+      "consoleSkips": []
+    },
+    {
+      "project": "tests/PiSharp.AzureResponses.Tests/PiSharp.AzureResponses.Tests.csproj",
+      "receipt": "artifacts/gap-validation/sync160-azureresponses-final-55e5690c428b4c18a4ee2ae69c81e6df/receipt.json",
+      "result": "passed",
+      "selectedCount": 17,
+      "fullSuite": true,
+      "stableDuringRun": true,
+      "currentSourceMatches": true,
+      "accepted": true,
+      "failures": [],
+      "skippedCases": [],
+      "consoleSkips": []
+    },
+    {
+      "project": "tests/PiSharp.AzureSimple.Tests/PiSharp.AzureSimple.Tests.csproj",
+      "receipt": "artifacts/gap-validation/sync160-azuresimple-final-4f1d167a77ca4b52b80907c6d2052de8/receipt.json",
+      "result": "passed",
+      "selectedCount": 8,
+      "fullSuite": true,
+      "stableDuringRun": true,
+      "currentSourceMatches": true,
+      "accepted": true,
+      "failures": [],
+      "skippedCases": [],
+      "consoleSkips": []
+    },
+    {
+      "project": "tests/PiSharp.Chord.Durable.Integration.Tests/PiSharp.Chord.Durable.Integration.Tests.csproj",
+      "receipt": "artifacts/gap-validation/sync160-chord-durable-integration-final-525a33402c654684828bd95224cd4ade/receipt.json",
+      "result": "passed",
+      "selectedCount": 7,
+      "fullSuite": true,
+      "stableDuringRun": true,
+      "currentSourceMatches": true,
+      "accepted": true,
+      "failures": [],
+      "skippedCases": [],
+      "consoleSkips": []
+    },
+    {
+      "project": "tests/PiSharp.Chord.Hosting.Tests/PiSharp.Chord.Hosting.Tests.csproj",
+      "receipt": "artifacts/gap-validation/sync160-chord-hosting-final-bd0d4cb6cc0b4eef8eb04d7cdf51de32/receipt.json",
+      "result": "passed",
+      "selectedCount": 62,
+      "fullSuite": true,
+      "stableDuringRun": true,
+      "currentSourceMatches": true,
+      "accepted": true,
+      "failures": [],
+      "skippedCases": [],
+      "consoleSkips": []
+    },
+    {
+      "project": "tests/PiSharp.Chord.Legacy.Cluster.Tests/PiSharp.Chord.Legacy.Cluster.Tests.csproj",
+      "receipt": "artifacts/gap-validation/sync160-chord-legacy-cluster-final-7ce36f6c1a3b4605b5db8a824044d4c3/receipt.json",
+      "result": "passed",
+      "selectedCount": 25,
+      "fullSuite": true,
+      "stableDuringRun": true,
+      "currentSourceMatches": true,
+      "accepted": true,
+      "failures": [],
+      "skippedCases": [],
+      "consoleSkips": []
+    },
+    {
+      "project": "tests/PiSharp.Chord.Tests/PiSharp.Chord.Tests.csproj",
+      "receipt": "artifacts/gap-validation/sync160-chord-final-0137bd46677b4e7e961a67a70c364c1a/receipt.json",
+      "result": "passed",
+      "selectedCount": 1510,
+      "fullSuite": true,
+      "stableDuringRun": true,
+      "currentSourceMatches": true,
+      "accepted": true,
+      "failures": [],
+      "skippedCases": [],
+      "consoleSkips": []
+    },
+    {
+      "project": "tests/PiSharp.ClassifierConfig.Tests/PiSharp.ClassifierConfig.Tests.csproj",
+      "receipt": "artifacts/gap-validation/sync160-classifierconfig-final-6063d4121d2948458d28d6eead4e258b/receipt.json",
+      "result": "passed",
+      "selectedCount": 1,
+      "fullSuite": true,
+      "stableDuringRun": true,
+      "currentSourceMatches": true,
+      "accepted": true,
+      "failures": [],
+      "skippedCases": [],
+      "consoleSkips": []
+    },
+    {
+      "project": "tests/PiSharp.Classifiers.Tests/PiSharp.Classifiers.Tests.csproj",
+      "receipt": "artifacts/gap-validation/sync160-classifiers-final-37c8d812ebaa4dbe9d2efee2967f097f/receipt.json",
+      "result": "passed",
+      "selectedCount": 66,
+      "fullSuite": true,
+      "stableDuringRun": true,
+      "currentSourceMatches": true,
+      "accepted": true,
+      "failures": [],
+      "skippedCases": [],
+      "consoleSkips": []
+    },
+    {
+      "project": "tests/PiSharp.CliParity.Tests/PiSharp.CliParity.Tests.csproj",
+      "receipt": "artifacts/gap-validation/sync160-cliparity-final-9269fff3713d4d02bcbc6b2fedc141bb/receipt.json",
+      "result": "passed",
+      "selectedCount": 237,
+      "fullSuite": true,
+      "stableDuringRun": true,
+      "currentSourceMatches": true,
+      "accepted": true,
+      "failures": [],
+      "skippedCases": [
+        {
+          "id": "unix.posix-spawn-own-process-group-cwd-environment-and-stdio-pipes",
+          "status": "SKIPPED_PLATFORM",
+          "reason": null
+        },
+        {
+          "id": "unix.posix-spawn-children-see-stdin-eof-and-inherit-no-parent-pipe-ends",
+          "status": "SKIPPED_PLATFORM",
+          "reason": null
+        },
+        {
+          "id": "unix.runner-refuses-a-missing-executable-or-working-directory-before-launching",
+          "status": "SKIPPED_PLATFORM",
+          "reason": null
+        },
+        {
+          "id": "unix.runner-timeout-and-cancel-kill-the-whole-process-group",
+          "status": "SKIPPED_PLATFORM",
+          "reason": null
+        },
+        {
+          "id": "unix.pi-entry-bash-tool-runs-and-timeout-kills-the-tree",
+          "status": "SKIPPED_PLATFORM",
+          "reason": null
+        },
+        {
+          "id": "session-format.extension",
+          "status": "SKIPPED_PLATFORM",
+          "reason": null
+        },
+        {
+          "id": "session-format.extensionmessage",
+          "status": "SKIPPED_PLATFORM",
+          "reason": null
+        },
+        {
+          "id": "session-format.extensionnavigate",
+          "status": "SKIPPED_PLATFORM",
+          "reason": null
+        },
+        {
+          "id": "session-format.forklabels",
+          "status": "SKIPPED_PLATFORM",
+          "reason": null
+        },
+        {
+          "id": "session-format.override-openrouter",
+          "status": "SKIPPED_PLATFORM",
+          "reason": null
+        },
+        {
+          "id": "sync150.macos-stop-group-before-kill.no-next-command-after-stop",
+          "status": "SKIPPED_PLATFORM",
+          "reason": null
+        }
+      ],
+      "consoleSkips": []
+    },
+    {
+      "project": "tests/PiSharp.CliSync.Tests/PiSharp.CliSync.Tests.csproj",
+      "receipt": "artifacts/gap-validation/sync160-clisync-final-b68748d3b1594e0abf3e707565bd433f/receipt.json",
+      "result": "passed",
+      "selectedCount": 73,
+      "fullSuite": true,
+      "stableDuringRun": true,
+      "currentSourceMatches": true,
+      "accepted": true,
+      "failures": [],
+      "skippedCases": [],
+      "consoleSkips": []
+    },
+    {
+      "project": "tests/PiSharp.Codemode.Tests/PiSharp.Codemode.Tests.csproj",
+      "receipt": "artifacts/gap-validation/sync160-codemode-final-89bc72be0b0f4492bf5cbacbbf05f290/receipt.json",
+      "result": "passed",
+      "selectedCount": 149,
+      "fullSuite": true,
+      "stableDuringRun": true,
+      "currentSourceMatches": true,
+      "accepted": true,
+      "failures": [],
+      "skippedCases": [],
+      "consoleSkips": []
+    },
+    {
+      "project": "tests/PiSharp.CodingAgent.Tests/PiSharp.CodingAgent.Tests.csproj",
+      "receipt": "artifacts/gap-validation/sync160-codingagent-final-7646a786cad94502954b99b44d1bbcda/receipt.json",
+      "result": "passed",
+      "selectedCount": 923,
+      "fullSuite": true,
+      "stableDuringRun": true,
+      "currentSourceMatches": true,
+      "accepted": true,
+      "failures": [],
+      "skippedCases": [],
+      "consoleSkips": []
+    },
+    {
+      "project": "tests/PiSharp.Compatibility.Tests/PiSharp.Compatibility.Tests.csproj",
+      "receipt": "artifacts/gap-validation/sync160-compatibility-final-bcadae5147e64aeab6d458df4d3c19cc/receipt.json",
+      "result": "passed",
+      "selectedCount": 236,
+      "fullSuite": true,
+      "stableDuringRun": true,
+      "currentSourceMatches": true,
+      "accepted": true,
+      "failures": [],
+      "skippedCases": [],
+      "consoleSkips": []
+    },
+    {
+      "project": "tests/PiSharp.CustomAgents.Tests/PiSharp.CustomAgents.Tests.csproj",
+      "receipt": "artifacts/gap-validation/sync160-customagents-final-fbc92db95e904b3d89a42224af9a4e00/receipt.json",
+      "result": "passed",
+      "selectedCount": 104,
+      "fullSuite": true,
+      "stableDuringRun": true,
+      "currentSourceMatches": true,
+      "accepted": true,
+      "failures": [],
+      "skippedCases": [],
+      "consoleSkips": []
+    },
+    {
+      "project": "tests/PiSharp.Durable.Hosting.Tests/PiSharp.Durable.Hosting.Tests.csproj",
+      "receipt": "artifacts/gap-validation/sync160-durable-hosting-final-0fcb2402230e46fbb9bee3438c2a9b4b/receipt.json",
+      "result": "passed",
+      "selectedCount": 129,
+      "fullSuite": true,
+      "stableDuringRun": true,
+      "currentSourceMatches": true,
+      "accepted": true,
+      "failures": [],
+      "skippedCases": [],
+      "consoleSkips": []
+    },
+    {
+      "project": "tests/PiSharp.Durable.Server.Tests/PiSharp.Durable.Server.Tests.csproj",
+      "receipt": "artifacts/gap-validation/sync160-durable-server-final-d5327341380b4e829291c45d866171cd/receipt.json",
+      "result": "passed",
+      "selectedCount": 36,
+      "fullSuite": true,
+      "stableDuringRun": true,
+      "currentSourceMatches": true,
+      "accepted": true,
+      "failures": [],
+      "skippedCases": [],
+      "consoleSkips": []
+    },
+    {
+      "project": "tests/PiSharp.Durable.Tests/PiSharp.Durable.Tests.csproj",
+      "receipt": "artifacts/gap-validation/sync160-durable-final-bcd433d12aff4d1d974dbf48ad731189/receipt.json",
+      "result": "passed",
+      "selectedCount": 4851,
+      "fullSuite": true,
+      "stableDuringRun": true,
+      "currentSourceMatches": true,
+      "accepted": true,
+      "failures": [],
+      "skippedCases": [
+        {
+          "id": "compat.reverse.upstream-reads-pisharp-sessions",
+          "status": "SKIPPED_NO_UPSTREAM",
+          "reason": "PISHARP_DURABLE_UPSTREAM unset"
+        },
+        {
+          "id": "plan.symlink-escape.file-link",
+          "status": "SKIPPED_NO_UPSTREAM",
+          "reason": "this process cannot create symbolic links (Windows needs SeCreateSymbolicLinkPrivilege or Developer Mode): A required privilege is not held by the client. : 'C:\\Users\\jksof\\AppData\\Local\\Temp\\pisharp-durable\\interaction-scope-file-link-fc5686a006e140c2bc778b16ee812e12\\plans\\1\\link.txt'."
+        },
+        {
+          "id": "plan.symlink-escape.dangling-final",
+          "status": "SKIPPED_NO_UPSTREAM",
+          "reason": "this process cannot create symbolic links (Windows needs SeCreateSymbolicLinkPrivilege or Developer Mode): A required privilege is not held by the client. : 'C:\\Users\\jksof\\AppData\\Local\\Temp\\pisharp-durable\\interaction-scope-dangling-0a57ae76f2af4ff394bc9eeda4d1728c\\plans\\1\\dangling.txt'."
+        },
+        {
+          "id": "plan.symlink-escape.intermediate-dir-link",
+          "status": "SKIPPED_NO_UPSTREAM",
+          "reason": "this process cannot create symbolic links (Windows needs SeCreateSymbolicLinkPrivilege or Developer Mode): A required privilege is not held by the client. : 'C:\\Users\\jksof\\AppData\\Local\\Temp\\pisharp-durable\\interaction-scope-dir-link-6a09f542acc9441fa7ae73a11f49e19f\\plans\\1\\sub'."
+        }
+      ],
+      "consoleSkips": []
+    },
+    {
+      "project": "tests/PiSharp.Durable.Web.Tests/PiSharp.Durable.Web.Tests.csproj",
+      "receipt": "artifacts/gap-validation/sync160-durable-web-final-d989e1278d7f4f8bb46ea35c18befe1b/receipt.json",
+      "result": "passed",
+      "selectedCount": 17,
+      "fullSuite": true,
+      "stableDuringRun": true,
+      "currentSourceMatches": true,
+      "accepted": true,
+      "failures": [],
+      "skippedCases": [],
+      "consoleSkips": []
+    },
+    {
+      "project": "tests/PiSharp.Durable150.Capture.Tests/PiSharp.Durable150.Capture.Tests.csproj",
+      "receipt": "artifacts/gap-validation/sync160-durable150-capture-final-0c540cf25dc94f08bacf49b895c8e7a8/receipt.json",
+      "result": "passed",
+      "selectedCount": 35,
+      "fullSuite": true,
+      "stableDuringRun": true,
+      "currentSourceMatches": true,
+      "accepted": true,
+      "failures": [],
+      "skippedCases": [],
+      "consoleSkips": []
+    },
+    {
+      "project": "tests/PiSharp.DurableCli.Tests/PiSharp.DurableCli.Tests.csproj",
+      "receipt": "artifacts/gap-validation/sync160-durablecli-final-58bc562a0e80424485dad4c7bba377a6/receipt.json",
+      "result": "passed",
+      "selectedCount": 122,
+      "fullSuite": true,
+      "stableDuringRun": true,
+      "currentSourceMatches": true,
+      "accepted": true,
+      "failures": [],
+      "skippedCases": [],
+      "consoleSkips": []
+    },
+    {
+      "project": "tests/PiSharp.DurableMessages.Tests/PiSharp.DurableMessages.Tests.csproj",
+      "receipt": "artifacts/gap-validation/sync160-durablemessages-final-e56142ef02534661bc9a55f566105513/receipt.json",
+      "result": "passed",
+      "selectedCount": 8,
+      "fullSuite": true,
+      "stableDuringRun": true,
+      "currentSourceMatches": true,
+      "accepted": true,
+      "failures": [],
+      "skippedCases": [],
+      "consoleSkips": []
+    },
+    {
+      "project": "tests/PiSharp.Env.Adapter.Tests/PiSharp.Env.Adapter.Tests.csproj",
+      "receipt": "artifacts/gap-validation/sync160-env-adapter-final-93254029d291446e82bde6a892729532/receipt.json",
+      "result": "passed-with-console-skips",
+      "selectedCount": 55,
+      "fullSuite": true,
+      "stableDuringRun": true,
+      "currentSourceMatches": true,
+      "accepted": true,
+      "failures": [],
+      "skippedCases": [],
+      "consoleSkips": [
+        "SKIP real daemon listDir leaves out a name that is not valid UTF-8: needs a file system that stores raw name bytes (Linux)"
+      ]
+    },
+    {
+      "project": "tests/PiSharp.Env.Connection.Tests/PiSharp.Env.Connection.Tests.csproj",
+      "receipt": "artifacts/gap-validation/sync160-env-connection-final-6748424c401e42408c2b454deef46b74/receipt.json",
+      "result": "passed",
+      "selectedCount": 10,
+      "fullSuite": true,
+      "stableDuringRun": true,
+      "currentSourceMatches": true,
+      "accepted": true,
+      "failures": [],
+      "skippedCases": [],
+      "consoleSkips": []
+    },
+    {
+      "project": "tests/PiSharp.Env.Daemon.Tests/PiSharp.Env.Daemon.Tests.csproj",
+      "receipt": "artifacts/gap-validation/sync160-env-daemon-final-50f4a04f258742a7986eca9545a34487/receipt.json",
+      "result": "passed-with-console-skips",
+      "selectedCount": 10,
+      "fullSuite": true,
+      "stableDuringRun": true,
+      "currentSourceMatches": true,
+      "accepted": true,
+      "failures": [],
+      "skippedCases": [
+        {
+          "id": "raw FIFO daemon exits after EOF and SIGTERM",
+          "status": "SKIP",
+          "detail": null,
+          "reason": "SKIP Unix raw FIFO EOF/SIGTERM regression on Windows"
+        }
+      ],
+      "consoleSkips": [
+        "SKIP Unix raw FIFO EOF/SIGTERM regression on Windows"
+      ]
+    },
+    {
+      "project": "tests/PiSharp.Env.Process.Tests/PiSharp.Env.Process.Tests.csproj",
+      "receipt": "artifacts/gap-validation/sync160-env-process-final-5f894458b0dd46ccbcb7d15d39d7e293/receipt.json",
+      "result": "passed",
+      "selectedCount": 14,
+      "fullSuite": true,
+      "stableDuringRun": true,
+      "currentSourceMatches": true,
+      "accepted": true,
+      "failures": [],
+      "skippedCases": [],
+      "consoleSkips": []
+    },
+    {
+      "project": "tests/PiSharp.Env.Ssh.Tests/PiSharp.Env.Ssh.Tests.csproj",
+      "receipt": "artifacts/gap-validation/sync160-env-ssh-final-b39071432bc04101bc6aaf49612e8b1f/receipt.json",
+      "result": "passed",
+      "selectedCount": 9,
+      "fullSuite": true,
+      "stableDuringRun": true,
+      "currentSourceMatches": true,
+      "accepted": true,
+      "failures": [],
+      "skippedCases": [],
+      "consoleSkips": []
+    },
+    {
+      "project": "tests/PiSharp.Env.Terminal.Tests/PiSharp.Env.Terminal.Tests.csproj",
+      "receipt": "artifacts/gap-validation/sync160-env-terminal-final-2da09b51d9e64b8f8d0321587dfdc09c/receipt.json",
+      "result": "passed",
+      "selectedCount": 7,
+      "fullSuite": true,
+      "stableDuringRun": true,
+      "currentSourceMatches": true,
+      "accepted": true,
+      "failures": [],
+      "skippedCases": [],
+      "consoleSkips": []
+    },
+    {
+      "project": "tests/PiSharp.Env.Watch.Tests/PiSharp.Env.Watch.Tests.csproj",
+      "receipt": "artifacts/gap-validation/sync160-env-watch-final-976f893794c54d969840836d9fe0fcde/receipt.json",
+      "result": "passed",
+      "selectedCount": 5,
+      "fullSuite": true,
+      "stableDuringRun": true,
+      "currentSourceMatches": true,
+      "accepted": true,
+      "failures": [],
+      "skippedCases": [],
+      "consoleSkips": []
+    },
+    {
+      "project": "tests/PiSharp.ExtensionHost.Tests/PiSharp.ExtensionHost.Tests.csproj",
+      "receipt": "artifacts/gap-validation/sync160-extensionhost-final-ce6ae663ad4845b7a1d6ece2f1459cde/receipt.json",
+      "result": "passed",
+      "selectedCount": 25,
+      "fullSuite": true,
+      "stableDuringRun": true,
+      "currentSourceMatches": true,
+      "accepted": true,
+      "failures": [],
+      "skippedCases": [],
+      "consoleSkips": []
+    },
+    {
+      "project": "tests/PiSharp.ExtensionParity.Tests/PiSharp.ExtensionParity.Tests.csproj",
+      "receipt": "artifacts/gap-validation/sync160-extensionparity-final-863e3cf2386b4b24a6cb592d004fcfa3/receipt.json",
+      "result": "passed",
+      "selectedCount": 180,
+      "fullSuite": true,
+      "stableDuringRun": true,
+      "currentSourceMatches": true,
+      "accepted": true,
+      "failures": [],
+      "skippedCases": [
+        {
+          "id": "runtime.pi-packages-installed-with-verified-provenance",
+          "status": "SKIP_NO_PRODUCTION_RUNTIME",
+          "reason": "Production installer provenance requires explicit PISHARP_TEST_INSTALL_PI_RUNTIME=1; local fixture admission is tested separately."
+        },
+        {
+          "id": "runtime.tsx-extension-through-pi-jiti-and-real-packages",
+          "status": "SKIP_NO_PI_RUNTIME",
+          "reason": "Provide the reviewed local fixture; production npm installation requires PISHARP_TEST_INSTALL_PI_RUNTIME=1."
+        },
+        {
+          "id": "gap.builtin-tool-factory-with-custom-operations",
+          "status": "SKIP_NO_PI_RUNTIME",
+          "reason": "Provide the reviewed local fixture; production npm installation requires PISHARP_TEST_INSTALL_PI_RUNTIME=1."
+        },
+        {
+          "id": "gap.chat-provider-registration-and-unregistration",
+          "status": "SKIP_NO_PI_RUNTIME",
+          "reason": "Provide the reviewed local fixture; production npm installation requires PISHARP_TEST_INSTALL_PI_RUNTIME=1."
+        },
+        {
+          "id": "gap.chat-provider-long-stream-lossless",
+          "status": "SKIP_NO_PI_RUNTIME",
+          "reason": "Provide the reviewed local fixture; production npm installation requires PISHARP_TEST_INSTALL_PI_RUNTIME=1."
+        },
+        {
+          "id": "gap.editor-component-and-autocomplete-provider",
+          "status": "SKIP_NO_PI_RUNTIME",
+          "reason": "Provide the reviewed local fixture; production npm installation requires PISHARP_TEST_INSTALL_PI_RUNTIME=1."
+        },
+        {
+          "id": "oauth.extension-provider-login-refresh-and-models",
+          "status": "SKIP_NO_PI_RUNTIME",
+          "reason": "Provide the reviewed local fixture; production npm installation requires PISHARP_TEST_INSTALL_PI_RUNTIME=1."
+        },
+        {
+          "id": "json.extension-stream-simple-receives-lone-surrogates-unchanged",
+          "status": "SKIP_NO_PI_RUNTIME",
+          "reason": "Provide the reviewed local fixture; production npm installation requires PISHARP_TEST_INSTALL_PI_RUNTIME=1."
+        },
+        {
+          "id": "sync150.trust-saved-decision-reaches-extensions",
+          "status": "SKIP_ANCESTOR_SKILLS",
+          "reason": "An ancestor of the temporary directory holds .agents/skills, so the project requires trust here."
+        },
+        {
+          "id": "sync150.oauth-device-code-confirm-options-reach-the-auth-event",
+          "status": "SKIP_NO_PI_RUNTIME",
+          "reason": "Provide the reviewed local fixture; production npm installation requires PISHARP_TEST_INSTALL_PI_RUNTIME=1."
+        },
+        {
+          "id": "sync150.bridge-installed-pi-maps-pi-ai-models",
+          "status": "SKIP_NO_PI_RUNTIME",
+          "reason": "Provide the reviewed local fixture; production npm installation requires PISHARP_TEST_INSTALL_PI_RUNTIME=1."
+        },
+        {
+          "id": "gap.runtime-installed-pi150-real-abi-and-attribution",
+          "status": "SKIP_NO_RUNTIME_FIXTURE",
+          "reason": "Install the exact published Pi 1.6.0 runtime fixture to execute this ABI test."
+        }
+      ],
+      "consoleSkips": []
+    },
+    {
+      "project": "tests/PiSharp.Extensions.ContractTests/PiSharp.Extensions.ContractTests.csproj",
+      "receipt": "artifacts/gap-validation/sync160-extensions-contracttests-final-c84cfb88098f41ceab128ee4d3c30c3a/receipt.json",
+      "result": "passed",
+      "selectedCount": 397,
+      "fullSuite": true,
+      "stableDuringRun": true,
+      "currentSourceMatches": true,
+      "accepted": true,
+      "failures": [],
+      "skippedCases": [],
+      "consoleSkips": []
+    },
+    {
+      "project": "tests/PiSharp.InteractiveParity.Tests/PiSharp.InteractiveParity.Tests.csproj",
+      "receipt": "artifacts/gap-validation/sync160-interactiveparity-final-830df8ea85634d96a23d81be70b40eb9/receipt.json",
+      "result": "passed",
+      "selectedCount": 787,
+      "fullSuite": true,
+      "stableDuringRun": true,
+      "currentSourceMatches": true,
+      "accepted": true,
+      "failures": [],
+      "skippedCases": [
+        {
+          "id": "util.clipboard-command.binary-output",
+          "status": "SKIPPED",
+          "reason": "Unix-only case."
+        },
+        {
+          "id": "util.clipboard-command.unicode-input",
+          "status": "SKIPPED",
+          "reason": "Unix-only case."
+        },
+        {
+          "id": "util.paths.canonicalize-symlinks",
+          "status": "SKIPPED",
+          "reason": "Unix-only case."
+        },
+        {
+          "id": "util.paths.posix-literal-percent",
+          "status": "SKIPPED",
+          "reason": "Unix-only case."
+        },
+        {
+          "id": "x11-clipboard.xvfb-reads-text-images-and-incr",
+          "status": "SKIPPED",
+          "reason": "X11 cases need Linux."
+        },
+        {
+          "id": "x11-clipboard.xvfb-stalled-owner-fails-after-the-deadline",
+          "status": "SKIPPED",
+          "reason": "X11 cases need Linux."
+        }
+      ],
+      "consoleSkips": []
+    },
+    {
+      "project": "tests/PiSharp.McpParity.Tests/PiSharp.McpParity.Tests.csproj",
+      "receipt": "artifacts/gap-validation/sync160-mcpparity-final-1372e3043beb48ef82d1a51928826e0b/receipt.json",
+      "result": "passed",
+      "selectedCount": 49,
+      "fullSuite": true,
+      "stableDuringRun": true,
+      "currentSourceMatches": true,
+      "accepted": true,
+      "failures": [],
+      "skippedCases": [],
+      "consoleSkips": []
+    },
+    {
+      "project": "tests/PiSharp.McpSync.Tests/PiSharp.McpSync.Tests.csproj",
+      "receipt": "artifacts/gap-validation/sync160-mcpsync-final-4e537023ff2a472e8e73a26bc12019f8/receipt.json",
+      "result": "passed",
+      "selectedCount": 66,
+      "fullSuite": true,
+      "stableDuringRun": true,
+      "currentSourceMatches": true,
+      "accepted": true,
+      "failures": [],
+      "skippedCases": [],
+      "consoleSkips": []
+    },
+    {
+      "project": "tests/PiSharp.MistralConversations.Tests/PiSharp.MistralConversations.Tests.csproj",
+      "receipt": "artifacts/gap-validation/sync160-mistralconversations-final-20d80e0cd0de4dd08153e7548434ed8c/receipt.json",
+      "result": "passed",
+      "selectedCount": 66,
+      "fullSuite": true,
+      "stableDuringRun": true,
+      "currentSourceMatches": true,
+      "accepted": true,
+      "failures": [],
+      "skippedCases": [],
+      "consoleSkips": []
+    },
+    {
+      "project": "tests/PiSharp.MistralOriginalOptions.Tests/PiSharp.MistralOriginalOptions.Tests.csproj",
+      "receipt": "artifacts/gap-validation/sync160-mistraloriginaloptions-final-13ffea71e6d24b3f816a2d0e2b10e08b/receipt.json",
+      "result": "failed",
+      "selectedCount": null,
+      "fullSuite": true,
+      "stableDuringRun": true,
+      "currentSourceMatches": true,
+      "accepted": false,
+      "failures": [],
+      "skippedCases": [],
+      "consoleSkips": []
+    },
+    {
+      "project": "tests/PiSharp.ModelRuntime.Tests/PiSharp.ModelRuntime.Tests.csproj",
+      "receipt": "artifacts/gap-validation/sync160-modelruntime-final-f144fa5b7a8e4597be61a97feb10669a/receipt.json",
+      "result": "passed",
+      "selectedCount": 22,
+      "fullSuite": true,
+      "stableDuringRun": true,
+      "currentSourceMatches": true,
+      "accepted": true,
+      "failures": [],
+      "skippedCases": [],
+      "consoleSkips": []
+    },
+    {
+      "project": "tests/PiSharp.Models.Tests/PiSharp.Models.Tests.csproj",
+      "receipt": "artifacts/gap-validation/sync160-models-final-141a79f18be340cbbbf8d627fc62ee45/receipt.json",
+      "result": "passed",
+      "selectedCount": 143,
+      "fullSuite": true,
+      "stableDuringRun": true,
+      "currentSourceMatches": true,
+      "accepted": true,
+      "failures": [],
+      "skippedCases": [],
+      "consoleSkips": []
+    },
+    {
+      "project": "tests/PiSharp.NativeModelCatalog.Tests/PiSharp.NativeModelCatalog.Tests.csproj",
+      "receipt": "artifacts/gap-validation/sync160-nativemodelcatalog-final-2a2b514be1044ea19660a4db8dce874c/receipt.json",
+      "result": "passed",
+      "selectedCount": 7,
+      "fullSuite": true,
+      "stableDuringRun": true,
+      "currentSourceMatches": true,
+      "accepted": true,
+      "failures": [],
+      "skippedCases": [],
+      "consoleSkips": []
+    },
+    {
+      "project": "tests/PiSharp.OpenAICompatibilityGap.Tests/PiSharp.OpenAICompatibilityGap.Tests.csproj",
+      "receipt": "artifacts/gap-validation/sync160-openaicompatibilitygap-final-6348c346425c43b4abd674b70e2c4aa4/receipt.json",
+      "result": "passed",
+      "selectedCount": 1,
+      "fullSuite": true,
+      "stableDuringRun": true,
+      "currentSourceMatches": true,
+      "accepted": true,
+      "failures": [],
+      "skippedCases": [],
+      "consoleSkips": []
+    },
+    {
+      "project": "tests/PiSharp.OpenAIResponsesHooks.Tests/PiSharp.OpenAIResponsesHooks.Tests.csproj",
+      "receipt": "artifacts/gap-validation/sync160-openairesponseshooks-final-6f9044671fb1489d83979b3f24b214bd/receipt.json",
+      "result": "failed",
+      "selectedCount": null,
+      "fullSuite": true,
+      "stableDuringRun": true,
+      "currentSourceMatches": true,
+      "accepted": false,
+      "failures": [],
+      "skippedCases": [],
+      "consoleSkips": []
+    },
+    {
+      "project": "tests/PiSharp.ProviderApis.Tests/PiSharp.ProviderApis.Tests.csproj",
+      "receipt": "artifacts/gap-validation/sync160-providerapis-final-aaedcaae920640ee8dbf8a5fac4a4597/receipt.json",
+      "result": "passed",
+      "selectedCount": 67,
+      "fullSuite": true,
+      "stableDuringRun": true,
+      "currentSourceMatches": true,
+      "accepted": true,
+      "failures": [],
+      "skippedCases": [],
+      "consoleSkips": []
+    },
+    {
+      "project": "tests/PiSharp.ProviderOfflineDifferential.Tests/PiSharp.ProviderOfflineDifferential.Tests.csproj",
+      "receipt": "artifacts/gap-validation/sync160-providerofflinedifferential-final-d2588d6d68414b9dbb694e8f58d6589a/receipt.json",
+      "result": "passed",
+      "selectedCount": 30,
+      "fullSuite": true,
+      "stableDuringRun": true,
+      "currentSourceMatches": true,
+      "accepted": true,
+      "failures": [],
+      "skippedCases": [],
+      "consoleSkips": []
+    },
+    {
+      "project": "tests/PiSharp.ProviderSync.Tests/PiSharp.ProviderSync.Tests.csproj",
+      "receipt": "artifacts/gap-validation/sync160-providersync-final-5965ffe92418463887199e1638c8e6a7/receipt.json",
+      "result": "passed",
+      "selectedCount": 113,
+      "fullSuite": true,
+      "stableDuringRun": true,
+      "currentSourceMatches": true,
+      "accepted": true,
+      "failures": [],
+      "skippedCases": [],
+      "consoleSkips": []
+    },
+    {
+      "project": "tests/PiSharp.ResponsesGrammarFallback.Tests/PiSharp.ResponsesGrammarFallback.Tests.csproj",
+      "receipt": "artifacts/gap-validation/sync160-responsesgrammarfallback-final-39eb5db0d71349e99708ddd88ddb1cdf/receipt.json",
+      "result": "failed",
+      "selectedCount": null,
+      "fullSuite": true,
+      "stableDuringRun": true,
+      "currentSourceMatches": true,
+      "accepted": false,
+      "failures": [],
+      "skippedCases": [],
+      "consoleSkips": []
+    },
+    {
+      "project": "tests/PiSharp.ResponsesOrphan.Tests/PiSharp.ResponsesOrphan.Tests.csproj",
+      "receipt": "artifacts/gap-validation/sync160-responsesorphan-final-587b823f7ac44a9384b48beb79d67592/receipt.json",
+      "result": "failed",
+      "selectedCount": 0,
+      "fullSuite": true,
+      "stableDuringRun": true,
+      "currentSourceMatches": true,
+      "accepted": false,
+      "failures": [],
+      "skippedCases": [],
+      "consoleSkips": []
+    },
+    {
+      "project": "tests/PiSharp.ResponsesPublicMetadata.Tests/PiSharp.ResponsesPublicMetadata.Tests.csproj",
+      "receipt": "artifacts/gap-validation/sync160-responsespublicmetadata-final-0d82b25c2be244f6bea8a6f242185237/receipt.json",
+      "result": "passed",
+      "selectedCount": 4,
+      "fullSuite": true,
+      "stableDuringRun": true,
+      "currentSourceMatches": true,
+      "accepted": true,
+      "failures": [],
+      "skippedCases": [],
+      "consoleSkips": []
+    },
+    {
+      "project": "tests/PiSharp.ResponsesTranscriptTools.Tests/PiSharp.ResponsesTranscriptTools.Tests.csproj",
+      "receipt": "artifacts/gap-validation/sync160-responsestranscripttools-final-bd7bed097bc94e18b98769adc9234f2c/receipt.json",
+      "result": "passed",
+      "selectedCount": 1,
+      "fullSuite": true,
+      "stableDuringRun": true,
+      "currentSourceMatches": true,
+      "accepted": true,
+      "failures": [],
+      "skippedCases": [],
+      "consoleSkips": []
+    },
+    {
+      "project": "tests/PiSharp.Rpc.Tests/PiSharp.Rpc.Tests.csproj",
+      "receipt": "artifacts/gap-validation/sync160-rpc-final-d5c7e21d399b4ad1a1df0e4a8f87ce7b/receipt.json",
+      "result": "passed",
+      "selectedCount": 140,
+      "fullSuite": true,
+      "stableDuringRun": true,
+      "currentSourceMatches": true,
+      "accepted": true,
+      "failures": [],
+      "skippedCases": [],
+      "consoleSkips": []
+    },
+    {
+      "project": "tests/PiSharp.SdkAsyncEventBus.Tests/PiSharp.SdkAsyncEventBus.Tests.csproj",
+      "receipt": "artifacts/gap-validation/sync160-sdkasynceventbus-final-470f1171af554374950ff23532d0d56d/receipt.json",
+      "result": "passed",
+      "selectedCount": 23,
+      "fullSuite": true,
+      "stableDuringRun": true,
+      "currentSourceMatches": true,
+      "accepted": true,
+      "failures": [],
+      "skippedCases": [],
+      "consoleSkips": []
+    },
+    {
+      "project": "tests/PiSharp.SdkEventBus.Tests/PiSharp.SdkEventBus.Tests.csproj",
+      "receipt": "artifacts/gap-validation/sync160-sdkeventbus-final-5a08277b999d480fbfbeaceb9178e57e/receipt.json",
+      "result": "passed",
+      "selectedCount": 19,
+      "fullSuite": true,
+      "stableDuringRun": true,
+      "currentSourceMatches": true,
+      "accepted": true,
+      "failures": [],
+      "skippedCases": [],
+      "consoleSkips": []
+    },
+    {
+      "project": "tests/PiSharp.SessionParity.Tests/PiSharp.SessionParity.Tests.csproj",
+      "receipt": "artifacts/gap-validation/sync160-sessionparity-final-de50f3ee02c64617bccde3cc2a561567/receipt.json",
+      "result": "passed",
+      "selectedCount": 139,
+      "fullSuite": true,
+      "stableDuringRun": true,
+      "currentSourceMatches": true,
+      "accepted": true,
+      "failures": [],
+      "skippedCases": [],
+      "consoleSkips": []
+    },
+    {
+      "project": "tests/PiSharp.Sessions.Tests/PiSharp.Sessions.Tests.csproj",
+      "receipt": "artifacts/gap-validation/sync160-sessions-final-ff57cbf3f34641679847eeea1b5983fb/receipt.json",
+      "result": "passed",
+      "selectedCount": 138,
+      "fullSuite": true,
+      "stableDuringRun": true,
+      "currentSourceMatches": true,
+      "accepted": true,
+      "failures": [],
+      "skippedCases": [],
+      "consoleSkips": []
+    },
+    {
+      "project": "tests/PiSharp.SimpleOutputBudget.Tests/PiSharp.SimpleOutputBudget.Tests.csproj",
+      "receipt": "artifacts/gap-validation/sync160-simpleoutputbudget-final-f69fabe9c23c4d13bd75d02ef64bd169/receipt.json",
+      "result": "passed",
+      "selectedCount": 131,
+      "fullSuite": true,
+      "stableDuringRun": true,
+      "currentSourceMatches": true,
+      "accepted": true,
+      "failures": [],
+      "skippedCases": [],
+      "consoleSkips": []
+    },
+    {
+      "project": "tests/PiSharp.Telemetry.Tests/PiSharp.Telemetry.Tests.csproj",
+      "receipt": "artifacts/gap-validation/sync160-telemetry-final-9be8891f766f407c809616bcae1c4718/receipt.json",
+      "result": "passed",
+      "selectedCount": 68,
+      "fullSuite": true,
+      "stableDuringRun": true,
+      "currentSourceMatches": true,
+      "accepted": true,
+      "failures": [],
+      "skippedCases": [],
+      "consoleSkips": []
+    },
+    {
+      "project": "tests/PiSharp.Tools.Tests/PiSharp.Tools.Tests.csproj",
+      "receipt": "artifacts/gap-validation/sync160-tools-final-0152b59e07a44a729655ab16645e0671/receipt.json",
+      "result": "passed-with-console-skips",
+      "selectedCount": 183,
+      "fullSuite": true,
+      "stableDuringRun": true,
+      "currentSourceMatches": true,
+      "accepted": true,
+      "failures": [],
+      "skippedCases": [],
+      "consoleSkips": [
+        "INFO symlink fixture unavailable: IOException"
+      ]
+    },
+    {
+      "project": "tests/PiSharp.ToolSearch.Tests/PiSharp.ToolSearch.Tests.csproj",
+      "receipt": "artifacts/gap-validation/sync160-toolsearch-final-c7ea9cc8831f49ba8bf8f69536605767/receipt.json",
+      "result": "passed",
+      "selectedCount": 25,
+      "fullSuite": true,
+      "stableDuringRun": true,
+      "currentSourceMatches": true,
+      "accepted": true,
+      "failures": [],
+      "skippedCases": [],
+      "consoleSkips": []
+    },
+    {
+      "project": "tests/PiSharp.Transport.Tests/PiSharp.Transport.Tests.csproj",
+      "receipt": "artifacts/gap-validation/sync160-transport-final-e666bc7f51ad4ed58a4c9b89b740e1a0/receipt.json",
+      "result": "passed",
+      "selectedCount": 245,
+      "fullSuite": true,
+      "stableDuringRun": true,
+      "currentSourceMatches": true,
+      "accepted": true,
+      "failures": [],
+      "skippedCases": [],
+      "consoleSkips": []
+    },
+    {
+      "project": "tests/PiSharp.Tui.Editor.Tests/PiSharp.Tui.Editor.Tests.csproj",
+      "receipt": "artifacts/gap-validation/sync160-tui-editor-final-cb2c32fa612245da80833efe211a4e3a/receipt.json",
+      "result": "passed",
+      "selectedCount": 85,
+      "fullSuite": true,
+      "stableDuringRun": true,
+      "currentSourceMatches": true,
+      "accepted": true,
+      "failures": [],
+      "skippedCases": [],
+      "consoleSkips": []
+    },
+    {
+      "project": "tests/PiSharp.Tui.NativeModifiers.Tests/PiSharp.Tui.NativeModifiers.Tests.csproj",
+      "receipt": "artifacts/gap-validation/sync160-tui-nativemodifiers-final-94e1257156254572af7f5f33ac8317aa/receipt.json",
+      "result": "passed",
+      "selectedCount": 6,
+      "fullSuite": true,
+      "stableDuringRun": true,
+      "currentSourceMatches": true,
+      "accepted": true,
+      "failures": [],
+      "skippedCases": [],
+      "consoleSkips": []
+    },
+    {
+      "project": "tests/PiSharp.Tui.Tests/PiSharp.Tui.Tests.csproj",
+      "receipt": "artifacts/gap-validation/sync160-tui-final-1413aaed9fd34035ae98b9d44b5010c3/receipt.json",
+      "result": "passed",
+      "selectedCount": 84,
+      "fullSuite": true,
+      "stableDuringRun": true,
+      "currentSourceMatches": true,
+      "accepted": true,
+      "failures": [],
+      "skippedCases": [],
+      "consoleSkips": []
+    },
+    {
+      "project": "tests/PiSharp.VertexSimple.Tests/PiSharp.VertexSimple.Tests.csproj",
+      "receipt": "artifacts/gap-validation/sync160-vertexsimple-final-765028888e7a4ca981928748ab790a79/receipt.json",
+      "result": "failed",
+      "selectedCount": null,
+      "fullSuite": true,
+      "stableDuringRun": true,
+      "currentSourceMatches": true,
+      "accepted": false,
+      "failures": [],
+      "skippedCases": [],
+      "consoleSkips": []
+    },
+    {
+      "project": "tests/PiSharp.WebAgent.Tests/PiSharp.WebAgent.Tests.csproj",
+      "receipt": "artifacts/gap-validation/sync160-webagent-final-0370d203dbd74a9ba0de8564d19fbff9/receipt.json",
+      "result": "passed",
+      "selectedCount": 544,
+      "fullSuite": true,
+      "stableDuringRun": true,
+      "currentSourceMatches": true,
+      "accepted": true,
+      "failures": [],
+      "skippedCases": [],
+      "consoleSkips": []
+    },
+    {
+      "project": "tests/PiSharp.WireSync.Tests/PiSharp.WireSync.Tests.csproj",
+      "receipt": "artifacts/gap-validation/sync160-wiresync-final-59838c9598114d3da107c04f43b6ea7f/receipt.json",
+      "result": "passed",
+      "selectedCount": 20,
+      "fullSuite": true,
+      "stableDuringRun": true,
+      "currentSourceMatches": true,
+      "accepted": true,
+      "failures": [],
+      "skippedCases": [],
+      "consoleSkips": []
+    }
+  ],
+  "runs": [
+    {
+      "project": "tests/PiSharp.Agent.Tests/PiSharp.Agent.Tests.csproj",
+      "label": "sync160-agent-final",
+      "receipt": "artifacts/gap-validation/sync160-agent-final-35798cab8a92434e9aa7691cd3cdac17/receipt.json",
+      "result": "passed",
+      "startedUtc": "2026-11-22T00:58:46.6738362Z",
+      "finishedUtc": "2026-11-22T00:59:00.1417463Z",
+      "fullSuite": true,
+      "source": {
+        "head": "6db03f92102ef2dff884199923e505953e2c3fc9",
+        "dirty": true,
+        "beforeSha256": "311e64ca344db4b8bfab61649cb63324d145adbf4059fbcaf2026719ea06618d",
+        "manifest": "E:\\AI\\PiSharp\\PiSharp\\.claude\\worktrees\\sync-pi-1.6.0\\artifacts\\gap-validation\\sync160-agent-final-35798cab8a92434e9aa7691cd3cdac17\\source-before.json",
+        "afterSha256": "311e64ca344db4b8bfab61649cb63324d145adbf4059fbcaf2026719ea06618d",
+        "changedDuringRun": false
+      },
+      "selectedCount": 244
+    },
+    {
+      "project": "tests/PiSharp.AnthropicAuthSync.Tests/PiSharp.AnthropicAuthSync.Tests.csproj",
+      "label": "sync160-anthropicauthsync-final",
+      "receipt": "artifacts/gap-validation/sync160-anthropicauthsync-final-caf2deadc16c4a4ea2ceefec67f50f4c/receipt.json",
+      "result": "passed",
+      "startedUtc": "2026-11-22T00:59:00.6996831Z",
+      "finishedUtc": "2026-11-22T00:59:04.7700930Z",
+      "fullSuite": true,
+      "source": {
+        "head": "6db03f92102ef2dff884199923e505953e2c3fc9",
+        "dirty": true,
+        "beforeSha256": "de05759fb50487aaf2275369a97a988c0f0b5d770c0d7e94a0558ac4fe544a19",
+        "manifest": "E:\\AI\\PiSharp\\PiSharp\\.claude\\worktrees\\sync-pi-1.6.0\\artifacts\\gap-validation\\sync160-anthropicauthsync-final-caf2deadc16c4a4ea2ceefec67f50f4c\\source-before.json",
+        "afterSha256": "de05759fb50487aaf2275369a97a988c0f0b5d770c0d7e94a0558ac4fe544a19",
+        "changedDuringRun": false
+      },
+      "selectedCount": 30
+    },
+    {
+      "project": "tests/PiSharp.AnthropicProfile.Tests/PiSharp.AnthropicProfile.Tests.csproj",
+      "label": "sync160-anthropicprofile-final",
+      "receipt": "artifacts/gap-validation/sync160-anthropicprofile-final-918380736c7e44e6af1f2e20b176731b/receipt.json",
+      "result": "passed",
+      "startedUtc": "2026-11-22T00:59:05.2389586Z",
+      "finishedUtc": "2026-11-22T00:59:52.5661535Z",
+      "fullSuite": true,
+      "source": {
+        "head": "6db03f92102ef2dff884199923e505953e2c3fc9",
+        "dirty": true,
+        "beforeSha256": "01893c2198e5a671ad116c76d5a3cb861606aac3523040e4c921603aed245ca5",
+        "manifest": "E:\\AI\\PiSharp\\PiSharp\\.claude\\worktrees\\sync-pi-1.6.0\\artifacts\\gap-validation\\sync160-anthropicprofile-final-918380736c7e44e6af1f2e20b176731b\\source-before.json",
+        "afterSha256": "01893c2198e5a671ad116c76d5a3cb861606aac3523040e4c921603aed245ca5",
+        "changedDuringRun": false
+      },
+      "selectedCount": 6
+    },
+    {
+      "project": "tests/PiSharp.AnthropicResolved.Tests/PiSharp.AnthropicResolved.Tests.csproj",
+      "label": "sync160-anthropicresolved-final",
+      "receipt": "artifacts/gap-validation/sync160-anthropicresolved-final-54a5d8dc569f4c2ba2eb48e44b22cb54/receipt.json",
+      "result": "passed",
+      "startedUtc": "2026-11-22T00:59:52.9560071Z",
+      "finishedUtc": "2026-11-22T00:59:56.3525648Z",
+      "fullSuite": true,
+      "source": {
+        "head": "6db03f92102ef2dff884199923e505953e2c3fc9",
+        "dirty": true,
+        "beforeSha256": "bafa11058880ddd2801bad69da4b35b7b49856a2e2feb74f37ab71db12ab4d41",
+        "manifest": "E:\\AI\\PiSharp\\PiSharp\\.claude\\worktrees\\sync-pi-1.6.0\\artifacts\\gap-validation\\sync160-anthropicresolved-final-54a5d8dc569f4c2ba2eb48e44b22cb54\\source-before.json",
+        "afterSha256": "bafa11058880ddd2801bad69da4b35b7b49856a2e2feb74f37ab71db12ab4d41",
+        "changedDuringRun": false
+      },
+      "selectedCount": 18
+    },
+    {
+      "project": "tests/PiSharp.AnthropicSimple.Tests/PiSharp.AnthropicSimple.Tests.csproj",
+      "label": "sync160-anthropicsimple-final",
+      "receipt": "artifacts/gap-validation/sync160-anthropicsimple-final-7c9cee3f94a543d5bda5f89d6fcf45c7/receipt.json",
+      "result": "passed",
+      "startedUtc": "2026-11-22T00:59:56.6913093Z",
+      "finishedUtc": "2026-11-22T01:00:00.2780073Z",
+      "fullSuite": true,
+      "source": {
+        "head": "6db03f92102ef2dff884199923e505953e2c3fc9",
+        "dirty": true,
+        "beforeSha256": "d3dab7128985398f78e554f42873db69a25639e718c6def690b98de4dab32b12",
+        "manifest": "E:\\AI\\PiSharp\\PiSharp\\.claude\\worktrees\\sync-pi-1.6.0\\artifacts\\gap-validation\\sync160-anthropicsimple-final-7c9cee3f94a543d5bda5f89d6fcf45c7\\source-before.json",
+        "afterSha256": "d3dab7128985398f78e554f42873db69a25639e718c6def690b98de4dab32b12",
+        "changedDuringRun": false
+      },
+      "selectedCount": 13
+    },
+    {
+      "project": "tests/PiSharp.AnthropicThreads.Tests/PiSharp.AnthropicThreads.Tests.csproj",
+      "label": "sync160-anthropicthreads-final",
+      "receipt": "artifacts/gap-validation/sync160-anthropicthreads-final-c1eb48925ab840558253d4e693fab3dc/receipt.json",
+      "result": "passed",
+      "startedUtc": "2026-11-22T01:00:00.6538317Z",
+      "finishedUtc": "2026-11-22T01:00:04.2012997Z",
+      "fullSuite": true,
+      "source": {
+        "head": "6db03f92102ef2dff884199923e505953e2c3fc9",
+        "dirty": true,
+        "beforeSha256": "24e14695ac2aabc32af822a09c60656204e2f4890f564a378a191af6b30c77d8",
+        "manifest": "E:\\AI\\PiSharp\\PiSharp\\.claude\\worktrees\\sync-pi-1.6.0\\artifacts\\gap-validation\\sync160-anthropicthreads-final-c1eb48925ab840558253d4e693fab3dc\\source-before.json",
+        "afterSha256": "24e14695ac2aabc32af822a09c60656204e2f4890f564a378a191af6b30c77d8",
+        "changedDuringRun": false
+      },
+      "selectedCount": 4
+    },
+    {
+      "project": "tests/PiSharp.Authentication.Tests/PiSharp.Authentication.Tests.csproj",
+      "label": "sync160-authentication-final",
+      "receipt": "artifacts/gap-validation/sync160-authentication-final-29b5289c0cd043faa4aab0c559e862b4/receipt.json",
+      "result": "passed",
+      "startedUtc": "2026-11-22T01:00:04.5418157Z",
+      "finishedUtc": "2026-11-22T01:00:07.9158191Z",
+      "fullSuite": true,
+      "source": {
+        "head": "6db03f92102ef2dff884199923e505953e2c3fc9",
+        "dirty": true,
+        "beforeSha256": "3e113405d0266f5b9ad7e6beb373306f858747ec00ac5ed0254b0881ad1dfbb9",
+        "manifest": "E:\\AI\\PiSharp\\PiSharp\\.claude\\worktrees\\sync-pi-1.6.0\\artifacts\\gap-validation\\sync160-authentication-final-29b5289c0cd043faa4aab0c559e862b4\\source-before.json",
+        "afterSha256": "3e113405d0266f5b9ad7e6beb373306f858747ec00ac5ed0254b0881ad1dfbb9",
+        "changedDuringRun": false
+      },
+      "selectedCount": 42
+    },
+    {
+      "project": "tests/PiSharp.AzureResponses.Tests/PiSharp.AzureResponses.Tests.csproj",
+      "label": "sync160-azureresponses-final",
+      "receipt": "artifacts/gap-validation/sync160-azureresponses-final-55e5690c428b4c18a4ee2ae69c81e6df/receipt.json",
+      "result": "passed",
+      "startedUtc": "2026-11-22T01:00:08.2821452Z",
+      "finishedUtc": "2026-11-22T01:00:12.2122788Z",
+      "fullSuite": true,
+      "source": {
+        "head": "6db03f92102ef2dff884199923e505953e2c3fc9",
+        "dirty": true,
+        "beforeSha256": "0823f6f5a904e4554fee380520d248fa9a8ea8d516047b41c6b315e3a7831ee4",
+        "manifest": "E:\\AI\\PiSharp\\PiSharp\\.claude\\worktrees\\sync-pi-1.6.0\\artifacts\\gap-validation\\sync160-azureresponses-final-55e5690c428b4c18a4ee2ae69c81e6df\\source-before.json",
+        "afterSha256": "0823f6f5a904e4554fee380520d248fa9a8ea8d516047b41c6b315e3a7831ee4",
+        "changedDuringRun": false
+      },
+      "selectedCount": 17
+    },
+    {
+      "project": "tests/PiSharp.AzureSimple.Tests/PiSharp.AzureSimple.Tests.csproj",
+      "label": "sync160-azuresimple-final",
+      "receipt": "artifacts/gap-validation/sync160-azuresimple-final-4f1d167a77ca4b52b80907c6d2052de8/receipt.json",
+      "result": "passed",
+      "startedUtc": "2026-11-22T01:00:12.5831080Z",
+      "finishedUtc": "2026-11-22T01:00:15.8866589Z",
+      "fullSuite": true,
+      "source": {
+        "head": "6db03f92102ef2dff884199923e505953e2c3fc9",
+        "dirty": true,
+        "beforeSha256": "532ac864ad90bab3efeb626a61b927e7a306b1e02a7009060a61d29b081c57f9",
+        "manifest": "E:\\AI\\PiSharp\\PiSharp\\.claude\\worktrees\\sync-pi-1.6.0\\artifacts\\gap-validation\\sync160-azuresimple-final-4f1d167a77ca4b52b80907c6d2052de8\\source-before.json",
+        "afterSha256": "532ac864ad90bab3efeb626a61b927e7a306b1e02a7009060a61d29b081c57f9",
+        "changedDuringRun": false
+      },
+      "selectedCount": 8
+    },
+    {
+      "project": "tests/PiSharp.Chord.Tests/PiSharp.Chord.Tests.csproj",
+      "label": "sync160-chord-final",
+      "receipt": "artifacts/gap-validation/sync160-chord-final-0137bd46677b4e7e961a67a70c364c1a/receipt.json",
+      "result": "passed",
+      "startedUtc": "2026-11-22T01:00:16.2486987Z",
+      "finishedUtc": "2026-11-22T01:01:31.4673818Z",
+      "fullSuite": true,
+      "source": {
+        "head": "6db03f92102ef2dff884199923e505953e2c3fc9",
+        "dirty": true,
+        "beforeSha256": "40c28c5ef198133b440a0f658f1651ba845525a3b032ed7119ac1b2596601d01",
+        "manifest": "E:\\AI\\PiSharp\\PiSharp\\.claude\\worktrees\\sync-pi-1.6.0\\artifacts\\gap-validation\\sync160-chord-final-0137bd46677b4e7e961a67a70c364c1a\\source-before.json",
+        "afterSha256": "40c28c5ef198133b440a0f658f1651ba845525a3b032ed7119ac1b2596601d01",
+        "changedDuringRun": false
+      },
+      "selectedCount": 1510
+    },
+    {
+      "project": "tests/PiSharp.Chord.Durable.Integration.Tests/PiSharp.Chord.Durable.Integration.Tests.csproj",
+      "label": "sync160-chord-durable-integration-final",
+      "receipt": "artifacts/gap-validation/sync160-chord-durable-integration-final-525a33402c654684828bd95224cd4ade/receipt.json",
+      "result": "passed",
+      "startedUtc": "2026-11-22T01:01:31.9577777Z",
+      "finishedUtc": "2026-11-22T01:01:39.4359963Z",
+      "fullSuite": true,
+      "source": {
+        "head": "6db03f92102ef2dff884199923e505953e2c3fc9",
+        "dirty": true,
+        "beforeSha256": "de29d54b27823e21173ddd235dd4cf5dcc70535f21748f1b42120ccd2b3fddab",
+        "manifest": "E:\\AI\\PiSharp\\PiSharp\\.claude\\worktrees\\sync-pi-1.6.0\\artifacts\\gap-validation\\sync160-chord-durable-integration-final-525a33402c654684828bd95224cd4ade\\source-before.json",
+        "afterSha256": "de29d54b27823e21173ddd235dd4cf5dcc70535f21748f1b42120ccd2b3fddab",
+        "changedDuringRun": false
+      },
+      "selectedCount": 7
+    },
+    {
+      "project": "tests/PiSharp.Chord.Hosting.Tests/PiSharp.Chord.Hosting.Tests.csproj",
+      "label": "sync160-chord-hosting-final",
+      "receipt": "artifacts/gap-validation/sync160-chord-hosting-final-bd0d4cb6cc0b4eef8eb04d7cdf51de32/receipt.json",
+      "result": "passed",
+      "startedUtc": "2026-11-22T01:01:39.8927863Z",
+      "finishedUtc": "2026-11-22T01:03:04.7984763Z",
+      "fullSuite": true,
+      "source": {
+        "head": "6db03f92102ef2dff884199923e505953e2c3fc9",
+        "dirty": true,
+        "beforeSha256": "98a3b6b5efa305df778ac16b9e7fe3af65658a7bdb2a9ea01828333911a08a5a",
+        "manifest": "E:\\AI\\PiSharp\\PiSharp\\.claude\\worktrees\\sync-pi-1.6.0\\artifacts\\gap-validation\\sync160-chord-hosting-final-bd0d4cb6cc0b4eef8eb04d7cdf51de32\\source-before.json",
+        "afterSha256": "98a3b6b5efa305df778ac16b9e7fe3af65658a7bdb2a9ea01828333911a08a5a",
+        "changedDuringRun": false
+      },
+      "selectedCount": 62
+    },
+    {
+      "project": "tests/PiSharp.Chord.Legacy.Cluster.Tests/PiSharp.Chord.Legacy.Cluster.Tests.csproj",
+      "label": "sync160-chord-legacy-cluster-final",
+      "receipt": "artifacts/gap-validation/sync160-chord-legacy-cluster-final-7ce36f6c1a3b4605b5db8a824044d4c3/receipt.json",
+      "result": "passed",
+      "startedUtc": "2026-11-22T01:03:05.2698330Z",
+      "finishedUtc": "2026-11-22T01:03:12.7695824Z",
+      "fullSuite": true,
+      "source": {
+        "head": "6db03f92102ef2dff884199923e505953e2c3fc9",
+        "dirty": true,
+        "beforeSha256": "6881fb7dbbaeed6ab84f58363a02150793729bb6c21a8c480883bcf10646a124",
+        "manifest": "E:\\AI\\PiSharp\\PiSharp\\.claude\\worktrees\\sync-pi-1.6.0\\artifacts\\gap-validation\\sync160-chord-legacy-cluster-final-7ce36f6c1a3b4605b5db8a824044d4c3\\source-before.json",
+        "afterSha256": "6881fb7dbbaeed6ab84f58363a02150793729bb6c21a8c480883bcf10646a124",
+        "changedDuringRun": false
+      },
+      "selectedCount": 25
+    },
+    {
+      "project": "tests/PiSharp.ClassifierConfig.Tests/PiSharp.ClassifierConfig.Tests.csproj",
+      "label": "sync160-classifierconfig-final",
+      "receipt": "artifacts/gap-validation/sync160-classifierconfig-final-6063d4121d2948458d28d6eead4e258b/receipt.json",
+      "result": "passed",
+      "startedUtc": "2026-11-22T01:03:13.2559979Z",
+      "finishedUtc": "2026-11-22T01:03:20.6971010Z",
+      "fullSuite": true,
+      "source": {
+        "head": "6db03f92102ef2dff884199923e505953e2c3fc9",
+        "dirty": true,
+        "beforeSha256": "85b40ce694e150919177cef2f8749b6b8b848d6acf492795f4a428462b4d6103",
+        "manifest": "E:\\AI\\PiSharp\\PiSharp\\.claude\\worktrees\\sync-pi-1.6.0\\artifacts\\gap-validation\\sync160-classifierconfig-final-6063d4121d2948458d28d6eead4e258b\\source-before.json",
+        "afterSha256": "85b40ce694e150919177cef2f8749b6b8b848d6acf492795f4a428462b4d6103",
+        "changedDuringRun": false
+      },
+      "selectedCount": 1
+    },
+    {
+      "project": "tests/PiSharp.Classifiers.Tests/PiSharp.Classifiers.Tests.csproj",
+      "label": "sync160-classifiers-final",
+      "receipt": "artifacts/gap-validation/sync160-classifiers-final-37c8d812ebaa4dbe9d2efee2967f097f/receipt.json",
+      "result": "passed",
+      "startedUtc": "2026-11-22T01:03:21.2026142Z",
+      "finishedUtc": "2026-11-22T01:03:30.1000195Z",
+      "fullSuite": true,
+      "source": {
+        "head": "6db03f92102ef2dff884199923e505953e2c3fc9",
+        "dirty": true,
+        "beforeSha256": "1b1842b531ecb209190fb2c3e50ec6890c89180f5f7b991758583e933a2535e2",
+        "manifest": "E:\\AI\\PiSharp\\PiSharp\\.claude\\worktrees\\sync-pi-1.6.0\\artifacts\\gap-validation\\sync160-classifiers-final-37c8d812ebaa4dbe9d2efee2967f097f\\source-before.json",
+        "afterSha256": "1b1842b531ecb209190fb2c3e50ec6890c89180f5f7b991758583e933a2535e2",
+        "changedDuringRun": false
+      },
+      "selectedCount": 66
+    },
+    {
+      "project": "tests/PiSharp.CliParity.Tests/PiSharp.CliParity.Tests.csproj",
+      "label": "sync160-cliparity-final",
+      "receipt": "artifacts/gap-validation/sync160-cliparity-final-9269fff3713d4d02bcbc6b2fedc141bb/receipt.json",
+      "result": "passed",
+      "startedUtc": "2026-11-22T01:03:30.6166420Z",
+      "finishedUtc": "2026-11-22T01:05:54.5428930Z",
+      "fullSuite": true,
+      "source": {
+        "head": "6db03f92102ef2dff884199923e505953e2c3fc9",
+        "dirty": true,
+        "beforeSha256": "4b747f2292e314a9860b616a232ed30cad8cb1db078e916b858c58dbbd533266",
+        "manifest": "E:\\AI\\PiSharp\\PiSharp\\.claude\\worktrees\\sync-pi-1.6.0\\artifacts\\gap-validation\\sync160-cliparity-final-9269fff3713d4d02bcbc6b2fedc141bb\\source-before.json",
+        "afterSha256": "4b747f2292e314a9860b616a232ed30cad8cb1db078e916b858c58dbbd533266",
+        "changedDuringRun": false
+      },
+      "selectedCount": 237
+    },
+    {
+      "project": "tests/PiSharp.CliSync.Tests/PiSharp.CliSync.Tests.csproj",
+      "label": "sync160-clisync-final",
+      "receipt": "artifacts/gap-validation/sync160-clisync-final-b68748d3b1594e0abf3e707565bd433f/receipt.json",
+      "result": "passed",
+      "startedUtc": "2026-11-22T01:05:55.0954417Z",
+      "finishedUtc": "2026-11-22T01:06:19.8151868Z",
+      "fullSuite": true,
+      "source": {
+        "head": "6db03f92102ef2dff884199923e505953e2c3fc9",
+        "dirty": true,
+        "beforeSha256": "993ec000a352eaf23ff8aece38eab6985675cb7b4fa1514074d55df98a336662",
+        "manifest": "E:\\AI\\PiSharp\\PiSharp\\.claude\\worktrees\\sync-pi-1.6.0\\artifacts\\gap-validation\\sync160-clisync-final-b68748d3b1594e0abf3e707565bd433f\\source-before.json",
+        "afterSha256": "993ec000a352eaf23ff8aece38eab6985675cb7b4fa1514074d55df98a336662",
+        "changedDuringRun": false
+      },
+      "selectedCount": 73
+    },
+    {
+      "project": "tests/PiSharp.Codemode.Tests/PiSharp.Codemode.Tests.csproj",
+      "label": "sync160-codemode-final",
+      "receipt": "artifacts/gap-validation/sync160-codemode-final-89bc72be0b0f4492bf5cbacbbf05f290/receipt.json",
+      "result": "passed",
+      "startedUtc": "2026-11-22T01:06:20.3683232Z",
+      "finishedUtc": "2026-11-22T01:08:02.7688986Z",
+      "fullSuite": true,
+      "source": {
+        "head": "6db03f92102ef2dff884199923e505953e2c3fc9",
+        "dirty": true,
+        "beforeSha256": "47dc267e9d5f23a3c5dc9048fc3eebd0ab63267ed3006677c5f5bb0c5d7b8f01",
+        "manifest": "E:\\AI\\PiSharp\\PiSharp\\.claude\\worktrees\\sync-pi-1.6.0\\artifacts\\gap-validation\\sync160-codemode-final-89bc72be0b0f4492bf5cbacbbf05f290\\source-before.json",
+        "afterSha256": "47dc267e9d5f23a3c5dc9048fc3eebd0ab63267ed3006677c5f5bb0c5d7b8f01",
+        "changedDuringRun": false
+      },
+      "selectedCount": 149
+    },
+    {
+      "project": "tests/PiSharp.CodingAgent.Tests/PiSharp.CodingAgent.Tests.csproj",
+      "label": "sync160-codingagent-final",
+      "receipt": "artifacts/gap-validation/sync160-codingagent-final-5a01c0465d314585bc385233b3e9e64e/receipt.json",
+      "result": "failed",
+      "startedUtc": "2026-11-22T01:08:03.2722945Z",
+      "finishedUtc": "2026-11-22T01:13:47.8552016Z",
+      "fullSuite": true,
+      "source": {
+        "head": "6db03f92102ef2dff884199923e505953e2c3fc9",
+        "dirty": true,
+        "beforeSha256": "7843625be335dd3387a72c51f4efc3af131ec0c842edeef21bc78b3092f624b5",
+        "manifest": "E:\\AI\\PiSharp\\PiSharp\\.claude\\worktrees\\sync-pi-1.6.0\\artifacts\\gap-validation\\sync160-codingagent-final-5a01c0465d314585bc385233b3e9e64e\\source-before.json",
+        "afterSha256": "7843625be335dd3387a72c51f4efc3af131ec0c842edeef21bc78b3092f624b5",
+        "changedDuringRun": false
+      },
+      "selectedCount": 923
+    },
+    {
+      "project": "tests/PiSharp.Compatibility.Tests/PiSharp.Compatibility.Tests.csproj",
+      "label": "sync160-compatibility-final",
+      "receipt": "artifacts/gap-validation/sync160-compatibility-final-bcadae5147e64aeab6d458df4d3c19cc/receipt.json",
+      "result": "passed",
+      "startedUtc": "2026-11-22T01:13:48.5897428Z",
+      "finishedUtc": "2026-11-22T01:13:56.3735351Z",
+      "fullSuite": true,
+      "source": {
+        "head": "6db03f92102ef2dff884199923e505953e2c3fc9",
+        "dirty": true,
+        "beforeSha256": "a249ae8c2b3784366f8d84a3360b0a89e461f4b23b8817c04e162b3fc1577a73",
+        "manifest": "E:\\AI\\PiSharp\\PiSharp\\.claude\\worktrees\\sync-pi-1.6.0\\artifacts\\gap-validation\\sync160-compatibility-final-bcadae5147e64aeab6d458df4d3c19cc\\source-before.json",
+        "afterSha256": "a249ae8c2b3784366f8d84a3360b0a89e461f4b23b8817c04e162b3fc1577a73",
+        "changedDuringRun": false
+      },
+      "selectedCount": 236
+    },
+    {
+      "project": "tests/PiSharp.CustomAgents.Tests/PiSharp.CustomAgents.Tests.csproj",
+      "label": "sync160-customagents-final",
+      "receipt": "artifacts/gap-validation/sync160-customagents-final-fbc92db95e904b3d89a42224af9a4e00/receipt.json",
+      "result": "passed",
+      "startedUtc": "2026-11-22T01:13:56.9950167Z",
+      "finishedUtc": "2026-11-22T01:14:26.4759314Z",
+      "fullSuite": true,
+      "source": {
+        "head": "6db03f92102ef2dff884199923e505953e2c3fc9",
+        "dirty": true,
+        "beforeSha256": "df329a5beaed5c86c06f022292e70585b3504334bba510be08e46046834d6e79",
+        "manifest": "E:\\AI\\PiSharp\\PiSharp\\.claude\\worktrees\\sync-pi-1.6.0\\artifacts\\gap-validation\\sync160-customagents-final-fbc92db95e904b3d89a42224af9a4e00\\source-before.json",
+        "afterSha256": "df329a5beaed5c86c06f022292e70585b3504334bba510be08e46046834d6e79",
+        "changedDuringRun": false
+      },
+      "selectedCount": 104
+    },
+    {
+      "project": "tests/PiSharp.Durable.Tests/PiSharp.Durable.Tests.csproj",
+      "label": "sync160-durable-final",
+      "receipt": "artifacts/gap-validation/sync160-durable-final-bcd433d12aff4d1d974dbf48ad731189/receipt.json",
+      "result": "passed",
+      "startedUtc": "2026-11-22T01:14:27.1024683Z",
+      "finishedUtc": "2026-11-22T01:23:12.6894695Z",
+      "fullSuite": true,
+      "source": {
+        "head": "6db03f92102ef2dff884199923e505953e2c3fc9",
+        "dirty": true,
+        "beforeSha256": "d2e77c70be4e6f2b1bdb150ba012329de6e22de33cbefd5f503208ee82c4dc57",
+        "manifest": "E:\\AI\\PiSharp\\PiSharp\\.claude\\worktrees\\sync-pi-1.6.0\\artifacts\\gap-validation\\sync160-durable-final-bcd433d12aff4d1d974dbf48ad731189\\source-before.json",
+        "afterSha256": "d2e77c70be4e6f2b1bdb150ba012329de6e22de33cbefd5f503208ee82c4dc57",
+        "changedDuringRun": false
+      },
+      "selectedCount": 4851
+    },
+    {
+      "project": "tests/PiSharp.Durable.Hosting.Tests/PiSharp.Durable.Hosting.Tests.csproj",
+      "label": "sync160-durable-hosting-final",
+      "receipt": "artifacts/gap-validation/sync160-durable-hosting-final-0fcb2402230e46fbb9bee3438c2a9b4b/receipt.json",
+      "result": "passed",
+      "startedUtc": "2026-11-22T01:23:13.8588206Z",
+      "finishedUtc": "2026-11-22T01:23:34.8788120Z",
+      "fullSuite": true,
+      "source": {
+        "head": "6db03f92102ef2dff884199923e505953e2c3fc9",
+        "dirty": true,
+        "beforeSha256": "edc45c74a80bb446ed299ddd3ba6633a43179c1e5d9049304da4808ad2291303",
+        "manifest": "E:\\AI\\PiSharp\\PiSharp\\.claude\\worktrees\\sync-pi-1.6.0\\artifacts\\gap-validation\\sync160-durable-hosting-final-0fcb2402230e46fbb9bee3438c2a9b4b\\source-before.json",
+        "afterSha256": "edc45c74a80bb446ed299ddd3ba6633a43179c1e5d9049304da4808ad2291303",
+        "changedDuringRun": false
+      },
+      "selectedCount": 129
+    },
+    {
+      "project": "tests/PiSharp.Durable.Server.Tests/PiSharp.Durable.Server.Tests.csproj",
+      "label": "sync160-durable-server-final",
+      "receipt": "artifacts/gap-validation/sync160-durable-server-final-d5327341380b4e829291c45d866171cd/receipt.json",
+      "result": "passed",
+      "startedUtc": "2026-11-22T01:23:35.9537389Z",
+      "finishedUtc": "2026-11-22T01:24:18.1737283Z",
+      "fullSuite": true,
+      "source": {
+        "head": "6db03f92102ef2dff884199923e505953e2c3fc9",
+        "dirty": true,
+        "beforeSha256": "26e13d0c82b9e0e46bf0deae57b0bf700a4bdd2a88ba1c6e6d5d45fcd23fc517",
+        "manifest": "E:\\AI\\PiSharp\\PiSharp\\.claude\\worktrees\\sync-pi-1.6.0\\artifacts\\gap-validation\\sync160-durable-server-final-d5327341380b4e829291c45d866171cd\\source-before.json",
+        "afterSha256": "26e13d0c82b9e0e46bf0deae57b0bf700a4bdd2a88ba1c6e6d5d45fcd23fc517",
+        "changedDuringRun": false
+      },
+      "selectedCount": 36
+    },
+    {
+      "project": "tests/PiSharp.Durable.Web.Tests/PiSharp.Durable.Web.Tests.csproj",
+      "label": "sync160-durable-web-final",
+      "receipt": "artifacts/gap-validation/sync160-durable-web-final-d989e1278d7f4f8bb46ea35c18befe1b/receipt.json",
+      "result": "passed",
+      "startedUtc": "2026-11-22T01:24:19.2988499Z",
+      "finishedUtc": "2026-11-22T01:24:40.9443672Z",
+      "fullSuite": true,
+      "source": {
+        "head": "6db03f92102ef2dff884199923e505953e2c3fc9",
+        "dirty": true,
+        "beforeSha256": "01056cb7dea36ce0dbf9a15e72570e682cf9cb459da2bb6c23c0e42dbbc8dadc",
+        "manifest": "E:\\AI\\PiSharp\\PiSharp\\.claude\\worktrees\\sync-pi-1.6.0\\artifacts\\gap-validation\\sync160-durable-web-final-d989e1278d7f4f8bb46ea35c18befe1b\\source-before.json",
+        "afterSha256": "01056cb7dea36ce0dbf9a15e72570e682cf9cb459da2bb6c23c0e42dbbc8dadc",
+        "changedDuringRun": false
+      },
+      "selectedCount": 17
+    },
+    {
+      "project": "tests/PiSharp.Durable150.Capture.Tests/PiSharp.Durable150.Capture.Tests.csproj",
+      "label": "sync160-durable150-capture-final",
+      "receipt": "artifacts/gap-validation/sync160-durable150-capture-final-0c540cf25dc94f08bacf49b895c8e7a8/receipt.json",
+      "result": "passed",
+      "startedUtc": "2026-11-22T01:24:42.0990326Z",
+      "finishedUtc": "2026-11-22T01:24:46.8984546Z",
+      "fullSuite": true,
+      "source": {
+        "head": "6db03f92102ef2dff884199923e505953e2c3fc9",
+        "dirty": true,
+        "beforeSha256": "34d7a2008ef4ee72ba5c9d88bf6cd16a0309f2b91a74f4fbd790a8d23c7e7989",
+        "manifest": "E:\\AI\\PiSharp\\PiSharp\\.claude\\worktrees\\sync-pi-1.6.0\\artifacts\\gap-validation\\sync160-durable150-capture-final-0c540cf25dc94f08bacf49b895c8e7a8\\source-before.json",
+        "afterSha256": "34d7a2008ef4ee72ba5c9d88bf6cd16a0309f2b91a74f4fbd790a8d23c7e7989",
+        "changedDuringRun": false
+      },
+      "selectedCount": 35
+    },
+    {
+      "project": "tests/PiSharp.DurableCli.Tests/PiSharp.DurableCli.Tests.csproj",
+      "label": "sync160-durablecli-final",
+      "receipt": "artifacts/gap-validation/sync160-durablecli-final-58bc562a0e80424485dad4c7bba377a6/receipt.json",
+      "result": "passed",
+      "startedUtc": "2026-11-22T01:24:48.0454686Z",
+      "finishedUtc": "2026-11-22T01:26:39.1302003Z",
+      "fullSuite": true,
+      "source": {
+        "head": "6db03f92102ef2dff884199923e505953e2c3fc9",
+        "dirty": true,
+        "beforeSha256": "8fbf5acfa1071231f488bdf99f56ac94cb6e1cbf8a6707247f80b4629f12954e",
+        "manifest": "E:\\AI\\PiSharp\\PiSharp\\.claude\\worktrees\\sync-pi-1.6.0\\artifacts\\gap-validation\\sync160-durablecli-final-58bc562a0e80424485dad4c7bba377a6\\source-before.json",
+        "afterSha256": "8fbf5acfa1071231f488bdf99f56ac94cb6e1cbf8a6707247f80b4629f12954e",
+        "changedDuringRun": false
+      },
+      "selectedCount": 122
+    },
+    {
+      "project": "tests/PiSharp.DurableMessages.Tests/PiSharp.DurableMessages.Tests.csproj",
+      "label": "sync160-durablemessages-final",
+      "receipt": "artifacts/gap-validation/sync160-durablemessages-final-e56142ef02534661bc9a55f566105513/receipt.json",
+      "result": "passed",
+      "startedUtc": "2026-11-22T01:26:40.2903285Z",
+      "finishedUtc": "2026-11-22T01:26:47.9396392Z",
+      "fullSuite": true,
+      "source": {
+        "head": "6db03f92102ef2dff884199923e505953e2c3fc9",
+        "dirty": true,
+        "beforeSha256": "2e40accc9f75b49aeadad86067111e07d54c2f9a283b075f1fd6143875746f94",
+        "manifest": "E:\\AI\\PiSharp\\PiSharp\\.claude\\worktrees\\sync-pi-1.6.0\\artifacts\\gap-validation\\sync160-durablemessages-final-e56142ef02534661bc9a55f566105513\\source-before.json",
+        "afterSha256": "2e40accc9f75b49aeadad86067111e07d54c2f9a283b075f1fd6143875746f94",
+        "changedDuringRun": false
+      },
+      "selectedCount": 8
+    },
+    {
+      "project": "tests/PiSharp.Env.Adapter.Tests/PiSharp.Env.Adapter.Tests.csproj",
+      "label": "sync160-env-adapter-final",
+      "receipt": "artifacts/gap-validation/sync160-env-adapter-final-93254029d291446e82bde6a892729532/receipt.json",
+      "result": "passed-with-console-skips",
+      "startedUtc": "2026-11-22T01:26:48.9750640Z",
+      "finishedUtc": "2026-11-22T01:27:07.3446593Z",
+      "fullSuite": true,
+      "source": {
+        "head": "6db03f92102ef2dff884199923e505953e2c3fc9",
+        "dirty": true,
+        "beforeSha256": "aa13125d3466419a8823164255e7a76c442daf96c48e68dc84da2ad73fa78b23",
+        "manifest": "E:\\AI\\PiSharp\\PiSharp\\.claude\\worktrees\\sync-pi-1.6.0\\artifacts\\gap-validation\\sync160-env-adapter-final-93254029d291446e82bde6a892729532\\source-before.json",
+        "afterSha256": "aa13125d3466419a8823164255e7a76c442daf96c48e68dc84da2ad73fa78b23",
+        "changedDuringRun": false
+      },
+      "selectedCount": 55
+    },
+    {
+      "project": "tests/PiSharp.Env.Connection.Tests/PiSharp.Env.Connection.Tests.csproj",
+      "label": "sync160-env-connection-final",
+      "receipt": "artifacts/gap-validation/sync160-env-connection-final-6748424c401e42408c2b454deef46b74/receipt.json",
+      "result": "passed",
+      "startedUtc": "2026-11-22T01:27:08.5794738Z",
+      "finishedUtc": "2026-11-22T01:27:14.8900202Z",
+      "fullSuite": true,
+      "source": {
+        "head": "6db03f92102ef2dff884199923e505953e2c3fc9",
+        "dirty": true,
+        "beforeSha256": "3488b0e64d5d390a26047fda361cdfcef92bbe509d9559dda27516e5486cb5b7",
+        "manifest": "E:\\AI\\PiSharp\\PiSharp\\.claude\\worktrees\\sync-pi-1.6.0\\artifacts\\gap-validation\\sync160-env-connection-final-6748424c401e42408c2b454deef46b74\\source-before.json",
+        "afterSha256": "3488b0e64d5d390a26047fda361cdfcef92bbe509d9559dda27516e5486cb5b7",
+        "changedDuringRun": false
+      },
+      "selectedCount": 10
+    },
+    {
+      "project": "tests/PiSharp.Env.Daemon.Tests/PiSharp.Env.Daemon.Tests.csproj",
+      "label": "sync160-env-daemon-final",
+      "receipt": "artifacts/gap-validation/sync160-env-daemon-final-50f4a04f258742a7986eca9545a34487/receipt.json",
+      "result": "passed-with-console-skips",
+      "startedUtc": "2026-11-22T01:27:16.0557227Z",
+      "finishedUtc": "2026-11-22T01:27:21.7195658Z",
+      "fullSuite": true,
+      "source": {
+        "head": "6db03f92102ef2dff884199923e505953e2c3fc9",
+        "dirty": true,
+        "beforeSha256": "5b0779f521347699495a099e35ff723b1d6607ef482337419abb0ca1bc79984f",
+        "manifest": "E:\\AI\\PiSharp\\PiSharp\\.claude\\worktrees\\sync-pi-1.6.0\\artifacts\\gap-validation\\sync160-env-daemon-final-50f4a04f258742a7986eca9545a34487\\source-before.json",
+        "afterSha256": "5b0779f521347699495a099e35ff723b1d6607ef482337419abb0ca1bc79984f",
+        "changedDuringRun": false
+      },
+      "selectedCount": 10
+    },
+    {
+      "project": "tests/PiSharp.Env.Process.Tests/PiSharp.Env.Process.Tests.csproj",
+      "label": "sync160-env-process-final",
+      "receipt": "artifacts/gap-validation/sync160-env-process-final-5f894458b0dd46ccbcb7d15d39d7e293/receipt.json",
+      "result": "passed",
+      "startedUtc": "2026-11-22T01:27:22.8848776Z",
+      "finishedUtc": "2026-11-22T01:27:43.7943326Z",
+      "fullSuite": true,
+      "source": {
+        "head": "6db03f92102ef2dff884199923e505953e2c3fc9",
+        "dirty": true,
+        "beforeSha256": "070af16c264a96fc4ff9368bf1d39898bf6327d7240ca772064c4c39ec9e4d84",
+        "manifest": "E:\\AI\\PiSharp\\PiSharp\\.claude\\worktrees\\sync-pi-1.6.0\\artifacts\\gap-validation\\sync160-env-process-final-5f894458b0dd46ccbcb7d15d39d7e293\\source-before.json",
+        "afterSha256": "070af16c264a96fc4ff9368bf1d39898bf6327d7240ca772064c4c39ec9e4d84",
+        "changedDuringRun": false
+      },
+      "selectedCount": 14
+    },
+    {
+      "project": "tests/PiSharp.Env.Ssh.Tests/PiSharp.Env.Ssh.Tests.csproj",
+      "label": "sync160-env-ssh-final",
+      "receipt": "artifacts/gap-validation/sync160-env-ssh-final-b39071432bc04101bc6aaf49612e8b1f/receipt.json",
+      "result": "passed",
+      "startedUtc": "2026-11-22T01:27:45.0002218Z",
+      "finishedUtc": "2026-11-22T01:27:52.1390635Z",
+      "fullSuite": true,
+      "source": {
+        "head": "6db03f92102ef2dff884199923e505953e2c3fc9",
+        "dirty": true,
+        "beforeSha256": "6c8051e409a26271add3c7a47780900cfde43d13b159a4988a502f95d53ba62b",
+        "manifest": "E:\\AI\\PiSharp\\PiSharp\\.claude\\worktrees\\sync-pi-1.6.0\\artifacts\\gap-validation\\sync160-env-ssh-final-b39071432bc04101bc6aaf49612e8b1f\\source-before.json",
+        "afterSha256": "6c8051e409a26271add3c7a47780900cfde43d13b159a4988a502f95d53ba62b",
+        "changedDuringRun": false
+      },
+      "selectedCount": 9
+    },
+    {
+      "project": "tests/PiSharp.Env.Terminal.Tests/PiSharp.Env.Terminal.Tests.csproj",
+      "label": "sync160-env-terminal-final",
+      "receipt": "artifacts/gap-validation/sync160-env-terminal-final-2da09b51d9e64b8f8d0321587dfdc09c/receipt.json",
+      "result": "passed",
+      "startedUtc": "2026-11-22T01:27:53.4208580Z",
+      "finishedUtc": "2026-11-22T01:27:58.5605235Z",
+      "fullSuite": true,
+      "source": {
+        "head": "6db03f92102ef2dff884199923e505953e2c3fc9",
+        "dirty": true,
+        "beforeSha256": "da7a27094130b1efd7e0db8f545ef89093ad38edad129e09dbca5c2c846f04d9",
+        "manifest": "E:\\AI\\PiSharp\\PiSharp\\.claude\\worktrees\\sync-pi-1.6.0\\artifacts\\gap-validation\\sync160-env-terminal-final-2da09b51d9e64b8f8d0321587dfdc09c\\source-before.json",
+        "afterSha256": "da7a27094130b1efd7e0db8f545ef89093ad38edad129e09dbca5c2c846f04d9",
+        "changedDuringRun": false
+      },
+      "selectedCount": 7
+    },
+    {
+      "project": "tests/PiSharp.Env.Watch.Tests/PiSharp.Env.Watch.Tests.csproj",
+      "label": "sync160-env-watch-final",
+      "receipt": "artifacts/gap-validation/sync160-env-watch-final-976f893794c54d969840836d9fe0fcde/receipt.json",
+      "result": "passed",
+      "startedUtc": "2026-11-22T01:27:59.6038605Z",
+      "finishedUtc": "2026-11-22T01:28:07.5200586Z",
+      "fullSuite": true,
+      "source": {
+        "head": "6db03f92102ef2dff884199923e505953e2c3fc9",
+        "dirty": true,
+        "beforeSha256": "09d7a521bdc67b435caf9f9d1bbe86a23e273bfe9d4efbbf407771f22e6b6802",
+        "manifest": "E:\\AI\\PiSharp\\PiSharp\\.claude\\worktrees\\sync-pi-1.6.0\\artifacts\\gap-validation\\sync160-env-watch-final-976f893794c54d969840836d9fe0fcde\\source-before.json",
+        "afterSha256": "09d7a521bdc67b435caf9f9d1bbe86a23e273bfe9d4efbbf407771f22e6b6802",
+        "changedDuringRun": false
+      },
+      "selectedCount": 5
+    },
+    {
+      "project": "tests/PiSharp.ExtensionHost.Tests/PiSharp.ExtensionHost.Tests.csproj",
+      "label": "sync160-extensionhost-final",
+      "receipt": "artifacts/gap-validation/sync160-extensionhost-final-ce6ae663ad4845b7a1d6ece2f1459cde/receipt.json",
+      "result": "passed",
+      "startedUtc": "2026-11-22T01:28:08.5885977Z",
+      "finishedUtc": "2026-11-22T01:28:11.9693647Z",
+      "fullSuite": true,
+      "source": {
+        "head": "6db03f92102ef2dff884199923e505953e2c3fc9",
+        "dirty": true,
+        "beforeSha256": "16303dfe003cc866e655d8fce55c4137c5f647124f6995aa89f878531c6da8da",
+        "manifest": "E:\\AI\\PiSharp\\PiSharp\\.claude\\worktrees\\sync-pi-1.6.0\\artifacts\\gap-validation\\sync160-extensionhost-final-ce6ae663ad4845b7a1d6ece2f1459cde\\source-before.json",
+        "afterSha256": "16303dfe003cc866e655d8fce55c4137c5f647124f6995aa89f878531c6da8da",
+        "changedDuringRun": false
+      },
+      "selectedCount": 25
+    },
+    {
+      "project": "tests/PiSharp.ExtensionParity.Tests/PiSharp.ExtensionParity.Tests.csproj",
+      "label": "sync160-extensionparity-final",
+      "receipt": "artifacts/gap-validation/sync160-extensionparity-final-863e3cf2386b4b24a6cb592d004fcfa3/receipt.json",
+      "result": "passed",
+      "startedUtc": "2026-11-22T01:28:13.1093686Z",
+      "finishedUtc": "2026-11-22T01:34:30.8396810Z",
+      "fullSuite": true,
+      "source": {
+        "head": "6db03f92102ef2dff884199923e505953e2c3fc9",
+        "dirty": true,
+        "beforeSha256": "dc575318ef8072d44d1a7af9f941258fb0e18c9cb7956c5404313484b171f3e0",
+        "manifest": "E:\\AI\\PiSharp\\PiSharp\\.claude\\worktrees\\sync-pi-1.6.0\\artifacts\\gap-validation\\sync160-extensionparity-final-863e3cf2386b4b24a6cb592d004fcfa3\\source-before.json",
+        "afterSha256": "dc575318ef8072d44d1a7af9f941258fb0e18c9cb7956c5404313484b171f3e0",
+        "changedDuringRun": false
+      },
+      "selectedCount": 180
+    },
+    {
+      "project": "tests/PiSharp.Extensions.ContractTests/PiSharp.Extensions.ContractTests.csproj",
+      "label": "sync160-extensions-contracttests-final",
+      "receipt": "artifacts/gap-validation/sync160-extensions-contracttests-final-c84cfb88098f41ceab128ee4d3c30c3a/receipt.json",
+      "result": "passed",
+      "startedUtc": "2026-11-22T01:34:32.2587721Z",
+      "finishedUtc": "2026-11-22T01:34:53.6192666Z",
+      "fullSuite": true,
+      "source": {
+        "head": "6db03f92102ef2dff884199923e505953e2c3fc9",
+        "dirty": true,
+        "beforeSha256": "741ce19c2d5ab2cbee25c4c0c72bf52290fb40c4833a7a252aaf7d08002a2857",
+        "manifest": "E:\\AI\\PiSharp\\PiSharp\\.claude\\worktrees\\sync-pi-1.6.0\\artifacts\\gap-validation\\sync160-extensions-contracttests-final-c84cfb88098f41ceab128ee4d3c30c3a\\source-before.json",
+        "afterSha256": "741ce19c2d5ab2cbee25c4c0c72bf52290fb40c4833a7a252aaf7d08002a2857",
+        "changedDuringRun": false
+      },
+      "selectedCount": 397
+    },
+    {
+      "project": "tests/PiSharp.InteractiveParity.Tests/PiSharp.InteractiveParity.Tests.csproj",
+      "label": "sync160-interactiveparity-final",
+      "receipt": "artifacts/gap-validation/sync160-interactiveparity-final-830df8ea85634d96a23d81be70b40eb9/receipt.json",
+      "result": "passed",
+      "startedUtc": "2026-11-22T01:34:55.0554218Z",
+      "finishedUtc": "2026-11-22T01:37:10.4779851Z",
+      "fullSuite": true,
+      "source": {
+        "head": "6db03f92102ef2dff884199923e505953e2c3fc9",
+        "dirty": true,
+        "beforeSha256": "0582db782b6f7a6ec6dcbcc98905010188aad9b07f6b4159bd96774c3b9d7a16",
+        "manifest": "E:\\AI\\PiSharp\\PiSharp\\.claude\\worktrees\\sync-pi-1.6.0\\artifacts\\gap-validation\\sync160-interactiveparity-final-830df8ea85634d96a23d81be70b40eb9\\source-before.json",
+        "afterSha256": "0582db782b6f7a6ec6dcbcc98905010188aad9b07f6b4159bd96774c3b9d7a16",
+        "changedDuringRun": false
+      },
+      "selectedCount": 787
+    },
+    {
+      "project": "tests/PiSharp.McpParity.Tests/PiSharp.McpParity.Tests.csproj",
+      "label": "sync160-mcpparity-final",
+      "receipt": "artifacts/gap-validation/sync160-mcpparity-final-1372e3043beb48ef82d1a51928826e0b/receipt.json",
+      "result": "passed",
+      "startedUtc": "2026-11-22T01:37:11.8380859Z",
+      "finishedUtc": "2026-11-22T01:37:45.2216943Z",
+      "fullSuite": true,
+      "source": {
+        "head": "6db03f92102ef2dff884199923e505953e2c3fc9",
+        "dirty": true,
+        "beforeSha256": "be2e489fd0a849ac243775e86f2b4d19d84518e2129bb78805d453fe3c0e8704",
+        "manifest": "E:\\AI\\PiSharp\\PiSharp\\.claude\\worktrees\\sync-pi-1.6.0\\artifacts\\gap-validation\\sync160-mcpparity-final-1372e3043beb48ef82d1a51928826e0b\\source-before.json",
+        "afterSha256": "be2e489fd0a849ac243775e86f2b4d19d84518e2129bb78805d453fe3c0e8704",
+        "changedDuringRun": false
+      },
+      "selectedCount": 49
+    },
+    {
+      "project": "tests/PiSharp.McpSync.Tests/PiSharp.McpSync.Tests.csproj",
+      "label": "sync160-mcpsync-final",
+      "receipt": "artifacts/gap-validation/sync160-mcpsync-final-4e537023ff2a472e8e73a26bc12019f8/receipt.json",
+      "result": "passed",
+      "startedUtc": "2026-11-22T01:37:46.7295134Z",
+      "finishedUtc": "2026-11-22T01:38:19.3479930Z",
+      "fullSuite": true,
+      "source": {
+        "head": "6db03f92102ef2dff884199923e505953e2c3fc9",
+        "dirty": true,
+        "beforeSha256": "3af39c3c412f66922771955574ae41af83d1d3faf21e4a634f2e78774285ce06",
+        "manifest": "E:\\AI\\PiSharp\\PiSharp\\.claude\\worktrees\\sync-pi-1.6.0\\artifacts\\gap-validation\\sync160-mcpsync-final-4e537023ff2a472e8e73a26bc12019f8\\source-before.json",
+        "afterSha256": "3af39c3c412f66922771955574ae41af83d1d3faf21e4a634f2e78774285ce06",
+        "changedDuringRun": false
+      },
+      "selectedCount": 66
+    },
+    {
+      "project": "tests/PiSharp.MistralConversations.Tests/PiSharp.MistralConversations.Tests.csproj",
+      "label": "sync160-mistralconversations-final",
+      "receipt": "artifacts/gap-validation/sync160-mistralconversations-final-20d80e0cd0de4dd08153e7548434ed8c/receipt.json",
+      "result": "passed",
+      "startedUtc": "2026-11-22T01:38:20.8988901Z",
+      "finishedUtc": "2026-11-22T01:38:26.8726087Z",
+      "fullSuite": true,
+      "source": {
+        "head": "6db03f92102ef2dff884199923e505953e2c3fc9",
+        "dirty": true,
+        "beforeSha256": "1df930f5f953da62e20f456976970ab5fe324c1cd5b515270dfed3ad3e031d9a",
+        "manifest": "E:\\AI\\PiSharp\\PiSharp\\.claude\\worktrees\\sync-pi-1.6.0\\artifacts\\gap-validation\\sync160-mistralconversations-final-20d80e0cd0de4dd08153e7548434ed8c\\source-before.json",
+        "afterSha256": "1df930f5f953da62e20f456976970ab5fe324c1cd5b515270dfed3ad3e031d9a",
+        "changedDuringRun": false
+      },
+      "selectedCount": 66
+    },
+    {
+      "project": "tests/PiSharp.MistralOriginalOptions.Tests/PiSharp.MistralOriginalOptions.Tests.csproj",
+      "label": "sync160-mistraloriginaloptions-final",
+      "receipt": "artifacts/gap-validation/sync160-mistraloriginaloptions-final-13ffea71e6d24b3f816a2d0e2b10e08b/receipt.json",
+      "result": "failed",
+      "startedUtc": "2026-11-22T01:38:28.3636684Z",
+      "finishedUtc": "2026-11-22T01:38:32.8325811Z",
+      "fullSuite": true,
+      "source": {
+        "head": "6db03f92102ef2dff884199923e505953e2c3fc9",
+        "dirty": true,
+        "beforeSha256": "dec691327f873d25904aab8ea4e0254cad75cf439940d2f78626aea5ac894f2b",
+        "manifest": "E:\\AI\\PiSharp\\PiSharp\\.claude\\worktrees\\sync-pi-1.6.0\\artifacts\\gap-validation\\sync160-mistraloriginaloptions-final-13ffea71e6d24b3f816a2d0e2b10e08b\\source-before.json",
+        "afterSha256": "dec691327f873d25904aab8ea4e0254cad75cf439940d2f78626aea5ac894f2b",
+        "changedDuringRun": false
+      },
+      "selectedCount": null
+    },
+    {
+      "project": "tests/PiSharp.ModelRuntime.Tests/PiSharp.ModelRuntime.Tests.csproj",
+      "label": "sync160-modelruntime-final",
+      "receipt": "artifacts/gap-validation/sync160-modelruntime-final-f144fa5b7a8e4597be61a97feb10669a/receipt.json",
+      "result": "passed",
+      "startedUtc": "2026-11-22T01:38:34.3897786Z",
+      "finishedUtc": "2026-11-22T01:38:48.4112156Z",
+      "fullSuite": true,
+      "source": {
+        "head": "6db03f92102ef2dff884199923e505953e2c3fc9",
+        "dirty": true,
+        "beforeSha256": "77ff15fd033c990eff9983c97232830d3780a8383e29172b5ba82bd66997ead0",
+        "manifest": "E:\\AI\\PiSharp\\PiSharp\\.claude\\worktrees\\sync-pi-1.6.0\\artifacts\\gap-validation\\sync160-modelruntime-final-f144fa5b7a8e4597be61a97feb10669a\\source-before.json",
+        "afterSha256": "77ff15fd033c990eff9983c97232830d3780a8383e29172b5ba82bd66997ead0",
+        "changedDuringRun": false
+      },
+      "selectedCount": 22
+    },
+    {
+      "project": "tests/PiSharp.Models.Tests/PiSharp.Models.Tests.csproj",
+      "label": "sync160-models-final",
+      "receipt": "artifacts/gap-validation/sync160-models-final-141a79f18be340cbbbf8d627fc62ee45/receipt.json",
+      "result": "passed",
+      "startedUtc": "2026-11-22T01:38:49.9366093Z",
+      "finishedUtc": "2026-11-22T01:39:32.1096269Z",
+      "fullSuite": true,
+      "source": {
+        "head": "6db03f92102ef2dff884199923e505953e2c3fc9",
+        "dirty": true,
+        "beforeSha256": "cf8b3698cb38fa212f3ed59249d0a48292c5b8943765cf4f7210ddf76467d9ea",
+        "manifest": "E:\\AI\\PiSharp\\PiSharp\\.claude\\worktrees\\sync-pi-1.6.0\\artifacts\\gap-validation\\sync160-models-final-141a79f18be340cbbbf8d627fc62ee45\\source-before.json",
+        "afterSha256": "cf8b3698cb38fa212f3ed59249d0a48292c5b8943765cf4f7210ddf76467d9ea",
+        "changedDuringRun": false
+      },
+      "selectedCount": 143
+    },
+    {
+      "project": "tests/PiSharp.NativeModelCatalog.Tests/PiSharp.NativeModelCatalog.Tests.csproj",
+      "label": "sync160-nativemodelcatalog-final",
+      "receipt": "artifacts/gap-validation/sync160-nativemodelcatalog-final-2a2b514be1044ea19660a4db8dce874c/receipt.json",
+      "result": "passed",
+      "startedUtc": "2026-11-22T01:39:33.6736532Z",
+      "finishedUtc": "2026-11-22T01:39:42.9742117Z",
+      "fullSuite": true,
+      "source": {
+        "head": "6db03f92102ef2dff884199923e505953e2c3fc9",
+        "dirty": true,
+        "beforeSha256": "2e8593cec59d4c44778eca649562c3a54f83453d67bb170422c5b2bd502730f1",
+        "manifest": "E:\\AI\\PiSharp\\PiSharp\\.claude\\worktrees\\sync-pi-1.6.0\\artifacts\\gap-validation\\sync160-nativemodelcatalog-final-2a2b514be1044ea19660a4db8dce874c\\source-before.json",
+        "afterSha256": "2e8593cec59d4c44778eca649562c3a54f83453d67bb170422c5b2bd502730f1",
+        "changedDuringRun": false
+      },
+      "selectedCount": 7
+    },
+    {
+      "project": "tests/PiSharp.OpenAICompatibilityGap.Tests/PiSharp.OpenAICompatibilityGap.Tests.csproj",
+      "label": "sync160-openaicompatibilitygap-final",
+      "receipt": "artifacts/gap-validation/sync160-openaicompatibilitygap-final-6348c346425c43b4abd674b70e2c4aa4/receipt.json",
+      "result": "passed",
+      "startedUtc": "2026-11-22T01:39:44.5188299Z",
+      "finishedUtc": "2026-11-22T01:39:50.4197950Z",
+      "fullSuite": true,
+      "source": {
+        "head": "6db03f92102ef2dff884199923e505953e2c3fc9",
+        "dirty": true,
+        "beforeSha256": "c7f1d0444fd9b4abfc09d813b78053f92583ce7d6ee4070fde4e00772c0325f4",
+        "manifest": "E:\\AI\\PiSharp\\PiSharp\\.claude\\worktrees\\sync-pi-1.6.0\\artifacts\\gap-validation\\sync160-openaicompatibilitygap-final-6348c346425c43b4abd674b70e2c4aa4\\source-before.json",
+        "afterSha256": "c7f1d0444fd9b4abfc09d813b78053f92583ce7d6ee4070fde4e00772c0325f4",
+        "changedDuringRun": false
+      },
+      "selectedCount": 1
+    },
+    {
+      "project": "tests/PiSharp.OpenAIResponsesHooks.Tests/PiSharp.OpenAIResponsesHooks.Tests.csproj",
+      "label": "sync160-openairesponseshooks-final",
+      "receipt": "artifacts/gap-validation/sync160-openairesponseshooks-final-6f9044671fb1489d83979b3f24b214bd/receipt.json",
+      "result": "failed",
+      "startedUtc": "2026-11-22T01:39:52.0777341Z",
+      "finishedUtc": "2026-11-22T01:39:57.0551502Z",
+      "fullSuite": true,
+      "source": {
+        "head": "6db03f92102ef2dff884199923e505953e2c3fc9",
+        "dirty": true,
+        "beforeSha256": "fb7fe76ea5b70102c522b8ccc0728af00255c998d6886d3ebffd2fe742811a3e",
+        "manifest": "E:\\AI\\PiSharp\\PiSharp\\.claude\\worktrees\\sync-pi-1.6.0\\artifacts\\gap-validation\\sync160-openairesponseshooks-final-6f9044671fb1489d83979b3f24b214bd\\source-before.json",
+        "afterSha256": "fb7fe76ea5b70102c522b8ccc0728af00255c998d6886d3ebffd2fe742811a3e",
+        "changedDuringRun": false
+      },
+      "selectedCount": null
+    },
+    {
+      "project": "tests/PiSharp.ProviderApis.Tests/PiSharp.ProviderApis.Tests.csproj",
+      "label": "sync160-providerapis-final",
+      "receipt": "artifacts/gap-validation/sync160-providerapis-final-aaedcaae920640ee8dbf8a5fac4a4597/receipt.json",
+      "result": "passed",
+      "startedUtc": "2026-11-22T01:39:58.6608922Z",
+      "finishedUtc": "2026-11-22T01:40:25.0113154Z",
+      "fullSuite": true,
+      "source": {
+        "head": "6db03f92102ef2dff884199923e505953e2c3fc9",
+        "dirty": true,
+        "beforeSha256": "ff0b36cb7b25cb248a3e906117a2fec8db8e6825c7394373b8036909de42a463",
+        "manifest": "E:\\AI\\PiSharp\\PiSharp\\.claude\\worktrees\\sync-pi-1.6.0\\artifacts\\gap-validation\\sync160-providerapis-final-aaedcaae920640ee8dbf8a5fac4a4597\\source-before.json",
+        "afterSha256": "ff0b36cb7b25cb248a3e906117a2fec8db8e6825c7394373b8036909de42a463",
+        "changedDuringRun": false
+      },
+      "selectedCount": 67
+    },
+    {
+      "project": "tests/PiSharp.ProviderOfflineDifferential.Tests/PiSharp.ProviderOfflineDifferential.Tests.csproj",
+      "label": "sync160-providerofflinedifferential-final",
+      "receipt": "artifacts/gap-validation/sync160-providerofflinedifferential-final-d2588d6d68414b9dbb694e8f58d6589a/receipt.json",
+      "result": "passed",
+      "startedUtc": "2026-11-22T01:40:26.7191581Z",
+      "finishedUtc": "2026-11-22T01:40:31.9019017Z",
+      "fullSuite": true,
+      "source": {
+        "head": "6db03f92102ef2dff884199923e505953e2c3fc9",
+        "dirty": true,
+        "beforeSha256": "3744685e811ba6146984acf8ff20c961e269dff21c4e0de04360b1e4b69c0343",
+        "manifest": "E:\\AI\\PiSharp\\PiSharp\\.claude\\worktrees\\sync-pi-1.6.0\\artifacts\\gap-validation\\sync160-providerofflinedifferential-final-d2588d6d68414b9dbb694e8f58d6589a\\source-before.json",
+        "afterSha256": "3744685e811ba6146984acf8ff20c961e269dff21c4e0de04360b1e4b69c0343",
+        "changedDuringRun": false
+      },
+      "selectedCount": 30
+    },
+    {
+      "project": "tests/PiSharp.ProviderSync.Tests/PiSharp.ProviderSync.Tests.csproj",
+      "label": "sync160-providersync-final",
+      "receipt": "artifacts/gap-validation/sync160-providersync-final-5965ffe92418463887199e1638c8e6a7/receipt.json",
+      "result": "passed",
+      "startedUtc": "2026-11-22T01:40:33.6376386Z",
+      "finishedUtc": "2026-11-22T01:40:42.2333770Z",
+      "fullSuite": true,
+      "source": {
+        "head": "6db03f92102ef2dff884199923e505953e2c3fc9",
+        "dirty": true,
+        "beforeSha256": "b8dee7c3bd3cfcd441ecfe0aa87310266d1dc24a7db878782abbd011555ac486",
+        "manifest": "E:\\AI\\PiSharp\\PiSharp\\.claude\\worktrees\\sync-pi-1.6.0\\artifacts\\gap-validation\\sync160-providersync-final-5965ffe92418463887199e1638c8e6a7\\source-before.json",
+        "afterSha256": "b8dee7c3bd3cfcd441ecfe0aa87310266d1dc24a7db878782abbd011555ac486",
+        "changedDuringRun": false
+      },
+      "selectedCount": 113
+    },
+    {
+      "project": "tests/PiSharp.ResponsesGrammarFallback.Tests/PiSharp.ResponsesGrammarFallback.Tests.csproj",
+      "label": "sync160-responsesgrammarfallback-final",
+      "receipt": "artifacts/gap-validation/sync160-responsesgrammarfallback-final-39eb5db0d71349e99708ddd88ddb1cdf/receipt.json",
+      "result": "failed",
+      "startedUtc": "2026-11-22T01:40:43.8672380Z",
+      "finishedUtc": "2026-11-22T01:40:48.3871615Z",
+      "fullSuite": true,
+      "source": {
+        "head": "6db03f92102ef2dff884199923e505953e2c3fc9",
+        "dirty": true,
+        "beforeSha256": "855a379e8f02d456a4d4868fc0834c7fc4fd6c9144a6c4e50725051a9d124565",
+        "manifest": "E:\\AI\\PiSharp\\PiSharp\\.claude\\worktrees\\sync-pi-1.6.0\\artifacts\\gap-validation\\sync160-responsesgrammarfallback-final-39eb5db0d71349e99708ddd88ddb1cdf\\source-before.json",
+        "afterSha256": "855a379e8f02d456a4d4868fc0834c7fc4fd6c9144a6c4e50725051a9d124565",
+        "changedDuringRun": false
+      },
+      "selectedCount": null
+    },
+    {
+      "project": "tests/PiSharp.ResponsesOrphan.Tests/PiSharp.ResponsesOrphan.Tests.csproj",
+      "label": "sync160-responsesorphan-final",
+      "receipt": "artifacts/gap-validation/sync160-responsesorphan-final-587b823f7ac44a9384b48beb79d67592/receipt.json",
+      "result": "failed",
+      "startedUtc": "2026-11-22T01:40:50.0197660Z",
+      "finishedUtc": "2026-11-22T01:40:54.9243220Z",
+      "fullSuite": true,
+      "source": {
+        "head": "6db03f92102ef2dff884199923e505953e2c3fc9",
+        "dirty": true,
+        "beforeSha256": "6a64399317278df51d42f2680ffc630ba5cf0dc9d0fb7b7fe1128eb8df6aec6b",
+        "manifest": "E:\\AI\\PiSharp\\PiSharp\\.claude\\worktrees\\sync-pi-1.6.0\\artifacts\\gap-validation\\sync160-responsesorphan-final-587b823f7ac44a9384b48beb79d67592\\source-before.json",
+        "afterSha256": "6a64399317278df51d42f2680ffc630ba5cf0dc9d0fb7b7fe1128eb8df6aec6b",
+        "changedDuringRun": false
+      },
+      "selectedCount": 0
+    },
+    {
+      "project": "tests/PiSharp.ResponsesPublicMetadata.Tests/PiSharp.ResponsesPublicMetadata.Tests.csproj",
+      "label": "sync160-responsespublicmetadata-final",
+      "receipt": "artifacts/gap-validation/sync160-responsespublicmetadata-final-0d82b25c2be244f6bea8a6f242185237/receipt.json",
+      "result": "passed",
+      "startedUtc": "2026-11-22T01:40:56.6638725Z",
+      "finishedUtc": "2026-11-22T01:41:01.6633131Z",
+      "fullSuite": true,
+      "source": {
+        "head": "6db03f92102ef2dff884199923e505953e2c3fc9",
+        "dirty": true,
+        "beforeSha256": "2b5aa4a3b9259629cb4f88b4c0b806369ba420422c340619009eb5840d24646f",
+        "manifest": "E:\\AI\\PiSharp\\PiSharp\\.claude\\worktrees\\sync-pi-1.6.0\\artifacts\\gap-validation\\sync160-responsespublicmetadata-final-0d82b25c2be244f6bea8a6f242185237\\source-before.json",
+        "afterSha256": "2b5aa4a3b9259629cb4f88b4c0b806369ba420422c340619009eb5840d24646f",
+        "changedDuringRun": false
+      },
+      "selectedCount": 4
+    },
+    {
+      "project": "tests/PiSharp.ResponsesTranscriptTools.Tests/PiSharp.ResponsesTranscriptTools.Tests.csproj",
+      "label": "sync160-responsestranscripttools-final",
+      "receipt": "artifacts/gap-validation/sync160-responsestranscripttools-final-bd7bed097bc94e18b98769adc9234f2c/receipt.json",
+      "result": "passed",
+      "startedUtc": "2026-11-22T01:41:03.3517844Z",
+      "finishedUtc": "2026-11-22T01:41:08.3273922Z",
+      "fullSuite": true,
+      "source": {
+        "head": "6db03f92102ef2dff884199923e505953e2c3fc9",
+        "dirty": true,
+        "beforeSha256": "c9fd31fe67d7dc85423f6a2ba88a363b88a2cc725437532094c48c094339f282",
+        "manifest": "E:\\AI\\PiSharp\\PiSharp\\.claude\\worktrees\\sync-pi-1.6.0\\artifacts\\gap-validation\\sync160-responsestranscripttools-final-bd7bed097bc94e18b98769adc9234f2c\\source-before.json",
+        "afterSha256": "c9fd31fe67d7dc85423f6a2ba88a363b88a2cc725437532094c48c094339f282",
+        "changedDuringRun": false
+      },
+      "selectedCount": 1
+    },
+    {
+      "project": "tests/PiSharp.Rpc.Tests/PiSharp.Rpc.Tests.csproj",
+      "label": "sync160-rpc-final",
+      "receipt": "artifacts/gap-validation/sync160-rpc-final-d5c7e21d399b4ad1a1df0e4a8f87ce7b/receipt.json",
+      "result": "passed",
+      "startedUtc": "2026-11-22T01:41:10.0610367Z",
+      "finishedUtc": "2026-11-22T01:41:23.6184684Z",
+      "fullSuite": true,
+      "source": {
+        "head": "6db03f92102ef2dff884199923e505953e2c3fc9",
+        "dirty": true,
+        "beforeSha256": "1df8c291f8357bc667b65363a5e5cca951e3045ed62a35603b99d6891e5c6ca3",
+        "manifest": "E:\\AI\\PiSharp\\PiSharp\\.claude\\worktrees\\sync-pi-1.6.0\\artifacts\\gap-validation\\sync160-rpc-final-d5c7e21d399b4ad1a1df0e4a8f87ce7b\\source-before.json",
+        "afterSha256": "1df8c291f8357bc667b65363a5e5cca951e3045ed62a35603b99d6891e5c6ca3",
+        "changedDuringRun": false
+      },
+      "selectedCount": 140
+    },
+    {
+      "project": "tests/PiSharp.SdkAsyncEventBus.Tests/PiSharp.SdkAsyncEventBus.Tests.csproj",
+      "label": "sync160-sdkasynceventbus-final",
+      "receipt": "artifacts/gap-validation/sync160-sdkasynceventbus-final-470f1171af554374950ff23532d0d56d/receipt.json",
+      "result": "passed",
+      "startedUtc": "2026-11-22T01:41:25.6051030Z",
+      "finishedUtc": "2026-11-22T01:41:30.4925912Z",
+      "fullSuite": true,
+      "source": {
+        "head": "6db03f92102ef2dff884199923e505953e2c3fc9",
+        "dirty": true,
+        "beforeSha256": "2dcc1d84366605f3c3ffdee345a35293ec6a058e22cee967f28f8582ca57cedb",
+        "manifest": "E:\\AI\\PiSharp\\PiSharp\\.claude\\worktrees\\sync-pi-1.6.0\\artifacts\\gap-validation\\sync160-sdkasynceventbus-final-470f1171af554374950ff23532d0d56d\\source-before.json",
+        "afterSha256": "2dcc1d84366605f3c3ffdee345a35293ec6a058e22cee967f28f8582ca57cedb",
+        "changedDuringRun": false
+      },
+      "selectedCount": 23
+    },
+    {
+      "project": "tests/PiSharp.SdkEventBus.Tests/PiSharp.SdkEventBus.Tests.csproj",
+      "label": "sync160-sdkeventbus-final",
+      "receipt": "artifacts/gap-validation/sync160-sdkeventbus-final-5a08277b999d480fbfbeaceb9178e57e/receipt.json",
+      "result": "passed",
+      "startedUtc": "2026-11-22T01:41:32.0781898Z",
+      "finishedUtc": "2026-11-22T01:41:36.5115297Z",
+      "fullSuite": true,
+      "source": {
+        "head": "6db03f92102ef2dff884199923e505953e2c3fc9",
+        "dirty": true,
+        "beforeSha256": "607aa030f2d025c6970e14fd518c9017b398784767249a95abfa0bd2d2f2f1b0",
+        "manifest": "E:\\AI\\PiSharp\\PiSharp\\.claude\\worktrees\\sync-pi-1.6.0\\artifacts\\gap-validation\\sync160-sdkeventbus-final-5a08277b999d480fbfbeaceb9178e57e\\source-before.json",
+        "afterSha256": "607aa030f2d025c6970e14fd518c9017b398784767249a95abfa0bd2d2f2f1b0",
+        "changedDuringRun": false
+      },
+      "selectedCount": 19
+    },
+    {
+      "project": "tests/PiSharp.SessionParity.Tests/PiSharp.SessionParity.Tests.csproj",
+      "label": "sync160-sessionparity-final",
+      "receipt": "artifacts/gap-validation/sync160-sessionparity-final-de50f3ee02c64617bccde3cc2a561567/receipt.json",
+      "result": "passed",
+      "startedUtc": "2026-11-22T01:41:38.1438739Z",
+      "finishedUtc": "2026-11-22T01:42:06.2819322Z",
+      "fullSuite": true,
+      "source": {
+        "head": "6db03f92102ef2dff884199923e505953e2c3fc9",
+        "dirty": true,
+        "beforeSha256": "69fe85a5ce5b7a05195eb53fcaab87842edd1238f233bdc4118a49cfccaa2b8f",
+        "manifest": "E:\\AI\\PiSharp\\PiSharp\\.claude\\worktrees\\sync-pi-1.6.0\\artifacts\\gap-validation\\sync160-sessionparity-final-de50f3ee02c64617bccde3cc2a561567\\source-before.json",
+        "afterSha256": "69fe85a5ce5b7a05195eb53fcaab87842edd1238f233bdc4118a49cfccaa2b8f",
+        "changedDuringRun": false
+      },
+      "selectedCount": 139
+    },
+    {
+      "project": "tests/PiSharp.Sessions.Tests/PiSharp.Sessions.Tests.csproj",
+      "label": "sync160-sessions-final",
+      "receipt": "artifacts/gap-validation/sync160-sessions-final-ff57cbf3f34641679847eeea1b5983fb/receipt.json",
+      "result": "passed",
+      "startedUtc": "2026-11-22T01:42:07.9618332Z",
+      "finishedUtc": "2026-11-22T01:42:16.8224808Z",
+      "fullSuite": true,
+      "source": {
+        "head": "6db03f92102ef2dff884199923e505953e2c3fc9",
+        "dirty": true,
+        "beforeSha256": "f6976dd095bbd4a91243ed2814614ff3d3ea5c5eea08472b04724a88c9113fad",
+        "manifest": "E:\\AI\\PiSharp\\PiSharp\\.claude\\worktrees\\sync-pi-1.6.0\\artifacts\\gap-validation\\sync160-sessions-final-ff57cbf3f34641679847eeea1b5983fb\\source-before.json",
+        "afterSha256": "f6976dd095bbd4a91243ed2814614ff3d3ea5c5eea08472b04724a88c9113fad",
+        "changedDuringRun": false
+      },
+      "selectedCount": 138
+    },
+    {
+      "project": "tests/PiSharp.SimpleOutputBudget.Tests/PiSharp.SimpleOutputBudget.Tests.csproj",
+      "label": "sync160-simpleoutputbudget-final",
+      "receipt": "artifacts/gap-validation/sync160-simpleoutputbudget-final-f69fabe9c23c4d13bd75d02ef64bd169/receipt.json",
+      "result": "passed",
+      "startedUtc": "2026-11-22T01:42:18.5330047Z",
+      "finishedUtc": "2026-11-22T01:42:23.2943391Z",
+      "fullSuite": true,
+      "source": {
+        "head": "6db03f92102ef2dff884199923e505953e2c3fc9",
+        "dirty": true,
+        "beforeSha256": "a595f7075f3200738a5f61fcb44cbcd69a65a78ca14c760e68479b7b440d2daa",
+        "manifest": "E:\\AI\\PiSharp\\PiSharp\\.claude\\worktrees\\sync-pi-1.6.0\\artifacts\\gap-validation\\sync160-simpleoutputbudget-final-f69fabe9c23c4d13bd75d02ef64bd169\\source-before.json",
+        "afterSha256": "a595f7075f3200738a5f61fcb44cbcd69a65a78ca14c760e68479b7b440d2daa",
+        "changedDuringRun": false
+      },
+      "selectedCount": 131
+    },
+    {
+      "project": "tests/PiSharp.Telemetry.Tests/PiSharp.Telemetry.Tests.csproj",
+      "label": "sync160-telemetry-final",
+      "receipt": "artifacts/gap-validation/sync160-telemetry-final-9be8891f766f407c809616bcae1c4718/receipt.json",
+      "result": "passed",
+      "startedUtc": "2026-11-22T01:42:24.9958152Z",
+      "finishedUtc": "2026-11-22T01:42:31.9012125Z",
+      "fullSuite": true,
+      "source": {
+        "head": "6db03f92102ef2dff884199923e505953e2c3fc9",
+        "dirty": true,
+        "beforeSha256": "ef45beaec9afb1397ee7cc09cdf916e4e59992a1e32325465c22614436247b13",
+        "manifest": "E:\\AI\\PiSharp\\PiSharp\\.claude\\worktrees\\sync-pi-1.6.0\\artifacts\\gap-validation\\sync160-telemetry-final-9be8891f766f407c809616bcae1c4718\\source-before.json",
+        "afterSha256": "ef45beaec9afb1397ee7cc09cdf916e4e59992a1e32325465c22614436247b13",
+        "changedDuringRun": false
+      },
+      "selectedCount": 68
+    },
+    {
+      "project": "tests/PiSharp.ToolSearch.Tests/PiSharp.ToolSearch.Tests.csproj",
+      "label": "sync160-toolsearch-final",
+      "receipt": "artifacts/gap-validation/sync160-toolsearch-final-c7ea9cc8831f49ba8bf8f69536605767/receipt.json",
+      "result": "passed",
+      "startedUtc": "2026-11-22T01:42:33.6202513Z",
+      "finishedUtc": "2026-11-22T01:42:48.7550274Z",
+      "fullSuite": true,
+      "source": {
+        "head": "6db03f92102ef2dff884199923e505953e2c3fc9",
+        "dirty": true,
+        "beforeSha256": "f454a7a14737d8dcca51a0d5b5ea07daf8a587467f3c804adfe956e058535ac9",
+        "manifest": "E:\\AI\\PiSharp\\PiSharp\\.claude\\worktrees\\sync-pi-1.6.0\\artifacts\\gap-validation\\sync160-toolsearch-final-c7ea9cc8831f49ba8bf8f69536605767\\source-before.json",
+        "afterSha256": "f454a7a14737d8dcca51a0d5b5ea07daf8a587467f3c804adfe956e058535ac9",
+        "changedDuringRun": false
+      },
+      "selectedCount": 25
+    },
+    {
+      "project": "tests/PiSharp.Tools.Tests/PiSharp.Tools.Tests.csproj",
+      "label": "sync160-tools-final",
+      "receipt": "artifacts/gap-validation/sync160-tools-final-0152b59e07a44a729655ab16645e0671/receipt.json",
+      "result": "passed-with-console-skips",
+      "startedUtc": "2026-11-22T01:42:50.4085167Z",
+      "finishedUtc": "2026-11-22T01:43:10.5401225Z",
+      "fullSuite": true,
+      "source": {
+        "head": "6db03f92102ef2dff884199923e505953e2c3fc9",
+        "dirty": true,
+        "beforeSha256": "90a95a5e070d11bb94bbc5ca1046dce33239363ee8269caec1a8916ba0178c40",
+        "manifest": "E:\\AI\\PiSharp\\PiSharp\\.claude\\worktrees\\sync-pi-1.6.0\\artifacts\\gap-validation\\sync160-tools-final-0152b59e07a44a729655ab16645e0671\\source-before.json",
+        "afterSha256": "90a95a5e070d11bb94bbc5ca1046dce33239363ee8269caec1a8916ba0178c40",
+        "changedDuringRun": false
+      },
+      "selectedCount": 183
+    },
+    {
+      "project": "tests/PiSharp.Transport.Tests/PiSharp.Transport.Tests.csproj",
+      "label": "sync160-transport-final",
+      "receipt": "artifacts/gap-validation/sync160-transport-final-e666bc7f51ad4ed58a4c9b89b740e1a0/receipt.json",
+      "result": "passed",
+      "startedUtc": "2026-11-22T01:43:12.3083342Z",
+      "finishedUtc": "2026-11-22T01:43:23.8765873Z",
+      "fullSuite": true,
+      "source": {
+        "head": "6db03f92102ef2dff884199923e505953e2c3fc9",
+        "dirty": true,
+        "beforeSha256": "c6ac22b2f27993ce4a19ad7f98f874aacb58851fef1abe40f42898924d969e27",
+        "manifest": "E:\\AI\\PiSharp\\PiSharp\\.claude\\worktrees\\sync-pi-1.6.0\\artifacts\\gap-validation\\sync160-transport-final-e666bc7f51ad4ed58a4c9b89b740e1a0\\source-before.json",
+        "afterSha256": "c6ac22b2f27993ce4a19ad7f98f874aacb58851fef1abe40f42898924d969e27",
+        "changedDuringRun": false
+      },
+      "selectedCount": 245
+    },
+    {
+      "project": "tests/PiSharp.Tui.Tests/PiSharp.Tui.Tests.csproj",
+      "label": "sync160-tui-final",
+      "receipt": "artifacts/gap-validation/sync160-tui-final-1413aaed9fd34035ae98b9d44b5010c3/receipt.json",
+      "result": "passed",
+      "startedUtc": "2026-11-22T01:43:25.7498018Z",
+      "finishedUtc": "2026-11-22T01:43:34.3251165Z",
+      "fullSuite": true,
+      "source": {
+        "head": "6db03f92102ef2dff884199923e505953e2c3fc9",
+        "dirty": true,
+        "beforeSha256": "566b2c33d8558d9a81ca10bea5941603fb24303d9148ca9e11943374930f3bb1",
+        "manifest": "E:\\AI\\PiSharp\\PiSharp\\.claude\\worktrees\\sync-pi-1.6.0\\artifacts\\gap-validation\\sync160-tui-final-1413aaed9fd34035ae98b9d44b5010c3\\source-before.json",
+        "afterSha256": "566b2c33d8558d9a81ca10bea5941603fb24303d9148ca9e11943374930f3bb1",
+        "changedDuringRun": false
+      },
+      "selectedCount": 84
+    },
+    {
+      "project": "tests/PiSharp.Tui.Editor.Tests/PiSharp.Tui.Editor.Tests.csproj",
+      "label": "sync160-tui-editor-final",
+      "receipt": "artifacts/gap-validation/sync160-tui-editor-final-cb2c32fa612245da80833efe211a4e3a/receipt.json",
+      "result": "passed",
+      "startedUtc": "2026-11-22T01:43:36.4249238Z",
+      "finishedUtc": "2026-11-22T01:43:44.5985207Z",
+      "fullSuite": true,
+      "source": {
+        "head": "6db03f92102ef2dff884199923e505953e2c3fc9",
+        "dirty": true,
+        "beforeSha256": "bee63a316a52cfa77afc51fd12146afeeccb8ca508cc3bbb1606913bf48b0397",
+        "manifest": "E:\\AI\\PiSharp\\PiSharp\\.claude\\worktrees\\sync-pi-1.6.0\\artifacts\\gap-validation\\sync160-tui-editor-final-cb2c32fa612245da80833efe211a4e3a\\source-before.json",
+        "afterSha256": "bee63a316a52cfa77afc51fd12146afeeccb8ca508cc3bbb1606913bf48b0397",
+        "changedDuringRun": false
+      },
+      "selectedCount": 85
+    },
+    {
+      "project": "tests/PiSharp.Tui.NativeModifiers.Tests/PiSharp.Tui.NativeModifiers.Tests.csproj",
+      "label": "sync160-tui-nativemodifiers-final",
+      "receipt": "artifacts/gap-validation/sync160-tui-nativemodifiers-final-94e1257156254572af7f5f33ac8317aa/receipt.json",
+      "result": "passed",
+      "startedUtc": "2026-11-22T01:43:46.5424237Z",
+      "finishedUtc": "2026-11-22T01:43:50.7358721Z",
+      "fullSuite": true,
+      "source": {
+        "head": "6db03f92102ef2dff884199923e505953e2c3fc9",
+        "dirty": true,
+        "beforeSha256": "25d2cc396e6bdd59643a05c7b114395982e7d9f193e19989d59d332089c5760b",
+        "manifest": "E:\\AI\\PiSharp\\PiSharp\\.claude\\worktrees\\sync-pi-1.6.0\\artifacts\\gap-validation\\sync160-tui-nativemodifiers-final-94e1257156254572af7f5f33ac8317aa\\source-before.json",
+        "afterSha256": "25d2cc396e6bdd59643a05c7b114395982e7d9f193e19989d59d332089c5760b",
+        "changedDuringRun": false
+      },
+      "selectedCount": 6
+    },
+    {
+      "project": "tests/PiSharp.VertexSimple.Tests/PiSharp.VertexSimple.Tests.csproj",
+      "label": "sync160-vertexsimple-final",
+      "receipt": "artifacts/gap-validation/sync160-vertexsimple-final-765028888e7a4ca981928748ab790a79/receipt.json",
+      "result": "failed",
+      "startedUtc": "2026-11-22T01:43:52.6439912Z",
+      "finishedUtc": "2026-11-22T01:43:57.5151950Z",
+      "fullSuite": true,
+      "source": {
+        "head": "6db03f92102ef2dff884199923e505953e2c3fc9",
+        "dirty": true,
+        "beforeSha256": "6ea81f86f563b0184701ffe6a8959ed68dd6787a3736a2aadc5aa5fa6cc849cb",
+        "manifest": "E:\\AI\\PiSharp\\PiSharp\\.claude\\worktrees\\sync-pi-1.6.0\\artifacts\\gap-validation\\sync160-vertexsimple-final-765028888e7a4ca981928748ab790a79\\source-before.json",
+        "afterSha256": "6ea81f86f563b0184701ffe6a8959ed68dd6787a3736a2aadc5aa5fa6cc849cb",
+        "changedDuringRun": false
+      },
+      "selectedCount": null
+    },
+    {
+      "project": "tests/PiSharp.WebAgent.Tests/PiSharp.WebAgent.Tests.csproj",
+      "label": "sync160-webagent-final",
+      "receipt": "artifacts/gap-validation/sync160-webagent-final-0370d203dbd74a9ba0de8564d19fbff9/receipt.json",
+      "result": "passed",
+      "startedUtc": "2026-11-22T01:43:59.5054750Z",
+      "finishedUtc": "2026-11-22T01:55:51.7137727Z",
+      "fullSuite": true,
+      "source": {
+        "head": "6db03f92102ef2dff884199923e505953e2c3fc9",
+        "dirty": true,
+        "beforeSha256": "3261b4aab2fc311ceb2e466b673995115cb7f26b83dbd3200cfcc620a20d39d5",
+        "manifest": "E:\\AI\\PiSharp\\PiSharp\\.claude\\worktrees\\sync-pi-1.6.0\\artifacts\\gap-validation\\sync160-webagent-final-0370d203dbd74a9ba0de8564d19fbff9\\source-before.json",
+        "afterSha256": "3261b4aab2fc311ceb2e466b673995115cb7f26b83dbd3200cfcc620a20d39d5",
+        "changedDuringRun": false
+      },
+      "selectedCount": 544
+    },
+    {
+      "project": "tests/PiSharp.WireSync.Tests/PiSharp.WireSync.Tests.csproj",
+      "label": "sync160-wiresync-final",
+      "receipt": "artifacts/gap-validation/sync160-wiresync-final-59838c9598114d3da107c04f43b6ea7f/receipt.json",
+      "result": "passed",
+      "startedUtc": "2026-11-22T01:55:53.7589416Z",
+      "finishedUtc": "2026-11-22T01:56:00.8485155Z",
+      "fullSuite": true,
+      "source": {
+        "head": "6db03f92102ef2dff884199923e505953e2c3fc9",
+        "dirty": true,
+        "beforeSha256": "295989385c9c96eba5a0b28d713c43b4fbc3a7abf3e12204cc7b183f3b53a3d4",
+        "manifest": "E:\\AI\\PiSharp\\PiSharp\\.claude\\worktrees\\sync-pi-1.6.0\\artifacts\\gap-validation\\sync160-wiresync-final-59838c9598114d3da107c04f43b6ea7f\\source-before.json",
+        "afterSha256": "295989385c9c96eba5a0b28d713c43b4fbc3a7abf3e12204cc7b183f3b53a3d4",
+        "changedDuringRun": false
+      },
+      "selectedCount": 20
+    },
+    {
+      "project": "tests/PiSharp.CodingAgent.Tests/PiSharp.CodingAgent.Tests.csproj",
+      "label": "sync160-codingagent-final",
+      "receipt": "artifacts/gap-validation/sync160-codingagent-final-7646a786cad94502954b99b44d1bbcda/receipt.json",
+      "result": "passed",
+      "startedUtc": "2026-11-22T02:04:19.0574891Z",
+      "finishedUtc": "2026-11-22T02:10:57.7897360Z",
+      "fullSuite": true,
+      "source": {
+        "head": "60c4301b4fa18a94d4e13616e921687c50301e4a",
+        "dirty": true,
+        "beforeSha256": "9ab263677033b215f4283a6117b705110d0cd610e1cfe8e5ebd8741cdbcbbffd",
+        "manifest": "E:\\AI\\PiSharp\\PiSharp\\.claude\\worktrees\\sync-pi-1.6.0\\artifacts\\gap-validation\\sync160-codingagent-final-7646a786cad94502954b99b44d1bbcda\\source-before.json",
+        "afterSha256": "9ab263677033b215f4283a6117b705110d0cd610e1cfe8e5ebd8741cdbcbbffd",
+        "changedDuringRun": false
+      },
+      "selectedCount": 923
+    }
+  ],
+  "sourceValidationOnly": true,
+  "packageValidation": {
+    "status": "pending",
+    "record": "AI_DOCS/sync-1.6.0-packaging.json"
+  },
+  "summary": {
+    "requiredSuites": 66,
+    "selectedCaseExecutions": 12891,
+    "passedCaseExecutions": 12857,
+    "documentedSkippedCaseExecutions": 34,
+    "distinctAssertionCountClaimed": false,
+    "coverageGroups": 24,
+    "explicitlyTrackedNewCaseIds": 752
+  },
+  "frozenUtc": "2026-11-22T02:16:21.840Z"
+}

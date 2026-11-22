@@ -1,4 +1,7 @@
-// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/chord/src/next/host/host.ts
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/chord/src/host/host.ts
+// 1.6.0 here: events and call windows, the sharing table's use in Place (chord-remote), and for admission (slice 14 §2): presence lists
+// an admitted object's holders from its first allow until a denial (ChordObject.ListsHolders), and PrincipalKeyOf for a route's
+// admission, which keeps one decision per principal key.
 using System.Text.Json.Nodes;
 using PiSharp.Chord.Contracts;
 using PiSharp.Chord.Data;
@@ -15,6 +18,7 @@ public sealed partial class ChordHost : IAsyncDisposable
     internal readonly HostOptions Options;
     internal readonly OldWork OldWork = new();
     internal readonly ReloadCycles ReloadCycles = new();
+    internal readonly HostEvents Events;
     internal readonly UnboundClock UnboundClock;
     internal TimeSpan ReloadDrainTimeout => Options.ReloadDrainTimeout < Options.CloseTimeout ? Options.ReloadDrainTimeout : Options.CloseTimeout;
     internal readonly Batch Batch;
@@ -30,7 +34,9 @@ public sealed partial class ChordHost : IAsyncDisposable
     internal bool Closed;
     internal event Action? PublishedChanged;
     internal event Action? Closing;
-    internal Func<Contract, CheckedParams, Caller, ChordContext, ITarget?>? RemoteTarget;
+    // Binds a reference to a remote object over the path its address places it on (the one this host holds for its sharing key, or a new
+    // one); false when nothing places it.
+    internal Func<Binding, bool>? BindRemote;
     private readonly List<Binding> bindings = [];
     private readonly List<CallContext> roots = [];
     private readonly List<RegistryContribution> facetContributions = [];
@@ -48,7 +54,8 @@ public sealed partial class ChordHost : IAsyncDisposable
         if (options.Principal is { } principal && ChordJson.AsString(principal["kind"]) is null)
             throw new ArgumentException("A host principal needs a kind", nameof(options));
         if (options.ReadyTimeout < TimeSpan.Zero || options.CloseTimeout < TimeSpan.Zero || options.ReloadDrainTimeout < TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(options));
-        Options = options;
+        if (options.CallWindow < 1 || options.EventWindow < 1) throw new ArgumentOutOfRangeException(nameof(options), "CallWindow and EventWindow are positive");
+        Options = options; Events = new(this);
         UnboundClock = new(options.TimeProvider, Dispatcher.Post, Report);
         Dispatcher.Unhandled = error => Report(new("runtime_failed", error));
         Store = options.Store as ChordStore;
@@ -210,8 +217,7 @@ public sealed partial class ChordHost : IAsyncDisposable
                 binding.Bind(LocalObject(served, binding.Parameters, binding.Caller, binding.AcquisitionContext));
                 return;
             }
-            var remote = RemoteTarget?.Invoke(type, binding.Parameters, binding.Caller, binding.AcquisitionContext);
-            if (remote is not null) { binding.Bind(remote); return; }
+            if (BindRemote?.Invoke(binding) == true) return;
             binding.Waiting(new ChordError("unavailable", $"{type.Name}: no provider"));
         }
         catch (Exception error) { binding.Failed(new FailureCause(FailureKind.Broken, DataInternal.AsChordError(error, binding.Contract.Name))); }
@@ -256,7 +262,7 @@ public sealed partial class ChordHost : IAsyncDisposable
         return (INativeWatchable<IReadOnlyList<Presence>>)source;
     });
     private IReadOnlyList<Presence> CurrentPresence(string name) =>
-        Objects.Values.Where(obj => obj.State.Kind == "live" && obj.Served.Contract.Name == name)
+        Objects.Values.Where(obj => obj.ListsHolders && obj.Served.Contract.Name == name)
             .SelectMany(obj => obj.Holders.Where(holder => holder.Listed).Select(holder => new Presence(obj.Parameters.Value, holder.Caller.Principal, holder.Caller.Incarnation))).ToArray();
     internal void ChangedPresence()
     {
@@ -269,6 +275,9 @@ public sealed partial class ChordHost : IAsyncDisposable
         }, Context);
     }
     internal void Forget(Binding binding) { bindings.Remove(binding); ChangedPresence(); }
+    /// <summary>The principal key of <paramref name="principal"/> (<c>HostOptions.PrincipalKey</c>): a route's admission keeps one
+    /// decision per key.</summary>
+    internal string PrincipalKeyOf(JsonObject principal, ChordContext context) => DataInternal.PrincipalKey(principal, context, Options.PrincipalKey);
     internal void CountCall(int by) { runningCalls += by; ChordTelemetry.Metrics(Telemetry.Metrics).UpDownCounter("chord.calls.in_flight").Add(by); ChangedPresence(); }
     internal void CountJob(int by) { runningJobs += by; ChangedPresence(); }
     internal void CountReference(int by) { incomingReferences += by; ChangedPresence(); }
@@ -327,6 +336,7 @@ public sealed partial class ChordHost : IAsyncDisposable
         var failures = new List<Exception>();
         foreach (var obj in objects)
             try { await obj.EndAsync(HostErrors.Closed(), NativeCloseReason.Close); } catch (Exception error) { failures.Add(error); }
+        foreach (var obj in objects) obj.UnbindSets();
         foreach (var contribution in facetContributions) contribution.Record.Remove(contribution);
         facetContributions.Clear();
         foreach (var record in RegistryRecords.Values) record.Close();

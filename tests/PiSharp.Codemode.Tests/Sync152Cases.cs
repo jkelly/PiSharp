@@ -1,7 +1,7 @@
 using System.Text.Json;
 using PiSharp.Codemode;
 
-// Pi b4afdddf44e059c67ccf5097e5317d913521b470 (MIT): packages/codemode/test/{declarations,sandbox}.test.ts.
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/codemode/test/{declarations,sandbox}.test.ts.
 // Authored from the v1.5.2 source; not captured upstream output. Additional native cases cover the public helper,
 // every declaration entrypoint and both native hosts, in ordinary and deterministic execution modes.
 internal static partial class Program

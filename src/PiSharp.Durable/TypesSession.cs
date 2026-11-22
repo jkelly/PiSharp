@@ -622,6 +622,13 @@ public interface ITx
     /// <summary>Places a queued submission at <paramref name="entry"/>: an input becomes placed, a write done. Resolved like
     /// <see cref="SettleSubmission"/>.</summary>
     void PlaceSubmission(SubmissionId id, EntryId entry);
+    /// <summary>
+    /// Delivers <paramref name="value"/> to task <paramref name="taskId"/> under <paramref name="key"/> (upstream <c>signal</c>, Pi v1.6.0):
+    /// stored in the task until a sleep on the key wakes on it, also when the task does not sleep on it yet. Reads the task, so it throws
+    /// <see cref="ReadAfterWriteException"/> after the commit's first table write; the result is provisional until the commit is stored.
+    /// Checks nothing about the caller.
+    /// </summary>
+    Task<SignalResult> SignalAsync(TaskId taskId, SignalToken token, string key, JsonValue value);
 
     /// <summary>Gets or creates the draft of a Session singleton.</summary>
     Task<DraftObject> DocAsync(SessionDocToken token);

@@ -1,4 +1,4 @@
-// Pi b4afdddf44e059c67ccf5097e5317d913521b470 (MIT): packages/ai/src/utils/identity.ts and packages/ai/src/utils/version.ts.
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/ai/src/utils/identity.ts and packages/ai/src/utils/version.ts.
 using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.InteropServices;
@@ -65,8 +65,8 @@ public sealed record ClientIdentity
 [Experimental("PISHARP_IDENTITY001")]
 public static class ClientIdentities
 {
-    /// <summary>version.ts <c>PI_AI_VERSION</c>: decision 0014 has PiSharp identify as the Pi release it tracks.</summary>
-    public const string PiVersion = "1.5.2";
+    /// <summary>version.ts <c>PI_AI_VERSION</c>: decision 0015 has PiSharp identify as the Pi release it tracks.</summary>
+    public const string PiVersion = "1.6.0";
 
     private const string NvidiaNimHost = "integrate.api.nvidia.com";
     private const string OpenCodeHost = "opencode.ai";

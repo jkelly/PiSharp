@@ -1451,7 +1451,10 @@ internal static partial class StructuredTests
         AddHooks(setup.Registry, HarnessTasks.GenerationTask, new GenerationHooks
         {
             AfterTools = async (_, _, api, callContext) =>
-                await opened().CommitAsync(tx => tx.CreateTaskAsync(nodes.Node, NodeInput("hooked"), Owned(api.TaskId)), callContext),
+            {
+                await opened().CommitAsync(tx => tx.CreateTaskAsync(nodes.Node, NodeInput("hooked"), Owned(api.TaskId)), callContext);
+                return null;
+            },
         });
 
     private static async Task<TaskId> FirstGeneration(IHarness harness) =>

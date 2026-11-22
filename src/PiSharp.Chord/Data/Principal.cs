@@ -1,4 +1,4 @@
-// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/chord/src/next/data/principal.ts
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/chord/src/data/principal.ts
 //
 // Principals: the app's caller identities, and the keys Chord derives from them. A principal is plain JSON with a "kind", a JsonObject
 // here; Chord never persists it. Its keys are cached per principal object and, for a custom key, per function too, in weak tables (as
@@ -26,6 +26,25 @@ internal static partial class DataInternal
     private static readonly ConditionalWeakTable<JsonObject, string> DefaultKeys = new();
 
     private static readonly ConditionalWeakTable<PrincipalKeyFunction, ConditionalWeakTable<JsonObject, string>> CustomKeys = new();
+
+    private static readonly ConditionalWeakTable<JsonObject, string> WireJson = new();
+
+    /// <summary>A principal's own JSON, as the wire carries it (its fields in insertion order): two principals give the same text only
+    /// when they serialize equally (upstream <c>principalJson</c>). Cached per principal object, one walk counted per object (decision
+    /// "References share one wire hold": the caller part of the sharing key). The text is JavaScript's <c>JSON.stringify</c>
+    /// (<see cref="ChordJson.Stringify(JsonNode?)"/>), so it equals what a TypeScript host computes for the same principal.</summary>
+    internal static string PrincipalJson(JsonObject principal, ChordContext context)
+    {
+        ArgumentNullException.ThrowIfNull(principal);
+        ArgumentNullException.ThrowIfNull(context);
+        if (!WireJson.TryGetValue(principal, out var json))
+        {
+            context.Count("chord.data.walks");
+            json = ChordJson.Stringify(principal);
+            WireJson.AddOrUpdate(principal, json);
+        }
+        return json;
+    }
 
     /// <summary>The key of a principal: its canonical JSON, or <paramref name="customKey"/>'s (upstream <c>principalKey</c>). Cached per
     /// principal object; a custom key's cache is keyed by the function too.</summary>

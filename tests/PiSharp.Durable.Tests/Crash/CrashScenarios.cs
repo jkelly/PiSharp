@@ -264,7 +264,11 @@ internal static class CrashScenarios
             });
             HarnessTests.AddHooks(setup.Registry, HarnessTasks.GenerationTask, new GenerationHooks
             {
-                AfterTools = (_, _, _, _) => gate.At("after-tools"),
+                AfterTools = async (_, _, _, _) =>
+                {
+                    await gate.At("after-tools");
+                    return null;
+                },
             });
         }
         var retried = 0;

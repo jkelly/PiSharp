@@ -10,10 +10,12 @@ using PiSharp.Cli.Models;
 // test/resolve-config-value.test.ts, test/virtual-models.test.ts, test/remote-catalog-provider.test.ts) by reading, never captured
 // from an upstream run. Fake HTTP endpoints answer in process; no network or live credentials are used.
 // Optional: --tarball <pi-ai package tarball, e.g. pi-ai-1.5.0.tgz> also compares every embedded shard byte-for-byte with the package archive.
+// Optional: --release-tarball <pi-ai-1.6.0.tgz> does the same for the current release catalog (PiSharp.AI Catalogs/Releases/1.6.0).
 internal static partial class Program
 {
     private const string Upstream = "f9a26365568127461c47a07a37dcb42c140a3ac5";
     internal static string? Tarball;
+    internal static string? ReleaseTarball;
 
     private static async Task<int> Main(string[] args)
     {
@@ -22,7 +24,8 @@ internal static partial class Program
         {
             if (args[index] == "--report" && report is null && index + 1 < args.Length) report = Path.GetFullPath(args[++index]);
             else if (args[index] == "--tarball" && Tarball is null && index + 1 < args.Length) Tarball = Path.GetFullPath(args[++index]);
-            else throw new ArgumentException("Use [--report <fresh path>] [--tarball <pi-ai package tarball>].");
+            else if (args[index] == "--release-tarball" && ReleaseTarball is null && index + 1 < args.Length) ReleaseTarball = Path.GetFullPath(args[++index]);
+            else throw new ArgumentException("Use [--report <fresh path>] [--tarball <pi-ai 1.5.0 package tarball>] [--release-tarball <pi-ai 1.6.0 package tarball>].");
         }
         var cases = new List<(string Id, Func<Task> Run)>();
         cases.AddRange(CatalogCases());
@@ -30,6 +33,7 @@ internal static partial class Program
         cases.AddRange(CatalogCorrectionCases());
         cases.AddRange(CatalogExpansionCases());
         cases.AddRange(Sync152CatalogCases());
+        cases.AddRange(Sync160CatalogCases());
         cases.AddRange(ResolverCases());
         cases.AddRange(ModelsJsonCases());
         cases.AddRange(ConfigValueCases());
@@ -57,7 +61,7 @@ internal static partial class Program
         }
         var output = new { sourceSha = Upstream, status = "AUTHORED NATIVE; NO UPSTREAM CAPTURE", cases = cases.Count, failures, skipped,
             platform = OperatingSystem.IsWindows() ? "windows" : OperatingSystem.IsMacOS() ? "macos" : "linux",
-            tarballVerified = Tarball is not null, genuineSourceCasesCaptured = 0, liveRoutes = LiveRoutes, results };
+            tarballVerified = Tarball is not null, releaseTarballVerified = ReleaseTarball is not null, genuineSourceCasesCaptured = 0, liveRoutes = LiveRoutes, results };
         var json = JsonSerializer.Serialize(output, new JsonSerializerOptions { WriteIndented = true });
         if (report is not null)
         {

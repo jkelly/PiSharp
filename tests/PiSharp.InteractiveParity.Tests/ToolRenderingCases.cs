@@ -435,7 +435,7 @@ internal static partial class ToolRenderingCases
             var component = Tool("read", """{"path":"notes.txt"}""", BuiltInToolRenderers.ForToolDefinition("read"), Environment.CurrentDirectory);
             component.UpdateResult(TextResult("hidden content"));
             const int width = 120;
-            var lines = component.Render(width);
+            var lines = component.Render(width).ToList();
             var resultRow = lines.FindIndex(line => Strip(line).Contains("notes.txt", StringComparison.Ordinal));
             Check(resultRow >= 0, "header row");
             var mouseEvent = new TuiMouseEvent(TuiMouseEventType.Click, TuiMouseButton.Left, 2, resultRow, 2, resultRow, width, lines.Count, ClickCount: 1);
@@ -826,7 +826,7 @@ internal static partial class ToolRenderingCases
         yield return ("tool.edit.default-shell-matches-shell-less-definition", Sync(() =>
         {
             using var dir = new TempDir();
-            List<string> RenderEdit(ToolRenderers definition) => new ToolExecutionComponent("edit", "edit-shell-test",
+            IReadOnlyList<string> RenderEdit(ToolRenderers definition) => new ToolExecutionComponent("edit", "edit-shell-test",
                 Args("""{"path":"notes.txt","oldText":"before","newText":"after"}"""), null, definition, Ui(), dir.Path).Render(40);
             var minimalMode = BuiltInToolRenderers.ForToolDefinition("edit")! with { RenderShell = ToolRenderShell.Default };
             var withoutShell = minimalMode with { RenderShell = null };

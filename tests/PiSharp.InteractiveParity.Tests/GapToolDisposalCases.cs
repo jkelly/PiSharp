@@ -8,7 +8,7 @@ internal static partial class ToolRenderingCases
     private sealed class DisposalView : IComponent, IDisposableComponent
     {
         internal int Disposals, Renders;
-        public List<string> Render(int width) { Check(Disposals == 0, "disposed renderer was painted"); Renders++; return ["view"]; }
+        public IReadOnlyList<string> Render(int width) { Check(Disposals == 0, "disposed renderer was painted"); Renders++; return ["view"]; }
         public void Invalidate() => Check(Disposals == 0, "disposed renderer was invalidated");
         public void Dispose() => Disposals++;
     }

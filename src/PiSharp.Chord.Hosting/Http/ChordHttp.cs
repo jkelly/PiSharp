@@ -170,7 +170,10 @@ public sealed class ChordHttp : IAsyncDisposable
                         {
                             if (options.LinksOpened is { } opened)
                             {
-                                try { cleanup = await opened(request, principal!).ConfigureAwait(false); }
+                                // Upstream upgrades.ts link(): `opened(() => end(upgraded))`. The socket leaves `sockets` before it is disposed,
+                                // so a call after the link is gone finds nothing to end.
+                                void Terminate() { lock (sync) { if (!sockets.ContainsKey(socket)) return; } socket.Abort(); }
+                                try { cleanup = await opened(request, principal!, Terminate).ConfigureAwait(false); }
                                 catch (Exception error) { Report(new("hook_failed", error, Pattern: "links.opened")); }
                             }
                             var link = WebSocketLink.FromWebSocket(socket, 1024 * 1024);

@@ -64,7 +64,7 @@ Every project gets these settings from `Directory.Build.props`:
 
 | Setting | Value | Effect |
 | --- | --- | --- |
-| `VersionPrefix` | `1.5.2` | The version a build reports, unless you pass `-p:VersionPrefix`. A build of `main` reports it even when it holds unreleased features. |
+| `VersionPrefix` | `1.6.0` | The version a build reports, unless you pass `-p:VersionPrefix`. A build of `main` reports it even when it holds unreleased features. |
 | `TargetFramework` | `net10.0` | |
 | `Nullable`, `ImplicitUsings` | `enable` | |
 | `TreatWarningsAsErrors` | `true` | Any compiler warning fails the build. |

@@ -1,4 +1,4 @@
-// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/chord/src/next/contracts/evolve.ts
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/chord/src/contracts/evolve.ts
 //
 // Evolution: Contract.Evolve(previous, e => e...) appends the next version of a history with structured edits. Upstream hands a remote
 // contract's evolve a RemoteEditor (the draft itself) and a local one's a LocalEditor (the same edits with the variant filled in), and
@@ -6,7 +6,10 @@
 // table see each version's members. C# has no literal or mapped types and a Contract is not generic, so there is one ContractEditor with
 // both kinds' edits: the remote forms name a variant, the local ones do not, and the keyed edits are local only. An edit of the other
 // kind's form, which upstream's types rule out, is refused when it runs (a PiSharp-only refusal, as declarations check kinds when they
-// run). Every other check and message is upstream's.
+// run). Every other check and message is upstream's. 1.6.0: event edits (Event, AddEvent, RemoveEvent; both forms), queries members
+// carried over as they are, and Admission(schema) for a remote contract. Upstream makes admission(schema) the last edit of a version
+// through its return type (it returns no editor); here it returns the editor, as evolve must get its editor back, and an edit made after
+// it is refused when it runs (a PiSharp-only refusal standing in for the type).
 using System.Text.Json.Nodes;
 
 namespace PiSharp.Chord.Contracts;
@@ -36,6 +39,10 @@ public sealed class ContractEditor
     private readonly OrderedDictionary<string, VariantData> _views = new(StringComparer.Ordinal);
     private readonly OrderedDictionary<string, MemberKind> _kinds;
     private readonly List<Change> _changes = [];
+    // The admission of the next version: the previous one's unless Admission(schema) replaced it.
+    private AdmissionData? _admission;
+    // Set by Admission(schema): the last edit of a version.
+    private bool _sealed;
 
     internal ContractEditor(ContractData data)
     {
@@ -45,12 +52,14 @@ public sealed class ContractEditor
         Path = $"{data.Name} v{_version}";
         foreach (var (name, variant) in current.Variants)
         {
-            var draft = new DraftVariant(Copy(variant.State), Copy(variant.Methods), Copy(variant.Keyed));
+            // `queries` members are carried over as they are: no edit changes one yet (slice 14, carry-over).
+            var draft = new DraftVariant(Copy(variant.State), Copy(variant.Methods), Copy(variant.Keyed), Copy(variant.Events), variant.Queries);
             _variants[name] = draft;
             // A view over the draft's maps, for the member checks.
-            _views[name] = new VariantData(draft.State, draft.Methods, draft.Keyed);
+            _views[name] = new VariantData(draft.State, draft.Methods, draft.Keyed, draft.Events, draft.Queries);
         }
         _kinds = Copy(data.Kinds);
+        _admission = data.Admission;
     }
 
     /// <summary>The next version's name in errors: <c>notes v2</c>.</summary>
@@ -60,6 +69,37 @@ public sealed class ContractEditor
 
     /// <summary>Changes state member <paramref name="member"/> of <paramref name="variant"/> (a remote contract).</summary>
     public ContractEditor State(string variant, string member, JsonNode? schema) => ChangeState(RemoteVariant(variant), member, schema);
+
+    /// <summary>Replaces the schema of the admission's value (slice 14 §2.5), or gives the contract one: the last edit of a version, and a
+    /// remote contract's only. The wire fingerprint is untouched; a reload rehearses the new factory only with a value of an equal
+    /// admission schema.</summary>
+    public ContractEditor Admission(JsonNode? schema)
+    {
+        Open();
+        if (IsLocal) throw new ArgumentException($"{Path}: an admission belongs to a remote contract");
+        _admission = ContractsInternal.AdmissionDataOf(schema, $"{Path}.admission");
+        _sealed = true;
+        return this;
+    }
+
+    /// <summary>Changes event member <paramref name="member"/>'s schema in <paramref name="variant"/> (a remote contract): an older
+    /// consumer gets each value mapped, or is refused.</summary>
+    public ContractEditor Event(string variant, string member, JsonNode? schema) => ChangeEvent(RemoteVariant(variant), member, schema);
+
+    /// <summary>Changes event member <paramref name="member"/>'s schema (a local contract).</summary>
+    public ContractEditor Event(string member, JsonNode? schema) => ChangeEvent(LocalVariant(), member, schema);
+
+    /// <summary>Adds event member <paramref name="member"/> to <paramref name="variant"/> (a remote contract).</summary>
+    public ContractEditor AddEvent(string variant, string member, JsonNode? schema) => AddEventTo(RemoteVariant(variant), member, schema);
+
+    /// <summary>Adds event member <paramref name="member"/> (a local contract).</summary>
+    public ContractEditor AddEvent(string member, JsonNode? schema) => AddEventTo(LocalVariant(), member, schema);
+
+    /// <summary>Removes event member <paramref name="member"/> from <paramref name="variant"/> (a remote contract).</summary>
+    public ContractEditor RemoveEvent(string variant, string member) => RemoveEventFrom(RemoteVariant(variant), member);
+
+    /// <summary>Removes event member <paramref name="member"/> (a local contract).</summary>
+    public ContractEditor RemoveEvent(string member) => RemoveEventFrom(LocalVariant(), member);
 
     /// <summary>Changes state member <paramref name="member"/> (a local contract).</summary>
     public ContractEditor State(string member, JsonNode? schema) => ChangeState(LocalVariant(), member, schema);
@@ -120,6 +160,7 @@ public sealed class ContractEditor
     public ContractEditor RemoveKeyed(string member)
     {
         var variant = KeyedVariant();
+        Open();
         if (!Variant(variant).Keyed.Remove(member)) throw new ArgumentException($"{MemberPath(variant, member, MemberKind.Keyed)}: no such keyed member");
         return this;
     }
@@ -136,6 +177,7 @@ public sealed class ContractEditor
     /// <summary>Removes method <paramref name="member"/> from every variant that has it.</summary>
     public ContractEditor RemoveMethod(string member)
     {
+        Open();
         foreach (var variant in VariantsWith(member)) Variant(variant).Methods.Remove(member);
         return this;
     }
@@ -145,9 +187,38 @@ public sealed class ContractEditor
     {
         // Copies: an editor kept past its evolve call cannot change the version it produced.
         var variants = new OrderedDictionary<string, VariantData>(StringComparer.Ordinal);
-        foreach (var (name, draft) in _variants) variants[name] = new VariantData(Copy(draft.State), Copy(draft.Methods), Copy(draft.Keyed));
+        foreach (var (name, draft) in _variants)
+            variants[name] = new VariantData(Copy(draft.State), Copy(draft.Methods), Copy(draft.Keyed), Copy(draft.Events), draft.Queries);
         var version = ContractsInternal.Materialize(_data.Kind, _data.Params, _version, variants, [.. _changes]);
-        return _data with { Versions = [.. _data.Versions, version], Kinds = Copy(_kinds) };
+        return _data with { Versions = [.. _data.Versions, version], Kinds = Copy(_kinds), Admission = _admission };
+    }
+
+    private ContractEditor ChangeEvent(string variant, string member, JsonNode? schema)
+    {
+        Open();
+        if (!Variant(variant).Events.ContainsKey(member)) throw new ArgumentException($"{MemberPath(variant, member, MemberKind.Event)}: no such event member");
+        return PutEvent(variant, member, schema);
+    }
+
+    private ContractEditor AddEventTo(string variant, string member, JsonNode? schema)
+    {
+        Open();
+        RefuseDeclared(variant, member, MemberKind.Event);
+        return PutEvent(variant, member, schema);
+    }
+
+    private ContractEditor RemoveEventFrom(string variant, string member)
+    {
+        Open();
+        if (!Variant(variant).Events.Remove(member)) throw new ArgumentException($"{MemberPath(variant, member, MemberKind.Event)}: no such event member");
+        return this;
+    }
+
+    private ContractEditor PutEvent(string variant, string member, JsonNode? schema)
+    {
+        Variant(variant).Events[member] = ContractsInternal.EventSnapshot(schema, MemberPath(variant, member, MemberKind.Event));
+        _changes.Add(new Change(variant, member, ChangeSide.Event));
+        return Checked();
     }
 
     private ContractEditor ChangeState(string variant, string member, JsonNode? schema)
@@ -164,12 +235,14 @@ public sealed class ContractEditor
 
     private ContractEditor RemoveStateFrom(string variant, string member)
     {
+        Open();
         if (!Variant(variant).State.Remove(member)) throw new ArgumentException($"{MemberPath(variant, member, MemberKind.State)}: no such state member");
         return this;
     }
 
     private ContractEditor AddMethodTo(string variant, string member, JsonNode? args, JsonNode? result)
     {
+        Open();
         RefuseDeclared(variant, member, MemberKind.Method);
         Variant(variant).Methods[member] = ContractsInternal.ReadMethod(new MethodDeclaration(args!, result!), MemberPath(variant, member, MemberKind.Method));
         _changes.Add(new Change(variant, member, ChangeSide.Args));
@@ -179,6 +252,7 @@ public sealed class ContractEditor
 
     private ContractEditor PutState(string variant, string member, JsonNode? schema)
     {
+        Open();
         Variant(variant).State[member] = ContractsInternal.SnapshotSchema(schema, MemberPath(variant, member, MemberKind.State));
         _changes.Add(new Change(variant, member, ChangeSide.State));
         return Checked();
@@ -186,6 +260,7 @@ public sealed class ContractEditor
 
     private ContractEditor PutKeyed(string variant, string member, JsonNode? schema, HostKind? host = null)
     {
+        Open();
         if (host is not null) ContractsInternal.KindParams(host);
         Variant(variant).Keyed[member] = ContractsInternal.SnapshotSchema(schema, MemberPath(variant, member, MemberKind.Keyed)) with { KeyHost = host };
         _changes.Add(new Change(variant, member, ChangeSide.Keyed));
@@ -195,6 +270,7 @@ public sealed class ContractEditor
     /// <summary>Changes the given sides of a method in every variant that has it.</summary>
     private ContractEditor ChangeMethod(string member, (JsonNode? Schema, bool Changed) args, (JsonNode? Schema, bool Changed) result)
     {
+        Open();
         var variants = VariantsWith(member);
         var path = MemberPath(variants[0], member, MemberKind.Method);
         var newArgs = args.Changed ? ContractsInternal.SnapshotArguments(args.Schema, $"{path}.args") : null;
@@ -222,9 +298,16 @@ public sealed class ContractEditor
 
     private void RefuseDeclared(string variant, string member, MemberKind kind)
     {
-        var (state, methods, keyed) = Variant(variant);
-        if (state.ContainsKey(member) || methods.ContainsKey(member) || keyed.ContainsKey(member))
+        var (state, methods, keyed, events, queries) = Variant(variant);
+        if (state.ContainsKey(member) || methods.ContainsKey(member) || keyed.ContainsKey(member) || events.ContainsKey(member) || queries.ContainsKey(member))
             throw new ArgumentException($"{MemberPath(variant, member, kind)}: already declared");
+    }
+
+    /// <summary>Refuses an edit after <see cref="Admission"/>, which upstream's types make the last edit of a version (it returns no
+    /// editor).</summary>
+    private void Open()
+    {
+        if (_sealed) throw new ArgumentException($"{Path}: admission(schema) is the last edit of a version");
     }
 
     /// <summary>The variant of a remote edit; a local contract's edits name none (upstream's LocalEditor has no variant parameter).</summary>
@@ -259,7 +342,9 @@ public sealed class ContractEditor
     private sealed record DraftVariant(
         OrderedDictionary<string, Snapshot> State,
         OrderedDictionary<string, MethodData> Methods,
-        OrderedDictionary<string, Snapshot> Keyed);
+        OrderedDictionary<string, Snapshot> Keyed,
+        OrderedDictionary<string, Snapshot> Events,
+        IReadOnlyDictionary<string, QueriesData> Queries);
 }
 
 internal static partial class ContractsInternal

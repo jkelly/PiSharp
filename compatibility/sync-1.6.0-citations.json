@@ -1,0 +1,2135 @@
+{
+  "schemaVersion": 1,
+  "mode": "applied",
+  "generatedBy": "node tools/CompatibilityReport/repin-sources.mjs --upstream <Pi repo> --from v1.5.2 --to v1.6.0 --write",
+  "decision": "docs/decisions/0015-pi-1.6.0-sync.md",
+  "from": {
+    "tag": "v1.5.2",
+    "commit": "b4afdddf44e059c67ccf5097e5317d913521b470"
+  },
+  "to": {
+    "tag": "v1.6.0",
+    "commit": "faac585884ae2c013a6b1400f3e9e77f10b34bac"
+  },
+  "rule": "A citation moves to the new commit only when every upstream path it names has the same git object id at both tags. The rest stay on the old commit until their area is re-ported, then move with the port.",
+  "summary": {
+    "filesWithOldCommit": 214,
+    "citations": {
+      "repinned": 85,
+      "pending": 37,
+      "unparsed": 13,
+      "nonHeader": 8,
+      "excludedHistorical": 9292,
+      "releaseDocs": 6
+    },
+    "files": {
+      "repinned": 85,
+      "pending": 37,
+      "historical": 73,
+      "releaseDocs": 3,
+      "nonHeader": 6
+    },
+    "pendingByArea": {
+      "ai": {
+        "files": 4,
+        "changeSize": 36
+      },
+      "chord": {
+        "files": 24,
+        "changeSize": 1765
+      },
+      "coding-agent": {
+        "files": 8,
+        "changeSize": 593
+      },
+      "tui": {
+        "files": 1,
+        "changeSize": 170
+      }
+    }
+  },
+  "pending": [
+    {
+      "file": "src/PiSharp.AI/Protocols/AnthropicMessages/AnthropicCatalogCompatibility.cs",
+      "area": "ai",
+      "citations": [
+        {
+          "line": 1,
+          "changed": [
+            "packages/ai/src/api/anthropic-messages.ts"
+          ]
+        }
+      ],
+      "upstream": [
+        {
+          "path": "packages/ai/src/api/anthropic-messages.ts",
+          "status": "changed",
+          "linesChanged": 9
+        }
+      ],
+      "changeSize": 9,
+      "applicabilityRows": [
+        "sync160.file.0790"
+      ]
+    },
+    {
+      "file": "tests/PiSharp.ProviderSync.Tests/AnthropicCatalogBindingCases.cs",
+      "area": "ai",
+      "citations": [
+        {
+          "line": 1,
+          "changed": [
+            "packages/ai/src/api/anthropic-messages.ts"
+          ],
+          "unchanged": [
+            "packages/ai/src/providers/anthropic.ts"
+          ]
+        }
+      ],
+      "upstream": [
+        {
+          "path": "packages/ai/src/api/anthropic-messages.ts",
+          "status": "changed",
+          "linesChanged": 9
+        }
+      ],
+      "changeSize": 9,
+      "applicabilityRows": [
+        "sync160.file.0790"
+      ]
+    },
+    {
+      "file": "tests/PiSharp.ProviderSync.Tests/ProviderRouteCacheCases.cs",
+      "area": "ai",
+      "citations": [
+        {
+          "line": 1,
+          "changed": [
+            "packages/ai/src/api/anthropic-messages.ts"
+          ],
+          "unchanged": [
+            "packages/ai/src/api/openai-responses.ts"
+          ]
+        }
+      ],
+      "upstream": [
+        {
+          "path": "packages/ai/src/api/anthropic-messages.ts",
+          "status": "changed",
+          "linesChanged": 9
+        }
+      ],
+      "changeSize": 9,
+      "applicabilityRows": [
+        "sync160.file.0790"
+      ]
+    },
+    {
+      "file": "tests/PiSharp.ProviderSync.Tests/StrictSessionCases.cs",
+      "area": "ai",
+      "citations": [
+        {
+          "line": 1,
+          "changed": [
+            "packages/ai/src/api/anthropic-messages.ts"
+          ],
+          "unchanged": [
+            "packages/ai/src/api/strict-tool-limits.ts",
+            "packages/ai/src/api/bedrock-converse-stream.ts"
+          ]
+        }
+      ],
+      "upstream": [
+        {
+          "path": "packages/ai/src/api/anthropic-messages.ts",
+          "status": "changed",
+          "linesChanged": 9
+        }
+      ],
+      "changeSize": 9,
+      "applicabilityRows": [
+        "sync160.file.0790"
+      ]
+    },
+    {
+      "file": "tests/PiSharp.Chord.Tests/Remote/Remote152Cases.cs",
+      "area": "chord",
+      "citations": [
+        {
+          "line": 1,
+          "changed": [
+            "packages/chord/src/remote/consumer.ts",
+            "packages/chord/src/remote/provider.ts",
+            "packages/chord/src/remote/relay.ts"
+          ]
+        }
+      ],
+      "upstream": [
+        {
+          "path": "packages/chord/src/remote/consumer.ts",
+          "status": "changed",
+          "linesChanged": 140
+        },
+        {
+          "path": "packages/chord/src/remote/provider.ts",
+          "status": "changed",
+          "linesChanged": 307
+        },
+        {
+          "path": "packages/chord/src/remote/relay.ts",
+          "status": "changed",
+          "linesChanged": 158
+        }
+      ],
+      "changeSize": 605,
+      "applicabilityRows": [
+        "sync160.file.0926",
+        "sync160.file.0931",
+        "sync160.file.0932"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Chord/Host/Tracing.cs",
+      "area": "chord",
+      "citations": [
+        {
+          "line": 1,
+          "changed": [
+            "packages/chord/src/telemetry.ts",
+            "packages/chord/src/host/host.ts"
+          ]
+        }
+      ],
+      "upstream": [
+        {
+          "path": "packages/chord/src/telemetry.ts",
+          "status": "changed",
+          "linesChanged": 53
+        },
+        {
+          "path": "packages/chord/src/host/host.ts",
+          "status": "changed",
+          "linesChanged": 206
+        }
+      ],
+      "changeSize": 259,
+      "applicabilityRows": [
+        "sync160.file.0968",
+        "sync160.file.0870"
+      ]
+    },
+    {
+      "file": "tests/PiSharp.Chord.Hosting.Tests/WorkerSnapshotCases.cs",
+      "area": "chord",
+      "citations": [
+        {
+          "line": 1,
+          "changed": [
+            "packages/chord/src/node/workers/base.ts",
+            "packages/chord/src/node/workers/workers.ts"
+          ]
+        }
+      ],
+      "upstream": [
+        {
+          "path": "packages/chord/src/node/workers/base.ts",
+          "status": "changed",
+          "linesChanged": 4
+        },
+        {
+          "path": "packages/chord/src/node/workers/workers.ts",
+          "status": "changed",
+          "linesChanged": 140
+        }
+      ],
+      "changeSize": 144,
+      "applicabilityRows": [
+        "sync160.file.0918",
+        "sync160.file.0920"
+      ]
+    },
+    {
+      "file": "tests/PiSharp.Chord.Tests/Contracts/HostKeyedCases.cs",
+      "area": "chord",
+      "citations": [
+        {
+          "line": 1,
+          "changed": [
+            "packages/chord/src/contracts/contract.ts"
+          ],
+          "unchanged": [
+            "packages/chord/src/contracts/host-kind.ts"
+          ]
+        }
+      ],
+      "upstream": [
+        {
+          "path": "packages/chord/src/contracts/contract.ts",
+          "status": "changed",
+          "linesChanged": 141
+        }
+      ],
+      "changeSize": 141,
+      "applicabilityRows": [
+        "sync160.file.0849"
+      ]
+    },
+    {
+      "file": "tests/PiSharp.Chord.Tests/Host/HostDataTelemetryCases.cs",
+      "area": "chord",
+      "citations": [
+        {
+          "line": 1,
+          "changed": [
+            "packages/chord/src/host/host-data.ts",
+            "packages/chord/src/telemetry.ts"
+          ]
+        }
+      ],
+      "upstream": [
+        {
+          "path": "packages/chord/src/host/host-data.ts",
+          "status": "changed",
+          "linesChanged": 46
+        },
+        {
+          "path": "packages/chord/src/telemetry.ts",
+          "status": "changed",
+          "linesChanged": 53
+        }
+      ],
+      "changeSize": 99,
+      "applicabilityRows": [
+        "sync160.file.0869",
+        "sync160.file.0968"
+      ]
+    },
+    {
+      "file": "tests/PiSharp.Chord.Tests/Sync/SessionCases.cs",
+      "area": "chord",
+      "citations": [
+        {
+          "line": 1,
+          "changed": [
+            "packages/chord/src/sync/client.ts",
+            "packages/chord/src/sync/remote.ts"
+          ],
+          "unchanged": [
+            "packages/chord/src/sync/state.ts"
+          ]
+        }
+      ],
+      "upstream": [
+        {
+          "path": "packages/chord/src/sync/client.ts",
+          "status": "changed",
+          "linesChanged": 66
+        },
+        {
+          "path": "packages/chord/src/sync/remote.ts",
+          "status": "changed",
+          "linesChanged": 22
+        }
+      ],
+      "changeSize": 88,
+      "applicabilityRows": [
+        "sync160.file.0963",
+        "sync160.file.0966"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Chord/Sync/FlushScheduler.cs",
+      "area": "chord",
+      "citations": [
+        {
+          "line": 1,
+          "changed": [
+            "packages/chord/src/sync/client.ts"
+          ]
+        }
+      ],
+      "upstream": [
+        {
+          "path": "packages/chord/src/sync/client.ts",
+          "status": "changed",
+          "linesChanged": 66
+        }
+      ],
+      "changeSize": 66,
+      "applicabilityRows": [
+        "sync160.file.0963"
+      ]
+    },
+    {
+      "file": "tests/PiSharp.Chord.Tests/Sync/SchedulerCases.cs",
+      "area": "chord",
+      "citations": [
+        {
+          "line": 1,
+          "changed": [
+            "packages/chord/src/sync/client.ts"
+          ]
+        }
+      ],
+      "upstream": [
+        {
+          "path": "packages/chord/src/sync/client.ts",
+          "status": "changed",
+          "linesChanged": 66
+        }
+      ],
+      "changeSize": 66,
+      "applicabilityRows": [
+        "sync160.file.0963"
+      ]
+    },
+    {
+      "file": "tests/PiSharp.Chord.Tests/Telemetry152Cases.cs",
+      "area": "chord",
+      "citations": [
+        {
+          "line": 1,
+          "changed": [
+            "packages/chord/src/telemetry.ts"
+          ]
+        }
+      ],
+      "upstream": [
+        {
+          "path": "packages/chord/src/telemetry.ts",
+          "status": "changed",
+          "linesChanged": 53
+        }
+      ],
+      "changeSize": 53,
+      "applicabilityRows": [
+        "sync160.file.0968"
+      ]
+    },
+    {
+      "file": "tests/PiSharp.Chord.Tests/Sync/FileCases.cs",
+      "area": "chord",
+      "citations": [
+        {
+          "line": 1,
+          "changed": [
+            "packages/chord/src/sync/filesystem.ts"
+          ],
+          "unchanged": [
+            "packages/chord/src/sync/files.ts"
+          ]
+        }
+      ],
+      "upstream": [
+        {
+          "path": "packages/chord/src/sync/filesystem.ts",
+          "status": "changed",
+          "linesChanged": 48
+        }
+      ],
+      "changeSize": 48,
+      "applicabilityRows": [
+        "sync160.file.0964"
+      ]
+    },
+    {
+      "file": "tests/PiSharp.Chord.Tests/Host/HostDataCases.cs",
+      "area": "chord",
+      "citations": [
+        {
+          "line": 1,
+          "changed": [
+            "packages/chord/src/host/host-data.ts"
+          ]
+        }
+      ],
+      "upstream": [
+        {
+          "path": "packages/chord/src/host/host-data.ts",
+          "status": "changed",
+          "linesChanged": 46
+        }
+      ],
+      "changeSize": 46,
+      "applicabilityRows": [
+        "sync160.file.0869"
+      ]
+    },
+    {
+      "file": "tests/PiSharp.Chord.Tests/Store/HostDataCases.cs",
+      "area": "chord",
+      "citations": [
+        {
+          "line": 1,
+          "changed": [
+            "packages/chord/src/store/host-data.ts"
+          ]
+        }
+      ],
+      "upstream": [
+        {
+          "path": "packages/chord/src/store/host-data.ts",
+          "status": "changed",
+          "linesChanged": 32
+        }
+      ],
+      "changeSize": 32,
+      "applicabilityRows": [
+        "sync160.file.0942"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Chord.Hosting/App/Archive.cs",
+      "area": "chord",
+      "citations": [
+        {
+          "line": 1,
+          "changed": [
+            "packages/chord/src/node/app/app.ts"
+          ],
+          "unchanged": [
+            "packages/chord/src/node/app/archive.ts"
+          ]
+        }
+      ],
+      "upstream": [
+        {
+          "path": "packages/chord/src/node/app/app.ts",
+          "status": "changed",
+          "linesChanged": 28
+        }
+      ],
+      "changeSize": 28,
+      "applicabilityRows": [
+        "sync160.file.0894"
+      ]
+    },
+    {
+      "file": "tests/PiSharp.Chord.Hosting.Tests/AppStartTests.cs",
+      "area": "chord",
+      "citations": [
+        {
+          "line": 1,
+          "changed": [
+            "packages/chord/src/node/app/app.ts"
+          ],
+          "unchanged": [
+            "packages/chord/src/node/app/worker.ts"
+          ]
+        }
+      ],
+      "upstream": [
+        {
+          "path": "packages/chord/src/node/app/app.ts",
+          "status": "changed",
+          "linesChanged": 28
+        }
+      ],
+      "changeSize": 28,
+      "applicabilityRows": [
+        "sync160.file.0894"
+      ]
+    },
+    {
+      "file": "tests/PiSharp.Chord.Hosting.Tests/Http152Cases.cs",
+      "area": "chord",
+      "citations": [
+        {
+          "line": 1,
+          "changed": [
+            "packages/chord/src/node/http/http.ts"
+          ]
+        }
+      ],
+      "upstream": [
+        {
+          "path": "packages/chord/src/node/http/http.ts",
+          "status": "changed",
+          "linesChanged": 11
+        }
+      ],
+      "changeSize": 11,
+      "applicabilityRows": [
+        "sync160.file.0905"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Chord.Hosting/Surfaces/SurfaceBuild.cs",
+      "area": "chord",
+      "citations": [
+        {
+          "line": 1,
+          "changed": [
+            "packages/chord/src/node/surfaces/surface-build.ts"
+          ]
+        }
+      ],
+      "upstream": [
+        {
+          "path": "packages/chord/src/node/surfaces/surface-build.ts",
+          "status": "changed",
+          "linesChanged": 10
+        }
+      ],
+      "changeSize": 10,
+      "applicabilityRows": [
+        "sync160.file.0914"
+      ]
+    },
+    {
+      "file": "tests/PiSharp.Chord.Hosting.Tests/SurfacePublicationTests.cs",
+      "area": "chord",
+      "citations": [
+        {
+          "line": 1,
+          "changed": [
+            "packages/chord/src/node/surfaces/surface-build.ts"
+          ],
+          "unchanged": [
+            "packages/chord/src/node/surfaces/published.ts"
+          ]
+        }
+      ],
+      "upstream": [
+        {
+          "path": "packages/chord/src/node/surfaces/surface-build.ts",
+          "status": "changed",
+          "linesChanged": 10
+        }
+      ],
+      "changeSize": 10,
+      "applicabilityRows": [
+        "sync160.file.0914"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Chord.Hosting/Plugins/PluginInstaller.cs",
+      "area": "chord",
+      "citations": [
+        {
+          "line": 1,
+          "changed": [
+            "packages/chord/src/node/plugins/install.ts"
+          ]
+        }
+      ],
+      "upstream": [
+        {
+          "path": "packages/chord/src/node/plugins/install.ts",
+          "status": "changed",
+          "linesChanged": 9
+        }
+      ],
+      "changeSize": 9,
+      "applicabilityRows": [
+        "sync160.file.0908"
+      ]
+    },
+    {
+      "file": "tests/PiSharp.Chord.Hosting.Tests/PluginDiscoveryTests.cs",
+      "area": "chord",
+      "citations": [
+        {
+          "line": 1,
+          "changed": [
+            "packages/chord/src/node/plugins/install.ts"
+          ],
+          "unchanged": [
+            "packages/chord/src/node/plugins/discover.ts",
+            "packages/chord/src/node/plugins/testing.ts"
+          ]
+        }
+      ],
+      "upstream": [
+        {
+          "path": "packages/chord/src/node/plugins/install.ts",
+          "status": "changed",
+          "linesChanged": 9
+        }
+      ],
+      "changeSize": 9,
+      "applicabilityRows": [
+        "sync160.file.0908"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Chord.Hosting/Workers/WorkerBase.cs",
+      "area": "chord",
+      "citations": [
+        {
+          "line": 1,
+          "changed": [
+            "packages/chord/src/node/workers/base.ts"
+          ]
+        }
+      ],
+      "upstream": [
+        {
+          "path": "packages/chord/src/node/workers/base.ts",
+          "status": "changed",
+          "linesChanged": 4
+        }
+      ],
+      "changeSize": 4,
+      "applicabilityRows": [
+        "sync160.file.0918"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Chord.Hosting/Surfaces/PublishedScripts.cs",
+      "area": "chord",
+      "citations": [
+        {
+          "line": 1,
+          "changed": [
+            "packages/chord/src/node/surfaces/served.ts"
+          ],
+          "unchanged": [
+            "packages/chord/src/node/surfaces/published.ts"
+          ]
+        }
+      ],
+      "upstream": [
+        {
+          "path": "packages/chord/src/node/surfaces/served.ts",
+          "status": "changed",
+          "linesChanged": 3
+        }
+      ],
+      "changeSize": 3,
+      "applicabilityRows": [
+        "sync160.file.0913"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Chord.Hosting/App/Layout.cs",
+      "area": "chord",
+      "citations": [
+        {
+          "line": 1,
+          "changed": [
+            "packages/chord/src/node/app/layout.ts"
+          ]
+        }
+      ],
+      "upstream": [
+        {
+          "path": "packages/chord/src/node/app/layout.ts",
+          "status": "changed",
+          "linesChanged": 2
+        }
+      ],
+      "changeSize": 2,
+      "applicabilityRows": [
+        "sync160.file.0900"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Chord/ChordNext.cs",
+      "area": "chord",
+      "citations": [
+        {
+          "line": 1,
+          "changed": [
+            "packages/chord/src/index.ts"
+          ]
+        }
+      ],
+      "upstream": [
+        {
+          "path": "packages/chord/src/index.ts",
+          "status": "changed",
+          "linesChanged": 2
+        }
+      ],
+      "changeSize": 2,
+      "applicabilityRows": [
+        "sync160.file.0886"
+      ]
+    },
+    {
+      "file": "tests/PiSharp.Chord.Hosting.Tests/AppLayoutTests.cs",
+      "area": "chord",
+      "citations": [
+        {
+          "line": 1,
+          "changed": [
+            "packages/chord/src/node/app/layout.ts"
+          ],
+          "unchanged": [
+            "packages/chord/src/node/app/secrets.ts"
+          ]
+        }
+      ],
+      "upstream": [
+        {
+          "path": "packages/chord/src/node/app/layout.ts",
+          "status": "changed",
+          "linesChanged": 2
+        }
+      ],
+      "changeSize": 2,
+      "applicabilityRows": [
+        "sync160.file.0900"
+      ]
+    },
+    {
+      "file": "tests/PiSharp.InteractiveParity.Tests/Sync152SessionCases.cs",
+      "area": "coding-agent",
+      "citations": [
+        {
+          "line": 1,
+          "changed": [
+            "packages/coding-agent/src/modes/interactive/interactive-mode.ts"
+          ]
+        }
+      ],
+      "upstream": [
+        {
+          "path": "packages/coding-agent/src/modes/interactive/interactive-mode.ts",
+          "status": "changed",
+          "linesChanged": 119
+        }
+      ],
+      "changeSize": 119,
+      "applicabilityRows": [
+        "sync160.file.1139"
+      ]
+    },
+    {
+      "file": "tests/PiSharp.InteractiveParity.Tests/Sync152SmallUiCases.cs",
+      "area": "coding-agent",
+      "citations": [
+        {
+          "line": 1,
+          "changed": [
+            "packages/coding-agent/src/modes/interactive/interactive-mode.ts"
+          ]
+        }
+      ],
+      "upstream": [
+        {
+          "path": "packages/coding-agent/src/modes/interactive/interactive-mode.ts",
+          "status": "changed",
+          "linesChanged": 119
+        }
+      ],
+      "changeSize": 119,
+      "applicabilityRows": [
+        "sync160.file.1139"
+      ]
+    },
+    {
+      "file": "tests/PiSharp.InteractiveParity.Tests/Sync152UiFlowCases.cs",
+      "area": "coding-agent",
+      "citations": [
+        {
+          "line": 1,
+          "changed": [
+            "packages/coding-agent/src/modes/interactive/interactive-mode.ts"
+          ]
+        }
+      ],
+      "upstream": [
+        {
+          "path": "packages/coding-agent/src/modes/interactive/interactive-mode.ts",
+          "status": "changed",
+          "linesChanged": 119
+        }
+      ],
+      "changeSize": 119,
+      "applicabilityRows": [
+        "sync160.file.1139"
+      ]
+    },
+    {
+      "file": "tests/PiSharp.ExtensionParity.Tests/Sync152PackageCases.cs",
+      "area": "coding-agent",
+      "citations": [
+        {
+          "line": 1,
+          "changed": [
+            "packages/coding-agent/src/core/package-manager.ts",
+            "packages/coding-agent/src/package-manager-cli.ts"
+          ]
+        }
+      ],
+      "upstream": [
+        {
+          "path": "packages/coding-agent/src/core/package-manager.ts",
+          "status": "changed",
+          "linesChanged": 66
+        },
+        {
+          "path": "packages/coding-agent/src/package-manager-cli.ts",
+          "status": "changed",
+          "linesChanged": 16
+        }
+      ],
+      "changeSize": 82,
+      "applicabilityRows": [
+        "sync160.file.1112",
+        "sync160.file.1144"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Cli/Extensions/PromptImageNormalizer.cs",
+      "area": "coding-agent",
+      "citations": [
+        {
+          "line": 1,
+          "changed": [
+            "packages/coding-agent/src/core/agent-session.ts"
+          ]
+        }
+      ],
+      "upstream": [
+        {
+          "path": "packages/coding-agent/src/core/agent-session.ts",
+          "status": "changed",
+          "linesChanged": 41
+        }
+      ],
+      "changeSize": 41,
+      "applicabilityRows": [
+        "sync160.file.1103"
+      ]
+    },
+    {
+      "file": "src/PiSharp.CodingAgent/PersistentAgentSession.InputNormalization.cs",
+      "area": "coding-agent",
+      "citations": [
+        {
+          "line": 1,
+          "changed": [
+            "packages/coding-agent/src/core/agent-session.ts"
+          ]
+        }
+      ],
+      "upstream": [
+        {
+          "path": "packages/coding-agent/src/core/agent-session.ts",
+          "status": "changed",
+          "linesChanged": 41
+        }
+      ],
+      "changeSize": 41,
+      "applicabilityRows": [
+        "sync160.file.1103"
+      ]
+    },
+    {
+      "file": "tests/PiSharp.CodingAgent.Tests/QueuedImageNormalizationTests.cs",
+      "area": "coding-agent",
+      "citations": [
+        {
+          "line": 1,
+          "changed": [
+            "packages/coding-agent/src/core/agent-session.ts"
+          ]
+        }
+      ],
+      "upstream": [
+        {
+          "path": "packages/coding-agent/src/core/agent-session.ts",
+          "status": "changed",
+          "linesChanged": 41
+        }
+      ],
+      "changeSize": 41,
+      "applicabilityRows": [
+        "sync160.file.1103"
+      ]
+    },
+    {
+      "file": "tests/PiSharp.Tools.Tests/Sync152ToolsCases.cs",
+      "area": "coding-agent",
+      "citations": [
+        {
+          "line": 1,
+          "changed": [
+            "packages/coding-agent/src/core/tools/read.ts"
+          ],
+          "unchanged": [
+            "packages/coding-agent/src/core/tools/edit.ts"
+          ]
+        }
+      ],
+      "upstream": [
+        {
+          "path": "packages/coding-agent/src/core/tools/read.ts",
+          "status": "changed",
+          "linesChanged": 31
+        }
+      ],
+      "changeSize": 31,
+      "applicabilityRows": [
+        "sync160.file.1119"
+      ]
+    },
+    {
+      "file": "tests/PiSharp.Tui.Tests/Sync152TuiTests.cs",
+      "area": "tui",
+      "citations": [
+        {
+          "line": 1,
+          "changed": [
+            "packages/tui/src/components/markdown.ts",
+            "packages/tui/src/utils.ts",
+            "packages/tui/src/terminal-image.ts"
+          ],
+          "unchanged": [
+            "packages/tui/src/tui-main-screen.ts"
+          ]
+        }
+      ],
+      "upstream": [
+        {
+          "path": "packages/tui/src/components/markdown.ts",
+          "status": "changed",
+          "linesChanged": 8
+        },
+        {
+          "path": "packages/tui/src/utils.ts",
+          "status": "changed",
+          "linesChanged": 112
+        },
+        {
+          "path": "packages/tui/src/terminal-image.ts",
+          "status": "changed",
+          "linesChanged": 50
+        }
+      ],
+      "changeSize": 170,
+      "applicabilityRows": [
+        "sync160.file.1280",
+        "sync160.file.1289",
+        "sync160.file.1286"
+      ]
+    }
+  ],
+  "unparsed": [
+    {
+      "file": "src/PiSharp.Chord.Hosting/Terminal/README.md",
+      "line": 13,
+      "text": "Upstream mapping at Pi `b4afdddf44e059c67ccf5097e5317d913521b470`:"
+    },
+    {
+      "file": "src/PiSharp.Cli/Interactive/Mode/LovelyMermaid/MermaidJs.cs",
+      "line": 1,
+      "text": "// lovely-mermaid 0.3.3 (Apache-2.0): ECMAScript string semantics shared by src/*.ts; Pi b4afdddf44e059c67ccf5097e5317d913521b470 (MIT)."
+    },
+    {
+      "file": "src/PiSharp.Cli/Interactive/Mode/LovelyMermaid/MermaidWidth.cs",
+      "line": 1,
+      "text": "// lovely-mermaid 0.3.3 (Apache-2.0): src/width.ts; Pi b4afdddf44e059c67ccf5097e5317d913521b470 (MIT)."
+    },
+    {
+      "file": "src/PiSharp.Durable/Storage/Jsonl/JsonlStorage.cs",
+      "line": 2,
+      "text": "// Read-only opening follows Pi b4afdddf44e059c67ccf5097e5317d913521b470, including bounded retries when a writer reclaims during recovery."
+    },
+    {
+      "file": "tests/PiSharp.CliParity.Tests/Sync152AuthPackageCases.cs",
+      "line": 1,
+      "text": "// Authored from Pi b4afdddf44e059c67ccf5097e5317d913521b470: auth-login/logout, radius-mcp and llama/client."
+    },
+    {
+      "file": "tests/PiSharp.Codemode.Tests/DeterministicCases.cs",
+      "line": 616,
+      "text": "// Derived from b4afdddf44e059c67ccf5097e5317d913521b470 PRELUDE_SOURCE; see the offline"
+    },
+    {
+      "file": "tests/PiSharp.Durable.Tests/Sync152SchedulerCases.cs",
+      "line": 1,
+      "text": "// Pi b4afdddf44e059c67ccf5097e5317d913521b470 (MIT), durable scheduler fix #11892 (e50dc7a): a pass must retain notifications"
+    },
+    {
+      "file": "tests/PiSharp.ModelRuntime.Tests/CatalogRefreshAuthCases.cs",
+      "line": 10,
+      "text": "// Pi b4afdddf44e059c67ccf5097e5317d913521b470: models.ts refreshModelsAuth. All endpoints and credentials are fake."
+    },
+    {
+      "file": "tests/PiSharp.Models.Tests/Sync152CatalogCases.cs",
+      "line": 1,
+      "text": "// PiSharp-only authored tests (no upstream capture): Pi b4afdddf44e059c67ccf5097e5317d913521b470 (MIT), catalog/providers/anthropic.ts,",
+      "note": "unresolved: catalog/providers/anthropic.ts, catalog/families/anthropic.ts, catalog/providers/azure.ts",
+      "unchanged": [
+        "packages/ai/src/providers/openai-codex.ts"
+      ]
+    },
+    {
+      "file": "tests/PiSharp.Models.Tests/Sync152CatalogCases.cs",
+      "line": 40,
+      "text": "Equal(\"b4afdddf44e059c67ccf5097e5317d913521b470\", release.SourceCommit, \"1.5.2 source provenance\");"
+    },
+    {
+      "file": "tests/PiSharp.Models.Tests/Sync160CatalogCases.cs",
+      "line": 133,
+      "text": "Equal(\"b4afdddf44e059c67ccf5097e5317d913521b470\", preserved.SourceCommit, \"preserved release source\");"
+    },
+    {
+      "file": "tests/PiSharp.Schema.Tests/Sync152Cases.cs",
+      "line": 5,
+      "text": "// Authored native equivalents of Pi b4afdddf44e059c67ccf5097e5317d913521b470 schema tests."
+    },
+    {
+      "file": "website/src/pages/parity.astro",
+      "line": 47,
+      "text": "<p class=\"ps-muted\">The source of this release is <a href=\"https://github.com/earendil-works/pi/tree/b4afdddf44e059c67ccf5097e5317d913521b470\">b4afdddf</a>. The exact-tag release workflow validates so"
+    }
+  ],
+  "nonHeaderCitations": [
+    {
+      "file": "src/PiSharp.AI/Catalogs/ReleasedModelCatalog.cs",
+      "area": "ai",
+      "kind": "ai",
+      "occurrences": 2,
+      "handling": "model catalog provenance; a released catalog keeps its commit and the current catalog moves with the new release's catalog"
+    },
+    {
+      "file": "src/PiSharp.AI/Catalogs/Releases/1.5.2.provenance.json",
+      "area": "ai",
+      "kind": "ai",
+      "occurrences": 1,
+      "handling": "model catalog provenance; a released catalog keeps its commit and the current catalog moves with the new release's catalog"
+    },
+    {
+      "file": "src/PiSharp.AI/Catalogs/reviewed-2026-11-10.json",
+      "area": "ai",
+      "kind": "ai",
+      "occurrences": 1,
+      "handling": "model catalog provenance; a released catalog keeps its commit and the current catalog moves with the new release's catalog"
+    },
+    {
+      "file": "tests/PiSharp.Tools.Tests/Sync152EditExpectations.cs",
+      "area": "tools",
+      "kind": "suite-label",
+      "line": 11,
+      "handling": "test-report baseline label; move it when the suite's area is re-ported and the suite passes against the new baseline"
+    },
+    {
+      "file": "tools/Env/upstream-android-1.5.2.json",
+      "area": "env",
+      "kind": "env",
+      "occurrences": 2,
+      "handling": "pins one release's pi-env Android daemon archives by hash; a new release needs its own manifest from its own archives"
+    },
+    {
+      "file": "tools/LovelyMermaid/source-0.3.3.json",
+      "area": "coding-agent-cli",
+      "kind": "coding-agent-cli",
+      "occurrences": 1,
+      "handling": "records the Pi release the lovely-mermaid port was generated beside; regenerate it only when the pinned lovely-mermaid version changes"
+    }
+  ],
+  "releaseDocs": [
+    {
+      "file": "IMPLEMENTATION_STATUS.md",
+      "occurrences": 1,
+      "reason": "status and notice pages name the published and candidate baselines; root updates them at the 1.6.0 closeout"
+    },
+    {
+      "file": "README.md",
+      "occurrences": 3,
+      "reason": "describes the published release's baseline; update with the 1.6.0 release"
+    },
+    {
+      "file": "THIRD-PARTY-NOTICES.md",
+      "occurrences": 2,
+      "reason": "status and notice pages name the published and candidate baselines; root updates them at the 1.6.0 closeout"
+    }
+  ],
+  "excludedHistorical": [
+    {
+      "file": ".github/workflows/core.yml",
+      "occurrences": 2,
+      "reason": "fetches every preserved pin for the historical source checks"
+    },
+    {
+      "file": "AI_DOCS/agent-reports/sync-1.5.2-ai-binding-implementation.md",
+      "occurrences": 1,
+      "reason": "work plans, agent reports and release records name the commit each piece of work was done against"
+    },
+    {
+      "file": "AI_DOCS/agent-reports/sync-1.5.2-ai-discovery.md",
+      "occurrences": 1,
+      "reason": "work plans, agent reports and release records name the commit each piece of work was done against"
+    },
+    {
+      "file": "AI_DOCS/agent-reports/sync-1.5.2-catalog.md",
+      "occurrences": 1,
+      "reason": "work plans, agent reports and release records name the commit each piece of work was done against"
+    },
+    {
+      "file": "AI_DOCS/agent-reports/sync-1.5.2-chord-app-implementation.md",
+      "occurrences": 1,
+      "reason": "work plans, agent reports and release records name the commit each piece of work was done against"
+    },
+    {
+      "file": "AI_DOCS/agent-reports/sync-1.5.2-chord-archives-implementation.md",
+      "occurrences": 1,
+      "reason": "work plans, agent reports and release records name the commit each piece of work was done against"
+    },
+    {
+      "file": "AI_DOCS/agent-reports/sync-1.5.2-chord-discovery.md",
+      "occurrences": 1,
+      "reason": "work plans, agent reports and release records name the commit each piece of work was done against"
+    },
+    {
+      "file": "AI_DOCS/agent-reports/sync-1.5.2-chord-hostdata-implementation.md",
+      "occurrences": 1,
+      "reason": "work plans, agent reports and release records name the commit each piece of work was done against"
+    },
+    {
+      "file": "AI_DOCS/agent-reports/sync-1.5.2-chord-sync-codec.md",
+      "occurrences": 1,
+      "reason": "work plans, agent reports and release records name the commit each piece of work was done against"
+    },
+    {
+      "file": "AI_DOCS/agent-reports/sync-1.5.2-chord-sync-discovery.md",
+      "occurrences": 1,
+      "reason": "work plans, agent reports and release records name the commit each piece of work was done against"
+    },
+    {
+      "file": "AI_DOCS/agent-reports/sync-1.5.2-chord-sync-implementation.md",
+      "occurrences": 1,
+      "reason": "work plans, agent reports and release records name the commit each piece of work was done against"
+    },
+    {
+      "file": "AI_DOCS/agent-reports/sync-1.5.2-chord-wire-implementation.md",
+      "occurrences": 1,
+      "reason": "work plans, agent reports and release records name the commit each piece of work was done against"
+    },
+    {
+      "file": "AI_DOCS/agent-reports/sync-1.5.2-ci.md",
+      "occurrences": 1,
+      "reason": "work plans, agent reports and release records name the commit each piece of work was done against"
+    },
+    {
+      "file": "AI_DOCS/agent-reports/sync-1.5.2-cli-auth-packages.md",
+      "occurrences": 1,
+      "reason": "work plans, agent reports and release records name the commit each piece of work was done against"
+    },
+    {
+      "file": "AI_DOCS/agent-reports/sync-1.5.2-cli-discovery.md",
+      "occurrences": 1,
+      "reason": "work plans, agent reports and release records name the commit each piece of work was done against"
+    },
+    {
+      "file": "AI_DOCS/agent-reports/sync-1.5.2-cli-input-cache-implementation.md",
+      "occurrences": 1,
+      "reason": "work plans, agent reports and release records name the commit each piece of work was done against"
+    },
+    {
+      "file": "AI_DOCS/agent-reports/sync-1.5.2-cli-review.md",
+      "occurrences": 1,
+      "reason": "work plans, agent reports and release records name the commit each piece of work was done against"
+    },
+    {
+      "file": "AI_DOCS/agent-reports/sync-1.5.2-cli-tools-implementation.md",
+      "occurrences": 1,
+      "reason": "work plans, agent reports and release records name the commit each piece of work was done against"
+    },
+    {
+      "file": "AI_DOCS/agent-reports/sync-1.5.2-cli-ui-implementation.md",
+      "occurrences": 1,
+      "reason": "work plans, agent reports and release records name the commit each piece of work was done against"
+    },
+    {
+      "file": "AI_DOCS/agent-reports/sync-1.5.2-codemode.md",
+      "occurrences": 1,
+      "reason": "work plans, agent reports and release records name the commit each piece of work was done against"
+    },
+    {
+      "file": "AI_DOCS/agent-reports/sync-1.5.2-current-catalog-review.md",
+      "occurrences": 1,
+      "reason": "work plans, agent reports and release records name the commit each piece of work was done against"
+    },
+    {
+      "file": "AI_DOCS/agent-reports/sync-1.5.2-data-review.md",
+      "occurrences": 1,
+      "reason": "work plans, agent reports and release records name the commit each piece of work was done against"
+    },
+    {
+      "file": "AI_DOCS/agent-reports/sync-1.5.2-durable-discovery.md",
+      "occurrences": 1,
+      "reason": "work plans, agent reports and release records name the commit each piece of work was done against"
+    },
+    {
+      "file": "AI_DOCS/agent-reports/sync-1.5.2-env-discovery.md",
+      "occurrences": 2,
+      "reason": "work plans, agent reports and release records name the commit each piece of work was done against"
+    },
+    {
+      "file": "AI_DOCS/agent-reports/sync-1.5.2-kernel-review.md",
+      "occurrences": 1,
+      "reason": "work plans, agent reports and release records name the commit each piece of work was done against"
+    },
+    {
+      "file": "AI_DOCS/agent-reports/sync-1.5.2-mcp-discovery.md",
+      "occurrences": 1,
+      "reason": "work plans, agent reports and release records name the commit each piece of work was done against"
+    },
+    {
+      "file": "AI_DOCS/agent-reports/sync-1.5.2-mcp-transport-implementation.md",
+      "occurrences": 1,
+      "reason": "work plans, agent reports and release records name the commit each piece of work was done against"
+    },
+    {
+      "file": "AI_DOCS/agent-reports/sync-1.5.2-meta-pin.md",
+      "occurrences": 2,
+      "reason": "work plans, agent reports and release records name the commit each piece of work was done against"
+    },
+    {
+      "file": "AI_DOCS/agent-reports/sync-1.5.2-model-refresh-implementation.md",
+      "occurrences": 1,
+      "reason": "work plans, agent reports and release records name the commit each piece of work was done against"
+    },
+    {
+      "file": "AI_DOCS/agent-reports/sync-1.5.2-schema-discovery.md",
+      "occurrences": 1,
+      "reason": "work plans, agent reports and release records name the commit each piece of work was done against"
+    },
+    {
+      "file": "AI_DOCS/agent-reports/sync-1.5.2-sqlite.md",
+      "occurrences": 1,
+      "reason": "work plans, agent reports and release records name the commit each piece of work was done against"
+    },
+    {
+      "file": "AI_DOCS/agent-reports/sync-1.5.2-storage-discovery.md",
+      "occurrences": 1,
+      "reason": "work plans, agent reports and release records name the commit each piece of work was done against"
+    },
+    {
+      "file": "AI_DOCS/agent-reports/sync-1.5.2-surfaces-implementation.md",
+      "occurrences": 1,
+      "reason": "work plans, agent reports and release records name the commit each piece of work was done against"
+    },
+    {
+      "file": "AI_DOCS/agent-reports/sync-1.5.2-telemetry-discovery.md",
+      "occurrences": 1,
+      "reason": "work plans, agent reports and release records name the commit each piece of work was done against"
+    },
+    {
+      "file": "AI_DOCS/agent-reports/sync-1.5.2-telemetry-review.md",
+      "occurrences": 1,
+      "reason": "work plans, agent reports and release records name the commit each piece of work was done against"
+    },
+    {
+      "file": "AI_DOCS/agent-reports/sync-1.5.2-terminal-implementation.md",
+      "occurrences": 1,
+      "reason": "work plans, agent reports and release records name the commit each piece of work was done against"
+    },
+    {
+      "file": "AI_DOCS/agent-reports/sync-1.5.2-tui-discovery.md",
+      "occurrences": 1,
+      "reason": "work plans, agent reports and release records name the commit each piece of work was done against"
+    },
+    {
+      "file": "AI_DOCS/agent-reports/sync-1.5.2-tui-implementation.md",
+      "occurrences": 1,
+      "reason": "work plans, agent reports and release records name the commit each piece of work was done against"
+    },
+    {
+      "file": "AI_DOCS/agent-reports/sync-1.6.0-ai-catalog.md",
+      "occurrences": 1,
+      "reason": "work plans, agent reports and release records name the commit each piece of work was done against"
+    },
+    {
+      "file": "AI_DOCS/agent-reports/sync-1.6.0-chord-discovery.md",
+      "occurrences": 1,
+      "reason": "work plans, agent reports and release records name the commit each piece of work was done against"
+    },
+    {
+      "file": "AI_DOCS/agent-reports/sync-1.6.0-chord-edge.md",
+      "occurrences": 1,
+      "reason": "work plans, agent reports and release records name the commit each piece of work was done against"
+    },
+    {
+      "file": "AI_DOCS/agent-reports/sync-1.6.0-chord-foundation.md",
+      "occurrences": 1,
+      "reason": "work plans, agent reports and release records name the commit each piece of work was done against"
+    },
+    {
+      "file": "AI_DOCS/agent-reports/sync-1.6.0-cli-session.md",
+      "occurrences": 1,
+      "reason": "work plans, agent reports and release records name the commit each piece of work was done against"
+    },
+    {
+      "file": "AI_DOCS/agent-reports/sync-1.6.0-cli-ui.md",
+      "occurrences": 1,
+      "reason": "work plans, agent reports and release records name the commit each piece of work was done against"
+    },
+    {
+      "file": "AI_DOCS/agent-reports/sync-1.6.0-durable-core.md",
+      "occurrences": 1,
+      "reason": "work plans, agent reports and release records name the commit each piece of work was done against"
+    },
+    {
+      "file": "AI_DOCS/agent-reports/sync-1.6.0-durable-edge.md",
+      "occurrences": 1,
+      "reason": "work plans, agent reports and release records name the commit each piece of work was done against"
+    },
+    {
+      "file": "AI_DOCS/sync-1.5.2.md",
+      "occurrences": 1,
+      "reason": "work plans, agent reports and release records name the commit each piece of work was done against"
+    },
+    {
+      "file": "AI_DOCS/sync-1.6.0.md",
+      "occurrences": 1,
+      "reason": "work plans, agent reports and release records name the commit each piece of work was done against"
+    },
+    {
+      "file": "compatibility/durable-port-map.json",
+      "occurrences": 1,
+      "reason": "the durable port map pins its own upstream commits; build-port-map.mjs re-pins it with the durable area"
+    },
+    {
+      "file": "compatibility/durable-sync-1.5.2-overlay.json",
+      "occurrences": 123,
+      "reason": "the v1.5.2 sync record"
+    },
+    {
+      "file": "compatibility/durable-sync-1.6.0-overlay.json",
+      "occurrences": 44,
+      "reason": "names the commit the v1.6.0 sync starts from"
+    },
+    {
+      "file": "compatibility/implementation-status.json",
+      "occurrences": 1,
+      "reason": "pi152Candidate records the v1.5.2 candidate and its acceptance"
+    },
+    {
+      "file": "compatibility/public-release.json",
+      "occurrences": 2,
+      "reason": "previousReleases record the upstream commit each published release tracked"
+    },
+    {
+      "file": "compatibility/sync-1.5.2-acceptance.json",
+      "occurrences": 1,
+      "reason": "the v1.5.2 sync record"
+    },
+    {
+      "file": "compatibility/sync-1.5.2-applicability.json",
+      "occurrences": 2426,
+      "reason": "the v1.5.2 sync record"
+    },
+    {
+      "file": "compatibility/sync-1.5.2-citations.json",
+      "occurrences": 1,
+      "reason": "the v1.5.2 sync record"
+    },
+    {
+      "file": "compatibility/sync-1.5.2-files.json",
+      "occurrences": 2426,
+      "reason": "the v1.5.2 sync record"
+    },
+    {
+      "file": "compatibility/sync-1.6.0-applicability.json",
+      "occurrences": 817,
+      "reason": "names the commit the v1.6.0 sync starts from"
+    },
+    {
+      "file": "compatibility/sync-1.6.0-files.json",
+      "occurrences": 817,
+      "reason": "names the commit the v1.6.0 sync starts from"
+    },
+    {
+      "file": "compatibility/target.lock.json",
+      "occurrences": 1,
+      "reason": "previousTarget names the previous target lock"
+    },
+    {
+      "file": "compatibility/target.v1.5.2.lock.json",
+      "occurrences": 2568,
+      "reason": "the preserved v1.5.2 target lock"
+    },
+    {
+      "file": "docs/compatibility/baseline.md",
+      "occurrences": 1,
+      "reason": "describes the previous target"
+    },
+    {
+      "file": "docs/decisions/0014-pi-1.5.2-sync.md",
+      "occurrences": 1,
+      "reason": "the v1.5.2 sync decision"
+    },
+    {
+      "file": "docs/decisions/0015-pi-1.6.0-sync.md",
+      "occurrences": 1,
+      "reason": "names the commit the v1.6.0 sync starts from"
+    },
+    {
+      "file": "docs/release-notes/1.5.2.md",
+      "occurrences": 1,
+      "reason": "release notes record what each release was built from"
+    },
+    {
+      "file": "docs/release-notes/1.6.0.md",
+      "occurrences": 1,
+      "reason": "release notes record what each release was built from"
+    },
+    {
+      "file": "tests/PiSharp.Chord.Tests/Link/Link152Cases.cs",
+      "occurrences": 2,
+      "reason": "the frozen v1.5.2 Chord link goldens and their generator"
+    },
+    {
+      "file": "tests/PiSharp.Chord.Tests/Link/generate-goldens152.mjs",
+      "occurrences": 1,
+      "reason": "the frozen v1.5.2 Chord link goldens and their generator"
+    },
+    {
+      "file": "tests/fixtures/chord-link-v152.json",
+      "occurrences": 1,
+      "reason": "the frozen v1.5.2 Chord link goldens and their generator"
+    },
+    {
+      "file": "tools/CompatibilityReport/accept-sync-1.5.2.test.mjs",
+      "occurrences": 1,
+      "reason": "the v1.5.2 sync's tooling and tests, which stay on its preserved lock"
+    },
+    {
+      "file": "tools/CompatibilityReport/sync-1.5.2-acceptance-policy.json",
+      "occurrences": 1,
+      "reason": "the v1.5.2 sync's tooling and tests, which stay on its preserved lock"
+    },
+    {
+      "file": "tools/CompatibilityReport/sync-1.5.2-source-headers.mjs",
+      "occurrences": 1,
+      "reason": "the v1.5.2 sync's tooling and tests, which stay on its preserved lock"
+    },
+    {
+      "file": "tools/CompatibilityReport/sync-1.5.2-source.test.mjs",
+      "occurrences": 1,
+      "reason": "the v1.5.2 sync's tooling and tests, which stay on its preserved lock"
+    }
+  ],
+  "repinned": [
+    {
+      "file": "src/PiSharp.AI/Protocols/ProviderShared/StrictToolLimits.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/ai/src/api/strict-tool-limits.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Chord.Hosting/App/Blobs.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/chord/src/node/app/blobs.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Chord.Hosting/App/Files.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/chord/src/node/app/files.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Chord.Hosting/App/FilesCopy.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/chord/src/node/app/files-copy.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Chord.Hosting/App/FilesEntry.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/chord/src/node/app/files-entry.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Chord.Hosting/App/FilesIndex.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/chord/src/node/app/files-index.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Chord.Hosting/App/FolderViews.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/chord/src/node/app/folder-views.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Chord.Hosting/App/HostData.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/chord/src/node/app/data.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Chord.Hosting/App/Info.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/chord/src/node/app/info.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Chord.Hosting/App/Secrets.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/chord/src/node/app/secrets.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Chord.Hosting/App/Tar.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/chord/src/node/app/tar.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Chord.Hosting/App/Uploads.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/chord/src/node/app/uploads.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Chord.Hosting/App/Users.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/chord/src/node/app/users.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Chord.Hosting/App/WorkerApp.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/chord/src/node/app/worker.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Chord.Hosting/Plugins/BaseInputs.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/chord/src/node/plugins/base-inputs.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Chord.Hosting/Plugins/PluginTesting.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/chord/src/node/plugins/testing.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Chord.Hosting/Surfaces/SurfaceScripts.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/chord/src/node/surfaces/current.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Chord.Hosting/Terminal/Bridge.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/chord/src/tui/bridge.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Chord.Hosting/Terminal/TerminalActions.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/chord/src/node/tui/actions.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Chord.Hosting/Terminal/TerminalChannel.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/chord/src/tui/channel.ts",
+        "packages/chord/src/tui/terminal.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Chord.Hosting/Terminal/TerminalLauncher.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/chord/src/node/tui/launcher.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Chord.Hosting/Terminal/TerminalNetwork.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/chord/src/node/tui/credentials.ts",
+        "packages/chord/src/node/tui/launcher.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Chord.Hosting/Terminal/TerminalOutput.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/chord/src/node/tui/filter.ts",
+        "packages/chord/src/tui/frames.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Chord.Hosting/Terminal/TerminalPipe.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/chord/src/node/tui/pipe.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Chord/Host/OldWork.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/chord/src/host/old-work.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Chord/Host/UnboundClock.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/chord/src/host/unbound-clock.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Chord/Store/HostColumn.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/chord/src/store/host-column.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Chord/Store/ImportMigration.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/chord/src/store/import-migration.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Chord/Surfaces/ActiveLanguage.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/chord/src/surfaces/active-language.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Chord/Surfaces/ActiveTheme.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/chord/src/surfaces/active-theme.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Chord/Surfaces/Language.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/chord/src/surfaces/format.ts",
+        "packages/chord/src/surfaces/language.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Chord/Surfaces/LoadedFacets.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/chord/src/surfaces/loaded.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Chord/Surfaces/Messages.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/chord/src/surfaces/messages.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Chord/Surfaces/PageState.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/chord/src/surfaces/page-state.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Chord/Surfaces/Preference.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/chord/src/surfaces/locale-choice.ts",
+        "packages/chord/src/surfaces/preference.ts",
+        "packages/chord/src/surfaces/theme-choice.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Chord/Surfaces/Registered.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/chord/src/surfaces/registered.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Chord/Surfaces/Scripts.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/chord/src/surfaces/scripts.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Chord/Surfaces/Themes.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/chord/src/surfaces/themes.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Chord/Surfaces/Translations.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/chord/src/surfaces/translations.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Chord/Sync/Codec.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/chord/src/sync/batch.ts",
+        "packages/chord/src/sync/lines.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Chord/Sync/Files.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/chord/src/sync/files.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Chord/Sync/FileState.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/chord/src/sync/state.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Chord/TelemetryIngest/Contracts.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/chord/src/telemetry-ingest/batch.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Chord/TelemetryIngest/Sender.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/chord/src/telemetry-ingest/sender.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Chord/TelemetryIngest/TelemetryBatch.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/chord/src/telemetry-ingest/recorder.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Chord/TelemetryIngest/TelemetryRecorder.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/chord/src/telemetry-ingest/recorder.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Chord/TelemetrySqlite/SqliteTelemetryReader.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/chord/src/telemetry-sqlite/node.ts",
+        "packages/chord/src/telemetry-sqlite/store.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Chord/TelemetrySqlite/SqliteTelemetrySchema.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/chord/src/telemetry-sqlite/schema.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Cli/Interactive/Mode/Components/MermaidTransformer.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/modes/interactive/components/mermaid.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Cli/Interactive/Mode/Components/ProviderBrand.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/core/preferred-providers.ts",
+        "packages/coding-agent/src/modes/interactive/components/provider-brand.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Cli/Interactive/Mode/LovelyMermaid/MermaidUnicodeData.g.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/modes/interactive/components/mermaid.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Cli/Mcp/Authentication/McpSignIn.Client.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/mcp/src/oauth/sign-in.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Cli/Mcp/RadiusMcpServer.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/core/radius-mcp.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Codemode/CodemodeDeclarations.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/codemode/src/declarations.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Codemode/Runtime/codemode-prelude.js",
+      "citations": 1,
+      "upstream": [
+        "packages/codemode/src/runtime/prelude-source.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Codemode/Runtime/CodemodePrelude.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/codemode/src/runtime/prelude-source.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Durable.Sqlite/Commit.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/durable/src/storage/sqlite/commit.ts",
+        "packages/durable/src/storage/sqlite/statements.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Extensions.Abstractions/Mcp/Authentication/McpSignInContracts.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/mcp/src/oauth/types.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Extensions.Abstractions/Mcp/Transport/McpPipeContracts.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/mcp/src/transports/pipe.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Extensions.Runtime/Mcp/Authentication/McpOAuthAuthProvider.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/mcp/src/oauth/auth-provider.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Extensions.Runtime/Mcp/Authentication/McpOAuthSignIn.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/mcp/src/oauth/sign-in.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Extensions.Runtime/Mcp/Resources/McpContentLimiter.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/mcp/src/output-limit.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Extensions.Runtime/Mcp/Transport/McpJsonRpcLineReader.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/mcp/src/transports/lines.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Extensions.Runtime/Mcp/Transport/McpPipeTransport.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/mcp/src/transports/pipe.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Telemetry/TelemetryClock.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/telemetry/src/index.ts"
+      ]
+    },
+    {
+      "file": "tests/PiSharp.Chord.Hosting.Tests/ArchiveCases.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/chord/src/node/app/archive.ts",
+        "packages/chord/src/node/app/tar.ts"
+      ]
+    },
+    {
+      "file": "tests/PiSharp.Chord.Hosting.Tests/FilesCases.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/chord/src/node/app/files-copy.ts",
+        "packages/chord/src/node/app/files.ts",
+        "packages/chord/src/node/app/uploads.ts"
+      ]
+    },
+    {
+      "file": "tests/PiSharp.Chord.Hosting.Tests/Terminal152Cases.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/chord/src/node/tui/actions.ts",
+        "packages/chord/src/node/tui/launcher.ts",
+        "packages/chord/src/tui/bridge.ts"
+      ]
+    },
+    {
+      "file": "tests/PiSharp.Chord.Tests/Documents/HostKeyedCases.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/chord/src/documents/documents.ts",
+        "packages/chord/src/documents/handles.ts"
+      ]
+    },
+    {
+      "file": "tests/PiSharp.Chord.Tests/Host/Sync152KernelCases.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/chord/src/host/old-work.ts",
+        "packages/chord/src/host/readiness.ts",
+        "packages/chord/src/host/reload-cycle.ts"
+      ]
+    },
+    {
+      "file": "tests/PiSharp.Chord.Tests/Store/HostColumnCases.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/chord/src/store/host-column.ts"
+      ]
+    },
+    {
+      "file": "tests/PiSharp.Chord.Tests/Surfaces/IntegrationCases.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/chord/src/surfaces/active-language.ts",
+        "packages/chord/src/surfaces/active-theme.ts",
+        "packages/chord/src/surfaces/page-state.ts"
+      ]
+    },
+    {
+      "file": "tests/PiSharp.Chord.Tests/Surfaces/SurfaceCases.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/chord/src/surfaces/language.ts",
+        "packages/chord/src/surfaces/messages.ts",
+        "packages/chord/src/surfaces/themes.ts"
+      ]
+    },
+    {
+      "file": "tests/PiSharp.Chord.Tests/Sync/CodecCases.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/chord/src/sync/batch.ts",
+        "packages/chord/src/sync/lines.ts"
+      ]
+    },
+    {
+      "file": "tests/PiSharp.Chord.Tests/UnboundClockTests.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/chord/src/host/unbound-clock.ts"
+      ]
+    },
+    {
+      "file": "tests/PiSharp.Codemode.Tests/PureCases.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/codemode/src/runtime/prelude-source.ts"
+      ]
+    },
+    {
+      "file": "tests/PiSharp.Codemode.Tests/Sync152Cases.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/codemode/test/declarations.test.ts",
+        "packages/codemode/test/sandbox.test.ts"
+      ]
+    },
+    {
+      "file": "tests/PiSharp.Durable.Tests/Storage/JsonlReadOnlyCases.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/durable/test/jsonl-storage.test.ts"
+      ]
+    },
+    {
+      "file": "tests/PiSharp.Durable.Tests/Storage/SqliteDetailedBulkCases.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/durable/src/storage/sqlite/commit.ts",
+        "packages/durable/test/sqlite-commit.test.ts"
+      ]
+    },
+    {
+      "file": "tests/PiSharp.Extensions.ContractTests/McpSync152TransportTests.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/mcp/src/transports/lines.ts",
+        "packages/mcp/src/transports/pipe.ts"
+      ]
+    },
+    {
+      "file": "tests/PiSharp.McpSync.Tests/Sync152McpCases.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/mcp/src/client.ts",
+        "packages/mcp/src/oauth/flow.ts"
+      ]
+    },
+    {
+      "file": "tests/PiSharp.ModelRuntime.Tests/CatalogRefreshAuthCases.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/ai/src/models.ts"
+      ]
+    },
+    {
+      "file": "tests/PiSharp.Telemetry.Tests/ClockRender152Cases.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/telemetry/src/index.ts",
+        "packages/telemetry/src/render.ts"
+      ]
+    },
+    {
+      "file": "tests/PiSharp.Tools.Tests/Sync152EditExpectations.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/core/tools/edit.ts"
+      ]
+    },
+    {
+      "file": "tools/LovelyMermaid/gen-unicode-data.mjs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/modes/interactive/components/mermaid.ts"
+      ]
+    }
+  ]
+}

@@ -1,4 +1,4 @@
-// Pi b4afdddf44e059c67ccf5097e5317d913521b470 (MIT): packages/tui/src/layout.ts.
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/tui/src/layout.ts.
 // Ported to plain ESM for the PiSharp Node extension bridge (TypeScript types stripped mechanically; behaviour unchanged).
 import { allocateStackSizes, visibleStackEntries } from "./components/stack.mjs";
 import { getLayoutNode } from "./layout-node.mjs";
@@ -27,7 +27,7 @@ function renderCached(context, component, width) {
     }
     let lines = widths.get(safeWidth);
     if (!lines) {
-        lines = component.render(safeWidth);
+        lines = context.reusableOutput?.get(component)?.get(safeWidth) ?? component.render(safeWidth);
         widths.set(safeWidth, lines);
     }
     return lines;
@@ -288,15 +288,17 @@ function paintBox(box, screen, totalWidth) {
     }
     paintScrollbar(box, screen, totalWidth);
 }
-export function renderLayoutFrame(root, width, height, requestRender) {
+export function renderLayoutFrame(root, width, height, requestRender, reusableOutput) {
     const safeWidth = Math.max(1, Math.floor(width));
     const safeHeight = Math.max(1, Math.floor(height));
+    const renderCache = new Map();
     const context = {
         viewport: {
             width: safeWidth,
             height: safeHeight
         },
-        renderCache: new Map(),
+        renderCache,
+        reusableOutput,
         requestRender,
         primaryScrollView: undefined
     };
@@ -317,7 +319,8 @@ export function renderLayoutFrame(root, width, height, requestRender) {
         lines,
         ...context.primaryScrollView === undefined ? {} : {
             primaryScrollView: context.primaryScrollView
-        }
+        },
+        renderCache
     };
 }
 function containsPoint(rect, x, y) {

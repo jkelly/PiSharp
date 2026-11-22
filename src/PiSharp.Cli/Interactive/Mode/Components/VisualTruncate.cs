@@ -1,4 +1,4 @@
-// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): coding-agent/src/modes/interactive/components/visual-truncate.ts.
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): coding-agent/src/modes/interactive/components/visual-truncate.ts.
 // Shared utility for truncating text to visual lines (accounting for line wrapping).
 // Used by tool renderers and bash-execution.ts for consistent behavior.
 using PiSharp.Tui.Pi;
@@ -46,7 +46,7 @@ internal static class VisualTruncate
     }
 
     // JS Array.slice(-n): n == 0 gives slice(-0) == slice(0), i.e. every line; a negative n slices from the start.
-    private static List<string> SliceLast(List<string> lines, int count)
+    private static List<string> SliceLast(IReadOnlyList<string> lines, int count)
     {
         if (count == 0) return [.. lines];
         if (count < 0) return lines.Skip(Math.Min(lines.Count, -count)).ToList();
@@ -70,7 +70,7 @@ internal sealed class VisualLinePreview(VisualLinePreviewOptions options) : ICom
     private int? cachedWidth;
     private List<string>? cachedLines;
 
-    public List<string> Render(int width)
+    public IReadOnlyList<string> Render(int width)
     {
         if (cachedLines is null || cachedWidth != width)
         {

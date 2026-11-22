@@ -1,4 +1,4 @@
-// Pi b4afdddf44e059c67ccf5097e5317d913521b470 (MIT): packages/chord/src/surfaces/connection.ts, packages/chord/src/surfaces/client.ts.
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/chord/src/surfaces/connection.ts, packages/chord/src/surfaces/client.ts.
 // Authored native regression; not an upstream execution capture.
 using PiSharp.Chord.Surfaces;
 
@@ -74,10 +74,13 @@ internal static partial class Program
                 Environment = environment, CanRetry = () => decide.Task, OnState = _ => { },
                 Open = events => { var link = new SurfaceLink(events); links.Add(link); return link; },
             });
-            links[0].Close(); environment.Wake(); decide.SetResult(true);
-            // The continuation can run inline; wait for its scheduling without advancing virtual time.
-            for (var i = 0; environment.ActiveTimers == 0 && i < 100; i++) await Task.Yield();
-            environment.Advance(0); Equal(2, links.Count, "wake while deciding uses zero delay");
+            // Pi 1.6.0 (upstream replaced this case's "retries at once when woken while canRetry is deciding"): the retry is
+            // scheduled beside the question, not after its answer, so the wake finds it pending and runs it at once, whatever the
+            // answer and whenever it comes. The 1.6.0 cases are in Sync160ClientCases.cs.
+            links[0].Close(); Equal(1, links.Count, "the retry waits its pause while the question is open");
+            environment.Wake(); Equal(2, links.Count, "a wake while the question is open runs the pending retry at once");
+            decide.SetResult(true);
+            await Task.Yield(); environment.Advance(0); Equal(2, links.Count, "a late yes opens nothing more");
         }),
     ];
 

@@ -1,4 +1,4 @@
-// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/chord/src/next/store/sql.ts
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/chord/src/store/sql.ts
 //
 // SQL of declared tables (slice 6a §5, §6, §7): the DDL a table definition renders, and the statements of its reads and writes, generated
 // from the compiled vocabulary with every value bound and every identifier quoted. Names were checked at declaration (and at import), so
@@ -24,6 +24,12 @@ public sealed record Order(IReadOnlyList<string> Columns, OrderDirection Directi
 
 /// <summary>A statement and its parameters (upstream <c>Statement</c>).</summary>
 internal sealed record Statement(string Sql, IReadOnlyList<object?> Params);
+
+/// <summary>How a condition's parts that depend on where it runs are rendered: a column's name, and an <c>exists</c> (upstream
+/// <c>ConditionSql</c>).</summary>
+/// <param name="Column">A column's SQL by its name in the compiled node.</param>
+/// <param name="Exists">An <c>exists</c> as SQL, its operands added to the parameters.</param>
+internal sealed record ConditionSql(Func<string, string> Column, Func<WhereNode.Exists, List<object?>, string> Exists);
 
 internal static partial class StoreInternal
 {
@@ -175,33 +181,41 @@ internal static partial class StoreInternal
         _ => ">=",
     };
 
+    /// <summary>A write's condition: its table's columns unqualified; an <c>exists</c> never reaches one (refused when compiled; upstream
+    /// <c>OWN_COLUMNS</c>).</summary>
+    private static readonly ConditionSql OwnColumns = new(Quote, (_, _) => throw new InvalidOperationException("exists is rendered by a read"));
+
     /// <summary>A condition with its operands bound; SQL's <c>NULL</c> rules are the vocabulary's (upstream <c>whereSql</c>).</summary>
-    internal static string WhereSql(WhereNode node, List<object?> parameters)
+    internal static string WhereSql(WhereNode node, List<object?> parameters, ConditionSql? render = null)
     {
+        render ??= OwnColumns;
+        var name = render.Column;
         switch (node)
         {
             case WhereNode.And all:
-                return all.Nodes.Count == 0 ? "1" : $"({string.Join(" AND ", all.Nodes.Select(each => WhereSql(each, parameters)))})";
+                return all.Nodes.Count == 0 ? "1" : $"({string.Join(" AND ", all.Nodes.Select(each => WhereSql(each, parameters, render)))})";
             case WhereNode.Or any:
-                return any.Nodes.Count == 0 ? "0" : $"({string.Join(" OR ", any.Nodes.Select(each => WhereSql(each, parameters)))})";
+                return any.Nodes.Count == 0 ? "0" : $"({string.Join(" OR ", any.Nodes.Select(each => WhereSql(each, parameters, render)))})";
             case WhereNode.Not negated:
-                return $"(NOT {WhereSql(negated.Node, parameters)})";
+                return $"(NOT {WhereSql(negated.Node, parameters, render)})";
+            case WhereNode.Exists exists:
+                return render.Exists(exists, parameters);
             case WhereNode.IsNull isNull:
-                return $"{Quote(isNull.Column)} IS NULL";
+                return $"{name(isNull.Column)} IS NULL";
             case WhereNode.InArray inArray:
                 parameters.Add(SqliteJson(inArray.Values.Select(ToSqlite)));
-                return $"{Quote(inArray.Column)} IN (SELECT value FROM json_each(?))";
+                return $"{name(inArray.Column)} IN (SELECT value FROM json_each(?))";
             case WhereNode.Prefix prefix:
             {
                 var upper = PrefixUpperBound(prefix.Value);
                 parameters.Add(prefix.Value);
-                if (upper is null) return $"{Quote(prefix.Column)} >= ?";
+                if (upper is null) return $"{name(prefix.Column)} >= ?";
                 parameters.Add(upper);
-                return $"({Quote(prefix.Column)} >= ? AND {Quote(prefix.Column)} < ?)";
+                return $"({name(prefix.Column)} >= ? AND {name(prefix.Column)} < ?)";
             }
             case WhereNode.Compare compare:
                 parameters.Add(ToSqlite(compare.Value));
-                return $"{Quote(compare.Column)} {Sql(compare.Op)} ?";
+                return $"{name(compare.Column)} {Sql(compare.Op)} ?";
             default:
                 throw new InvalidOperationException("An unknown condition node.");
         }

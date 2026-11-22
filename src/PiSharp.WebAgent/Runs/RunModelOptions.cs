@@ -7,8 +7,8 @@
 // backend of provider openai-codex (auto, default, flex and priority: Codex CLI's Fast is priority), never Azure; text verbosity, the
 // reasoning summary and the session id (prompt_cache_key) only to the Responses and Codex APIs; parallel tool calls to the OpenAI APIs
 // (parallel_tool_calls) and Anthropic (disable_parallel_tool_use); strict tools to the OpenAI APIs. APIs PiSharp cannot patch yet
-// (Mistral, Bedrock, Vertex and the rest) take thinking, max tokens, tools, images and the timeout only (Codex: no max tokens, see
-// below). An option the user set that the model does not take is never dropped: the plan lists it as refused with the reason, and the
+// (Mistral, Bedrock, Vertex and the rest) take thinking, max tokens, tools, images and the timeout only (Codex: max tokens of 16 or
+// more, see below). An option the user set that the model does not take is never dropped: the plan lists it as refused with the reason, and the
 // engine refuses the run with that message. The faux models accept the sampling options offline and do not apply them (a note says so);
 // echo-thinking refuses temperature and top P while thinking, as Anthropic does, so the refusal can be seen offline.
 // One rule for the output cap (the user's max tokens, or the Spend Guard's "cap the output"): it is the whole output the request may write,
@@ -17,7 +17,10 @@
 // compat.forceAdaptiveThinking), so the run's patch sets max_tokens to the cap and a thinking budget that fits inside it (the level's,
 // at most the cap less 1,024 to answer); a cap below 2,048 cannot hold budget thinking and is refused. Amazon Bedrock raises it the same
 // way but its requests are signed, so a cap with thinking on a Bedrock budget-thinking Claude model is refused. The Codex backend takes
-// no output cap at all, so max tokens is refused there and the Spend Guard does not offer to cap its output. Anthropic takes tool choice
+// the cap as max_output_tokens since Pi 1.6.0 (PiSharp.AI's Codex transport sends it; before, it sent none and max tokens was refused
+// here), with two limits the transport has: it raises a cap below 16 to 16, the least the backend takes, so a cap below 16 is refused (it
+// would not be the whole output), and a model whose compat says supportsMaxOutputTokens false gets none, so max tokens is refused for it
+// and the Spend Guard does not offer to cap its output. Anthropic takes tool choice
 // auto or none only while the model thinks. Provider options never set the output's length or count (max_tokens, max_output_tokens,
 // generationConfig.maxOutputTokens, n, candidateCount and the like): Max tokens and the Spend Guard's worst case decide those.
 // W4 fix 2 (the options the Playground listed as "not sent"; they ride R0's body patch, which stays: decided after W5, PiSharp.AI keeps the
@@ -484,7 +487,7 @@ public static class RunModelOptions
                 return Levels(model, catalog).Count > 1 ? (true, null) : (false, "this model does not think");
             case MaxTokens:
                 return api == FauxApi ? (true, "the faux model ignores it")
-                    : api == CodexApi ? (false, NoCodexCap)
+                    : api == CodexApi && !CompatFlag(model, "supportsMaxOutputTokens", true) ? (false, NoCodexCap)
                     : thinking && BedrockBudgetThinking(model) ? (false, BedrockCap)
                     : (true, null);
             case Tools:
@@ -589,7 +592,10 @@ public static class RunModelOptions
         return (false, $"PiSharp does not send it on the {api} API yet");
     }
 
-    private const string NoCodexCap = "the Codex backend takes no output cap";
+    private const string NoCodexCap = "this model takes no output cap on the Codex backend (its compat says supportsMaxOutputTokens false)";
+
+    /// <summary>The least <c>max_output_tokens</c> the Codex backend takes; PiSharp.AI's Codex transport raises a lower cap to it.</summary>
+    public const int MinCodexOutputTokens = 16;
 
     private const string BedrockCap = "Amazon Bedrock adds the thinking budget to max tokens and PiSharp cannot change a signed Bedrock request, so the cap " +
         "would not hold; turn thinking off or clear max tokens";
@@ -599,7 +605,14 @@ public static class RunModelOptions
     public static string? OutputCapRefusal(DurableModel model, string? thinking, int maxTokens)
     {
         ArgumentNullException.ThrowIfNull(model);
-        if (model.Api == CodexApi) return NoCodexCap;
+        if (model.Api == CodexApi)
+        {
+            if (!CompatFlag(model, "supportsMaxOutputTokens", true)) return NoCodexCap;
+            // The transport sends max(cap, 16): a lower cap would not be the whole output the Spend Guard reserved.
+            return maxTokens < MinCodexOutputTokens
+                ? $"the Codex backend takes a max tokens of at least {Count(MinCodexOutputTokens)}; raise it to {Count(MinCodexOutputTokens)} or more"
+                : null;
+        }
         if (thinking is null) return null;
         if (BedrockBudgetThinking(model)) return BedrockCap;
         if (AnthropicBudgetThinking(model) && maxTokens < MinThinkingOutputTokens)

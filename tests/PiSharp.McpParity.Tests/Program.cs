@@ -67,6 +67,7 @@ internal static partial class Program
             ("registration.unhandled-registered-servers-are-reported", UnhandledRegisteredServersAreReported),
             ("results.tool-annotations-reach-the-plan", ToolAnnotationsReachThePlan)
         };
+        cases.AddRange(Sync160McpCases());
         var results = new List<object>(); var failures = 0;
         if (args is ["--only", var prefix]) cases.RemoveAll(test => !test.Id.StartsWith(prefix, StringComparison.Ordinal));
         foreach (var test in cases)

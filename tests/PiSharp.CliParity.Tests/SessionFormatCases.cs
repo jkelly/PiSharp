@@ -214,10 +214,22 @@ internal static partial class Program
         ("  - path: must have required properties path", "  - path: missing"),
     ];
 
+    /// <summary>Authored, not captured: the Pi 1.6.0 texts (faac585884ae2c013a6b1400f3e9e77f10b34bac) that replace texts of the
+    /// captures, applied after the 1.5.0 ones: the find <c>pattern</c> and grep <c>glob</c> parameter descriptions of
+    /// core/tools/find.ts and core/tools/grep.ts (#12066), as the tool declarations carry them.</summary>
+    private static readonly (string Old, string New)[] Pi160TextChanges =
+    [
+        ("Glob pattern to match files, e.g. '*.ts', '**/*.json', or 'src/**/*.spec.ts'",
+            "Glob pattern relative to the search directory, e.g. 'src/**/*.ts'. Without '/', e.g. '*.ts', it matches file names at any depth"),
+        ("Filter files by glob pattern, e.g. '*.ts' or '**/*.spec.ts'",
+            "Filter files by glob pattern relative to path, e.g. 'src/**/*.ts'. Without '/', e.g. '*.ts', it matches file names at any depth"),
+    ];
+
     private static string FollowPi120(string line)
     {
         foreach (var (old, replacement) in Pi120TextChanges) line = line.Replace(old, replacement, StringComparison.Ordinal);
         foreach (var (old, replacement) in Pi150TextChanges) line = line.Replace(old, replacement, StringComparison.Ordinal);
+        foreach (var (old, replacement) in Pi160TextChanges) line = line.Replace(old, replacement, StringComparison.Ordinal);
         return line;
     }
 

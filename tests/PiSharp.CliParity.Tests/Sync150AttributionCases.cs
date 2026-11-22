@@ -45,12 +45,11 @@ internal static partial class Program
         foreach (var provider in BuiltinProviders.All)
         {
             if (provider.Auth is not (ProviderAuthKind.EnvironmentKey or ProviderAuthKind.Anthropic or ProviderAuthKind.CloudflareWorkersAI or ProviderAuthKind.CloudflareAIGateway) ||
-                provider.ApiKeyVariables.IsDefaultOrEmpty || !BuiltinModelCatalog.Has(provider.Id)) continue;
+                provider.ApiKeyVariables.IsDefaultOrEmpty || CurrentModelCatalog.Get(provider.Id) is not { } catalog) continue;
             // Anthropic keeps the sandbox's API key only: no subscription or OAuth token.
             if (provider.Id != "anthropic") foreach (var variable in provider.ApiKeyVariables) sandbox.Vars[variable] = "test-key";
-            // The Completions route refuses a maxTokens above 1,000,000 (MaximumTokenMagnitude) before sending, so those models are passed over.
-            foreach (var model in BuiltinModelCatalog.Get(provider.Id).Models.Where(model => model.Type == CatalogModelType.Chat &&
-                    !(model.Raw.Value.TryGetProperty("maxTokens", out var max) && max.GetDouble() > 1_000_000))
+            // The rows are the current release's, which is where the CLI resolves --model.
+            foreach (var model in catalog.Models.Where(model => model.Type == CatalogModelType.Chat)
                 .GroupBy(model => model.DeclaredApi, StringComparer.Ordinal).Select(group => group.First()))
                 targets.Add((provider.Id, model.Id));
         }

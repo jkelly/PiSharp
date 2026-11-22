@@ -1,4 +1,4 @@
-// Pi b4afdddf44e059c67ccf5097e5317d913521b470 (MIT): packages/coding-agent/src/core/tools/edit.ts.
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/coding-agent/src/core/tools/edit.ts.
 // Authored native regression; not an upstream execution capture.
 using System.Security.Cryptography;
 using System.Text;

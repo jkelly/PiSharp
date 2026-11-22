@@ -1,6 +1,7 @@
-// Pi b4afdddf44e059c67ccf5097e5317d913521b470 (MIT): packages/chord/src/telemetry-ingest/facet.ts.
+// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/chord/src/telemetry-ingest/facet.ts.
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using PiSharp.Chord.Data;
 using PiSharp.Chord.Host;
 using PiSharp.Telemetry;
 
@@ -9,6 +10,9 @@ namespace PiSharp.Chord.TelemetryIngest;
 public sealed record TelemetryIngestOptions
 {
     public required ITelemetryIngestTarget Target { get; init; }
+    /// <summary>Whose pages may send their spans (<c>PageTelemetry</c>); a refused principal's hold fails <c>forbidden</c>. The per-page budget
+    /// bounds one page, not one principal, who may open many pages (links), so an app admits whom it trusts.</summary>
+    public required Func<JsonObject?, bool> Admit { get; init; }
     public required Func<JsonObject?, string?> WorkerHost { get; init; }
     public required Func<JsonObject?, SpanAttributes> PrincipalAttributes { get; init; }
     public TimeProvider TimeProvider { get; init; } = TimeProvider.System;
@@ -21,12 +25,14 @@ public static partial class TelemetryIngest
     {
         ArgumentNullException.ThrowIfNull(options);
         ArgumentNullException.ThrowIfNull(options.Target);
+        ArgumentNullException.ThrowIfNull(options.Admit);
         ArgumentNullException.ThrowIfNull(options.WorkerHost);
         ArgumentNullException.ThrowIfNull(options.PrincipalAttributes);
         return Facet.Define((host, _) =>
         {
             host.Serve(PageTelemetry, (_, principal, _) =>
             {
+                if (!options.Admit(principal)) throw Errors.Forbidden("chord.telemetry.page: not admitted");
                 var budgets = new PageBudgets();
                 return new(new Dictionary<string, object?>
                 {
