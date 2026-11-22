@@ -155,8 +155,9 @@ internal static partial class ImageCapabilityFrontendTests
         }
         var anthropic = JsonSerializer.SerializeToNode(SessionCommandTests.AnthropicInitialRequest(ToolUser))!.AsObject();
         anthropic["tools"]!.AsArray()[^1]!.AsObject().Remove("cache_control");
-        // Pinned Source non-strict Anthropic input_schema contains type/properties/required only.
-        var imageSchema = JsonNode.Parse(ImageToolSchema)!.AsObject(); imageSchema.Remove("additionalProperties");
+        // Pi 1.6.0 (#12067): a non-strict Anthropic input_schema keeps type/properties/required and the root additionalProperties
+        // (1.5.2 dropped additionalProperties).
+        var imageSchema = JsonNode.Parse(ImageToolSchema)!.AsObject();
         anthropic["tools"]!.AsArray().Add(new JsonObject { ["name"] = ImageTool, ["description"] = "Authored native mixed image result",
             ["input_schema"] = imageSchema, ["eager_input_streaming"] = true,
             ["cache_control"] = new JsonObject { ["type"] = "ephemeral" } });
