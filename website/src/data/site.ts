@@ -3,6 +3,7 @@ import { resolve } from 'node:path';
 
 export const nav = [
 	{ label: 'Docs', href: '/docs/' },
+	{ label: 'Samples', href: '/samples/' },
 	{ label: 'SDK', href: '/sdk/' },
 	{ label: 'Extensions', href: '/extensions/' },
 	{ label: 'Parity', href: '/parity/' },
@@ -18,6 +19,8 @@ export const links = {
 	plans: 'https://github.com/jkelly/PiSharp/tree/main/docs/plans',
 	compatibility: 'https://github.com/jkelly/PiSharp/tree/main/compatibility',
 	samples: 'https://github.com/jkelly/PiSharp/tree/main/samples/extensions',
+	agentSamples: 'https://github.com/jkelly/PiSharp/tree/main/samples/agents',
+	allSamples: 'https://github.com/jkelly/PiSharp/tree/main/samples',
 	pi: 'https://pi.dev',
 	piChangelog: 'https://pi.dev/changelog',
 	piBlogPost: 'https://mariozechner.at/posts/2025-11-30-pi-coding-agent/',

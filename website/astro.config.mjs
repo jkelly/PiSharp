@@ -32,6 +32,44 @@ export default defineConfig({
 					items: ['docs', 'docs/quickstart', 'docs/coming-from-pi', 'docs/versioning', 'docs/guides/gap-updates'],
 				},
 				{
+					label: 'How PiSharp works',
+					items: [
+						'docs/how-it-works/overview',
+						'docs/how-it-works/agent-loop',
+						'docs/how-it-works/tools-and-execution',
+						'docs/how-it-works/sessions-and-durability',
+						'docs/how-it-works/workflows-and-teams',
+						'docs/how-it-works/providers-media-remote',
+					],
+				},
+				{
+					label: 'Agent workflow patterns',
+					items: [
+						'docs/patterns',
+						'docs/patterns/approvals-and-hitl',
+						'docs/patterns/tool-errors-and-repairs',
+						'docs/patterns/steering-and-interrupts',
+						'docs/patterns/crash-recovery-and-idempotency',
+						'docs/patterns/context-and-compaction',
+						'docs/patterns/fan-out-and-orchestration',
+						'docs/patterns/streaming-and-observability',
+						'docs/patterns/testing-and-evals',
+					],
+				},
+				{
+					label: 'Samples & walkthroughs',
+					items: [
+						{ label: 'Browse all 115+ samples', link: '/samples/' },
+						'docs/samples/overview',
+						'docs/samples/persistent-task-manager',
+						'docs/samples/incident-timeline-builder',
+						'docs/samples/multimodal-receipt-and-studio',
+						'docs/samples/hybrid-orders-workflow',
+						'docs/samples/parallel-research-team',
+						'docs/samples/durable-and-extensions',
+					],
+				},
+				{
 					label: 'Use PiSharp',
 					items: [
 						'docs/guides/providers',
@@ -116,6 +154,7 @@ export default defineConfig({
 					collapsed: true,
 					items: [
 						{ label: 'Home', link: '/' },
+						{ label: 'Samples', link: '/samples/' },
 						{ label: 'SDK', link: '/sdk/' },
 						{ label: 'Extensions', link: '/extensions/' },
 						{ label: 'Parity', link: '/parity/' },

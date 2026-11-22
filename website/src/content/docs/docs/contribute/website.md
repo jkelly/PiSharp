@@ -13,7 +13,7 @@ This site, [pisharp.ai](https://pisharp.ai), is an [Astro](https://astro.build) 
 | `src/content.config.ts` | The content collections and the changelog schema. |
 | `src/content/docs/docs/` | The documentation pages, served under `/docs/`. |
 | `src/content/changelog/` | One Markdown file per release, for the [changelog](/changelog/). |
-| `src/pages/` | The custom pages: home (`index.astro`), [SDK](/sdk/), [Extensions](/extensions/), [Parity](/parity/), and the changelog with its RSS feed. |
+| `src/pages/` | The custom pages: home (`index.astro`), [Samples](/samples/) (`samples.astro`), [SDK](/sdk/), [Extensions](/extensions/), [Parity](/parity/), and the changelog with its RSS feed. |
 | `src/components/` | `SitePage.astro`, the layout of the custom pages, and Starlight overrides for the site title, page title and footer. |
 | `src/data/` | The data the pages read. See [Data files](#data-files). |
 | `src/styles/custom.css` | Theme colors and shared styles. |
@@ -102,6 +102,7 @@ The body is the entry's text. The repository's `CHANGELOG.md`, which ships with 
 | `src/data/site.ts` | The navigation, the external links, and `versions`: the current PiSharp release, its Pi baseline and the target baseline, read at build time from `../compatibility/public-release.json` and `../compatibility/target.lock.json`. `latestPi` is set by hand when Pi ships a release. | Home, parity and the other custom pages. |
 | `src/data/packages.ts` | The NuGet packages, each with an id, a description, a group (`Core`, `Frontends` or `Extensions`) and the flags `nuget`, `tool`, `optional` and `experimental`. | Home and SDK pages. |
 | `src/data/parity.json` | The parity assessment: per-area status (`ported`, `partial`, `planned`, `wont-port`, `unknown`) with notes and evidence, the deviations from Pi, and the phases. | [Parity](/parity/) page. |
+| `src/data/samples.ts` | Reads `../samples/agents/catalog.json` at build time, enforces 1:1 metadata coverage for all 62 practical agents, and exports the full catalog (Durable, Chord, CustomAgents, and extension samples included). | [Samples](/samples/) explorer. |
 | `src/data/changelog.ts` | `getReleases()`, which reads the changelog collection in version order. | Changelog page and feed. |
 
 Because `site.ts` reads `compatibility/`, the site reflects the release record. The current release is the one `public-release.json` marks as published on NuGet. See [After the release](/docs/contribute/releasing/#after-the-release). `src/data/parity.json` is not `compatibility/parity.json`; see [Two parity files](/docs/contribute/porting/#two-parity-files).
@@ -116,7 +117,7 @@ npm install
 npm run dev
 ```
 
-`npm run dev` serves the site at `http://localhost:4321` and reloads as you edit. `npm run build` writes the static site to `website/dist/`, and `npm run preview` serves that build. Run the commands from `website/`: `site.ts` finds the `compatibility/` files relative to the current directory.
+`npm run dev` serves the site at `http://localhost:4321` and reloads as you edit. `npm run build` writes the static site to `website/dist/`, `npm run check` verifies internal links and confirms all 62 entries from `samples/agents/catalog.json` are rendered on `/samples/`, and `npm run preview` serves that build. Run the commands from `website/`: `site.ts` and `samples.ts` find `compatibility/` and `samples/` relative to the current directory.
 
 ## Deployment
 
