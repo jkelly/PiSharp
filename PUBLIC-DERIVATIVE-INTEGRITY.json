@@ -9358,8 +9358,8 @@
       "originalSha256": "6255a94ced3d324da331d5957d787c10c479ba230f4fceaef22b98fe32b5a1c9"
     },
     {
-      "currentSha256": "d502bfd66ae27a3d4c74869bdd6d2421c54e2a2c955520823e808ad9da9efd4e",
-      "currentBytes": 30305,
+      "currentSha256": "3dab28466cb9f157cf41eb2ef80cc8eebf1540b45245a39c840acd6adacf5c9a",
+      "currentBytes": 31042,
       "originalBytes": 28338,
       "path": "src/PiSharp.Extensions.Runtime/Mcp/Transport/McpStreamableHttpTransport.cs",
       "originalSha256": "3d72f8456d1ea05dd4d5d8a25e5057cc355dacfb84a86c887aff1ee4763dd585"
@@ -13110,8 +13110,8 @@
       "originalSha256": "559f9f45d57f12bb1a31b88a23c176405690c73530aaa18dd82a09375184683e"
     },
     {
-      "currentSha256": "8a935988d044faccb68963cefc64fb3a157239f338fdc07e2ed499f02a3f3372",
-      "currentBytes": 15332,
+      "currentSha256": "15db72f37e7a97140fe5faf0ac707acdc4fa2d9e78a981acad83cb8a8896e564",
+      "currentBytes": 17907,
       "originalBytes": 15332,
       "path": "tests/PiSharp.Extensions.ContractTests/McpHttpOriginalOwnershipTests.cs",
       "originalSha256": "8a935988d044faccb68963cefc64fb3a157239f338fdc07e2ed499f02a3f3372"
