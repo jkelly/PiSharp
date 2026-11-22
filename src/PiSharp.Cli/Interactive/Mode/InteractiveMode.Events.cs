@@ -728,7 +728,7 @@ internal sealed partial class InteractiveMode
         if (GetDroppedReasoning(message) is not { } dropped) return null;
         // Providers report a withheld block again on every later request that replays it, so only a count above the previous
         // response's means new losses. message_end reaches the UI before the current message is persisted, so the branch's last
-        // assistant message is the previous response.
+        // assistant message is the previous response (see BranchBefore for the native entries read).
         for (var i = branch.Count - 1; i >= 0; i--)
         {
             var entry = branch[i];
@@ -744,10 +744,28 @@ internal sealed partial class InteractiveMode
         return $"{dropped.Diagnostic.Provider} dropped {dropped.Count.ToString(CultureInfo.InvariantCulture)} {noun}{reasons} (details in session)";
     }
 
+    /// <summary>
+    /// The branch as it was before <paramref name="message"/> was stored. Native: an entries read (SyncEntriesAsync, requested at
+    /// message_start) can return after the session stored the response and before its message_end is handled here, so the branch's
+    /// last assistant message may be a stored copy of the message ending now (equal to it in every field); it is left out. An earlier
+    /// response differs in its content even under a fixed clock (the test harness gives every response timestamp 0). Upstream has
+    /// no such read, so its branch never holds it.
+    /// </summary>
+    internal static IReadOnlyList<JsonObject> BranchBefore(JsonObject message, IReadOnlyList<JsonObject> branch)
+    {
+        for (var i = branch.Count - 1; i >= 0; i--)
+        {
+            var entry = branch[i];
+            if (SessionEntries.Type(entry) != "message" || entry["message"] is not JsonObject stored || S(stored["role"]) != "assistant") continue;
+            return ReferenceEquals(stored, message) || JsonNode.DeepEquals(stored, message) ? [.. branch.Take(i)] : branch;
+        }
+        return branch;
+    }
+
     private void MaybeShowThinkingDropNotice(JsonObject message)
     {
         if (!settings.ShowCacheMissNotices) return;
-        if (ReasoningDropNotice(message, SessionEntries.BuildSessionPath(state.Entries, state.LeafId)) is not { } notice) return;
+        if (ReasoningDropNotice(message, BranchBefore(message, SessionEntries.BuildSessionPath(state.Entries, state.LeafId))) is not { } notice) return;
         chatContainer.AddChild(new Spacer(1));
         chatContainer.AddChild(new ThemedText(() => theme.Fg("warning", notice), 1, 0));
     }

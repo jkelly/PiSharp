@@ -106,6 +106,22 @@ internal static class Sync160UiNoticeCases
             Equal("OpenAI dropped 3 reasoning items: prefix_mismatch (details in session)",
                 InteractiveMode.ReasoningDropNotice(OpenAIMessage(["rs_1", "rs_2", "rs_3"], ["prefix_mismatch"]), branch), "a third item");
         }));
+        // Native: the session may persist the current response before its message_end reaches the UI; the comparison still uses
+        // the response before it (CI macOS: a third response with a new drop showed no notice).
+        yield return ("sync160.ui.notice.native-current-message-already-persisted", Sync(() =>
+        {
+            static string? Notice(JsonObject message, List<JsonObject> branch) => InteractiveMode.ReasoningDropNotice(message, InteractiveMode.BranchBefore(message, branch));
+            var previous = AnthropicMessage(1, 3); var current = AnthropicMessage(2, 4, "prefix_binding_mismatch", "prefix_binding_mismatch", "prefix_binding_mismatch", "model_binding_mismatch");
+            Equal("Anthropic dropped 4 thinking blocks: prefix_binding_mismatch, model_binding_mismatch (details in session)",
+                Notice(current, Branch(previous, current)), "new drops with the current response persisted");
+            Equal(Notice(current, Branch(previous)), Notice(current, Branch(previous, current)), "the same notice as before it is persisted");
+            Equal(null, Notice(AnthropicMessage(2, 3), Branch(previous, AnthropicMessage(2, 3))), "unchanged drops with it persisted");
+            var only = AnthropicMessage(1, 3);
+            Equal("Anthropic dropped 3 thinking blocks: prefix_binding_mismatch (details in session)", Notice(only, Branch(only)), "the first response, persisted");
+            // Another response (another timestamp) is the previous one even when its blocks are the same.
+            Equal(null, Notice(AnthropicMessage(2, 3), Branch(AnthropicMessage(1, 3))), "an earlier response with the same drops");
+            Equal(2, InteractiveMode.BranchBefore(current, Branch(previous, current)).Count + 1, "only the stored copy is left out");
+        }));
         // Native: getDroppedReasoning on session data that is not what a provider writes.
         yield return ("sync160.ui.notice.native-untyped-diagnostics", Sync(() =>
         {

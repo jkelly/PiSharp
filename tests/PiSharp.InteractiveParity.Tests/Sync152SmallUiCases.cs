@@ -108,7 +108,9 @@ internal static class Sync152SmallUiCases
             var tui = new FakeTui(); using var loop = tui.Loop;
             using var selector = new OAuthSelectorComponent("login", [new("radius", "Radius", "oauth"), new("other", "Other", "api_key")], (_, _) => { }, () => { }, tui: tui, now: () => 0);
             Contains(string.Join("\n", selector.Render(100)), ProviderBrand.RadiusShimmer("Radius", 0), "selected brand style");
-            await Task.Delay(110); loop.RunPending(); Check(tui.RenderRequests > 0, "selected partner redraws");
+            // The animation timer's first tick: polled (a slow CI runner can take longer than one 110 ms sleep to fire it).
+            for (var waited = 0; tui.RenderRequests == 0 && waited < 2000; waited += 20) { await Task.Delay(20); loop.RunPending(); }
+            Check(tui.RenderRequests > 0, "selected partner redraws");
             selector.HandleInput("\u001b[B");
             await Task.Delay(70); loop.RunPending(); var idle = tui.RenderRequests;
             await Task.Delay(70); loop.RunPending(); Equal(idle, tui.RenderRequests, "ordinary selection does not redraw");
