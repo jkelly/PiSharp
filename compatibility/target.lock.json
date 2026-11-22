@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "status": "Source-level re-freeze per docs/decisions/0015-pi-1.6.0-sync.md; candidate implementation pending validation; unreleased",
+  "status": "Source-level re-freeze per docs/decisions/0015-pi-1.6.0-sync.md; tested-with-limitations local source evidence in compatibility/sync-1.6.0-acceptance.json; unreleased",
   "source": {
     "repository": "https://github.com/earendil-works/pi",
     "tag": "v1.6.0",

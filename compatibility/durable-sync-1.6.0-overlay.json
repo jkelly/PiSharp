@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "status": "implementation-pending-validation",
+  "status": "tested-with-limitations",
   "source": {
     "tag": "v1.6.0",
     "commit": "faac585884ae2c013a6b1400f3e9e77f10b34bac",
@@ -133,7 +133,7 @@
       "reports": [
         "AI_DOCS/agent-reports/sync-1.6.0-meta.md"
       ],
-      "status": "implementation-pending-validation",
+      "status": "tested-with-limitations",
       "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
       "review": {
         "finding": "ported"
@@ -157,6 +157,10 @@
           "bytes": 6357,
           "url": "https://github.com/earendil-works/pi/blob/faac585884ae2c013a6b1400f3e9e77f10b34bac/packages/durable/package.json"
         }
+      },
+      "validation": {
+        "record": "compatibility/sync-1.6.0-acceptance.json",
+        "workPackage": "meta"
       }
     },
     {
@@ -170,7 +174,7 @@
       "reports": [
         "AI_DOCS/agent-reports/sync-1.6.0-durable-edge.md"
       ],
-      "status": "implementation-pending-validation",
+      "status": "tested-with-limitations",
       "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
       "review": {
         "finding": "ported"
@@ -200,6 +204,10 @@
         "pisharp": "src/PiSharp.Durable.Tools/Codemode/Codemode.cs",
         "status": "ported",
         "blobSha1": "a2e7657792b24d63b40f668d1aa7d4a29e9e36fe"
+      },
+      "validation": {
+        "record": "compatibility/sync-1.6.0-acceptance.json",
+        "workPackage": "durable-edge"
       }
     },
     {
@@ -213,7 +221,7 @@
       "reports": [
         "AI_DOCS/agent-reports/sync-1.6.0-durable-edge.md"
       ],
-      "status": "implementation-pending-validation",
+      "status": "tested-with-limitations",
       "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
       "review": {
         "finding": "ported"
@@ -255,6 +263,10 @@
           "tests/PiSharp.Durable.Tests/Sync160CodemodeCases.cs"
         ],
         "note": "namespacesOf is DurableCodemode.NamespacesOf; CodemodeNamespace, its prefix and namespaceOf are removed, as upstream."
+      },
+      "validation": {
+        "record": "compatibility/sync-1.6.0-acceptance.json",
+        "workPackage": "durable-edge"
       }
     },
     {
@@ -268,7 +280,7 @@
       "reports": [
         "AI_DOCS/agent-reports/sync-1.6.0-durable-edge.md"
       ],
-      "status": "implementation-pending-validation",
+      "status": "tested-with-limitations",
       "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
       "review": {
         "finding": "ported"
@@ -298,6 +310,10 @@
         "pisharp": "src/PiSharp.Durable.Tools/Codemode/Codemode.cs",
         "status": "ported",
         "blobSha1": "e3b91f6c1c276b5a525f801adac09accbbeea511"
+      },
+      "validation": {
+        "record": "compatibility/sync-1.6.0-acceptance.json",
+        "workPackage": "durable-edge"
       }
     },
     {
@@ -355,7 +371,7 @@
       "reports": [
         "AI_DOCS/agent-reports/sync-1.6.0-durable-edge.md"
       ],
-      "status": "implementation-pending-validation",
+      "status": "tested-with-limitations",
       "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
       "review": {
         "finding": "ported"
@@ -397,6 +413,10 @@
           "tests/PiSharp.Durable.Tests/EnvNodeCases.cs"
         ],
         "note": "The file-system half of NodeExecutionEnv, listDir included, is LocalFileSystem; the historical map names the shell half."
+      },
+      "validation": {
+        "record": "compatibility/sync-1.6.0-acceptance.json",
+        "workPackage": "durable-edge"
       }
     },
     {
@@ -410,7 +430,7 @@
       "reports": [
         "AI_DOCS/agent-reports/sync-1.6.0-durable-core.md"
       ],
-      "status": "implementation-pending-validation",
+      "status": "tested-with-limitations",
       "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
       "review": {
         "finding": "ported"
@@ -440,6 +460,10 @@
         "pisharp": "src/PiSharp.Durable/Harness/Agent.cs",
         "status": "ported",
         "blobSha1": "df15a9f133aef34c8e15a5e2600d8dd65deeb489"
+      },
+      "validation": {
+        "record": "compatibility/sync-1.6.0-acceptance.json",
+        "workPackage": "durable-core"
       }
     },
     {
@@ -453,7 +477,7 @@
       "reports": [
         "AI_DOCS/agent-reports/sync-1.6.0-durable-core.md"
       ],
-      "status": "implementation-pending-validation",
+      "status": "tested-with-limitations",
       "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
       "review": {
         "finding": "ported"
@@ -483,6 +507,10 @@
         "pisharp": "src/PiSharp.Durable/Harness/Define.cs",
         "status": "ported",
         "blobSha1": "f5e0df8be1d5e20d07482f0d594afaa2c78c4c93"
+      },
+      "validation": {
+        "record": "compatibility/sync-1.6.0-acceptance.json",
+        "workPackage": "durable-core"
       }
     },
     {
@@ -496,7 +524,7 @@
       "reports": [
         "AI_DOCS/agent-reports/sync-1.6.0-durable-core.md"
       ],
-      "status": "implementation-pending-validation",
+      "status": "tested-with-limitations",
       "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
       "review": {
         "finding": "ported"
@@ -526,6 +554,10 @@
         "pisharp": "src/PiSharp.Durable/Harness/Generation.cs",
         "status": "ported",
         "blobSha1": "17c28db4749f6dc7d1f56f7fe9a8c0cc8c2d14dc"
+      },
+      "validation": {
+        "record": "compatibility/sync-1.6.0-acceptance.json",
+        "workPackage": "durable-core"
       }
     },
     {
@@ -539,7 +571,7 @@
       "reports": [
         "AI_DOCS/agent-reports/sync-1.6.0-durable-core.md"
       ],
-      "status": "implementation-pending-validation",
+      "status": "tested-with-limitations",
       "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
       "review": {
         "finding": "ported"
@@ -569,6 +601,10 @@
         "pisharp": "src/PiSharp.Durable/Harness/Harness.cs",
         "status": "ported",
         "blobSha1": "8fb91bcc0f25dcce8767fdd527b99550aaccca57"
+      },
+      "validation": {
+        "record": "compatibility/sync-1.6.0-acceptance.json",
+        "workPackage": "durable-core"
       }
     },
     {
@@ -582,7 +618,7 @@
       "reports": [
         "AI_DOCS/agent-reports/sync-1.6.0-durable-core.md"
       ],
-      "status": "implementation-pending-validation",
+      "status": "tested-with-limitations",
       "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
       "review": {
         "finding": "ported"
@@ -612,6 +648,10 @@
         "pisharp": "src/PiSharp.Durable/Harness/Inbox.cs",
         "status": "ported",
         "blobSha1": "3469e8e79e63a14255825c24184b4fe405c55bd9"
+      },
+      "validation": {
+        "record": "compatibility/sync-1.6.0-acceptance.json",
+        "workPackage": "durable-core"
       }
     },
     {
@@ -625,7 +665,7 @@
       "reports": [
         "AI_DOCS/agent-reports/sync-1.6.0-durable-core.md"
       ],
-      "status": "implementation-pending-validation",
+      "status": "tested-with-limitations",
       "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
       "review": {
         "finding": "ported"
@@ -655,6 +695,10 @@
         "pisharp": "src/PiSharp.Durable/Harness/Live.cs",
         "status": "ported",
         "blobSha1": "9888a402e7998603e0d7539263ed13f5f0d81334"
+      },
+      "validation": {
+        "record": "compatibility/sync-1.6.0-acceptance.json",
+        "workPackage": "durable-core"
       }
     },
     {
@@ -668,7 +712,7 @@
       "reports": [
         "AI_DOCS/agent-reports/sync-1.6.0-durable-core.md"
       ],
-      "status": "implementation-pending-validation",
+      "status": "tested-with-limitations",
       "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
       "review": {
         "finding": "ported"
@@ -695,6 +739,10 @@
           "tests/PiSharp.Durable.Tests/Sync160ParkChildrenCases.cs"
         ],
         "note": "A park is ToolExecutionResult.Park (ToolPark.Sleeping, ToolPark.Waiting; Harness/Types.cs); BASE_PARKS is ToolExecutionApi.BaseParks."
+      },
+      "validation": {
+        "record": "compatibility/sync-1.6.0-acceptance.json",
+        "workPackage": "durable-core"
       }
     },
     {
@@ -708,7 +756,7 @@
       "reports": [
         "AI_DOCS/agent-reports/sync-1.6.0-durable-core.md"
       ],
-      "status": "implementation-pending-validation",
+      "status": "tested-with-limitations",
       "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
       "review": {
         "finding": "ported"
@@ -738,6 +786,10 @@
         "pisharp": "src/PiSharp.Durable/Harness/Provider.cs",
         "status": "ported",
         "blobSha1": "b838982a686d3eb49c64324d91d281c9f55fb407"
+      },
+      "validation": {
+        "record": "compatibility/sync-1.6.0-acceptance.json",
+        "workPackage": "durable-core"
       }
     },
     {
@@ -751,7 +803,7 @@
       "reports": [
         "AI_DOCS/agent-reports/sync-1.6.0-durable-core.md"
       ],
-      "status": "implementation-pending-validation",
+      "status": "tested-with-limitations",
       "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
       "review": {
         "finding": "ported"
@@ -781,6 +833,10 @@
         "pisharp": "src/PiSharp.Durable/Harness/Scheduler.cs",
         "status": "ported",
         "blobSha1": "63cbe89acf0e457b13f867ac74a8ce8e32eb0f93"
+      },
+      "validation": {
+        "record": "compatibility/sync-1.6.0-acceptance.json",
+        "workPackage": "durable-core"
       }
     },
     {
@@ -794,7 +850,7 @@
       "reports": [
         "AI_DOCS/agent-reports/sync-1.6.0-durable-core.md"
       ],
-      "status": "implementation-pending-validation",
+      "status": "tested-with-limitations",
       "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
       "review": {
         "finding": "ported"
@@ -824,6 +880,10 @@
         "pisharp": "src/PiSharp.Durable/Harness/Submissions.cs",
         "status": "ported",
         "blobSha1": "bac428f448f21098a73711927562e3b46d7d3169"
+      },
+      "validation": {
+        "record": "compatibility/sync-1.6.0-acceptance.json",
+        "workPackage": "durable-core"
       }
     },
     {
@@ -837,7 +897,7 @@
       "reports": [
         "AI_DOCS/agent-reports/sync-1.6.0-durable-core.md"
       ],
-      "status": "implementation-pending-validation",
+      "status": "tested-with-limitations",
       "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
       "review": {
         "finding": "ported"
@@ -867,6 +927,10 @@
         "pisharp": "src/PiSharp.Durable/Harness/TaskGraph.cs",
         "status": "ported",
         "blobSha1": "c7fbcb824d0ddf4c57b12322a0e4bf712fdda97a"
+      },
+      "validation": {
+        "record": "compatibility/sync-1.6.0-acceptance.json",
+        "workPackage": "durable-core"
       }
     },
     {
@@ -880,7 +944,7 @@
       "reports": [
         "AI_DOCS/agent-reports/sync-1.6.0-durable-core.md"
       ],
-      "status": "implementation-pending-validation",
+      "status": "tested-with-limitations",
       "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
       "review": {
         "finding": "ported"
@@ -910,6 +974,10 @@
         "pisharp": "src/PiSharp.Durable/Harness/Tool.cs",
         "status": "ported",
         "blobSha1": "dc9e72ca28badbddac6b41c7643836a5a56a60a2"
+      },
+      "validation": {
+        "record": "compatibility/sync-1.6.0-acceptance.json",
+        "workPackage": "durable-core"
       }
     },
     {
@@ -923,7 +991,7 @@
       "reports": [
         "AI_DOCS/agent-reports/sync-1.6.0-durable-core.md"
       ],
-      "status": "implementation-pending-validation",
+      "status": "tested-with-limitations",
       "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
       "review": {
         "finding": "ported"
@@ -953,6 +1021,10 @@
         "pisharp": "src/PiSharp.Durable/Harness/Types.cs",
         "status": "ported",
         "blobSha1": "e312758b95c5b3579587a3cd3877b2adf290a9f9"
+      },
+      "validation": {
+        "record": "compatibility/sync-1.6.0-acceptance.json",
+        "workPackage": "durable-core"
       }
     },
     {
@@ -966,7 +1038,7 @@
       "reports": [
         "AI_DOCS/agent-reports/sync-1.6.0-durable-core.md"
       ],
-      "status": "implementation-pending-validation",
+      "status": "tested-with-limitations",
       "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
       "review": {
         "finding": "ported"
@@ -996,6 +1068,10 @@
         "pisharp": "src/PiSharp.Durable/Harness/Util.cs",
         "status": "ported",
         "blobSha1": "f3c8ea3747cc34e8f4ccf4bdd4635bf6cb178687"
+      },
+      "validation": {
+        "record": "compatibility/sync-1.6.0-acceptance.json",
+        "workPackage": "durable-core"
       }
     },
     {
@@ -1009,7 +1085,7 @@
       "reports": [
         "AI_DOCS/agent-reports/sync-1.6.0-durable-edge.md"
       ],
-      "status": "implementation-pending-validation",
+      "status": "tested-with-limitations",
       "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
       "review": {
         "finding": "ported"
@@ -1035,6 +1111,10 @@
           "tests/PiSharp.Durable.Tests/Sync160ImagesFitCases.cs"
         ],
         "note": "fitImage, fitImages and createFitImagesExtension are FitImages.FitImageAsync, FitAsync and CreateExtension."
+      },
+      "validation": {
+        "record": "compatibility/sync-1.6.0-acceptance.json",
+        "workPackage": "durable-edge"
       }
     },
     {
@@ -1092,7 +1172,7 @@
       "reports": [
         "AI_DOCS/agent-reports/sync-1.6.0-durable-core.md"
       ],
-      "status": "implementation-pending-validation",
+      "status": "tested-with-limitations",
       "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
       "review": {
         "finding": "ported"
@@ -1122,6 +1202,10 @@
         "pisharp": "src/PiSharp.Durable/Session/Transaction.cs",
         "status": "ported",
         "blobSha1": "a25197a74ea630c029e6ec35a51ca82f672e5dee"
+      },
+      "validation": {
+        "record": "compatibility/sync-1.6.0-acceptance.json",
+        "workPackage": "durable-core"
       }
     },
     {
@@ -1135,7 +1219,7 @@
       "reports": [
         "AI_DOCS/agent-reports/sync-1.6.0-durable-core.md"
       ],
-      "status": "implementation-pending-validation",
+      "status": "tested-with-limitations",
       "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
       "review": {
         "finding": "ported"
@@ -1161,6 +1245,10 @@
           "tests/PiSharp.Durable.Tests/Sync160SignalsCases.cs"
         ],
         "note": "defineSignal, SignalToken, SignalKey, SignalState, SignalResult and SubmissionSettled; harness.signal and tx.signal are IHarness.SignalAsync and ITx.SignalAsync (Harness/Harness.cs, Session/Transaction.cs)."
+      },
+      "validation": {
+        "record": "compatibility/sync-1.6.0-acceptance.json",
+        "workPackage": "durable-core"
       }
     },
     {
@@ -1174,7 +1262,7 @@
       "reports": [
         "AI_DOCS/agent-reports/sync-1.6.0-durable-core.md"
       ],
-      "status": "implementation-pending-validation",
+      "status": "tested-with-limitations",
       "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
       "review": {
         "finding": "ported",
@@ -1205,6 +1293,10 @@
         "pisharp": "src/PiSharp.Durable/Testing/StorageConformance.cs",
         "status": "ported",
         "blobSha1": "70f295454b3d91a19dbcc9321334413109dab6e0"
+      },
+      "validation": {
+        "record": "compatibility/sync-1.6.0-acceptance.json",
+        "workPackage": "durable-core"
       }
     },
     {
@@ -1218,7 +1310,7 @@
       "reports": [
         "AI_DOCS/agent-reports/sync-1.6.0-durable-edge.md"
       ],
-      "status": "implementation-pending-validation",
+      "status": "tested-with-limitations",
       "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
       "review": {
         "finding": "ported"
@@ -1260,6 +1352,10 @@
           "tests/PiSharp.Durable.Tests/ToolsImagesCases.cs"
         ],
         "note": "imageLimits is ImageLimits.Of and CodingTools.ImageLimitsOf; preparedNotes and fromBase64 are ImageFormats.PreparedNotes and FromBase64."
+      },
+      "validation": {
+        "record": "compatibility/sync-1.6.0-acceptance.json",
+        "workPackage": "durable-edge"
       }
     },
     {
@@ -1273,7 +1369,7 @@
       "reports": [
         "AI_DOCS/agent-reports/sync-1.6.0-durable-edge.md"
       ],
-      "status": "implementation-pending-validation",
+      "status": "tested-with-limitations",
       "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
       "review": {
         "finding": "ported"
@@ -1303,6 +1399,10 @@
         "pisharp": "src/PiSharp.Durable.Tools/Tools/Tools.cs",
         "status": "ported",
         "blobSha1": "adf06d188ff1b4eb8cad3824eefb396d3ef36489"
+      },
+      "validation": {
+        "record": "compatibility/sync-1.6.0-acceptance.json",
+        "workPackage": "durable-edge"
       }
     },
     {
@@ -1316,7 +1416,7 @@
       "reports": [
         "AI_DOCS/agent-reports/sync-1.6.0-durable-edge.md"
       ],
-      "status": "implementation-pending-validation",
+      "status": "tested-with-limitations",
       "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
       "review": {
         "finding": "ported"
@@ -1346,6 +1446,10 @@
         "pisharp": "src/PiSharp.Durable.Tools/Tools/Read.cs",
         "status": "ported",
         "blobSha1": "de84a2b2f18dcaf623fce4f17625c89b3da9df11"
+      },
+      "validation": {
+        "record": "compatibility/sync-1.6.0-acceptance.json",
+        "workPackage": "durable-edge"
       }
     },
     {
@@ -1359,7 +1463,7 @@
       "reports": [
         "AI_DOCS/agent-reports/sync-1.6.0-durable-core.md"
       ],
-      "status": "implementation-pending-validation",
+      "status": "tested-with-limitations",
       "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
       "review": {
         "finding": "ported"
@@ -1389,6 +1493,10 @@
         "pisharp": "src/PiSharp.Durable/Types.cs",
         "status": "ported",
         "blobSha1": "02783256833732bcf89146f5f817c43870dbfb3d"
+      },
+      "validation": {
+        "record": "compatibility/sync-1.6.0-acceptance.json",
+        "workPackage": "durable-core"
       }
     },
     {
@@ -1402,7 +1510,7 @@
       "reports": [
         "AI_DOCS/agent-reports/sync-1.6.0-durable-edge.md"
       ],
-      "status": "implementation-pending-validation",
+      "status": "tested-with-limitations",
       "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
       "review": {
         "finding": "ported"
@@ -1440,6 +1548,10 @@
           "tests/PiSharp.Durable.Tests/Sync160CodemodeCases.cs"
         ],
         "note": "The cases v1.6.0 rewrote are in CodemodeDescribeCases.cs; the ones it added are in Sync160CodemodeCases.cs."
+      },
+      "validation": {
+        "record": "compatibility/sync-1.6.0-acceptance.json",
+        "workPackage": "durable-edge"
       }
     },
     {
@@ -1453,7 +1565,7 @@
       "reports": [
         "AI_DOCS/agent-reports/sync-1.6.0-durable-edge.md"
       ],
-      "status": "implementation-pending-validation",
+      "status": "tested-with-limitations",
       "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
       "review": {
         "finding": "ported"
@@ -1483,6 +1595,10 @@
         "pisharp": "tests/PiSharp.Durable.Tests/CodemodeCases.cs",
         "status": "ported",
         "blobSha1": "c12eba6d276ed61b3e6d6a9a4e3385beb5f6113c"
+      },
+      "validation": {
+        "record": "compatibility/sync-1.6.0-acceptance.json",
+        "workPackage": "durable-edge"
       }
     },
     {
@@ -1496,7 +1612,7 @@
       "reports": [
         "AI_DOCS/agent-reports/sync-1.6.0-durable-edge.md"
       ],
-      "status": "implementation-pending-validation",
+      "status": "tested-with-limitations",
       "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
       "review": {
         "finding": "ported"
@@ -1518,6 +1634,10 @@
         "tests": [
           "tests/PiSharp.Durable.Tests/Sync160EnvListRaceCases.cs"
         ]
+      },
+      "validation": {
+        "record": "compatibility/sync-1.6.0-acceptance.json",
+        "workPackage": "durable-edge"
       }
     },
     {
@@ -1532,7 +1652,7 @@
         "AI_DOCS/agent-reports/sync-1.6.0-durable-core.md",
         "AI_DOCS/agent-reports/sync-1.6.0-durable-edge.md"
       ],
-      "status": "implementation-pending-validation",
+      "status": "tested-with-limitations",
       "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
       "review": {
         "finding": "ported",
@@ -1567,6 +1687,10 @@
         "pisharp": "samples/Durable.Examples/ExamplesTestsAfterEdits.cs",
         "status": "ported",
         "blobSha1": "240bfec31f13bba569715345ed9b122fd6450f37"
+      },
+      "validation": {
+        "record": "compatibility/sync-1.6.0-acceptance.json",
+        "workPackage": "durable-edge"
       }
     },
     {
@@ -1580,7 +1704,7 @@
       "reports": [
         "AI_DOCS/agent-reports/sync-1.6.0-durable-edge.md"
       ],
-      "status": "implementation-pending-validation",
+      "status": "tested-with-limitations",
       "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
       "review": {
         "finding": "ported",
@@ -1606,6 +1730,10 @@
         "tests": [
           "tests/PiSharp.Durable.Tests/ExamplesCases.cs"
         ]
+      },
+      "validation": {
+        "record": "compatibility/sync-1.6.0-acceptance.json",
+        "workPackage": "durable-edge"
       }
     },
     {
@@ -1619,7 +1747,7 @@
       "reports": [
         "AI_DOCS/agent-reports/sync-1.6.0-durable-edge.md"
       ],
-      "status": "implementation-pending-validation",
+      "status": "tested-with-limitations",
       "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
       "review": {
         "finding": "ported",
@@ -1645,6 +1773,10 @@
         "tests": [
           "tests/PiSharp.Durable.Tests/ExamplesCases.cs"
         ]
+      },
+      "validation": {
+        "record": "compatibility/sync-1.6.0-acceptance.json",
+        "workPackage": "durable-edge"
       }
     },
     {
@@ -1658,7 +1790,7 @@
       "reports": [
         "AI_DOCS/agent-reports/sync-1.6.0-durable-edge.md"
       ],
-      "status": "implementation-pending-validation",
+      "status": "tested-with-limitations",
       "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
       "review": {
         "finding": "ported",
@@ -1684,6 +1816,10 @@
         "tests": [
           "tests/PiSharp.Durable.Tests/ExamplesCases.cs"
         ]
+      },
+      "validation": {
+        "record": "compatibility/sync-1.6.0-acceptance.json",
+        "workPackage": "durable-edge"
       }
     },
     {
@@ -1697,7 +1833,7 @@
       "reports": [
         "AI_DOCS/agent-reports/sync-1.6.0-durable-edge.md"
       ],
-      "status": "implementation-pending-validation",
+      "status": "tested-with-limitations",
       "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
       "review": {
         "finding": "ported",
@@ -1723,6 +1859,10 @@
         "tests": [
           "tests/PiSharp.Durable.Tests/ExamplesCases.cs"
         ]
+      },
+      "validation": {
+        "record": "compatibility/sync-1.6.0-acceptance.json",
+        "workPackage": "durable-edge"
       }
     },
     {
@@ -1736,7 +1876,7 @@
       "reports": [
         "AI_DOCS/agent-reports/sync-1.6.0-durable-edge.md"
       ],
-      "status": "implementation-pending-validation",
+      "status": "tested-with-limitations",
       "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
       "review": {
         "finding": "ported",
@@ -1762,6 +1902,10 @@
         "tests": [
           "tests/PiSharp.Durable.Tests/ExamplesCases.cs"
         ]
+      },
+      "validation": {
+        "record": "compatibility/sync-1.6.0-acceptance.json",
+        "workPackage": "durable-edge"
       }
     },
     {
@@ -1775,7 +1919,7 @@
       "reports": [
         "AI_DOCS/agent-reports/sync-1.6.0-durable-edge.md"
       ],
-      "status": "implementation-pending-validation",
+      "status": "tested-with-limitations",
       "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
       "review": {
         "finding": "ported",
@@ -1801,6 +1945,10 @@
         "tests": [
           "tests/PiSharp.Durable.Tests/ExamplesCases.cs"
         ]
+      },
+      "validation": {
+        "record": "compatibility/sync-1.6.0-acceptance.json",
+        "workPackage": "durable-edge"
       }
     },
     {
@@ -1814,7 +1962,7 @@
       "reports": [
         "AI_DOCS/agent-reports/sync-1.6.0-durable-edge.md"
       ],
-      "status": "implementation-pending-validation",
+      "status": "tested-with-limitations",
       "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
       "review": {
         "finding": "ported",
@@ -1840,6 +1988,10 @@
         "tests": [
           "tests/PiSharp.Durable.Tests/ExamplesCases.cs"
         ]
+      },
+      "validation": {
+        "record": "compatibility/sync-1.6.0-acceptance.json",
+        "workPackage": "durable-edge"
       }
     },
     {
@@ -1853,7 +2005,7 @@
       "reports": [
         "AI_DOCS/agent-reports/sync-1.6.0-durable-edge.md"
       ],
-      "status": "implementation-pending-validation",
+      "status": "tested-with-limitations",
       "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
       "review": {
         "finding": "ported",
@@ -1879,6 +2031,10 @@
         "tests": [
           "tests/PiSharp.Durable.Tests/ExamplesCases.cs"
         ]
+      },
+      "validation": {
+        "record": "compatibility/sync-1.6.0-acceptance.json",
+        "workPackage": "durable-edge"
       }
     },
     {
@@ -1892,7 +2048,7 @@
       "reports": [
         "AI_DOCS/agent-reports/sync-1.6.0-durable-edge.md"
       ],
-      "status": "implementation-pending-validation",
+      "status": "tested-with-limitations",
       "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
       "review": {
         "finding": "ported",
@@ -1918,6 +2074,10 @@
         "tests": [
           "tests/PiSharp.Durable.Tests/ExamplesCases.cs"
         ]
+      },
+      "validation": {
+        "record": "compatibility/sync-1.6.0-acceptance.json",
+        "workPackage": "durable-edge"
       }
     },
     {
@@ -1931,7 +2091,7 @@
       "reports": [
         "AI_DOCS/agent-reports/sync-1.6.0-durable-edge.md"
       ],
-      "status": "implementation-pending-validation",
+      "status": "tested-with-limitations",
       "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
       "review": {
         "finding": "ported",
@@ -1957,6 +2117,10 @@
         "tests": [
           "tests/PiSharp.Durable.Tests/ExamplesCases.cs"
         ]
+      },
+      "validation": {
+        "record": "compatibility/sync-1.6.0-acceptance.json",
+        "workPackage": "durable-edge"
       }
     },
     {
@@ -1970,7 +2134,7 @@
       "reports": [
         "AI_DOCS/agent-reports/sync-1.6.0-durable-core.md"
       ],
-      "status": "implementation-pending-validation",
+      "status": "tested-with-limitations",
       "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
       "review": {
         "finding": "ported"
@@ -2000,6 +2164,10 @@
         "pisharp": "tests/PiSharp.Durable.Tests/HarnessAfterRunCases.cs",
         "status": "ported",
         "blobSha1": "7201fe6af60821659f831f927bf3d21254412d14"
+      },
+      "validation": {
+        "record": "compatibility/sync-1.6.0-acceptance.json",
+        "workPackage": "durable-core"
       }
     },
     {
@@ -2013,7 +2181,7 @@
       "reports": [
         "AI_DOCS/agent-reports/sync-1.6.0-durable-core.md"
       ],
-      "status": "implementation-pending-validation",
+      "status": "tested-with-limitations",
       "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
       "review": {
         "finding": "ported"
@@ -2035,6 +2203,10 @@
         "tests": [
           "tests/PiSharp.Durable.Tests/Sync160HookTasksCases.cs"
         ]
+      },
+      "validation": {
+        "record": "compatibility/sync-1.6.0-acceptance.json",
+        "workPackage": "durable-core"
       }
     },
     {
@@ -2048,7 +2220,7 @@
       "reports": [
         "AI_DOCS/agent-reports/sync-1.6.0-durable-core.md"
       ],
-      "status": "implementation-pending-validation",
+      "status": "tested-with-limitations",
       "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
       "review": {
         "finding": "ported"
@@ -2078,6 +2250,10 @@
         "pisharp": "tests/PiSharp.Durable.Tests/HarnessIdleScopesCases.cs",
         "status": "ported",
         "blobSha1": "b034150b0ec6150bf44b0ed62d0dd961067dd79d"
+      },
+      "validation": {
+        "record": "compatibility/sync-1.6.0-acceptance.json",
+        "workPackage": "durable-core"
       }
     },
     {
@@ -2091,7 +2267,7 @@
       "reports": [
         "AI_DOCS/agent-reports/sync-1.6.0-durable-core.md"
       ],
-      "status": "implementation-pending-validation",
+      "status": "tested-with-limitations",
       "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
       "review": {
         "finding": "ported"
@@ -2121,6 +2297,10 @@
         "pisharp": "tests/PiSharp.Durable.Tests/HarnessInputEntriesCases.cs",
         "status": "ported",
         "blobSha1": "ce6baa468da6418227967a0fb12a0768bd5283a0"
+      },
+      "validation": {
+        "record": "compatibility/sync-1.6.0-acceptance.json",
+        "workPackage": "durable-core"
       }
     },
     {
@@ -2134,7 +2314,7 @@
       "reports": [
         "AI_DOCS/agent-reports/sync-1.6.0-durable-core.md"
       ],
-      "status": "implementation-pending-validation",
+      "status": "tested-with-limitations",
       "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
       "review": {
         "finding": "ported"
@@ -2164,6 +2344,10 @@
         "pisharp": "tests/PiSharp.Durable.Tests/Harness/HarnessLifecycleCases.cs",
         "status": "ported",
         "blobSha1": "bf044120b09e43037143845553bbb902439374f6"
+      },
+      "validation": {
+        "record": "compatibility/sync-1.6.0-acceptance.json",
+        "workPackage": "durable-core"
       }
     },
     {
@@ -2177,7 +2361,7 @@
       "reports": [
         "AI_DOCS/agent-reports/sync-1.6.0-durable-core.md"
       ],
-      "status": "implementation-pending-validation",
+      "status": "tested-with-limitations",
       "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
       "review": {
         "finding": "ported"
@@ -2207,6 +2391,10 @@
         "pisharp": "tests/PiSharp.Durable.Tests/HarnessNestedToolsCases.cs",
         "status": "ported",
         "blobSha1": "66de32766878296cb742e9e8e128270e3e8e1f6d"
+      },
+      "validation": {
+        "record": "compatibility/sync-1.6.0-acceptance.json",
+        "workPackage": "durable-core"
       }
     },
     {
@@ -2220,7 +2408,7 @@
       "reports": [
         "AI_DOCS/agent-reports/sync-1.6.0-durable-core.md"
       ],
-      "status": "implementation-pending-validation",
+      "status": "tested-with-limitations",
       "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
       "review": {
         "finding": "ported"
@@ -2242,6 +2430,10 @@
         "tests": [
           "tests/PiSharp.Durable.Tests/Sync160ParkChildrenCases.cs"
         ]
+      },
+      "validation": {
+        "record": "compatibility/sync-1.6.0-acceptance.json",
+        "workPackage": "durable-core"
       }
     },
     {
@@ -2255,7 +2447,7 @@
       "reports": [
         "AI_DOCS/agent-reports/sync-1.6.0-durable-core.md"
       ],
-      "status": "implementation-pending-validation",
+      "status": "tested-with-limitations",
       "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
       "review": {
         "finding": "ported",
@@ -2278,6 +2470,13 @@
         "tests": [
           "tests/PiSharp.Durable.Tests/Sync160SignalsCases.cs"
         ]
+      },
+      "validation": {
+        "record": "compatibility/sync-1.6.0-acceptance.json",
+        "workPackage": "durable-core",
+        "limitations": [
+          "packages/durable/test/harness-signals.test.ts: One assertion is not ported: the NaN delivery inside \"answers not_found, invalid, ...\" (a JsonValue cannot hold NaN) (durable-core)."
+        ]
       }
     },
     {
@@ -2291,7 +2490,7 @@
       "reports": [
         "AI_DOCS/agent-reports/sync-1.6.0-durable-core.md"
       ],
-      "status": "implementation-pending-validation",
+      "status": "tested-with-limitations",
       "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
       "review": {
         "finding": "ported"
@@ -2321,6 +2520,10 @@
         "pisharp": "tests/PiSharp.Durable.Tests/Harness/HarnessSubmissionsCases.cs",
         "status": "ported",
         "blobSha1": "5ee8eac225b2c3fd0dca8d62b96b1b30d548054b"
+      },
+      "validation": {
+        "record": "compatibility/sync-1.6.0-acceptance.json",
+        "workPackage": "durable-core"
       }
     },
     {
@@ -2334,7 +2537,7 @@
       "reports": [
         "AI_DOCS/agent-reports/sync-1.6.0-durable-core.md"
       ],
-      "status": "implementation-pending-validation",
+      "status": "tested-with-limitations",
       "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
       "review": {
         "finding": "ported"
@@ -2356,6 +2559,10 @@
         "tests": [
           "tests/PiSharp.Durable.Tests/Sync160ToolGatesCases.cs"
         ]
+      },
+      "validation": {
+        "record": "compatibility/sync-1.6.0-acceptance.json",
+        "workPackage": "durable-core"
       }
     },
     {
@@ -2369,7 +2576,7 @@
       "reports": [
         "AI_DOCS/agent-reports/sync-1.6.0-durable-core.md"
       ],
-      "status": "implementation-pending-validation",
+      "status": "tested-with-limitations",
       "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
       "review": {
         "finding": "ported"
@@ -2399,6 +2606,10 @@
         "pisharp": "tests/PiSharp.Durable.Tests/HarnessToolHooksCases.cs",
         "status": "ported",
         "blobSha1": "beca471e1f8d1eb4e4755969563cc91edd251ee6"
+      },
+      "validation": {
+        "record": "compatibility/sync-1.6.0-acceptance.json",
+        "workPackage": "durable-core"
       }
     },
     {
@@ -2412,7 +2623,7 @@
       "reports": [
         "AI_DOCS/agent-reports/sync-1.6.0-durable-core.md"
       ],
-      "status": "implementation-pending-validation",
+      "status": "tested-with-limitations",
       "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
       "review": {
         "finding": "ported"
@@ -2434,6 +2645,10 @@
         "tests": [
           "tests/PiSharp.Durable.Tests/Sync160ToolParksCases.cs"
         ]
+      },
+      "validation": {
+        "record": "compatibility/sync-1.6.0-acceptance.json",
+        "workPackage": "durable-core"
       }
     },
     {
@@ -2447,7 +2662,7 @@
       "reports": [
         "AI_DOCS/agent-reports/sync-1.6.0-durable-core.md"
       ],
-      "status": "implementation-pending-validation",
+      "status": "tested-with-limitations",
       "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
       "review": {
         "finding": "ported"
@@ -2477,6 +2692,10 @@
         "pisharp": "tests/PiSharp.Durable.Tests/Harness/HarnessToolsCases.cs",
         "status": "ported",
         "blobSha1": "92aec1cf6c1c908d21394cd09d04f671ed169410"
+      },
+      "validation": {
+        "record": "compatibility/sync-1.6.0-acceptance.json",
+        "workPackage": "durable-core"
       }
     },
     {
@@ -2490,7 +2709,7 @@
       "reports": [
         "AI_DOCS/agent-reports/sync-1.6.0-durable-edge.md"
       ],
-      "status": "implementation-pending-validation",
+      "status": "tested-with-limitations",
       "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
       "review": {
         "finding": "ported"
@@ -2513,6 +2732,10 @@
           "tests/PiSharp.Durable.Tests/ToolsImagesCases.cs"
         ],
         "note": "The fixtures v1.6.0 moved out of tools-images.test.ts stay in ToolsImagesCases.cs, as private members of the suite's partial Program class that Sync160ImagesFitCases.cs shares."
+      },
+      "validation": {
+        "record": "compatibility/sync-1.6.0-acceptance.json",
+        "workPackage": "durable-edge"
       }
     },
     {
@@ -2526,7 +2749,7 @@
       "reports": [
         "AI_DOCS/agent-reports/sync-1.6.0-durable-edge.md"
       ],
-      "status": "implementation-pending-validation",
+      "status": "tested-with-limitations",
       "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
       "review": {
         "finding": "ported"
@@ -2548,6 +2771,10 @@
         "tests": [
           "tests/PiSharp.Durable.Tests/Sync160ImagesFitCases.cs"
         ]
+      },
+      "validation": {
+        "record": "compatibility/sync-1.6.0-acceptance.json",
+        "workPackage": "durable-edge"
       }
     },
     {
@@ -2561,7 +2788,7 @@
       "reports": [
         "AI_DOCS/agent-reports/sync-1.6.0-durable-core.md"
       ],
-      "status": "implementation-pending-validation",
+      "status": "tested-with-limitations",
       "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
       "review": {
         "finding": "ported"
@@ -2591,6 +2818,10 @@
         "pisharp": "tests/PiSharp.Durable.Tests/SpecUsageCases.cs",
         "status": "ported",
         "blobSha1": "b1896bf66c8bbd6a427a4d2c7defe3e4d1207d46"
+      },
+      "validation": {
+        "record": "compatibility/sync-1.6.0-acceptance.json",
+        "workPackage": "durable-core"
       }
     },
     {
@@ -2604,7 +2835,7 @@
       "reports": [
         "AI_DOCS/agent-reports/sync-1.6.0-durable-edge.md"
       ],
-      "status": "implementation-pending-validation",
+      "status": "tested-with-limitations",
       "reason": "Applicable source contract is assigned to this work package. Existing or newly authored implementation is not accepted until root records integrated validation; this row makes no passing-test or parity claim.",
       "review": {
         "finding": "ported"
@@ -2634,6 +2865,10 @@
         "pisharp": "tests/PiSharp.Durable.Tests/ToolsImagesCases.cs",
         "status": "ported",
         "blobSha1": "f893c7dbe6df28b23245d9120fdccaf9a82b674a"
+      },
+      "validation": {
+        "record": "compatibility/sync-1.6.0-acceptance.json",
+        "workPackage": "durable-edge"
       }
     },
     {
@@ -2680,5 +2915,6 @@
         "blobSha1": "dba4d7c9d83d56c1fb5dda4dcf1e7ad832068f8a"
       }
     }
-  ]
+  ],
+  "acceptance": "compatibility/sync-1.6.0-acceptance.json"
 }
