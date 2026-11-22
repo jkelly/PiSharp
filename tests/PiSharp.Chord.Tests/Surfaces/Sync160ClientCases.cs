@@ -250,7 +250,10 @@ internal static partial class Program
         {
             await using var desk = await Sync160DeskWorld.StartAsync();
             using var held = desk.Client.Hold(Sync160Desk, new(), ChordContext.Background);
-            Equal<IReference?>(null, Variants.LiveIn(held, "reader"), "a reference that is not bound yet");
+            // Upstream's hold is synchronous, so the reference is not bound yet here. The native client binds over an in-memory link
+            // on another thread and can be live already when this reads it: then it must be the reference itself, never another.
+            var early = Variants.LiveIn(held, "reader");
+            Check(early is null || ReferenceEquals(held, early), "a reference that is not bound yet: " + early);
             Equal<IReference?>(null, Variants.LiveIn<IReference>(null, "reader"), "no reference");
             await Sync160Until(() => held.State.Value.Kind == "live", "the reference is live");
             Check(ReferenceEquals(held, Variants.LiveIn(held, "reader")), "the reference is read in the variant it is live in");

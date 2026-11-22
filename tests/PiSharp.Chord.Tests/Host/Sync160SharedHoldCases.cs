@@ -384,7 +384,8 @@ internal static partial class Program
             await S6Until(() => server.Activity.Value.Calls == 1, "the call running");
             await server.ReloadAsync([G6ServeShownV2("v2", false)], S6Ctx);
             await S6Settled(server, client);
-            Equal("live", a.State.Value.Kind, "the old binding stays live while it drains");
+            Check(a.State.Value.Kind == "live", $"the old binding stays live while it drains: {a.State.Value.Kind} {a.State.Value.Cause?.Kind} " +
+                $"{a.State.Value.Cause?.Error.Code}: {a.State.Value.Cause?.Error.Message}");
             using var b = client.Hold(G6Shown, new(), S6Ctx);
             Sequence(["live", "\"v1\""], new[] { b.State.Value.Kind, b.Member("label").Value!.ToJsonString() }, "the joiner shares the old live binding");
             Equal(1, server.Activity.Value.References, "with no hold of its own");

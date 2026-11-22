@@ -98,6 +98,9 @@ public static partial class Examples
         // Set by the host below to make the first attempt "crash" after it triggered the build.
         var crashAfterTrigger = true;
         var died = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        // Held by the host while it delivers the webhook and its retry: the woken call waits here, so the retry meets an open task
+        // (upstream's retry runs before the woken call does; a native scheduler could otherwise finish the call first).
+        var woken = new ExampleTurn();
 
         var runCi = Define.Tool(new ToolRegistration
         {
@@ -108,6 +111,7 @@ public static partial class Examples
             Replay = ToolReplay.Safe,
             Execute = async (arguments, api, ctx) =>
             {
+                await woken.WaitAsync(ctx.CancellationToken);
                 // The result, the deadline's expiry, or nothing yet (a fresh call, or a rerun after a crash before the park).
                 var state = await api.ReadSignalAsync(ciResult, "done", ctx);
                 if (state?.Value is JsonObjectValue value)
@@ -202,8 +206,10 @@ public static partial class Examples
             return ResultName(await harness.SignalAsync(target.TaskId, target.Token, target.Key, payload, Context));
         }
         var passed = JsonValue.Object([new("status", "passed"), new("logUrl", "https://ci/1")]);
+        woken.Hold();
         await LogAsync(output, "webhook:", await Deliver(passed));
         await LogAsync(output, "retry:", await Deliver(passed));
+        woken.Release();
         await (await harness.SubmissionAsync(submissionId, Context))!.WaitAsync(Context);
         await LogAsync(output, "result:", (await LastToolResultAsync(root)).Text);
 

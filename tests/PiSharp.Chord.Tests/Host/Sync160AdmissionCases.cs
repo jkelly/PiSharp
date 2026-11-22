@@ -217,7 +217,10 @@ internal static partial class Program
             await using var w = await A6Served(code, "read", new A6AccessCode { Selves = selves });
             var doc = await w.Host.GetAsync(A6Doc, new() { ["id"] = "a" }, A6Ctx);
             A6FailLive(w.Host, selves[0], new ChordError("unavailable", "the store broke"));
-            Equal("loading", doc.State.Value.Kind, "sealed in the failure's flush");
+            // Sealed in the failure's flush: loading. The host's dispatcher runs on its own thread and can already have parked the
+            // reader on its failed source when this reads the state, so either is accepted here; the parked state is asserted below.
+            var sealedKind = doc.State.Value.Kind;
+            Check(sealedKind is "loading" or "failed", "sealed in the failure's flush: " + sealedKind);
             await A6Delivered(w.Host);
             Equal("failed Waiting", $"{doc.State.Value.Kind} {doc.State.Value.Cause?.Kind}", "parked on its failed source");
             Equal("waiting for test.access: the store broke", doc.State.Value.Cause!.Error.Message, "names the source");
@@ -835,7 +838,10 @@ internal static partial class Program
             Equal("\"t\"", A6Read(doc, "text"), "live");
             await w.Reload(doc: A6DocFacet(new()));
             await w.Set("read");
-            Equal("loading \"t\"", $"{doc.State.Value.Kind} {A6Read(doc, "text")}", "loading with its last value");
+            // Loading with its last value. The successor admits on the host's own dispatcher thread and can be live already when this
+            // reads it (it needs no gate); either way the value read is the last one, and the reader is asserted once it settled.
+            var sealedState = $"{doc.State.Value.Kind} {A6Read(doc, "text")}";
+            Check(sealedState is "loading \"t\"" or "live \"t\"", "loading with its last value: " + sealedState);
             Check((await writing).StartsWith("unavailable", StringComparison.Ordinal), "the drained call: " + await writing);
             gate.SetResult();
             await A6Delivered(w.Host);
