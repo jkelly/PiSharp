@@ -375,7 +375,10 @@ internal static partial class Program
         Case("remote.hold.shared-a-reference-made-during-a-version-dropping-reloads-drain-joins-the-old-live-binding-no-fresh-admission", async () =>
         {
             var gate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-            await using var server = S6Host(Server.Address()); await using var client = S6Host();
+            // Upstream's linked() leaves closeTimeout unset here, so the drain has the default deadline (5 s). S6Host's 200 ms close
+            // would cap the drain at 200 ms, less than a slow runner needs for the third host below: the drain would time out and
+            // cancel the running call before the gate opens.
+            await using var server = S6Host(Server.Address(), closeTimeout: TimeSpan.FromSeconds(30)); await using var client = S6Host();
             await server.LoadAsync([G6ServeShown("v1", gate: gate.Task)], S6Ctx); await client.LoadAsync([], S6Ctx);
             S6Link(server, client);
             using var a = await client.GetAsync(G6Shown, new(), S6Ctx);

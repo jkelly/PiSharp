@@ -127,13 +127,13 @@ internal static partial class Program
 
     /// <summary>A host of the 1.6.0 remote cases: errors and telemetry recorded when given, the windows as given.</summary>
     internal static ChordHost S6Host(Address? address = null, List<HostError>? errors = null, InMemoryTelemetryContext? telemetry = null,
-        int? callWindow = null, int? eventWindow = null, JsonObject? principal = null, ICompression? compression = null)
+        int? callWindow = null, int? eventWindow = null, JsonObject? principal = null, ICompression? compression = null, TimeSpan? closeTimeout = null)
     {
         var options = new HostOptions
         {
             Address = address, Principal = principal ?? (address is null ? S6User : S6ServerPrincipal), Telemetry = telemetry,
             OnError = error => { if (errors is not null) lock (errors) errors.Add(error); },
-            ReadyTimeout = TimeSpan.FromSeconds(3), CloseTimeout = TimeSpan.FromMilliseconds(200),
+            ReadyTimeout = TimeSpan.FromSeconds(3), CloseTimeout = closeTimeout ?? TimeSpan.FromMilliseconds(200),
             CallWindow = callWindow ?? 10_000, EventWindow = eventWindow ?? 32,
             Compression = compression,
         };
