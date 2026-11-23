@@ -1,0 +1,23 @@
+{
+  "$schema": "http://json.schemastore.org/template",
+  "author": "PiSharp contributors",
+  "classifications": [ "Console", "Workflow", "Durable", "AI", "PiSharp" ],
+  "identity": "PiSharp.Templates.Workflow.CSharp",
+  "name": "PiSharp Durable Workflow",
+  "shortName": "pisharp-workflow",
+  "sourceName": "MyPiSharpWorkflow",
+  "preferNameDirectory": true,
+  "tags": {
+    "language": "C#",
+    "type": "project"
+  },
+  "symbols": {
+    "PiSharpVersion": {
+      "type": "parameter",
+      "datatype": "string",
+      "defaultValue": "1.6.0.1",
+      "replaces": "1.6.0.1",
+      "description": "PiSharp NuGet package version to reference."
+    }
+  }
+}

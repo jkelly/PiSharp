@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- First-class Microsoft.Extensions.AI bridge:
+       - PiChatClient: exposes any PiSharp IChatTransport as Microsoft.Extensions.AI.IChatClient.
+       - ChatClientTransportAdapter: exposes any Microsoft.Extensions.AI.IChatClient as a PiSharp IChatTransport.
+       - PiEmbeddingGenerator: exposes PiSharp.AI.Media.IEmbeddingsApi as IEmbeddingGenerator<string, Embedding<float>>
+         (marked [Experimental("PISHARP_MEDIA001")] to match the underlying media contract).
+       - ServiceCollectionExtensions: DI registration helpers for ASP.NET Core / Generic Host apps.
+       Zero heavy dependencies: only Microsoft.Extensions.AI.Abstractions (10.11.1) and
+       Microsoft.Extensions.DependencyInjection.Abstractions (10.0.0), both MIT-licensed. -->
+  <PropertyGroup>
+    <RootNamespace>PiSharp.Extensions.AI</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../PiSharp.Contracts/PiSharp.Contracts.csproj" />
+    <ProjectReference Include="../PiSharp.AI/PiSharp.AI.csproj" />
+    <PackageReference Include="Microsoft.Extensions.AI.Abstractions" Version="$(PiSharpExtensionsAIAbstractionsVersion)" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="$(PiSharpDependencyInjectionAbstractionsVersion)" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="../../third-party/Microsoft.Extensions.AI.Abstractions.LICENSE.txt" Pack="true" PackagePath="licenses/" />
+  </ItemGroup>
+</Project>

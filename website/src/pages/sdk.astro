@@ -14,7 +14,7 @@ const groups = [
 	<div class="ps-row ps-pagehead">
 		<div>
 			<h1 class="ps-h1">Take the whole agent, or just a layer</h1>
-			<p class="ps-lede">Use the streaming LLM client on its own, add the agent loop, or embed the full coding agent. PiSharp {versions.pisharp} publishes 28 libraries and the CLI (29 packages), including experimental libraries for Chord, native hosting, shared Durable storage and remote environments.</p>
+			<p class="ps-lede">Use the streaming LLM client on its own, add the agent loop, bridge into <code>Microsoft.Extensions.AI</code>, or embed the full coding agent. PiSharp {versions.pisharp} publishes 29 libraries, the CLI tool, and the template pack (31 packages), including experimental libraries for Chord, native hosting, shared Durable storage and remote environments.</p>
 			<div class="ps-actions">
 				<a href="/docs/embed/sdk/" class="ps-button">Read the embedding guide</a>
 				<a href="/docs/reference/architecture/" class="ps-button ps-ghost">Architecture</a>
@@ -56,7 +56,7 @@ const groups = [
 								</div>
 								<div>
 									<p class="ps-muted">{p.description}</p>
-									{p.unpublished ? <p class="ps-fine"><a href={p.docs}>Unpublished. Read the source guide</a></p> : <code class="add">{p.tool ? `dotnet tool install -g ${p.id} --version ${versions.pisharp}` : `dotnet add package ${p.id} --version ${versions.pisharp}`}</code>}
+									{p.unpublished ? <p class="ps-fine"><a href={p.docs}>Unpublished. Read the source guide</a></p> : <code class="add">{p.tool ? `dotnet tool install -g ${p.id} --version ${versions.pisharp}` : p.template ? `dotnet new install ${p.id}::${versions.pisharp}` : `dotnet add package ${p.id} --version ${versions.pisharp}`}</code>}
 								</div>
 							</li>
 						))}
@@ -70,11 +70,11 @@ const groups = [
 		<ul class="pkgs">
 			<li>
 				<div class="name">
-					<a href="/docs/embed/media/">Media and service tiers</a>
-					<a class="ps-chip" data-tone="experimental" href="/docs/guides/service-tiers/">Experimental</a>
+					<a href="/docs/embed/media/">Media library</a>
+					<a class="ps-chip" data-tone="experimental" href="/docs/embed/media/">Experimental</a>
 				</div>
 				<div>
-					<p class="ps-muted">Image, video, speech, music, transcription, embedding and rerank models, and per-request service tiers. In PiSharp.AI, PiSharp.Agent, PiSharp.CodingAgent and PiSharp.Durable.Tools from 1.2.0.2.</p>
+					<p class="ps-muted">Image, video, speech, music, transcription, embedding and rerank models in <code>PiSharp.AI.Media</code> (<code>PISHARP_MEDIA001</code>). Service tiers graduated to stable in ADR 0017 and no longer require experimental opt-in.</p>
 					<p class="ps-fine"><a href="/docs/embed/media/">Read the media library guide</a></p>
 				</div>
 			</li>

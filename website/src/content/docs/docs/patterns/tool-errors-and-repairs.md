@@ -10,7 +10,7 @@ description: Handle invalid tool arguments, domain invariant failures and malfor
 | Layer | Validation & error conversion | What the model receives |
 | --- | --- | --- |
 | **`PiSharp.Agent`** | Unhandled exceptions from `IToolExecutor` are caught and mapped to `ToolFailureKind.ExecutionError`; return `ToolResult.Error(ToolFailureKind.InvalidArguments, ...)` for bad input. | A `toolResult` message with `isError: true` and your explanation text. |
-| **`PiSharp.Contracts.Schema`** | `JsonSchemaValidator` / `CoercingJsonSchemaValidator` *(experimental, `PISHARP_SCHEMA001`)* validates arguments against JSON Schema (`pi-schema`). | Structured validation errors pointing to the exact failing property. |
+| **`PiSharp.Contracts.Schema`** | `JsonSchemaValidator` / `CoercingJsonSchemaValidator` validates arguments against JSON Schema (`pi-schema`). | Structured validation errors pointing to the exact failing property. |
 | **`PiSharp.CustomAgents` tools** | `AgentTool.Create<TArgs>` validates arguments against the C# record's schema before invoking your handler. Return `AgentToolResult.Error("...")` for domain failures. | `"Invalid arguments for '<name>': ..."` or your explicit error text. |
 | **`PiSharp.CustomAgents` typed prompts** | `Prompt<TResult>` / `PromptAsync<T>` exposes a `submit_result` tool matching `TResult`'s schema and automatically runs up to `MaxRepairs` (default `2`) repair rounds. | `"Your answer could not be used: <error>. Call the submit_result tool with arguments that match its schema."` |
 

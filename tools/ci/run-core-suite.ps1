@@ -1,5 +1,5 @@
 # Hosted source-build lane. This does not issue native admission/launch receipts.
-param([Parameter(Mandatory)][ValidateSet('Compatibility','Agent','Transport','Sessions','Tools','CodingAgent','Rpc','Extensions.ContractTests','ExtensionHost','Tui')][string]$Suite,
+param([Parameter(Mandatory)][ValidateSet('Compatibility','Agent','Transport','Sessions','Tools','CodingAgent','Rpc','Extensions.ContractTests','ExtensionHost','Tui','Extensions.AI')][string]$Suite,
     [Parameter(Mandatory)][string]$ReportDirectory)
 $ErrorActionPreference = 'Stop'
 $repo = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path

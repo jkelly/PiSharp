@@ -1,0 +1,32 @@
+{
+  "version": 1,
+  "dependencies": {
+    "net10.0": {
+      "Microsoft.Extensions.AI.Abstractions": {
+        "type": "Direct",
+        "requested": "[10.11.1, 10.11.1]",
+        "resolved": "10.11.1",
+        "contentHash": "LcfA+SF7/GYZcI/XIC6WW17g7xytFvMQOzlBvbK5rvcltQKYXqnX47WaE/tvFqNm2GQtqhWnG/EkJC+T5PBKMw=="
+      },
+      "Microsoft.Extensions.DependencyInjection.Abstractions": {
+        "type": "Direct",
+        "requested": "[10.0.0, 10.0.0]",
+        "resolved": "10.0.0",
+        "contentHash": "L3AdmZ1WOK4XXT5YFPEwyt0ep6l8lGIPs7F5OOBZc77Zqeo01Of7XXICy47628sdVl0v/owxYJTe86DTgFwKCA=="
+      },
+      "pisharp.ai": {
+        "type": "Project",
+        "dependencies": {
+          "PiSharp.Contracts": "[1.6.0, )",
+          "PiSharp.Telemetry": "[1.6.0, )"
+        }
+      },
+      "pisharp.contracts": {
+        "type": "Project"
+      },
+      "pisharp.telemetry": {
+        "type": "Project"
+      }
+    }
+  }
+}

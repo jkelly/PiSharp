@@ -19,7 +19,6 @@
 // The Js helpers below are the JavaScript string and number conversions the durable tools print with (String.prototype.trim,
 // Number.prototype.toString).
 #nullable enable
-#pragma warning disable PISHARP_SCHEMA001 // pi-schema's port is experimental
 
 using System.Runtime.CompilerServices;
 using System.Text;

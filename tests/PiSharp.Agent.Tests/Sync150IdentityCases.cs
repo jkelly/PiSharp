@@ -13,7 +13,6 @@ using NativeAgent = PiSharp.Agent.Agent;
 // agent.identity changes it for later requests. Upstream's DEFAULT_AGENT_IDENTITY attributes requests to Pi; PiSharp's is
 // { attribution: null } (owner decision 2026-11-05, "Use safe defaults", core.agent-identity), so these cases also pin that the agent
 // adds no attribution of its own.
-#pragma warning disable PISHARP_IDENTITY001
 internal static class Sync150IdentityCases
 {
     private static readonly ModelDescriptor Model = new("identity-model", "openai-responses", "fixture-provider");
@@ -116,4 +115,3 @@ internal static class Sync150IdentityCases
     private static void Equal<T>(T expected, T actual) => Check(EqualityComparer<T>.Default.Equals(expected, actual), $"Expected {expected}; actual {actual}.");
     private static void Check(bool condition, string message) { if (!condition) throw new InvalidOperationException(message); }
 }
-#pragma warning restore PISHARP_IDENTITY001

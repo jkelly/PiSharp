@@ -2,7 +2,6 @@
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <!-- The pi-schema port (PiSharp.Contracts.Schema) is [Experimental]. -->
-    <NoWarn>$(NoWarn);PISHARP_SCHEMA001</NoWarn>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../../src/PiSharp.Agent/PiSharp.Agent.csproj" />

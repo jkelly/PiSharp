@@ -15,7 +15,6 @@ namespace PiSharp.Extensions.Mcp.Discovery;
 public sealed record ToolSearchDocument(string Name, string Text)
 {
     /// <summary>Name, description and instructions of the tool's namespace; empty without one.</summary>
-    [Experimental("PISHARP_TOOLSEARCH001")]
     public string NamespaceText { get; init; } = "";
 }
 public sealed record ToolSearchMatch(string Name, double Score);

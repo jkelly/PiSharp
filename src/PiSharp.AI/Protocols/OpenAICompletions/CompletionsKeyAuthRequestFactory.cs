@@ -41,11 +41,9 @@ public sealed record CompletionsKeyAuthRequestOptions(double? MaxTokens = null, 
     /// sends an Azure deployment name. The model identity, metadata binding and hooks keep the catalog id.</summary>
     public string? RequestModelId { get; init; }
     /// <summary>PiSharp-only: <c>service_tier</c> (OpenAI and OpenRouter: auto, default, flex, priority, fast, ultrafast); null omits it.</summary>
-    [System.Diagnostics.CodeAnalysis.Experimental("PISHARP_TIERS001")]
     public string? ServiceTier { get; init; }
     /// <summary>Source StreamOptions.identity (Pi 1.5.0 identity.ts): the User-Agent and attribution headers, below the model,
     /// session and request headers. Null: a detailed User-Agent and no attribution.</summary>
-    [System.Diagnostics.CodeAnalysis.Experimental("PISHARP_IDENTITY001")]
     public ClientIdentity? Identity { get; init; }
 }
 

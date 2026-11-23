@@ -1,0 +1,35 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <PackageType>Template</PackageType>
+    <PackageId>PiSharp.Templates</PackageId>
+    <Version Condition="'$(PiSharpReleaseVersion)' != ''">$(PiSharpReleaseVersion)</Version>
+    <PackageVersion Condition="'$(PiSharpReleaseVersion)' != ''">$(PiSharpReleaseVersion)</PackageVersion>
+    <Authors>PiSharp contributors</Authors>
+    <Description>dotnet new project templates for PiSharp: embedded agents (pisharp-agent), native C# CLI extensions (pisharp-extension), and durable workflows (pisharp-workflow).</Description>
+    <PackageTags>pisharp;ai;agent;llm;dotnet-new;templates</PackageTags>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <RepositoryType>git</RepositoryType>
+    <RepositoryCommit>$(PiSharpSourceCommit)</RepositoryCommit>
+    <IsPackable>true</IsPackable>
+    <IncludeContentInPack>true</IncludeContentInPack>
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <ContentTargetFolders>content</ContentTargetFolders>
+    <NoWarn>$(NoWarn);NU5128</NoWarn>
+    <NoDefaultExcludes>true</NoDefaultExcludes>
+    <EnableDefaultItems>false</EnableDefaultItems>
+    <NoBuild>true</NoBuild>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <GenerateTargetFrameworkAttribute>false</GenerateTargetFrameworkAttribute>
+    <RestorePackagesWithLockFile>false</RestorePackagesWithLockFile>
+    <IncludeSymbols>false</IncludeSymbols>
+    <IncludeSource>false</IncludeSource>
+  </PropertyGroup>
+  <ItemGroup>
+    <Content Include="content/**/*" Exclude="content/**/bin/**;content/**/obj/**" Pack="true" PackagePath="content/%(RecursiveDir)%(Filename)%(Extension)" />
+    <None Include="../LICENSE" Pack="true" PackagePath="/" />
+    <None Include="../THIRD-PARTY-NOTICES.md" Pack="true" PackagePath="/" />
+    <None Include="../README.md" Pack="true" PackagePath="/" />
+    <None Include="$(PiSharpProvenanceFile)" Condition="'$(PiSharpProvenanceFile)' != ''" Pack="true" PackagePath="/provenance.json" />
+  </ItemGroup>
+</Project>

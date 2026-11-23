@@ -9,7 +9,7 @@ public sealed record SeparatedProcessRunResult(ProcessRunResult Process,
 {
     /// <summary>The request's <see cref="ProcessRequest.CaptureLimitBytes"/> was exceeded: the runner stopped the process, and each
     /// pipe keeps only its complete UTF-8 characters within the limit.</summary>
-    [Experimental("PISHARP_EXEC001")] public bool CaptureLimitReached { get; init; }
+    public bool CaptureLimitReached { get; init; }
     /// <summary>True when a streaming stdout line filter discarded at least one non-whitespace line.</summary>
     internal bool StandardOutputFilteredNonEmpty { get; init; }
 }
@@ -53,7 +53,6 @@ public sealed class SeparatedProcessCapture : IDisposable
     /// <summary>A capture bounded by both pipes together (source execCommand maxBuffer). The explicit combined limit replaces
     /// the ordinary per-pipe bound; exceeding it sets <see cref="LimitReached"/> so the runner stops the process.
     /// Buffers grow only as bytes arrive. <paramref name="maximumBytes"/> retains its ordinary-bound validation.</summary>
-    [Experimental("PISHARP_EXEC001")]
     public SeparatedProcessCapture(int maximumBytes, long combinedLimit) : this(maximumBytes)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(combinedLimit);
@@ -61,7 +60,7 @@ public sealed class SeparatedProcessCapture : IDisposable
         _combinedLimit = combinedLimit;
         _maximumBytes = (int)combinedLimit;
     }
-    [Experimental("PISHARP_EXEC001")] public bool LimitReached { get; private set; }
+    public bool LimitReached { get; private set; }
     internal bool ShouldStopProcess => LimitReached || _stdoutMatchLimitReached;
     public void Append(bool standardError, ReadOnlySpan<byte> bytes) => AppendAdmitted(standardError, bytes);
 

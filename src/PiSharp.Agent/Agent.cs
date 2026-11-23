@@ -26,17 +26,14 @@ public sealed record AgentConfiguration(ModelDescriptor Model, IChatTransport Tr
     public string? SessionId { get; init; }
     /// <summary>PiSharp-only: the service tier of each request (<see cref="ChatRequest.ServiceTier"/>), read when the request is sent, so
     /// a session can switch tiers between requests. Null sends none.</summary>
-    [System.Diagnostics.CodeAnalysis.Experimental("PISHARP_TIERS001")]
     public Func<string?>? ServiceTier { get; init; }
     /// <summary>Source AgentOptions.identity / agent.identity: how every request identifies the calling app
     /// (<see cref="ChatRequest.Identity"/>), merged field by field over <see cref="DefaultIdentity"/>. Null leaves requests as they are.</summary>
-    [System.Diagnostics.CodeAnalysis.Experimental("PISHARP_IDENTITY001")]
     public ClientIdentity? Identity { get; init; }
     /// <summary>Source agent-loop.ts DEFAULT_AGENT_IDENTITY, under every agent identity. Upstream's attributes requests to Pi
     /// (<c>{ attribution: PI_ATTRIBUTION }</c>). PiSharp's is <c>{ attribution: null }</c> (<see cref="ClientIdentity.AttributionOff"/>):
     /// no attribution, by owner decision of 2026-11-05 ("Use safe defaults", core.agent-identity), since PiSharp must not report as Pi.
     /// An agent identity that sets an attribution still sends it.</summary>
-    [System.Diagnostics.CodeAnalysis.Experimental("PISHARP_IDENTITY001")]
     public static ClientIdentity DefaultIdentity { get; } = new() { AttributionOff = true };
 }
 public enum AgentCancellationBehavior { Propagate, SettleAborted }

@@ -6,7 +6,6 @@
 // read as JavaScript reads JSON (numbers are doubles, object keys keep JavaScript's order), so verdicts, error messages and coerced
 // values follow pi-schema's.
 #nullable enable
-#pragma warning disable PISHARP_SCHEMA001 // the engine uses its own experimental types
 
 using System.Diagnostics.CodeAnalysis;
 using System.Text.Json.Nodes;
@@ -14,7 +13,6 @@ using System.Text.Json.Nodes;
 namespace PiSharp.Contracts.Schema;
 
 /// <summary>The draft whose semantics a compile applies.</summary>
-[Experimental("PISHARP_SCHEMA001")]
 public enum JsonSchemaDraft
 {
     /// <summary>Draft 2020-12 (the default).</summary>
@@ -25,7 +23,6 @@ public enum JsonSchemaDraft
 }
 
 /// <summary>What a <c>$ref</c> that names nothing (a missing definition, a document not in the schemas) does.</summary>
-[Experimental("PISHARP_SCHEMA001")]
 public enum JsonSchemaUnresolvedRefs
 {
     /// <summary>Compile throws <see cref="JsonSchemaException"/> (the default).</summary>
@@ -36,7 +33,6 @@ public enum JsonSchemaUnresolvedRefs
 }
 
 /// <summary>Options of <see cref="JsonSchemaValidator.Compile"/> (pi-schema's CompileOptions).</summary>
-[Experimental("PISHARP_SCHEMA001")]
 public sealed class JsonSchemaCompileOptions
 {
     /// <summary>The draft whose semantics apply.</summary>
@@ -56,11 +52,9 @@ public sealed class JsonSchemaCompileOptions
 }
 
 /// <summary>One failure of a value: where it is (a JSON Pointer, "" for the value itself), the failing keyword and a message.</summary>
-[Experimental("PISHARP_SCHEMA001")]
 public sealed record JsonSchemaValidationError(string Path, string Keyword, string Message);
 
 /// <summary>A strict validation result: the original value on success, or its errors on failure. No coercion is performed.</summary>
-[Experimental("PISHARP_SCHEMA001")]
 public sealed class JsonSchemaValidationResult<T>
 {
     internal JsonSchemaValidationResult(bool ok, T? value, IReadOnlyList<JsonSchemaValidationError> errors)
@@ -81,7 +75,6 @@ public sealed class JsonSchemaValidationResult<T>
 }
 
 /// <summary>The result of <see cref="CoercingJsonSchemaValidator.Parse"/>: the coerced value when it is valid, else the errors of the coerced value.</summary>
-[Experimental("PISHARP_SCHEMA001")]
 public sealed class JsonSchemaParseResult
 {
     internal JsonSchemaParseResult(bool ok, JsonNode? value, IReadOnlyList<JsonSchemaValidationError> errors)
@@ -105,11 +98,9 @@ public sealed class JsonSchemaParseResult
 /// A schema that cannot be compiled (malformed, a <c>$ref</c> that names nothing, an invalid pattern), or a check that recursed without
 /// end ("Maximum call stack size exceeded", a schema that refers to itself in place).
 /// </summary>
-[Experimental("PISHARP_SCHEMA001")]
 public sealed class JsonSchemaException(string message) : Exception(message);
 
 /// <summary>The format checks of JSON Schema 2020-12 (pi-schema's <c>formats</c>, adapted there from TypeBox 1.3.27).</summary>
-[Experimental("PISHARP_SCHEMA001")]
 public static class JsonSchemaFormats
 {
     /// <summary>
@@ -120,7 +111,6 @@ public static class JsonSchemaFormats
 }
 
 /// <summary>A compiled JSON Schema (pi-schema's Validator): <see cref="Check"/> is the boolean test, <see cref="Errors"/> explains failures.</summary>
-[Experimental("PISHARP_SCHEMA001")]
 public class JsonSchemaValidator
 {
     private protected JsonSchemaValidator(SchemaValidator inner) => Inner = inner;
@@ -170,7 +160,6 @@ public class JsonSchemaValidator
 }
 
 /// <summary>A validator compiled with <see cref="JsonSchemaCompileOptions.Coerce"/>: it also coerces loosely typed input towards the schema.</summary>
-[Experimental("PISHARP_SCHEMA001")]
 public sealed class CoercingJsonSchemaValidator : JsonSchemaValidator
 {
     internal CoercingJsonSchemaValidator(SchemaValidator inner) : base(inner)

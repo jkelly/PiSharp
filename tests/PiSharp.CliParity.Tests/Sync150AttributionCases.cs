@@ -13,7 +13,6 @@ using PiSharp.Cli.Models;
 // attribution whatever enableInstallTelemetry says (owner decision 2026-11-05, "Use safe defaults", core.client-identity-attribution)
 // and keeps x-opencode-client: pisharp as an intentional difference. Authored from the source, never captured from an upstream run;
 // every provider is a fake endpoint in process.
-#pragma warning disable PISHARP_IDENTITY001
 internal static partial class Program
 {
     private static readonly string[] AttributionHeaders = ["HTTP-Referer", "X-OpenRouter-Title", "X-OpenRouter-Categories", "X-BILLING-INVOKE-ORIGIN"];
@@ -109,4 +108,3 @@ internal static partial class Program
         Equal(userAgent, BugReport.PiUserAgent(ClientIdentities.PiVersion), "bug report");
     }
 }
-#pragma warning restore PISHARP_IDENTITY001

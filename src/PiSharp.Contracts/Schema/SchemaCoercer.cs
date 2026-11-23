@@ -10,7 +10,6 @@
 // A value that cannot be coerced is left as it is. Every pass is copy-on-write: an object or array is copied only when one of its members
 // changes, so an unchanged value comes back as the same reference and the input is never modified. One coercer serves one coerce() call.
 #nullable enable
-#pragma warning disable PISHARP_SCHEMA001 // the engine uses its own experimental types
 
 using System.Numerics;
 using System.Runtime.CompilerServices;

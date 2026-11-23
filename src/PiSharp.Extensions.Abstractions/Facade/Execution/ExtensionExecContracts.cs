@@ -17,7 +17,7 @@ public sealed record ExtensionExecOptions(CancellationToken Signal = default,
 {
     /// <summary>Combined stdout/stderr byte limit (source maxBuffer); exceeding it stops the command with
     /// <see cref="ExtensionExecResult.Truncated"/>. Null is the default, 256 MiB capped by the runtime string limit.</summary>
-    [Experimental("PISHARP_EXEC001")] public long? MaxBuffer { get; init; }
+    public long? MaxBuffer { get; init; }
 }
 
 /// <param name="Code">The exit code, or 128 + the signal number when the command was ended instead of exiting (source exec.ts: 143 for
@@ -27,5 +27,5 @@ public sealed record ExtensionExecOptions(CancellationToken Signal = default,
 public sealed record ExtensionExecResult(string Stdout, string Stderr, int Code, bool Killed)
 {
     /// <summary>Output exceeded the byte limit (source truncated): stdout and stderr are incomplete and the code is nonzero.</summary>
-    [Experimental("PISHARP_EXEC001")] public bool Truncated { get; init; }
+    public bool Truncated { get; init; }
 }

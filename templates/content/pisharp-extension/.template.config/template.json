@@ -1,0 +1,23 @@
+{
+  "$schema": "http://json.schemastore.org/template",
+  "author": "PiSharp contributors",
+  "classifications": [ "Library", "Extension", "AI", "PiSharp" ],
+  "identity": "PiSharp.Templates.Extension.CSharp",
+  "name": "PiSharp Native C# Extension",
+  "shortName": "pisharp-extension",
+  "sourceName": "MyPiSharpExtension",
+  "preferNameDirectory": true,
+  "tags": {
+    "language": "C#",
+    "type": "project"
+  },
+  "symbols": {
+    "PiSharpVersion": {
+      "type": "parameter",
+      "datatype": "string",
+      "defaultValue": "1.6.0.1",
+      "replaces": "1.6.0.1",
+      "description": "PiSharp NuGet package version to reference."
+    }
+  }
+}

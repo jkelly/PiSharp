@@ -1,7 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <!-- The pi.exec capture limit (source execCommand maxBuffer) is [Experimental]; the runners here apply it. -->
-    <NoWarn>$(NoWarn);PISHARP_EXEC001</NoWarn>
   </PropertyGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="PiSharp.Tools.Tests" />

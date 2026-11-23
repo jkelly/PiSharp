@@ -4,7 +4,6 @@ using PiSharp.Contracts;
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
 
-#pragma warning disable PISHARP_IDENTITY001
 internal static partial class Program
 {
     private static IEnumerable<(string, Func<Task>)> GapDurableIdentityCases()

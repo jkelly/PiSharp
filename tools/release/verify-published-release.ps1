@@ -1,6 +1,6 @@
 #!/usr/bin/env pwsh
 # Post-publish verification for a tagged PiSharp release:
-# 1. Polls api.nuget.org flat-container indexes until all 29 packages expose $Version.
+# 1. Polls api.nuget.org flat-container indexes until all 31 packages expose $Version.
 # 2. Downloads GitHub release assets + official NuGet .nupkg files and compares every ZIP payload entry byte-for-byte
 #    (excluding NuGet's .signature.p7s), verifying .signature.p7s presence and nuspec version/commit.
 # 3. Restores and executes an isolated official-feed GapConsumer (un-admitted diagnostic rejection + admitted pass).
@@ -32,7 +32,7 @@ if ([string]::IsNullOrWhiteSpace($OutputJson)) {
 }
 
 $packages = @(
-    'PiSharp.Contracts', 'PiSharp.Telemetry', 'PiSharp.AI', 'PiSharp.Agent',
+    'PiSharp.Contracts', 'PiSharp.Telemetry', 'PiSharp.AI', 'PiSharp.Extensions.AI', 'PiSharp.Agent',
     'PiSharp.Sessions', 'PiSharp.Tools', 'PiSharp.Tools.Skia', 'PiSharp.CodingAgent',
     'PiSharp.PromptTemplates.Yaml', 'PiSharp.Rpc', 'PiSharp.Tui',
     'PiSharp.Extensions.Abstractions', 'PiSharp.Extensions.Runtime',
@@ -40,7 +40,7 @@ $packages = @(
     'PiSharp.Codemode', 'PiSharp.Durable', 'PiSharp.Durable.Tools', 'PiSharp.Durable.Sqlite',
     'PiSharp.Chord', 'PiSharp.Chord.Hosting', 'PiSharp.Durable.Store',
     'PiSharp.Env.Protocol', 'PiSharp.Env', 'PiSharp.CustomAgents',
-    'PiSharp.CustomAgents.JavaScript', 'PiSharp.CustomAgents.Scripting', 'PiSharp.Cli'
+    'PiSharp.CustomAgents.JavaScript', 'PiSharp.CustomAgents.Scripting', 'PiSharp.Cli', 'PiSharp.Templates'
 )
 
 $ghDir = Join-Path $WorkDir 'github'
@@ -50,7 +50,7 @@ $nugetCacheDir = Join-Path $WorkDir 'nuget-cache'
 $cliDir = Join-Path $WorkDir 'cli-tool'
 New-Item -ItemType Directory -Force -Path $ghDir, $nugetDir | Out-Null
 
-# 1. Poll canonical NuGet version indexes until 29/29 expose $Version
+# 1. Poll canonical NuGet version indexes until all packages expose $Version
 $deadline = (Get-Date).AddMinutes($MaxWaitMinutes)
 while ($true) {
     $missing = @()

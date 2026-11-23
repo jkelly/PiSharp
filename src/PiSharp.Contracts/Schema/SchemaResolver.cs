@@ -3,7 +3,6 @@
 //
 // Reference resolution of one compile: schema resources, anchors and JSON Pointers over the root schema and the registered documents.
 #nullable enable
-#pragma warning disable PISHARP_SCHEMA001 // the engine uses its own experimental types
 
 namespace PiSharp.Contracts.Schema;
 

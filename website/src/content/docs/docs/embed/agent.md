@@ -191,7 +191,7 @@ The built-in tools use a stricter path. An `IPreparedToolAdapter` turns a call i
 | `Hooks` | null | `AgentHooks` for the loop itself (below). |
 | `ThinkingLevel` | `off` | Sent with every request. It must be a level the transport supports for the model. |
 | `SessionId` | null | Sent with every request as `ChatRequest.SessionId`. |
-| `ServiceTier` | null | A `Func<string?>` read for each request. Experimental (`PISHARP_TIERS001`); see [Service tiers](/docs/guides/service-tiers/). |
+| `ServiceTier` | null | A `Func<string?>` read for each request; see [Service tiers](/docs/guides/service-tiers/). |
 
 `AgentHooks` lets you change requests and turn boundaries:
 

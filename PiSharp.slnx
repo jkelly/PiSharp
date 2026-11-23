@@ -4,6 +4,7 @@
     <Project Path="src/PiSharp.Telemetry/PiSharp.Telemetry.csproj" />
     <Project Path="src/PiSharp.Chord/PiSharp.Chord.csproj" />
     <Project Path="src/PiSharp.AI/PiSharp.AI.csproj" />
+    <Project Path="src/PiSharp.Extensions.AI/PiSharp.Extensions.AI.csproj" />
     <Project Path="src/PiSharp.Agent/PiSharp.Agent.csproj" />
     <Project Path="src/PiSharp.Sessions/PiSharp.Sessions.csproj" />
     <Project Path="src/PiSharp.Tools/PiSharp.Tools.csproj" />
@@ -72,6 +73,7 @@
     <Project Path="tests/PiSharp.Chord.Durable.Integration.Tests/PiSharp.Chord.Durable.Integration.Tests.csproj" />
     <Project Path="tests/PiSharp.Chord.Hosting.Tests/PiSharp.Chord.Hosting.Tests.csproj" />
     <Project Path="tests/PiSharp.Durable150.Capture.Tests/PiSharp.Durable150.Capture.Tests.csproj" />
+    <Project Path="tests/PiSharp.Extensions.AI.Tests/PiSharp.Extensions.AI.Tests.csproj" />
   </Folder>
   <Folder Name="/tests/companions/PiSharp.CompletionsAnchored.Tests/">
     <Project Path="tests/PiSharp.CompletionsAnchored.Tests/PiSharp.CompletionsAnchored.Tests.csproj" />

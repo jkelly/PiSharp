@@ -2,7 +2,6 @@ using System.Collections.Immutable;
 using System.Text;
 using PiSharp.Tools.Processes;
 using PiSharp.Tools.Processes.Unix;
-#pragma warning disable PISHARP_EXEC001 // Exercise explicit capture with a faux admitted Unix lease.
 
 internal static class UnixProcessRunnerTests
 {

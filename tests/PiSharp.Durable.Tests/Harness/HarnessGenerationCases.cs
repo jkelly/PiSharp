@@ -31,7 +31,6 @@
 // Pi v1.5.0 sync (area tool-tasks, 1c6928b30): "orphans a blocked run task with full run cleanup" stores the run under the generation
 // definition's version plus one (pi.generation is version 2), as v1.5.0's does.
 // Pi v1.5.0 sync (area live-turns, f6a9db1d8): that case's run is { taskId, inputs, turns: 0 }, as pi.live.run carries turns.
-#pragma warning disable PISHARP_IDENTITY001 // PiSharp.AI's ClientIdentity (Pi v1.5.0) is experimental.
 using System.Collections.Immutable;
 using System.Text.RegularExpressions;
 using PiSharp.Contracts;

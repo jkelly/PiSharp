@@ -1,5 +1,4 @@
 // Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/chord/src/wire.ts, link.ts.
-#pragma warning disable PISHARP_SCHEMA001 // The legacy protocol deliberately uses the existing experimental schema foundation.
 using System.Text.Json.Nodes;
 using PiSharp.Chord.Contracts;
 using PiSharp.Contracts.Schema;

@@ -9,9 +9,9 @@ description: Stream tokens, partial tool-call previews and progress updates to y
 
 | Need | API | Layer |
 | --- | --- | --- |
-| **Token-by-token streaming, tool progress & live UI updates** | `IAgentEventSink` + `StreamingJsonParser` (`PISHARP_AI001`) + `IToolExecutor` progress callback | `PiSharp.Agent` / `PiSharp.AI` |
+| **Token-by-token streaming, tool progress & live UI updates** | `IAgentEventSink` + `StreamingJsonParser` + `IToolExecutor` progress callback | `PiSharp.Agent` / `PiSharp.AI` |
 | **Reactive crash-safe conversation & task-graph state** | `IConversation.WatchAsync`, `IHarness.WatchTaskGraphAsync`, `ISession.WatchDocAsync`, Chord `ViewBridge` | `PiSharp.Durable` / `PiSharp.Durable.Store` |
-| **Structured spans, links & metrics with zero background export** | `PiSharp.Telemetry` (`PISHARP_TELEMETRY001`) | `PiSharp.AI` / `PiSharp.Durable` |
+| **Structured spans, links & metrics (OpenTelemetry / `System.Diagnostics` or in-memory)** | `PiSharp.Telemetry` (`DiagnosticsTelemetry` / `InMemoryTelemetryContext`, `PISHARP_TELEMETRY001`) | `PiSharp.AI` / `PiSharp.Durable` |
 
 ## Recipe 1: Live token & tool-progress sink (`PiSharp.Agent`)
 
@@ -46,7 +46,7 @@ sealed class LiveUiSink : IAgentEventSink
 }
 ```
 
-Use `agent.Subscribe(extraSink)` to attach temporary observers (for example, per-request logging or UI panels) and dispose the returned handle when finished. For live previews of streaming tool arguments before a tool finishes parsing, use `StreamingJsonParser` / `AssistantStreamReducer.GetToolArgumentsPreview` (`PISHARP_AI001`).
+Use `agent.Subscribe(extraSink)` to attach temporary observers (for example, per-request logging or UI panels) and dispose the returned handle when finished. For live previews of streaming tool arguments before a tool finishes parsing, use `StreamingJsonParser` / `AssistantStreamReducer.GetToolArgumentsPreview`.
 
 ## Recipe 2: Watching folded durable views (`WatchAsync`)
 

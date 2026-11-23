@@ -4,7 +4,6 @@
 // specialized closures (inlined leaf codes, declared-object and list fast paths, const and tagged unions) are performance work with the
 // same results; this port keeps one closure per keyword group and reaches the same verdicts.
 #nullable enable
-#pragma warning disable PISHARP_SCHEMA001 // the engine uses its own experimental types
 
 using System.Globalization;
 using System.Numerics;

@@ -31,10 +31,10 @@ public sealed record AuthEvent(AuthEventKind Kind)
     public string? VerificationUri { get; init; }
     /// <summary>device_code: whether clients offer best-effort browser opening when the user confirms. Absent means true; clients may
     /// ignore it (Pi 1.5.0 AuthEvent.openBrowserOnConfirm).</summary>
-    [System.Diagnostics.CodeAnalysis.Experimental("PISHARP_AUTH001")] public bool? OpenBrowserOnConfirm { get; init; }
+    public bool? OpenBrowserOnConfirm { get; init; }
     /// <summary>device_code: whether clients offer to copy the user code, replacing the clipboard, when the user confirms. Absent means
     /// true (Pi 1.5.0 AuthEvent.copyCodeOnConfirm).</summary>
-    [System.Diagnostics.CodeAnalysis.Experimental("PISHARP_AUTH001")] public bool? CopyCodeOnConfirm { get; init; }
+    public bool? CopyCodeOnConfirm { get; init; }
     public double? IntervalSeconds { get; init; }
     public double? ExpiresInSeconds { get; init; }
 }

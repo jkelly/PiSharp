@@ -43,7 +43,6 @@ public record ModelRequestOptions
     public Func<ImmutableArray<KeyValuePair<string, string?>>, CancellationToken, ValueTask<ImmutableArray<KeyValuePair<string, string?>>>>? TransformHeaders { get; init; }
     /// <summary>types.ts <c>ProviderRequestOptions.identity</c>: the <c>User-Agent</c> and attribution headers, applied below the
     /// model and request headers. Null: a detailed <c>User-Agent</c> and no attribution.</summary>
-    [System.Diagnostics.CodeAnalysis.Experimental("PISHARP_IDENTITY001")]
     public ClientIdentity? Identity { get; init; }
     /// <summary>types.ts <c>ProviderRequestOptions.telemetry</c>: the explicit parent span for telemetry produced by this logical
     /// request. Registry calls forward it with the options; as upstream, classifier and image requests record no spans of their own.</summary>

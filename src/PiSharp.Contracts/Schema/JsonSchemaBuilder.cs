@@ -1,6 +1,5 @@
 // Native JSON/CLR counterparts of Pi 7d073328 packages/schema/src/builders.ts.
 #nullable enable
-#pragma warning disable PISHARP_SCHEMA001
 
 using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
@@ -10,7 +9,6 @@ using System.Text.Json.Serialization.Metadata;
 namespace PiSharp.Contracts.Schema;
 
 /// <summary>Builders for recursive JSON schemas and explicit associations with CLR value types.</summary>
-[Experimental("PISHARP_SCHEMA001")]
 public static class JsonSchemaBuilder
 {
     /// <summary>
@@ -47,7 +45,6 @@ public static class JsonSchemaBuilder
 }
 
 /// <summary>A schema explicitly associated with the JSON serialization of a CLR type.</summary>
-[Experimental("PISHARP_SCHEMA001")]
 public sealed class JsonSchemaDefinition<T>
 {
     private readonly JsonNode _schema;
@@ -84,7 +81,6 @@ public sealed class JsonSchemaDefinition<T>
 }
 
 /// <summary>Strictly validates a CLR value's JSON representation without changing or deserializing the value.</summary>
-[Experimental("PISHARP_SCHEMA001")]
 public sealed class TypedJsonSchemaValidator<T>
 {
     private readonly JsonSchemaValidator _validator;

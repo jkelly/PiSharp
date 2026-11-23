@@ -348,10 +348,6 @@ Two other start methods change abort handling:
 
 ## Service tiers
 
-:::caution[Experimental]
-Service tiers ship as experimental in PiSharp 1.2.0.2. The API is marked `[Experimental("PISHARP_TIERS001")]`, so suppress `PISHARP_TIERS001` in your project to compile it. It may change or be removed in any release, without notice or a deprecation period.
-:::
-
 `ChatRequest.ServiceTier` picks a provider's processing tier for one request: `auto`, `normal`, `economy`, `priority`, `fast` or `ultrafast` (`ServiceTiers.All`). Each protocol maps the tier to its own field, and protocols without tiers ignore it. Null keeps the transport's own setting. [Service tiers](/docs/guides/service-tiers/) explains what each provider supports.
 
 ## Compared with Pi

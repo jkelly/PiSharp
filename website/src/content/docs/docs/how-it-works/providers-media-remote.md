@@ -16,7 +16,7 @@ Below the agent loops sits PiSharp's infrastructure layer: native LLM transports
   4. User `models.json` configuration.
   5. Extension-registered models.
 - **Explicit credentials:** embedded libraries never read environment variables implicitly. You supply an explicit key or environment reader (`Environment.GetEnvironmentVariable`) to `NativeProviderFactory` or `NativeDurableModels`.
-- **Service tiers (`PISHARP_TIERS001`):** attach per-request or per-conversation latency/cost tiers (`auto`, `normal`, `economy`, `priority`, `fast`, `ultrafast`) via `ChatRequest.ServiceTier`, `AgentConfiguration.ServiceTier`, or `/tier` in `pisharp durable`.
+- **Service tiers:** attach per-request or per-conversation latency/cost tiers (`auto`, `normal`, `economy`, `priority`, `fast`, `ultrafast`) via `ChatRequest.ServiceTier`, `AgentConfiguration.ServiceTier`, or `/tier` in `pisharp durable`.
 - **Anthropic message threads:** bounded process-local continuation cache (`AnthropicMessageThreadStore`, default 10,000 sessions) that hashes normalized transcript prefixes so repeated turns send only the new suffix plus the prior reply ID, automatically falling back to full requests if the endpoint rejects continuation. See [Anthropic message threads](/docs/embed/anthropic-threads/).
 
 :::note[New in 1.6.0: transport improvements]

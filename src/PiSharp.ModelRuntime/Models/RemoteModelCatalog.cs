@@ -294,9 +294,7 @@ internal sealed class RemoteCatalogOverlay : ICatalogOverlay
 
     /// <summary>Source getPiUserAgent(VERSION): Pi 1.5.0's pi-user-agent.ts is pi-ai's detailed formatUserAgent
     /// (<see cref="PiSharp.AI.ClientIdentities.FormatUserAgent"/>, the Pi version PiSharp tracks and the runtime field naming .NET).</summary>
-#pragma warning disable PISHARP_IDENTITY001
     internal static string UserAgent { get; } = PiSharp.AI.ClientIdentities.FormatUserAgent(null);
-#pragma warning restore PISHARP_IDENTITY001
 }
 
 /// <summary>

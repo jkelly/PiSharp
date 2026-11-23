@@ -19,7 +19,6 @@ using PiSharp.Durable;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Chord.Delta;
 
-#pragma warning disable PISHARP_AI001 // PiSharp.AI's ToolCallArgumentsStream (Pi v1.5.0) is experimental.
 
 internal static partial class Program
 {

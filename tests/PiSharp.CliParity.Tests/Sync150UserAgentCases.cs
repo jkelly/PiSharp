@@ -7,7 +7,6 @@ using PiSharp.CodingAgent.Diagnostics;
 // utils/tools-manager.ts (the getPiUserAgent(VERSION) download header) and core/bug-report.ts (environment.userAgent).
 // Pi 1.5.0 behaviour; the expectations are authored from the source, never captured from an upstream run. getPiUserAgent is pi-ai's
 // detailed formatUserAgent, so pi's own requests send the User-Agent providers get; tools-manager.ts sent `pi-coding-agent` before.
-#pragma warning disable PISHARP_IDENTITY001
 internal static partial class Program
 {
     private static IEnumerable<(string, Func<Task>)> Sync150UserAgentCases() =>
@@ -41,4 +40,3 @@ internal static partial class Program
         }
     }
 }
-#pragma warning restore PISHARP_IDENTITY001

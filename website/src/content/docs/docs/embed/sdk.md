@@ -21,11 +21,32 @@ The CLI itself is a .NET tool, not a library:
 dotnet tool install -g PiSharp.Cli
 ```
 
+## Project templates
+
+Install `PiSharp.Templates` to scaffold runnable starter projects with `dotnet new`:
+
+```powershell
+dotnet new install PiSharp.Templates::{{PISHARP_VERSION}}
+```
+
+| Template | Short name | What it scaffolds |
+| --- | --- | --- |
+| PiSharp Embedded Agent | `pisharp-agent` | Minimal embedded `PiSharp.Agent` console app with a custom tool, `IToolHooks` policy guard, and an offline scripted transport. |
+| PiSharp Native C# Extension | `pisharp-extension` | Dynamically loaded `IPiSharpExtension` class library with `ExcludeAssets="runtime"` and a matching `pisharp-extension.json` manifest. |
+| PiSharp Durable Workflow | `pisharp-workflow` | Crash-safe `PiSharp.CustomAgents` workflow on `PiSharp.Durable.Sqlite` with a durable `WaitForSignal` approval gate. |
+
+```powershell
+dotnet new pisharp-agent -n MyAgent
+dotnet new pisharp-extension -n MyExtension
+dotnet new pisharp-workflow -n MyWorkflow
+```
+
 ## Pick a library
 
 | You want to | Reference | Read |
 | --- | --- | --- |
 | Stream a chat completion from any provider Pi supports | `PiSharp.AI` | [Chat and providers](/docs/embed/chat/) |
+| Bridge PiSharp with `Microsoft.Extensions.AI` (`IChatClient`, `IEmbeddingGenerator`) | `PiSharp.Extensions.AI` | [Microsoft.Extensions.AI bridge](/docs/embed/extensions-ai/) |
 | Call classifier and image models | `PiSharp.AI` | [Classifiers and images](/docs/embed/model-operations/) |
 | Run a tool-calling loop with your own tools | `PiSharp.Agent` | [Agent loop](/docs/embed/agent/) |
 | Give the model Pi's read, write, edit, bash, grep, find and ls tools | `PiSharp.Tools`, and `PiSharp.Tools.Skia` to resize JPEG, GIF and WebP images | [Built-in tools](/docs/embed/coding-agent/#built-in-tools) |
@@ -47,13 +68,14 @@ dotnet tool install -g PiSharp.Cli
 
 ## Packages
 
-The published 1.5.0.1 inventory is **28 libraries plus the CLI, 29 packages**. The table below retains the 24 packages from 1.5.0; this release adds [Chord and Chord.Hosting](/docs/embed/chord/), [Durable.Store](/docs/embed/durable-store/), and [Env.Protocol and Env](/docs/embed/env/), all experimental. The [SDK page](/sdk/) lists all 29 with NuGet links and versioned install commands. All sibling references must use the same exact release version.
+The inventory is **29 libraries, the CLI tool, and the template pack — 31 packages**. The [SDK page](/sdk/) lists all 31 with NuGet links and versioned install commands. All sibling references must use the same exact release version.
 
 | Package | Group | Purpose | Docs |
 | --- | --- | --- | --- |
-| `PiSharp.Contracts` | Core | Messages, stream events, transcript entries and the JSON types every other package shares. | [Chat and providers](/docs/embed/chat/#messages-and-stream-events) |
-| `PiSharp.Telemetry` | Core, experimental | A port of Pi's telemetry contract: spans, links, metrics, propagation and typed schemas, with no-op and in-memory adapters and no exporter. | [Telemetry](/docs/embed/telemetry/) |
-| `PiSharp.AI` | Core | Streaming transports for every Pi chat API, the model catalog reader, provider auth and logins, and the classifier and image APIs. Also the media library and service tiers (experimental). | [Chat and providers](/docs/embed/chat/), [Classifiers and images](/docs/embed/model-operations/) |
+| `PiSharp.Contracts` | Core | Messages, stream events, transcript entries, JSON types, and the graduated `PiSharp.Contracts.Schema` JSON Schema validator (`pi-schema`). | [Chat and providers](/docs/embed/chat/#messages-and-stream-events) |
+| `PiSharp.Telemetry` | Core, experimental | A port of Pi's telemetry contract: spans, links, metrics, propagation and typed schemas, with no-op, in-memory and `System.Diagnostics` (`DiagnosticsTelemetry`) adapters. | [Telemetry](/docs/embed/telemetry/) |
+| `PiSharp.AI` | Core | Streaming transports for every Pi chat API, the model catalog reader, provider auth and logins, service tiers, and the classifier and image APIs. Also includes the experimental media library (`PiSharp.AI.Media`). | [Chat and providers](/docs/embed/chat/), [Classifiers and images](/docs/embed/model-operations/) |
+| `PiSharp.Extensions.AI` | Core | Bidirectional `Microsoft.Extensions.AI` bridge: `PiChatClient`, `ChatClientTransportAdapter`, `PiEmbeddingGenerator`, and DI helpers. | [Microsoft.Extensions.AI bridge](/docs/embed/extensions-ai/) |
 | `PiSharp.Agent` | Core | The agent loop: turns, tool invocation and batching, hooks, steering and follow-up queues. | [Agent loop](/docs/embed/agent/) |
 | `PiSharp.Tools` | Core | Pi's built-in file and process tools, with output truncation and a shared write queue. | [Built-in tools](/docs/embed/coding-agent/#built-in-tools) |
 | `PiSharp.Tools.Skia` | Core | An image codec on SkiaSharp that lets the read tool decode and resize PNG, JPEG, GIF, WebP and BMP. | [Images](/docs/embed/coding-agent/#images) |
@@ -70,6 +92,7 @@ The published 1.5.0.1 inventory is **28 libraries plus the CLI, 29 packages**. T
 | `PiSharp.Rpc` | Frontends | Pi's JSONL RPC protocol over stdin and stdout, including extension UI requests. | [RPC host](/docs/embed/rpc/) |
 | `PiSharp.Tui` | Frontends | Terminal UI components, layout, overlays and terminals. | [Terminal UI](/docs/embed/tui/) |
 | `PiSharp.Cli` | Frontends, .NET tool | The `pisharp` command-line app. | [CLI reference](/docs/reference/cli/) |
+| `PiSharp.Templates` | Frontends, `dotnet new` | Starter templates for embedded agents, native C# extensions, and durable workflows. | [Project templates](#project-templates) |
 | `PiSharp.Extensions.Abstractions` | Extensions | The interfaces you implement to write an extension. | [Build an extension](/docs/extensions/build-an-extension/) |
 | `PiSharp.Extensions.Runtime` | Extensions | Discovery, loading, registration and dispatch for extension hosts. | [Host extensions](/docs/embed/extension-host/) |
 | `PiSharp.Extensions.Agent` | Extensions | Connects extension hooks to the agent loop. | [Host extensions](/docs/embed/extension-host/) |
@@ -85,6 +108,7 @@ Each package references only the layers below it. `PiSharp.Contracts` and `PiSha
 | `PiSharp.Contracts` | nothing | none |
 | `PiSharp.Telemetry` | nothing | none |
 | `PiSharp.AI` | Contracts, Telemetry | none |
+| `PiSharp.Extensions.AI` | Contracts, AI | Microsoft.Extensions.AI.Abstractions 10.11.1, Microsoft.Extensions.DependencyInjection.Abstractions 10.0.0 |
 | `PiSharp.Agent` | Contracts, AI | none |
 | `PiSharp.Tools` | Contracts, Agent | none |
 | `PiSharp.Tools.Skia` | Tools | SkiaSharp 4.152.1 and its native assets |
@@ -126,29 +150,28 @@ They are experimental, from 1.2.0.2. [Custom agents](/docs/custom-agents/overvie
 
 Some APIs carry `[Experimental("<ID>")]`. The compiler reports an error when you use one, until you suppress its ID. An experimental API may change or be removed without notice.
 
+:::note[Tier-1 APIs graduated to stable]
+Per [ADR 0017](https://github.com/jkelly/PiSharp/blob/main/docs/decisions/0017-experimental-graduation-tier1.md), seven proven Tier-1 diagnostic IDs graduated to stable and no longer require suppression: `PISHARP_SCHEMA001` (`PiSharp.Contracts.Schema`), `PISHARP_IDENTITY001` (`ClientIdentity`), `PISHARP_TIERS001` (`ServiceTiers`), `PISHARP_AI001` (`StreamingJsonParser`), `PISHARP_AUTH001` (OAuth confirmation hints), `PISHARP_EXEC001` (`pi.exec` buffer limits), and `PISHARP_TOOLSEARCH001` (`ToolSearchDocument.NamespaceText`).
+:::
+
 | ID | Covers | Status |
 | --- | --- | --- |
-| `PISHARP_DURABLE001` | Every public type in `PiSharp.Durable`, `PiSharp.Durable.Tools` and `PiSharp.Durable.Sqlite`. | Released as experimental in 1.2.0.1. |
-| `PISHARP_MEDIA001` | The `PiSharp.AI.Media` namespace of `PiSharp.AI`: embeddings, images, video, speech, transcription, music, rerank and decisions. | Released as experimental in 1.2.0.2. |
-| `PISHARP_TIERS001` | Service tiers: `ChatRequest.ServiceTier`, `AgentConfiguration.ServiceTier`, `SessionRuntimeRegistryOptions.ServiceTier`, the protocol request options' `ServiceTier` and the `ServiceTiers` class. See [Service tiers](/docs/guides/service-tiers/). | Released as experimental in 1.2.0.2. |
-| `PISHARP_AGENTS001` | Every public type in the custom agents packages. These also use durable types, so suppress `PISHARP_DURABLE001` too. | Released as experimental in 1.2.0.2. |
-| `PISHARP_CATALOG001` | `MaintainedCatalogOverlay` and `MaintainedCatalogResult` in `PiSharp.AI`, which apply PiSharp's maintained model catalog layer. | Released as experimental in 1.2.0.2. |
-| `PISHARP_EXTUI001` | Extension UI additions from the Pi 1.5.0 sync: `IExtensionKeybindingHints` and `ExtensionToolRenderContext.Keybindings`, `ExtensionCustomComponentBlocked`, `ExtensionCustomComponentOverlay` and `ExtensionCustomComponentCallbacks.Blocked`, `.Overlay` and `.CapturesViewportInput` in `PiSharp.Extensions.Abstractions`, and `KeyText` and `KeyHint` on the HTML export's `ToolRenderContext` and `ToolHtmlRendererDependencies` in `PiSharp.CodingAgent`. | Released as experimental in 1.5.0. |
-| `PISHARP_IDENTITY001` | Client identity from the Pi 1.5.0 sync: `ClientIdentity`, `ClientUserAgent`, `ClientAttribution` and `ClientIdentities` in `PiSharp.AI`, the `Identity` of `ChatRequest`, the protocol options and `AgentConfiguration`, and `AgentConfiguration.DefaultIdentity`, which turns attribution off. Coding agent sessions send the detailed user agent and no attribution. PiSharp defines no attribution of its own. | Released as experimental in 1.5.0. |
-| `PISHARP_AI001` | Streaming tool-call arguments from the Pi 1.5.0 sync, in `PiSharp.AI`: `StreamingJsonParser` with `JsonChange`, `JsonSetChange`, `JsonAppendChange` and `JsonPathSegment`, `ToolCallArgumentsStream`, `ToolCallArgumentsResult`, `StreamingJson.ParseToolCallArguments`, and `GetToolArgumentsPreview` and `FinishToolArguments` on `AssistantStreamReducer`. | Released as experimental in 1.5.0. |
-| `PISHARP_AUTH001` | `AuthEvent.OpenBrowserOnConfirm` and `AuthEvent.CopyCodeOnConfirm`, a device-code sign-in's hints, in `PiSharp.AI`. | Released as experimental in 1.5.0. |
-| `PISHARP_CODEMODE001` | Worker admission in `PiSharp.Codemode`: `CodemodeSandboxOptions.AcquireWorker` and `.OnWorkerStarted`. | Released as experimental in 1.5.0. |
-| `PISHARP_EXEC001` | Output limits of `pi.exec()` and process runs: `MaxBuffer` and `Truncated` in `PiSharp.Extensions.Abstractions`, and `CaptureLimitBytes` and the combined capture limit in `PiSharp.Tools`. | Released as experimental in 1.5.0. |
-| `PISHARP_SCHEMA001` | The port of pi-schema in `PiSharp.Contracts` (namespace `PiSharp.Contracts.Schema`): `JsonSchemaValidator`, `CoercingJsonSchemaValidator`, `JsonSchemaCompileOptions`, `JsonSchemaFormats` and their results and errors. | Released as experimental in 1.5.0. |
-| `PISHARP_TELEMETRY001` | Every public type in `PiSharp.Telemetry`, and the telemetry members of `PiSharp.AI`. See [Telemetry](/docs/embed/telemetry/). | Released as experimental in 1.5.0. |
-| `PISHARP_TOOLSEARCH001` | `ToolSearchDocument.NamespaceText` in `PiSharp.Extensions.Abstractions`, which ranks a tool's namespace text. | Released as experimental in 1.5.0. |
-| `PISHARP_TUI001` | TUI additions in `PiSharp.Tui`: `KeybindingsManager.GetSelectPageIndex`, `Terminal.RestoreOnExit`, `TextUtils.ReplaceControlCharacters` and `IComponent.CapturesViewportInput` (from 1.5.0); and `ChildLines`, `LayoutRenderCache`, `TuiBase.RequestViewRender`, `TuiBase.ConsumeContentChanged`, `ITui.SetSuspendSignalHandler`, `TuiBase.SetSuspendSignalHandler`, `TuiBase.SuspendSignalRegistrar`, and `TerminalImage.ImageLineExtent`, `GetImageLineExtent` and `StripImageSequences` (from 1.6.0). | Released as experimental in 1.5.0; updated in 1.6.0. |
+| `PISHARP_DURABLE001` | Every public type in `PiSharp.Durable`, `PiSharp.Durable.Tools`, `PiSharp.Durable.Sqlite`, and `PiSharp.Durable.Store`. | Experimental. |
+| `PISHARP_MEDIA001` | The `PiSharp.AI.Media` namespace of `PiSharp.AI` (and `PiEmbeddingGenerator` in `PiSharp.Extensions.AI`): embeddings, images, video, speech, transcription, music, rerank and decisions. | Experimental. |
+| `PISHARP_AGENTS001` | Every public type in the custom agents packages (`PiSharp.CustomAgents*`). These also use durable types, so suppress `PISHARP_DURABLE001` too. | Experimental. |
+| `PISHARP_TELEMETRY001` | Every public type in `PiSharp.Telemetry`, and the telemetry members of `PiSharp.AI`. See [Telemetry](/docs/embed/telemetry/). | Experimental. |
+| `PISHARP_CHORD001` | Every public type in `PiSharp.Chord` and `PiSharp.Chord.Hosting`. See [Chord](/docs/embed/chord/). | Experimental. |
+| `PISHARP_ENV001` | Every public type in `PiSharp.Env.Protocol` and `PiSharp.Env`. See [Remote environments](/docs/embed/env/). | Experimental. |
+| `PISHARP_CATALOG001` | `MaintainedCatalogOverlay` and `MaintainedCatalogResult` in `PiSharp.AI`, which apply PiSharp's maintained model catalog layer. | Experimental. |
+| `PISHARP_EXTUI001` | Extension UI additions from the Pi 1.5.0 sync in `PiSharp.Extensions.Abstractions` and `PiSharp.CodingAgent`. | Experimental. |
+| `PISHARP_CODEMODE001` | Worker admission in `PiSharp.Codemode`: `CodemodeSandboxOptions.AcquireWorker` and `.OnWorkerStarted`. | Experimental. |
+| `PISHARP_TUI001` | TUI additions in `PiSharp.Tui` from 1.5.0 and 1.6.0. | Experimental. |
 
 Suppress the IDs you use in your project file:
 
 ```xml
 <PropertyGroup>
-  <NoWarn>$(NoWarn);PISHARP_DURABLE001;PISHARP_TIERS001</NoWarn>
+  <NoWarn>$(NoWarn);PISHARP_DURABLE001;PISHARP_AGENTS001</NoWarn>
 </PropertyGroup>
 ```
 

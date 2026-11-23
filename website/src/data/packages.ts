@@ -1,9 +1,10 @@
-export type Package = { id: string; description: string; group: 'Core' | 'Frontends' | 'Extensions'; nuget?: boolean; tool?: boolean; optional?: boolean; experimental?: boolean; unpublished?: boolean; docs?: string };
+export type Package = { id: string; description: string; group: 'Core' | 'Frontends' | 'Extensions'; nuget?: boolean; tool?: boolean; template?: boolean; optional?: boolean; experimental?: boolean; unpublished?: boolean; docs?: string };
 
 export const packages: Package[] = [
-	{ id: 'PiSharp.Contracts', group: 'Core', nuget: true, description: 'Shared message, streaming and JSON contracts used by every other package, and the JSON Schema validator for tool arguments, a port of pi-schema (experimental).' },
-	{ id: 'PiSharp.Telemetry', group: 'Core', nuget: true, experimental: true, docs: '/docs/embed/telemetry/', description: "A port of Pi's telemetry contract: spans, links, carriers, metrics and typed schemas, with no-op and in-memory adapters. Requests are traced only when a host passes a span; nothing is sent anywhere." },
-	{ id: 'PiSharp.AI', group: 'Core', nuget: true, description: "Streaming LLM transports for every Pi chat API, Pi's model catalogs, provider logins, and the classifier and image APIs. Also the experimental media library and service tiers." },
+	{ id: 'PiSharp.Contracts', group: 'Core', nuget: true, description: 'Shared message, streaming and JSON contracts used by every other package, plus the graduated JSON Schema validator for tool arguments (pi-schema).' },
+	{ id: 'PiSharp.Telemetry', group: 'Core', nuget: true, experimental: true, docs: '/docs/embed/telemetry/', description: "A port of Pi's telemetry contract: spans, links, carriers, metrics and typed schemas, with no-op, in-memory and System.Diagnostics ActivitySource/Meter adapters. Requests are traced only when a host passes a span; nothing is sent anywhere unless listeners attach." },
+	{ id: 'PiSharp.AI', group: 'Core', nuget: true, description: "Streaming LLM transports for every Pi chat API, Pi's model catalogs, provider logins, service tiers, and the classifier and image APIs. Also includes the experimental media library (PiSharp.AI.Media)." },
+	{ id: 'PiSharp.Extensions.AI', group: 'Core', nuget: true, docs: '/docs/embed/extensions-ai/', description: 'Microsoft.Extensions.AI bridge: exposes PiSharp transports as IChatClient, adapts any IChatClient into IChatTransport, and bridges embeddings via IEmbeddingGenerator.' },
 	{ id: 'PiSharp.Agent', group: 'Core', nuget: true, description: 'The agent loop: turns, tool invocation and batching, steering and follow-up queues.' },
 	{ id: 'PiSharp.Tools', group: 'Core', nuget: true, description: 'Built-in file and process tools with output truncation and safe file mutation.' },
 	{ id: 'PiSharp.Tools.Skia', group: 'Core', nuget: true, description: "Image decoding, resizing and JPEG re-encoding for the read tool, on SkiaSharp." },
@@ -13,6 +14,7 @@ export const packages: Package[] = [
 	{ id: 'PiSharp.Rpc', group: 'Frontends', nuget: true, description: "Pi's JSON RPC protocol over stdin/stdout, including extension UI requests." },
 	{ id: 'PiSharp.Tui', group: 'Frontends', nuget: true, description: 'Terminal UI building blocks: input, text and list components, rendering.' },
 	{ id: 'PiSharp.Cli', group: 'Frontends', tool: true, description: 'The command-line app itself, installed as a .NET tool and run as pisharp.' },
+	{ id: 'PiSharp.Templates', group: 'Frontends', template: true, docs: '/docs/embed/sdk/#project-templates', description: 'dotnet new project templates for embedded agents (pisharp-agent), native C# CLI extensions (pisharp-extension), and durable workflows (pisharp-workflow).' },
 	{ id: 'PiSharp.Codemode', group: 'Core', nuget: true, description: 'Codemode: model-written JavaScript in a Jint sandbox that calls the session tools.' },
 	{ id: 'PiSharp.Durable', group: 'Core', nuget: true, experimental: true, description: "A port of Pi's durable agent harness. Sessions commit every step before showing it and resume after a crash." },
 	{ id: 'PiSharp.Durable.Tools', group: 'Core', nuget: true, experimental: true, description: 'The execution environment, coding tools, tool_search, code mode and media tools for durable sessions.' },

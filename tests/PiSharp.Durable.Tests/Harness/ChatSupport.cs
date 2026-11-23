@@ -26,7 +26,6 @@
 // (area reports). chat-support.ts matches v1.5.0, but the citation stays on v1.2.0 for the faux provider: faux.ts's f3fa8bd92 (a cached
 // prompt's cacheWrite is max(0, promptTokens - cacheRead) and input 0 while caching is simulated) is not ported here, and f715a15c1's
 // ToolCallArgumentsStream partials have no counterpart in this provider's compact frames (ToolCallDelta carries the chunk only).
-#pragma warning disable PISHARP_IDENTITY001 // PiSharp.AI's ClientIdentity (Pi v1.5.0) is experimental.
 using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using System.Runtime.CompilerServices;

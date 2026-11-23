@@ -41,9 +41,7 @@ internal static class IncrementalSnapshotTests
         Check(old[0].GetProperty("arguments").GetProperty("nested").GetProperty("value").GetString() == "a", "Mistral history changed.");
         Check(old.GetArrayLength() == 1, "Later interleaved tool leaked backward.");
         var final = (StreamDone)mistral[^1];
-#pragma warning disable PISHARP_AI001 // Authored control verifies the experimental argument-error contract.
         Check(ToolCallArgumentsResult.ErrorOf((ToolCallContent)final.Message.Content[0]) is not null, "Malformed Mistral final lost its arguments error.");
-#pragma warning restore PISHARP_AI001
         Check(((ToolCallContent)final.Message.Content[1]).Arguments.Value.GetProperty("other").GetArrayLength() == 2, "Interleaved final lost arguments.");
         var failed = await MistralStreamingPerformanceTests.Read(Mistral(0, "{\"nested\":{\"value\":\"kept\"}}") + "data: {\"choices\":[{\"delta\":{\"unexpected\":true}}]}\n\n", true);
         Check(failed[^1] is StreamError failure && failure.Message.Content.OfType<ToolCallContent>().Single().Arguments.Value.GetProperty("nested").GetProperty("value").GetString() == "kept", "Late failure lost accepted Mistral partial.");

@@ -10,7 +10,6 @@ namespace PiSharp.AI;
 /// <c>pi/&lt;version&gt; (&lt;platform&gt;; dotnet/&lt;runtime version&gt;; &lt;arch&gt;)</c>, <see cref="Short"/> is <c>pi</c>,
 /// and <see cref="Custom(string)"/> is the given value.
 /// </summary>
-[Experimental("PISHARP_IDENTITY001")]
 public sealed record ClientUserAgent
 {
     private ClientUserAgent(string mode, string? value) { Mode = mode; Value = value; }
@@ -35,7 +34,6 @@ public sealed record ClientUserAgent
 /// <param name="Name">App name: OpenRouter app title, NVIDIA invoke origin (first letter upper-cased), OpenCode client.</param>
 /// <param name="Url">App URL: OpenRouter <c>HTTP-Referer</c>.</param>
 /// <param name="Categories">App categories, e.g. <c>cli-agent</c>: OpenRouter <c>X-OpenRouter-Categories</c>, comma-separated.</param>
-[Experimental("PISHARP_IDENTITY001")]
 public sealed record ClientAttribution(string Name, string Url, ImmutableArray<string> Categories = default)
 {
     public bool Equals(ClientAttribution? other) => other is not null && Name == other.Name && Url == other.Url &&
@@ -48,7 +46,6 @@ public sealed record ClientAttribution(string Name, string Url, ImmutableArray<s
 /// identity.ts <c>ClientIdentity</c>: how requests identify the calling app to providers. Every field is optional; absent
 /// fields use the defaults: a detailed <c>User-Agent</c> with the Pi version PiSharp tracks and no attribution headers.
 /// </summary>
-[Experimental("PISHARP_IDENTITY001")]
 public sealed record ClientIdentity
 {
     /// <summary>Null: <see cref="ClientUserAgent.Detailed"/>.</summary>
@@ -62,7 +59,6 @@ public sealed record ClientIdentity
 }
 
 /// <summary>identity.ts helpers: merging, the <c>User-Agent</c> value and the headers an identity adds to a request.</summary>
-[Experimental("PISHARP_IDENTITY001")]
 public static class ClientIdentities
 {
     /// <summary>version.ts <c>PI_AI_VERSION</c>: decision 0015 has PiSharp identify as the Pi release it tracks.</summary>

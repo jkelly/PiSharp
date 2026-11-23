@@ -14,7 +14,6 @@ using PiSharp.Extensions;
 using PiSharp.Extensions.Events;
 using static EventFixture;
 
-#pragma warning disable PISHARP_IDENTITY001
 internal static partial class Program
 {
     private static IEnumerable<(string, Func<Task>)> Sync150IdentityCases() =>
@@ -77,4 +76,3 @@ internal static partial class Program
         Equal("Bearer k", sent.Authorization?.ToString(), "authorization");
     }
 }
-#pragma warning restore PISHARP_IDENTITY001
