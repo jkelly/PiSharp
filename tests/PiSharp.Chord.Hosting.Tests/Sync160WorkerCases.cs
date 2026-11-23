@@ -221,6 +221,18 @@ internal static class Sync160WorkerCases
 
     private static string Key(string id) => Session.Address(("id", JsonValue.Create(id))).Key;
     private static ProcessWorkerState? StateOf(ProcessWorkers workers, string id) => workers.State.GetValueOrDefault(Key(id));
+    /// <summary>The address's current start (internal: no public state tells a start waiting behind a published failure), read under the
+    /// component's lock.</summary>
+    private static Task? StartingOf(ProcessWorkers workers, string id)
+    {
+        const BindingFlags flags = BindingFlags.NonPublic | BindingFlags.Instance;
+        var sync = typeof(ProcessWorkers).GetField("sync", flags)!.GetValue(workers)!;
+        lock (sync)
+        {
+            var entry = ((System.Collections.IDictionary)typeof(ProcessWorkers).GetField("entries", flags)!.GetValue(workers)!)[Key(id)];
+            return entry is null ? null : (Task?)entry.GetType().GetField("Starting", flags)!.GetValue(entry);
+        }
+    }
     private static JsonObject Id(string id) => new() { ["id"] = id };
     private static JsonArray LinesOf(IReference journal) => (JsonArray)journal.Member("lines").Value!;
 
@@ -375,6 +387,47 @@ internal static class Sync160WorkerCases
         fleet.Workers.Retry(Session.Address(("id", JsonValue.Create("S1"))));
         await Until(() => StateOf(fleet.Workers, "S1")?.Status == "running", "the retried worker is running");
         Check(StateOf(fleet.Workers, "S1")!.Incarnation is { Length: > 0 } second && second != first, "a new run kept the old incarnation");
+    }
+
+    // Native regression (not upstream) of the incarnation case's retry. The crashed worker's link closes before its exit is published (held
+    // here by the store), so the route asks for its successor at once: that start waits behind the exit (its Finished). The retry lands
+    // after the publish, before the exit's handles closed (from OnError, which the exit calls in between). That waiting start is then the
+    // retry's: the address shows its worker running (it was dropped and the entry removed, the worker running outside State), a stop stops it.
+    public static async Task RetryKeepsTheStartWaitingBehindTheExit()
+    {
+        var root = StoreRoot();
+        var store = (ChordStore)await Layout.OpenStoreAsync(Path.Combine(root, "store.sqlite"), Context);
+        try
+        {
+            var address = Session.Address(("id", JsonValue.Create("S1")));
+            ProcessWorkers? workers = null; var retried = 0;
+            await using var fleet = await FleetAsync(store, configure: made => workers = made.Workers,
+                onError: error => { if (error is WorkerProcessException { Kind: "worker_failed" } && Interlocked.Exchange(ref retried, 1) == 0) workers!.Retry(address); });
+            using var control = await fleet.Server.GetAsync(Control, Id("S1"), Context);
+            await Until(() => StateOf(fleet.Workers, "S1")?.Status == "running", "the worker is running");
+            var first = StateOf(fleet.Workers, "S1")!;
+            var started = StartingOf(fleet.Workers, "S1");
+            Check(started is { IsCompletedSuccessfully: true }, "the running worker's start");
+            var export = store.Export(Context);
+            if (!await export.MoveNextAsync()) throw new InvalidOperationException("the export yielded nothing");
+            try
+            {
+                await control.CallAsync("crash", JsonValue.Create(7), Context);
+                await Until(() => StartingOf(fleet.Workers, "S1") is { } next && !ReferenceEquals(next, started), "the route asked for a start behind the exit");
+                Check(Volatile.Read(ref retried) == 0 && StateOf(fleet.Workers, "S1") == first, "the exit was published before the store settled: " + StateOf(fleet.Workers, "S1"));
+            }
+            finally { await export.DisposeAsync(); }
+            await Until(() => control.State.Value.Kind == "live", "the retried worker's link is live");
+            Check(Volatile.Read(ref retried) == 1, "the crash was not reported");
+            Check(StateOf(fleet.Workers, "S1") is not null, "the retried worker runs outside its address's state");
+            await Until(() => StateOf(fleet.Workers, "S1")?.Status == "running", "the retried worker is running");
+            var second = StateOf(fleet.Workers, "S1")!;
+            Check(second.ProcessId != first.ProcessId && second.Incarnation is { Length: > 0 } && second.Incarnation != first.Incarnation, $"the retried worker: {second}");
+            Check(fleet.Starts.SequenceEqual([Key("S1"), Key("S1")]), "starts: " + string.Join(", ", fleet.Starts));
+            await fleet.Workers.StopAsync(address).WaitAsync(TimeSpan.FromSeconds(20));
+            Check(StateOf(fleet.Workers, "S1") is null && !Alive(second.ProcessId!.Value), "the retried worker was not stopped: " + StateOf(fleet.Workers, "S1"));
+        }
+        finally { await store.CloseAsync(Context); try { Directory.Delete(root, true); } catch (IOException) { } }
     }
 
     // process.test.ts "closes its link at its exit, before the exit is told, as neither a lost nor a closed link": the worker link's End.

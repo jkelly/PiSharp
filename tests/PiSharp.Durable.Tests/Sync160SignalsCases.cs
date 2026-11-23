@@ -398,13 +398,14 @@ internal static class SignalTests
             {
                 ["read"] = async (task, runtime, ctx) =>
                 {
+                    var token = (long)((JsonNumberValue)((JsonObjectValue)task.Input)["token"]).Value;
                     try
                     {
-                        await runtime.ReadSignalAsync(((JsonNumberValue)((JsonObjectValue)task.Input)["token"]).Value == 1 ? v1 : v2, "k", ctx);
+                        await runtime.ReadSignalAsync(token == 1 ? v1 : v2, "k", ctx);
                     }
                     catch (Exception error)
                     {
-                        errors.Add(error.Message);
+                        errors.Add(token + ": " + error.Message);
                     }
                     await runtime.CommitAsync((_, _) => Completed(null), ctx);
                 },
@@ -416,9 +417,10 @@ internal static class SignalTests
             await harness.SignalAsync(older, v1, "k", O("""{"n":1}"""), Context);
             await harness.WaitForTaskAsync(newer, Context);
             await harness.WaitForTaskAsync(older, Context);
-            Check(errors.Snapshot().SequenceEqual([
-                "Signal test.versioned value has version 2, newer than 1",
-                "Signal test.versioned has no migration from version 1",
+            // The two tasks run concurrently, so their errors arrive in either order: each is checked by its task's token.
+            Check(errors.Snapshot().Order(StringComparer.Ordinal).SequenceEqual([
+                "1: Signal test.versioned value has version 2, newer than 1",
+                "2: Signal test.versioned has no migration from version 1",
             ]), "errors: " + string.Join("|", errors.Snapshot()));
             await harness.CloseAsync(Context);
         });

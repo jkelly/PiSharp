@@ -58,7 +58,8 @@ internal sealed class HostRoute
     {
         internal readonly Address Address = address;
         internal RemotePath Path = null!;
-        internal bool Resolving, Suspended;
+        // Retried: a Retry came while a resolve ran (native, see Control).
+        internal bool Resolving, Suspended, Retried;
         internal OpenSpan? Span;
         internal ChordError? Failure;
     }
@@ -111,8 +112,11 @@ internal sealed class HostRoute
         else
         {
             routed.Suspended = false; routed.Failure = null;
+            // A resolve running now may fail for what this retry clears (a crashed worker's start, rejected for the crash): its failure is
+            // not recorded then, the address resolves again (native; upstream's single thread has no such window).
+            if (routed.Resolving) routed.Retried = true;
             // Resolved only when a holder wants its link (one the route's admission allows; any without an admission).
-            if (routed.Path.Wanted && routed.Path.Link is null && !routed.Resolving) _ = Resolve(routed);
+            else if (routed.Path.Wanted && routed.Path.Link is null) _ = Resolve(routed);
         }
     });
     internal void Opened(HostLink link) { if (links.TryGetValue(link, out var entry)) links[link] = (entry.Routed, true); }
@@ -149,7 +153,7 @@ internal sealed class HostRoute
     {
         if (routed.Resolving || host.Closed) return;
         routed.Resolving = true;
-        OpenSpan? span = null;
+        OpenSpan? span = null; var again = false;
         if (!ChordTelemetry.IsUntraced(host.Telemetry))
         {
             var attributes = host.Attributes(); attributes["kind"] = kind.Kind; attributes["address"] = ChordTelemetry.Capped(routed.Address.Key);
@@ -174,9 +178,12 @@ internal sealed class HostRoute
             routed.Resolving = false;
             if (host.Closed) return;
             host.Report(new HostError("resolve_failed", error, routed.Address.Key));
-            Settle(routed, DataInternal.AsChordError(error, routed.Address.Key));
+            // Retried while it ran (Control): resolved again, unless suspended or released since.
+            if (routed.Retried && !routed.Suspended && routed.Path.Held) again = true;
+            else Settle(routed, DataInternal.AsChordError(error, routed.Address.Key));
         }
-        finally { routed.Span = null; span?.End(); }
+        finally { routed.Span = null; span?.End(); routed.Retried = false; }
+        if (again && routed.Path.Wanted && routed.Path.Link is null) _ = Resolve(routed);
     }
     private void Settle(Routed routed, ChordError error)
     {
