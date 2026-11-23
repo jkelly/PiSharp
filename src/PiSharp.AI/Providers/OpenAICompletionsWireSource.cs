@@ -74,8 +74,14 @@ public sealed class OpenAICompletionsWireSource : IChatTransport
         OpenAICompletionsWireFailure? failure = null;
         NativeChatDiagnostic? cleanupDiagnostic = null;
         try { enumerator = (_source(request, cancellationToken) ?? throw Protocol()).GetAsyncEnumerator(cancellationToken); }
-        catch (Exception error) { owner?.Admit(error); failure = cancellationToken.IsCancellationRequested
-            ? OpenAICompletionsWireFailure.Cancelled : OpenAICompletionsWireFailure.SourceFailed; }
+        catch (Exception error)
+        {
+            owner?.Admit(error);
+            failure = cancellationToken.IsCancellationRequested
+                ? OpenAICompletionsWireFailure.Cancelled : OpenAICompletionsWireFailure.SourceFailed;
+            if (failure == OpenAICompletionsWireFailure.SourceFailed && TransportRetryClassifier.IsTransientConnectionFailure(error))
+                state.RetryableTransportFailure = true;
+        }
         if (enumerator is null)
         {
             foreach (var terminal in owner?.Finish(failure ?? OpenAICompletionsWireFailure.SourceFailed) ??
@@ -92,22 +98,45 @@ public sealed class OpenAICompletionsWireSource : IChatTransport
                 catch (Exception error) { failure = Classify(error, cancellationToken); }
             if (failure is null && enumerator is IPreparedCompletionsEnumerator prepared)
                 try { prepared.BindStartup(owner?.Startup); await prepared.PrepareAsync(cancellationToken).ConfigureAwait(false); }
-                catch (Exception error) { owner?.Admit(error); failure = cancellationToken.IsCancellationRequested
-                    ? OpenAICompletionsWireFailure.Cancelled : OpenAICompletionsWireFailure.SourceFailed; }
+                catch (Exception error)
+                {
+                    owner?.Admit(error);
+                    failure = cancellationToken.IsCancellationRequested
+                        ? OpenAICompletionsWireFailure.Cancelled : OpenAICompletionsWireFailure.SourceFailed;
+                    if (failure == OpenAICompletionsWireFailure.SourceFailed && !prepared.LastFailureNonTransport &&
+                        TransportRetryClassifier.IsTransientConnectionFailure(error))
+                        state.RetryableTransportFailure = true;
+                }
             if (failure is null && !cancellationToken.IsCancellationRequested && start is not null) yield return start;
             while (failure is null)
             {
                 if (cancellationToken.IsCancellationRequested) { failure = OpenAICompletionsWireFailure.Cancelled; break; }
                 var moved = false;
                 try { moved = await enumerator.MoveNextAsync().ConfigureAwait(false); }
-                catch (Exception error) { owner?.Admit(error); failure = cancellationToken.IsCancellationRequested
-                    ? OpenAICompletionsWireFailure.Cancelled : OpenAICompletionsWireFailure.SourceFailed; }
+                catch (Exception error)
+                {
+                    owner?.Admit(error);
+                    failure = cancellationToken.IsCancellationRequested
+                        ? OpenAICompletionsWireFailure.Cancelled : OpenAICompletionsWireFailure.SourceFailed;
+                    if (failure == OpenAICompletionsWireFailure.SourceFailed &&
+                        enumerator is not IPreparedCompletionsEnumerator { LastFailureNonTransport: true } &&
+                        TransportRetryClassifier.IsTransientConnectionFailure(error))
+                        state.RetryableTransportFailure = true;
+                }
                 if (failure is not null || !moved) break;
                 if (cancellationToken.IsCancellationRequested) { failure = OpenAICompletionsWireFailure.Cancelled; break; }
                 JsonData? chunk = null;
                 try { chunk = enumerator.Current; }
-                catch (Exception error) { owner?.Admit(error); failure = cancellationToken.IsCancellationRequested
-                    ? OpenAICompletionsWireFailure.Cancelled : OpenAICompletionsWireFailure.SourceFailed; }
+                catch (Exception error)
+                {
+                    owner?.Admit(error);
+                    failure = cancellationToken.IsCancellationRequested
+                        ? OpenAICompletionsWireFailure.Cancelled : OpenAICompletionsWireFailure.SourceFailed;
+                    if (failure == OpenAICompletionsWireFailure.SourceFailed &&
+                        enumerator is not IPreparedCompletionsEnumerator { LastFailureNonTransport: true } &&
+                        TransportRetryClassifier.IsTransientConnectionFailure(error))
+                        state.RetryableTransportFailure = true;
+                }
                 if (failure is not null) break;
                 if (cancellationToken.IsCancellationRequested) { failure = OpenAICompletionsWireFailure.Cancelled; break; }
                 List<StreamEvent> progress = [];
@@ -119,6 +148,8 @@ public sealed class OpenAICompletionsWireSource : IChatTransport
                     yield return item;
                 }
             }
+            if (failure is null && enumerator is IPreparedCompletionsEnumerator { RetryUnexpectedEof: true })
+                state.RetryPrematureEof = true;
             finishedReading = true;
         }
         finally
@@ -215,6 +246,8 @@ public sealed class OpenAICompletionsWireSource : IChatTransport
         private JsonData? _errorThinkingSignature;
         private bool _errorThinkingSignatureAttempted;
         private StopReason _reason = StopReason.Pending;
+        internal bool RetryableTransportFailure;
+        internal bool RetryPrematureEof;
         public StreamStarted Start { get; }
 
         public State(ChatRequest request, OpenAICompletionsWireOptions options, CancellationToken token)
@@ -539,7 +572,9 @@ public sealed class OpenAICompletionsWireSource : IChatTransport
                         ? "Completions stream was cancelled." : "Completions stream did not complete."));
             }
             var final = finalSnapshot with { Usage = _usage, StopReason = reason, ExtraProperties = properties };
-            StreamTerminalEvent terminal = failure is null ? new StreamDone(reason, final) : new StreamError(reason, final);
+            StreamTerminalEvent terminal = failure is null
+                ? new StreamDone(reason, final)
+                : new StreamError(reason, final) { IsRetryableTransportFailure = reason == StopReason.Error && (RetryableTransportFailure || (RetryPrematureEof && failure == OpenAICompletionsWireFailure.UnexpectedEof)) };
             if (failure is { } nativeFailure) terminal = terminal with { NativeDiagnostic = Diagnostic(nativeFailure) };
             // A resource failure may leave no space for another source-facing copy.
             // The native sanitized terminal still settles; no fabricated source trace

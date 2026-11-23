@@ -181,9 +181,9 @@ internal static partial class Program
                 "PiSharp-only session and experimental durable command lines");
             Check(stdout.Contains("  --tier <tier>                  Set service tier: auto, normal, economy, priority, fast, ultrafast\n" +
                 "  --service-tier <tier>          Alias for --tier\n", StringComparison.Ordinal), "--service-tier alias line");
-            // The CLI registers no powershell tool (the name is only reserved), so the tool list leaves it out.
-            Check(!stdout.Contains("powershell", StringComparison.Ordinal) && stdout.Contains("  bash       - Execute bash commands\n  edit       - Edit files", StringComparison.Ordinal),
-                "no powershell tool listed");
+            // The CLI registers the native powershell tool (off by default, selectable via --tools +powershell).
+            Check(stdout.Contains("  bash       - Execute bash commands\n  powershell - Execute PowerShell commands (off by default)\n  edit       - Edit files", StringComparison.Ordinal),
+                "powershell tool listed in help");
             // session --help lists the verbs; session <verb> --help prints that verb's usage; a command still runs.
             Check(PiSharp.Cli.Commands.SessionHelp.For(["session", "--help"]) is { } sessionHelp && sessionHelp.StartsWith("Usage:\n  pisharp session <verb> [options]\n", StringComparison.Ordinal) &&
                 sessionHelp.Contains("\n  compact, branch-summary      Compact a session or summarize a branch\n", StringComparison.Ordinal), "session --help");

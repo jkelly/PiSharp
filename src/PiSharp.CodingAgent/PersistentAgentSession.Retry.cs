@@ -186,9 +186,11 @@ public sealed partial class PersistentAgentSession
         }
         if (coordinator is null || result.Turns.IsEmpty || !policy.Enabled || coordinator.Attempt >= policy.MaxRetries ||
             _agent.Snapshot.CancellationRequested) return false;
-        var assistant = result.Turns[^1].Result.Chat.Message;
+        var chat = result.Turns[^1].Result.Chat;
+        var assistant = chat.Message;
         return !SessionRecoveryClassifier.IsContextOverflow(assistant, window) &&
-            AgentRetryPolicy.IsRetryableError(assistant.StopReason, RetryErrorMessage(assistant));
+            (assistant.StopReason == StopReason.Error && chat.IsRetryableTransportFailure ||
+             AgentRetryPolicy.IsRetryableError(assistant.StopReason, RetryErrorMessage(assistant)));
     }
 
     private async Task<bool> TryAutomaticRetryAsync(AgentLoopResult result, TaskCompletionSource idle, CancellationToken token)
@@ -197,11 +199,12 @@ public sealed partial class PersistentAgentSession
         lock (_gate) { coordinator = _retryCoordinator; window = _retryContextWindow; }
         if (coordinator is null || result.Turns.IsEmpty) return false;
         using var bashBoundary = await BeginUserBashBoundaryAsync(idle).ConfigureAwait(false);
-        var assistant = result.Turns[^1].Result.Chat.Message;
+        var chat = result.Turns[^1].Result.Chat;
+        var assistant = chat.Message;
         if (token.IsCancellationRequested) { await coordinator.FinishCancelledAsync().ConfigureAwait(false); return false; }
         var overflow = SessionRecoveryClassifier.IsContextOverflow(assistant, window);
         var retry = await coordinator.PrepareRetryAsync(assistant.StopReason, RetryErrorMessage(assistant), overflow,
-            () => OmitRetryAssistantAsync(assistant, idle, token), token).ConfigureAwait(false);
+            () => OmitRetryAssistantAsync(assistant, idle, token), chat.IsRetryableTransportFailure, token).ConfigureAwait(false);
         if (!retry) await coordinator.FinishAsync(assistant.StopReason, RetryErrorMessage(assistant)).ConfigureAwait(false);
         return retry && !token.IsCancellationRequested;
     }

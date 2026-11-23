@@ -63,6 +63,8 @@ public abstract record StreamTerminalEvent(StopReason Reason, AssistantMessage M
     [System.Text.Json.Serialization.JsonIgnore] public Task? NativeSourceTask { get; init; }
     [System.Text.Json.Serialization.JsonIgnore] public IReadOnlyList<Exception>? NativeCleanupExceptions { get; init; }
     [System.Text.Json.Serialization.JsonIgnore] public IReadOnlyList<Task>? NativeCleanupTasks { get; init; }
+    /// <summary>Decision 0016: internal in-memory signal that a sanitized transport failure originated from a transient connection drop.</summary>
+    [System.Text.Json.Serialization.JsonIgnore] public bool IsRetryableTransportFailure { get; init; }
 }
 public sealed record StreamDone(StopReason Reason, AssistantMessage Message, JsonFields? Properties = null)
     : StreamTerminalEvent(Reason, Message, Properties);
@@ -78,6 +80,8 @@ public sealed record ChatResult(AssistantMessage Message, ChatFailure? Failure =
 {
     public NativeChatDiagnostic? NativeDiagnostic { get; init; }
     public NativeChatDiagnostic? NativeCleanupDiagnostic { get; init; }
+    /// <summary>Decision 0016: internal in-memory signal that a sanitized transport failure originated from a transient connection drop.</summary>
+    [System.Text.Json.Serialization.JsonIgnore] public bool IsRetryableTransportFailure { get; init; }
 }
 
 public sealed class StreamProtocolException(string message) : Exception(message);

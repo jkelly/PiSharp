@@ -4,18 +4,30 @@
 // interactive/interactive-mode.ts (handleReloadCommand) and packages/coding-agent/src/core/resource-loader.ts (reload: the built-in
 // extensions resolved again).
 using PiSharp.Cli.Extensions;
+using PiSharp.Cli.Interactive.Mode;
+using PiSharp.Cli.Pi;
 using PiSharp.Cli.Prompts;
 using PiSharp.Cli.Skills;
+using PiSharp.CodingAgent.Resources;
 
 namespace PiSharp.Cli.Commands;
 
 /// <summary>The resources a Pi reload loads again: the system prompt admission (custom and appended prompts, context files, skills),
-/// the skills and the prompt templates.</summary>
-internal sealed record PiReloadedResources(OriginalSystemPromptAdmission SystemPrompt, SkillCliBinding? Skills, PromptTemplateCliConfiguration Prompts);
+/// the skills, the prompt templates, the full discovered resources, and any diagnostics collected during the reload.</summary>
+internal sealed record PiReloadedResources(OriginalSystemPromptAdmission SystemPrompt, SkillCliBinding? Skills, PromptTemplateCliConfiguration Prompts,
+    PiResources? Resources = null, ResourceDiagnostics? Diagnostics = null);
 
 internal sealed partial class OfflineSessionProfile
 {
     private readonly SemaphoreSlim piReload = new(1, 1);
+    private ResourceDiagnostics? latestReloadDiagnostics;
+    private PiResources? latestReloadedResources;
+
+    /// <summary>The diagnostics collected by the most recent <see cref="PiReloadAsync"/> call (null before any reload).</summary>
+    internal ResourceDiagnostics? LatestReloadDiagnostics => Volatile.Read(ref latestReloadDiagnostics);
+
+    /// <summary>The discovered <see cref="PiResources"/> from the most recent <see cref="PiReloadAsync"/> call (null before any reload).</summary>
+    internal PiResources? LatestReloadedResources => Volatile.Read(ref latestReloadedResources);
 
     /// <summary>The Pi entry's resource loader for a reload (null outside the Pi entry).</summary>
     internal Func<NativeExtensionActivation?, CancellationToken, Task<PiReloadedResources>>? PiReloadResources { get; set; }
@@ -63,6 +75,14 @@ internal sealed partial class OfflineSessionProfile
             extension, extension, PromptTemplateFrontendDecoder.Decode, token: token).ConfigureAwait(false);
         var inherited = CaptureOriginalSystemPrompt(attachment);
         var snapshot = OriginalSystemPromptBuilder.Capture(resources.SystemPrompt, Workspace, inherited.SelectedTools);
+        var promptDiagnostics = (prompts?.Templates.Catalog.Diagnostics ?? [])
+            .Select(diagnostic => diagnostic.Type == PromptTemplateResourceDiagnosticType.Collision && diagnostic.Collision is { } collision
+                ? new ResourceDiagnostic("collision", diagnostic.Message, diagnostic.Path, collision.Name, collision.WinnerPath, collision.LoserPath)
+                : new ResourceDiagnostic(diagnostic.Type.ToString().ToLowerInvariant(), diagnostic.Message, diagnostic.Path))
+            .ToArray();
+        var baseDiagnostics = resources.Diagnostics ?? new ResourceDiagnostics([], [], [], []);
+        Volatile.Write(ref latestReloadDiagnostics, baseDiagnostics with { Prompts = [.. baseDiagnostics.Prompts, .. promptDiagnostics] });
+        if (resources.Resources is { } reloadedResources) Volatile.Write(ref latestReloadedResources, reloadedResources);
         lock (viewGate)
         {
             view.Prompts = prompts;

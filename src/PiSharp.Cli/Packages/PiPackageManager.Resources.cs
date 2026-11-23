@@ -128,6 +128,29 @@ internal sealed partial class PiPackageManager
         if (entries.Count == 0) return;
         var plain = entries.Where(entry => !IsPattern(entry)).ToList();
         var patterns = entries.Where(IsPattern).ToList();
+        if (resourceType == "extensions")
+        {
+            var builtinPatterns = patterns.Where(IsBuiltinPattern).ToList();
+            patterns = patterns.Where(pattern => !IsBuiltinPattern(pattern)).ToList();
+            var builtins = plain.Where(entry => entry.StartsWith(BuiltinPathPrefix, StringComparison.Ordinal)).ToList();
+            if (builtins.Count > 0)
+            {
+                var enabledBuiltins = ApplyBuiltinPatterns(builtins, builtinPatterns);
+                var projectOverrides = metadata.Scope == "user" ? OverridePatterns(StringsOf(settings.Project, "extensions")) : null;
+                foreach (var builtin in builtins)
+                {
+                    var builtinEnabled = enabledBuiltins.Contains(builtin);
+                    var scope = metadata.Scope;
+                    if (projectOverrides is { Count: > 0 } && TryApplyBuiltinOverrides(builtin, projectOverrides, out var projectEnabled))
+                    {
+                        builtinEnabled = projectEnabled;
+                        scope = "project";
+                    }
+                    AddResource(target, builtin, new() { Source = "builtin", Scope = scope, Origin = "top-level" }, builtinEnabled);
+                }
+                plain = plain.Where(entry => !entry.StartsWith(BuiltinPathPrefix, StringComparison.Ordinal)).ToList();
+            }
+        }
         var allFiles = CollectFilesFromPaths([.. plain.Select(entry => ResolvePathFromBase(entry, baseDir))], resourceType);
         var enabled = ApplyPatterns(allFiles, patterns, baseDir);
         foreach (var file in allFiles) AddResource(target, file, metadata, enabled.Contains(file));
@@ -518,5 +541,49 @@ internal sealed partial class PiPackageManager
                 if (exact ? MatchesAnyExactPattern(path, [target], baseDir) : MatchesAnyPattern(path, [target], baseDir)) result[path] = enabled;
         }
         return result;
+    }
+
+    private static bool IsBuiltinPattern(string pattern)
+    {
+        var target = pattern.Length > 0 && pattern[0] is '+' or '-' or '!' ? pattern[1..] : pattern;
+        return target.StartsWith(BuiltinPathPrefix, StringComparison.Ordinal);
+    }
+
+    private static HashSet<string> ApplyBuiltinPatterns(List<string> builtins, List<string> patterns)
+    {
+        List<string> includes = [], excludes = [], forceIncludes = [], forceExcludes = [];
+        foreach (var pattern in patterns)
+        {
+            if (pattern.StartsWith('+')) { var t = pattern[1..]; if (t.StartsWith(BuiltinPathPrefix, StringComparison.Ordinal)) forceIncludes.Add(t); }
+            else if (pattern.StartsWith('-')) { var t = pattern[1..]; if (t.StartsWith(BuiltinPathPrefix, StringComparison.Ordinal)) forceExcludes.Add(t); }
+            else if (pattern.StartsWith('!')) { var t = pattern[1..]; if (t.StartsWith(BuiltinPathPrefix, StringComparison.Ordinal)) excludes.Add(t); }
+            else if (pattern.StartsWith(BuiltinPathPrefix, StringComparison.Ordinal)) includes.Add(pattern);
+        }
+        var result = includes.Count == 0 ? [.. builtins] : builtins.Where(b => includes.Any(p => PiMinimatch.Match(b, p))).ToList();
+        if (excludes.Count > 0) result = [.. result.Where(b => !excludes.Any(p => PiMinimatch.Match(b, p)))];
+        if (forceIncludes.Count > 0)
+            foreach (var b in builtins)
+                if (!result.Contains(b) && forceIncludes.Contains(b, StringComparer.Ordinal)) result.Add(b);
+        if (forceExcludes.Count > 0) result = [.. result.Where(b => !forceExcludes.Contains(b, StringComparer.Ordinal))];
+        return new HashSet<string>(result, StringComparer.Ordinal);
+    }
+
+    private static bool TryApplyBuiltinOverrides(string builtin, List<string> overrides, out bool enabled)
+    {
+        var matched = false;
+        enabled = true;
+        foreach (var pattern in overrides)
+        {
+            var marked = pattern.StartsWith('+') || pattern.StartsWith('-') || pattern.StartsWith('!');
+            var target = marked ? pattern[1..] : pattern;
+            if (!target.StartsWith(BuiltinPathPrefix, StringComparison.Ordinal)) continue;
+            var exact = pattern.StartsWith('+') || pattern.StartsWith('-');
+            if (exact ? string.Equals(builtin, target, StringComparison.Ordinal) : PiMinimatch.Match(builtin, target))
+            {
+                matched = true;
+                enabled = !pattern.StartsWith('-') && !pattern.StartsWith('!');
+            }
+        }
+        return matched;
     }
 }

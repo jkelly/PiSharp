@@ -35,7 +35,11 @@ public sealed class SessionRetryCoordinator
     }
 
     public Task<bool> PrepareRetryAsync(StopReason reason, string? errorMessage, bool contextOverflow,
-        Func<Task> omitOriginal, CancellationToken runToken = default)
+        Func<Task> omitOriginal, CancellationToken runToken = default) =>
+        PrepareRetryAsync(reason, errorMessage, contextOverflow, omitOriginal, isRetryableTransportFailure: false, runToken);
+
+    public Task<bool> PrepareRetryAsync(StopReason reason, string? errorMessage, bool contextOverflow,
+        Func<Task> omitOriginal, bool isRetryableTransportFailure, CancellationToken runToken = default)
     {
         ThrowSelfWait(); ArgumentNullException.ThrowIfNull(omitOriginal);
         Single(omitOriginal, nameof(omitOriginal));
@@ -45,17 +49,19 @@ public sealed class SessionRetryCoordinator
             if (preparing is not null || finishing is not null) throw new InvalidOperationException("Retry boundary already owns an original operation.");
             owner = new(TaskCreationOptions.RunContinuationsAsynchronously); preparing = owner;
         }
-        _ = PrepareOwnedAsync(owner, reason, errorMessage, contextOverflow, omitOriginal, runToken);
+        _ = PrepareOwnedAsync(owner, reason, errorMessage, contextOverflow, omitOriginal, isRetryableTransportFailure, runToken);
         return owner.Task;
     }
 
     private async Task PrepareOwnedAsync(TaskCompletionSource<bool> owner, StopReason reason, string? errorMessage,
-        bool overflow, Func<Task> omit, CancellationToken runToken)
+        bool overflow, Func<Task> omit, bool isRetryableTransportFailure, CancellationToken runToken)
     {
         var failures = new List<Exception>(); var retry = false; Backoff? admitted = null; var scheduled = false;
         try
         {
-            if (!runToken.IsCancellationRequested && !overflow && AgentRetryPolicy.IsRetryableError(reason, errorMessage))
+            var retryable = reason == StopReason.Error &&
+                (isRetryableTransportFailure || AgentRetryPolicy.IsRetryableError(reason, errorMessage));
+            if (!runToken.IsCancellationRequested && !overflow && retryable)
             {
                 var settings = InvokeCallback(policy);
                 int next;
@@ -63,7 +69,7 @@ public sealed class SessionRetryCoordinator
                 if (next != 0)
                 {
                     scheduled = true;
-                    await ObserveAsync(new SessionRetryStarted(next, settings.MaxRetries, settings.DelayMs(next), errorMessage!)).ConfigureAwait(false);
+                    await ObserveAsync(new SessionRetryStarted(next, settings.MaxRetries, settings.DelayMs(next), errorMessage ?? "Transport stream failed.")).ConfigureAwait(false);
                     // Await the admitted original, including checkpoint/context refresh, without a cancellable wrapper.
                     await InvokeTask(omit).ConfigureAwait(false);
                     var ownedBackoff = new Backoff(this, owner.Task); admitted = ownedBackoff;

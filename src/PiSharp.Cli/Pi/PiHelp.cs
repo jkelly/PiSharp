@@ -9,8 +9,7 @@ internal static class PiHelp
     /// <summary>Source printHelp. The command name is PiSharp's (<see cref="PiConfig.DisplayName"/>); the option list adds PiSharp's
     /// <c>--tool-policy</c> (decision 0004) and the <c>--service-tier</c> alias of <c>--tier</c>; the commands list adds PiSharp's native
     /// <c>session</c> verbs and the experimental <c>durable</c> mode (decision 0005; PiSharp-only since Pi v1.2.0 removed its durable
-    /// agent), both of which take <c>--help</c>. Built-in Tool Names leaves out <c>powershell</c>: the name is reserved, but the CLI
-    /// registers no such tool.</summary>
+    /// agent), both of which take <c>--help</c>. Built-in Tool Names includes <c>powershell</c> (off by default, selectable via <c>--tools +powershell</c>).</summary>
     internal static string Text(IReadOnlyList<PiExtensionFlag>? extensionFlags = null, bool color = false)
     {
         string Bold(string text) => color ? "\u001b[1m" + text + "\u001b[22m" : text;
@@ -215,6 +214,7 @@ Extensions can register additional flags (e.g., --plan from plan-mode extension)
 {Bold("Built-in Tool Names:")}
   read       - Read file contents
   bash       - Execute bash commands
+  powershell - Execute PowerShell commands (off by default)
   edit       - Edit files with find/replace
   write      - Write files (creates/overwrites)
   grep       - Search file contents (read-only, off by default)

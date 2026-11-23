@@ -207,7 +207,7 @@ internal sealed class GoogleEventMapper
         }
         return new StreamDone(_reason, Message(_reason));
     }
-    internal StreamError Error(Exception error, bool aborted)
+    internal StreamError Error(Exception error, bool aborted, bool allowTransportRetry = true)
     {
         FailureKind = error is GoogleGenerativeAIException knownFailure ? knownFailure.Failure :
             error is JsonException ? GoogleFailure.MalformedStream : GoogleFailure.SourceFailed;
@@ -216,8 +216,9 @@ internal sealed class GoogleEventMapper
         var message = aborted ? "Request was aborted" : error is GoogleGenerativeAIException known ? known.Message :
             error is JsonException ? "Invalid Google streamed JSON." : "Google provider operation failed.";
         var extra = _extra.Set("errorMessage", JsonData.Parse(JsonSerializer.Serialize(message)));
+        var retryable = !aborted && allowTransportRetry && (FailureKind == GoogleFailure.UnexpectedEof || TransportRetryClassifier.IsTransientConnectionFailure(error));
         return new(reason, Message(reason) with { ExtraProperties = extra })
-        { NativeDiagnostic = GoogleNativeDiagnostics.FromException(error, aborted) };
+        { NativeDiagnostic = GoogleNativeDiagnostics.FromException(error, aborted), IsRetryableTransportFailure = retryable };
     }
 }
 

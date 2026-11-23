@@ -18,7 +18,7 @@ internal static partial class GenerationPhases
     /// commit, so no stale partial lands after the outcome. A commit appends what text and thinking grew by and applies the argument
     /// changes since the last one (<see cref="PartialChanges"/>), so its cost follows the new text, not the strings' length.
     /// </summary>
-    private static async Task<JsonObjectValue> StreamResponseAsync(ITaskRuntime runtime, DurableModel model, ImmutableArray<JsonValue> messages,
+    private static async Task<(JsonObjectValue Message, bool IsRetryableTransportFailure)> StreamResponseAsync(ITaskRuntime runtime, DurableModel model, ImmutableArray<JsonValue> messages,
         DurableStreamOptions options, int attempt, DurableContext context)
     {
         var interval = runtime.Settings.Progress.PartialIntervalMs;
@@ -121,7 +121,7 @@ internal static partial class GenerationPhases
                 }
             }
             if (terminal is null) throw new InvalidOperationException($"The {model.Provider}/{model.Id} stream ended without a terminal event");
-            return ToWire(terminal.Message);
+            return (ToWire(terminal.Message), terminal.IsRetryableTransportFailure);
         }
         finally
         {
@@ -201,7 +201,8 @@ internal static partial class GenerationPhases
     }
 
     /// <summary>Classifies a terminal provider message in one commit that also clears the partial (upstream <c>classify</c>).</summary>
-    private static async Task ClassifyAsync(ITaskRuntime runtime, Request request, JsonObjectValue message, DurableContext context)
+    private static async Task ClassifyAsync(ITaskRuntime runtime, Request request, JsonObjectValue message, DurableContext context,
+        bool isRetryableTransportFailure = false)
     {
         // An abort mark or close: the abort invocation or the reopened run handles the committed state.
         runtime.Signal.ThrowIfCancellationRequested();
@@ -271,7 +272,7 @@ internal static partial class GenerationPhases
         }
         var retryPolicy = settings.Retry;
         // An overflow is never retried: only a compaction can make the next request fit.
-        var retry = stopReason == "error" && !overflow && PiAiRetry.IsRetryableAssistantError(message) && retryPolicy.Enabled &&
+        var retry = stopReason == "error" && !overflow && (isRetryableTransportFailure || PiAiRetry.IsRetryableAssistantError(message)) && retryPolicy.Enabled &&
             attempt <= retryPolicy.MaxRetries;
         var until = retry ? runtime.Now() + PiAiRetry.RetryDelayMs(retryPolicy.BaseDelayMs, retryPolicy.MaxAgentDelayMs, attempt) : 0;
         await runtime.CommitAsync(async (tx, _) =>

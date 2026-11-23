@@ -439,7 +439,7 @@ internal sealed partial class InteractiveMode
 
         if (showListing)
         {
-            var resources = context.Startup.Resources;
+            var resources = context.Startup.CurrentResources;
             var contextFiles = new List<string>();
             if (resources.SystemPromptSource is { } systemPromptSource && File.Exists(systemPromptSource)) contextFiles.Add(systemPromptSource);
             contextFiles.AddRange(resources.ContextFiles.Select(file => file.Path));

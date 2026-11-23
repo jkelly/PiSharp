@@ -237,5 +237,25 @@ internal static partial class Program
             var limited = Content(sandbox.Requests[4]);
             Check(limited == "many.txt:1: hit\nmany.txt:2: hit\nmany.txt:3: hit\n\n[3 matches limit reached. Use limit=6 for more, or refine pattern]", "grep limit: " + limited);
         }),
+        ("tools.pi-policy-powershell-tool-selects-and-runs-when-enabled", async () =>
+        {
+            try { _ = PiSharp.Tools.Processes.PowerShellDiscovery.Resolve(); }
+            catch (PiSharp.Tools.Processes.ShellDiscoveryException) { throw new SkipException("No PowerShell executable on this machine."); }
+            using var sandbox = new Sandbox("powershell-tool");
+            sandbox.Respond = (_, index) => index switch
+            {
+                0 => AnthropicToolCall("powershell", new { command = "Write-Output 'cli-ps-ok'" }, "toolu_ps"),
+                _ => AnthropicText("done")
+            };
+            var (code, stdout, stderr) = await sandbox.Run("-p", "--tools", "+powershell", "--provider", "anthropic", "--model", "claude-sonnet-4-5", "run ps");
+            Equal(0, code, "exit; " + stderr);
+            var offered = sandbox.Requests[0].Json.GetProperty("tools").EnumerateArray().Select(tool => tool.GetProperty("name").GetString()!).ToArray();
+            Check(offered.Contains("powershell", StringComparer.Ordinal), "powershell missing from offered tools: " + string.Join(",", offered));
+            Check(offered.Contains("bash", StringComparer.Ordinal), "bash should stay in defaults alongside +powershell");
+            var messages = sandbox.Requests[1].Json.GetProperty("messages");
+            var resultText = messages[messages.GetArrayLength() - 1].GetProperty("content")[0].GetProperty("content").GetString()!;
+            Check(resultText.Contains("cli-ps-ok", StringComparison.Ordinal), "powershell output: " + resultText);
+            Check(stdout.Contains("done", StringComparison.Ordinal), "stdout: " + stdout);
+        }),
     ];
 }

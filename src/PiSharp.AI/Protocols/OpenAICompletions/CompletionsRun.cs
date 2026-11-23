@@ -125,11 +125,18 @@ public sealed class CompletionsRun : IAsyncDisposable
     private async Task<CompletionsSourceMessage> ProduceAsync(OpenAICompletionsWireSource mapper, ChatRequest request, bool sourceView)
     {
         _insideProducer.Value = true;
+        var inTransportPull = false;
         try
         {
-            await foreach (var frame in mapper.StreamOwnedAsync(request, _context, _work.Token, sourceView).ConfigureAwait(false))
+            await using var enumerator = mapper.StreamOwnedAsync(request, _context, _work.Token, sourceView).GetAsyncEnumerator(_work.Token);
+            while (true)
             {
-                _captureCanonicalObservation |= frame.SourceEmissionSnapshot is not null;
+                inTransportPull = true;
+                var moved = await enumerator.MoveNextAsync().ConfigureAwait(false);
+                var frame = moved ? enumerator.Current : null;
+                inTransportPull = false;
+                if (!moved) break;
+                _captureCanonicalObservation |= frame!.SourceEmissionSnapshot is not null;
                 // The internal canonical reader never consumes source aliases. Preserve exact
                 // admission near source limits and whenever a source observer/capture needs them.
                 // Ends and terminals still publish the same fully admitted live message.
@@ -162,7 +169,8 @@ public sealed class CompletionsRun : IAsyncDisposable
             _semanticTerminal = new StreamError(native.StopReason, native with { ExtraProperties = (native.ExtraProperties ?? JsonFields.Empty)
                 .Set("errorMessage", JsonData.Parse(aborted ? "\"Completions stream was cancelled.\"" : "\"Completions stream did not complete.\"")) })
             { NativeDiagnostic = OpenAICompletionsWireSource.Diagnostic(aborted ? OpenAICompletionsWireFailure.Cancelled :
-                error is StreamLimitException ? OpenAICompletionsWireFailure.ResourceLimit : OpenAICompletionsWireFailure.SourceFailed) };
+                error is StreamLimitException ? OpenAICompletionsWireFailure.ResourceLimit : OpenAICompletionsWireFailure.SourceFailed),
+              IsRetryableTransportFailure = !aborted && inTransportPull && PiSharp.AI.Protocols.ProviderShared.TransportRetryClassifier.IsTransientConnectionFailure(error) };
             var captured = PublishMessage(_semanticTerminal);
             var source = SourceFrame(_semanticTerminal, captured);
             _semanticTerminal = ObserveTerminal(_semanticTerminal, source);
@@ -211,7 +219,8 @@ public sealed class CompletionsRun : IAsyncDisposable
             terminal.Reason == StopReason.Aborted ? "Completions stream was cancelled." : "Completions stream did not complete.")
             { NativeDiagnostic = terminal.NativeDiagnostic } : null;
         _semanticTerminal = terminal; _canonical.TrySetResult(new(terminal.Message, chatFailure)
-        { NativeDiagnostic = terminal.NativeDiagnostic, NativeCleanupDiagnostic = terminal.NativeCleanupDiagnostic });
+        { NativeDiagnostic = terminal.NativeDiagnostic, NativeCleanupDiagnostic = terminal.NativeCleanupDiagnostic,
+          IsRetryableTransportFailure = terminal.IsRetryableTransportFailure });
     }
 
     private StreamTerminalEvent ProjectAdmittedCanonicalFailure(StreamTerminalEvent terminal)

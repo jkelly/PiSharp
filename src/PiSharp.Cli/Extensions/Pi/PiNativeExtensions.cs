@@ -43,6 +43,8 @@ internal sealed class PiNativeExtension
     internal bool LateActivation { get; set; }
     /// <summary>The tool names the session's catalog holds for this extension when a reload retired it.</summary>
     internal ImmutableHashSet<string> CatalogToolNames { get; set; } = ImmutableHashSet<string>.Empty;
+    /// <summary>The <c>tool:&lt;name&gt;</c> and <c>command:&lt;name&gt;</c> registrations captured during activation, used by built-in replacement.</summary>
+    internal ImmutableArray<string> RegisteredNames { get; set; } = [];
     internal bool Retired { get; private set; }
 
     internal static bool IsManifest(string path) => string.Equals(System.IO.Path.GetFileName(path), ManifestName, StringComparison.Ordinal);

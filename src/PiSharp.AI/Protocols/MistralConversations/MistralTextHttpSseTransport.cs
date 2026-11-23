@@ -44,7 +44,17 @@ public sealed partial class MistralTextHttpSseTransport : IChatTransport, IModel
         var options = request.SessionId is { } session && this.options.SessionId is null ? this.options with { SessionId = session } : this.options;
         var token = caller; var state = new TextState(request, options);
         HttpRequestMessage? send = null; HttpResponseMessage? response = null; Stream? body = null; IAsyncEnumerator<JsonData>? reader = null;
-        Exception? failure = null, cleanup = null; var completed = false;
+        Exception? failure = null, cleanup = null; var completed = false; var permanentHttpStatus = false; var nonTransportFailure = false;
+        async ValueTask<T> AwaitHook<T>(Func<ValueTask<T>> action)
+        {
+            try { return await AwaitSource(action, classifyTransport: false).ConfigureAwait(false); }
+            catch { nonTransportFailure = true; throw; }
+        }
+        async ValueTask AwaitHookAction(Func<ValueTask> action)
+        {
+            try { await AwaitSource(action, classifyTransport: false).ConfigureAwait(false); }
+            catch { nonTransportFailure = true; throw; }
+        }
         try
         {
             try
@@ -53,7 +63,7 @@ public sealed partial class MistralTextHttpSseTransport : IChatTransport, IModel
                 if (string.IsNullOrEmpty(options.ApiKey)) throw Fail(NativeChatFailureCode.UnsupportedFeature, "No API key for provider: mistral");
                 if (options.OnPayload is { } hook)
                 {
-                    var replacement = await AwaitSource(() => hook(payload, model, token)).ConfigureAwait(false);
+                    var replacement = await AwaitHook(() => hook(payload, model, token)).ConfigureAwait(false);
                     token.ThrowIfCancellationRequested();
                     if (replacement is not null) { Admit(() => { AdmitPayload(replacement.Value, camel: true); return true; }); payload = replacement; }
                 }
@@ -87,10 +97,12 @@ public sealed partial class MistralTextHttpSseTransport : IChatTransport, IModel
                 ObserveHeaders(send.Headers.Concat(send.Content.Headers));
                 token.ThrowIfCancellationRequested();
                 response = await SendForHeaders(send, options.TimeoutMilliseconds, token).ConfigureAwait(false);
+                if (!response.IsSuccessStatusCode && !IsRetryableHttpStatus(response.StatusCode))
+                    permanentHttpStatus = true;
                 var observed = ObserveHeaders(response.Headers.Concat(response.Content.Headers));
-                if (options.OnResponse is { } responseHook) await AwaitSource(() => responseHook(JsonData.Parse(new JsonObject { ["status"] = (int)response.StatusCode, ["headers"] = observed }.ToJsonString()), model, token)).ConfigureAwait(false);
-                token.ThrowIfCancellationRequested(); body = await AwaitSource(() => new ValueTask<Stream>(response.Content.ReadAsStreamAsync(token))).ConfigureAwait(false);
-                if (!response.IsSuccessStatusCode) throw await HttpError(response, body, token).ConfigureAwait(false);
+                if (options.OnResponse is { } responseHook) await AwaitHookAction(() => responseHook(JsonData.Parse(new JsonObject { ["status"] = (int)response.StatusCode, ["headers"] = observed }.ToJsonString()), model, token)).ConfigureAwait(false);
+                token.ThrowIfCancellationRequested(); body = await AwaitSource(() => new ValueTask<Stream>(response.Content.ReadAsStreamAsync(token)), classifyTransport: !permanentHttpStatus).ConfigureAwait(false);
+                if (!response.IsSuccessStatusCode) throw await HttpError(response, body, token, classifyTransport: !permanentHttpStatus).ConfigureAwait(false);
                 if (body is null) throw Fail(NativeChatFailureCode.SourceFailed, "Mistral response has no body");
                 reader = Decode(body, token).GetAsyncEnumerator(token);
             }
@@ -105,7 +117,7 @@ public sealed partial class MistralTextHttpSseTransport : IChatTransport, IModel
                     if (moved)
                     {
                         var chunk = reader.Current;
-                        if (options.OnProviderStreamEvent is { } hook) await AwaitSource(() => hook(chunk, model, token)).ConfigureAwait(false);
+                        if (options.OnProviderStreamEvent is { } hook) await AwaitHookAction(() => hook(chunk, model, token)).ConfigureAwait(false);
                         token.ThrowIfCancellationRequested(); frames = state.Convert(chunk);
                     }
                 }
@@ -131,7 +143,10 @@ public sealed partial class MistralTextHttpSseTransport : IChatTransport, IModel
         else if (reason == StopReason.Pending) { reason = StopReason.Error; code = NativeChatFailureCode.UnexpectedEof; text = "Mistral stream ended without a finish reason"; }
         else if (reason == StopReason.Error) { code = NativeChatFailureCode.ProviderError; text = state.ProviderError; }
         if (cleanup is not null && text is null) { reason = StopReason.Error; code = NativeChatFailureCode.CleanupFailed; text = "Mistral invocation cleanup failed."; }
-        StreamTerminalEvent terminal = text is null ? new StreamDone(reason, state.Message(reason)) : new StreamError(reason, state.Message(reason, text)) { NativeDiagnostic = MistralNativeDiagnostics.FromCode(code) };
+        var retryable = reason == StopReason.Error && !permanentHttpStatus && !nonTransportFailure && (code == NativeChatFailureCode.UnexpectedEof ||
+            failure is MistralTextException { IsRetryableTransportFailure: true } ||
+            (failure is not MistralTextException && PiSharp.AI.Protocols.ProviderShared.TransportRetryClassifier.IsTransientConnectionFailure(failure, caller.IsCancellationRequested)));
+        StreamTerminalEvent terminal = text is null ? new StreamDone(reason, state.Message(reason)) : new StreamError(reason, state.Message(reason, text)) { NativeDiagnostic = MistralNativeDiagnostics.FromCode(code), IsRetryableTransportFailure = retryable };
         if (cleanup is not null) terminal = terminal with { NativeCleanupDiagnostic = MistralNativeDiagnostics.FromCode(NativeChatFailureCode.CleanupFailed) };
         yield return terminal;
     }
@@ -142,13 +157,14 @@ public sealed partial class MistralTextHttpSseTransport : IChatTransport, IModel
         using var headerTimeout = new CancellationTokenSource(timeoutMilliseconds);
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(caller, headerTimeout.Token);
         HttpResponseMessage? response = null;
-        try { response = await AwaitSource(() => new ValueTask<HttpResponseMessage>(client.SendAsync(send, HttpCompletionOption.ResponseHeadersRead, linked.Token))).ConfigureAwait(false); }
+        try { response = await AwaitSource(() => new ValueTask<HttpResponseMessage>(client.SendAsync(send, HttpCompletionOption.ResponseHeadersRead, linked.Token)), classifyTransport: true).ConfigureAwait(false); }
         catch (Exception) when (headerTimeout.IsCancellationRequested && !caller.IsCancellationRequested) { }
         // A send that settles only after the deadline (one that ignored the abort) is the same header timeout.
         if (headerTimeout.IsCancellationRequested && !caller.IsCancellationRequested)
         {
             response?.Dispose();
-            throw Fail(NativeChatFailureCode.SourceFailed, $"Mistral response headers timed out after {timeoutMilliseconds}ms");
+            throw new MistralTextException(NativeChatFailureCode.SourceFailed, $"Mistral response headers timed out after {timeoutMilliseconds}ms")
+            { IsRetryableTransportFailure = true };
         }
         return response!;
     }
@@ -252,10 +268,14 @@ public sealed partial class MistralTextHttpSseTransport : IChatTransport, IModel
                 throw Fail(NativeChatFailureCode.UnsupportedFeature, "Unsupported Mistral header binding.");
         }
     }
-    private async ValueTask<MistralTextException> HttpError(HttpResponseMessage response, Stream body, CancellationToken token)
+    private static bool IsRetryableHttpStatus(System.Net.HttpStatusCode status) => status is System.Net.HttpStatusCode.RequestTimeout
+        or System.Net.HttpStatusCode.TooManyRequests or System.Net.HttpStatusCode.InternalServerError
+        or System.Net.HttpStatusCode.BadGateway or System.Net.HttpStatusCode.ServiceUnavailable
+        or System.Net.HttpStatusCode.GatewayTimeout or (System.Net.HttpStatusCode)520 or (System.Net.HttpStatusCode)524;
+    private async ValueTask<MistralTextException> HttpError(HttpResponseMessage response, Stream body, CancellationToken token, bool classifyTransport)
     {
         using var bytes = new MemoryStream(); var buffer = new byte[4096]; int count;
-        while ((count = await AwaitSource(() => body.ReadAsync(buffer.AsMemory(), token)).ConfigureAwait(false)) != 0) { Limit(bytes.Length + count, options.MaximumErrorBytes); bytes.Write(buffer, 0, count); }
+        while ((count = await AwaitSource(() => body.ReadAsync(buffer.AsMemory(), token), classifyTransport).ConfigureAwait(false)) != 0) { Limit(bytes.Length + count, options.MaximumErrorBytes); bytes.Write(buffer, 0, count); }
         var text = Encoding.UTF8.GetString(bytes.ToArray()).Trim(EcmaWhitespace);
         var suffix = text.Length > 0 ? text.Length > 4000 ? text[..4000] + $"... [truncated {text.Length - 4000} chars]" : text : (string.IsNullOrEmpty(response.ReasonPhrase) ? $"Request failed with status {(int)response.StatusCode}" : response.ReasonPhrase);
         return Fail(NativeChatFailureCode.ProviderError, $"Mistral API error ({(int)response.StatusCode}): {suffix}");
@@ -266,7 +286,7 @@ public sealed partial class MistralTextHttpSseTransport : IChatTransport, IModel
     {
         using var input = new StreamReader(body, new UTF8Encoding(false, false), detectEncodingFromByteOrderMarks: false, bufferSize: 4096, leaveOpen: true);
         var buffer = new char[4096]; var pending = ""; long total = 0; int count; var first = true;
-        while ((count = await AwaitSource(() => input.ReadAsync(buffer.AsMemory(), token)).ConfigureAwait(false)) != 0)
+        while ((count = await AwaitSource(() => input.ReadAsync(buffer.AsMemory(), token), classifyTransport: true).ConfigureAwait(false)) != 0)
         {
             total += count; Limit(total, options.MaximumTotalCharacters); var incoming = new string(buffer, 0, count);
             if (first) { first = false; if (incoming.StartsWith('\uFEFF')) incoming = incoming[1..]; }
@@ -309,17 +329,25 @@ public sealed partial class MistralTextHttpSseTransport : IChatTransport, IModel
             ? NativeChatFailureCode.ResourceLimit : NativeChatFailureCode.MalformedStream, "Invalid Mistral tool argument fragment."); }
         catch (OverflowException) { throw Fail(NativeChatFailureCode.ResourceLimit, "Mistral numeric limit."); }
     }
-    private static async ValueTask<T> AwaitSource<T>(Func<ValueTask<T>> action)
+    private static async ValueTask<T> AwaitSource<T>(Func<ValueTask<T>> action, bool classifyTransport = false)
     {
         try { return await action().ConfigureAwait(false); }
         catch (OperationCanceledException) { throw; }
-        catch (Exception) { throw Fail(NativeChatFailureCode.SourceFailed, "Mistral source operation failed."); }
+        catch (Exception error)
+        {
+            throw new MistralTextException(NativeChatFailureCode.SourceFailed, "Mistral source operation failed.")
+            { IsRetryableTransportFailure = classifyTransport && PiSharp.AI.Protocols.ProviderShared.TransportRetryClassifier.IsTransientConnectionFailure(error) };
+        }
     }
-    private static async ValueTask AwaitSource(Func<ValueTask> action)
+    private static async ValueTask AwaitSource(Func<ValueTask> action, bool classifyTransport = false)
     {
         try { await action().ConfigureAwait(false); }
         catch (OperationCanceledException) { throw; }
-        catch (Exception) { throw Fail(NativeChatFailureCode.SourceFailed, "Mistral source operation failed."); }
+        catch (Exception error)
+        {
+            throw new MistralTextException(NativeChatFailureCode.SourceFailed, "Mistral source operation failed.")
+            { IsRetryableTransportFailure = classifyTransport && PiSharp.AI.Protocols.ProviderShared.TransportRetryClassifier.IsTransientConnectionFailure(error) };
+        }
     }
     internal static void Limit(long value, long maximum) { if (value > maximum) throw Fail(NativeChatFailureCode.ResourceLimit, "Mistral data exceeds configured limits."); }
     internal static MistralTextException Fail(NativeChatFailureCode code, string message) => new(code, message);

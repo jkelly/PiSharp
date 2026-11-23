@@ -12,6 +12,7 @@ public static class BuiltinToolPrompts
     {
         ["read"] = "Read file contents",
         ["bash"] = "Execute bash commands (ls, grep, find, etc.)",
+        ["powershell"] = "Execute PowerShell commands",
         ["edit"] = "Make precise file edits with exact text replacement, including multiple disjoint edits in one call",
         ["write"] = "Create or overwrite files",
         ["grep"] = "Search file contents for patterns (respects .gitignore)",
@@ -19,11 +20,12 @@ public static class BuiltinToolPrompts
         ["ls"] = "List directory contents",
     }.ToImmutableDictionary(StringComparer.Ordinal);
 
-    /// <summary>Source promptGuidelines per tool name. Bash's guideline applies only while session variables are exposed.</summary>
+    /// <summary>Source promptGuidelines per tool name. Shell guidelines apply only while session variables are exposed.</summary>
     public static ImmutableDictionary<string, ImmutableArray<string>> Guidelines { get; } = new Dictionary<string, ImmutableArray<string>>
     {
         ["read"] = ["Use read to examine files instead of cat or sed."],
         ["bash"] = BashGuidelines(exposeSessionEnvironment: true),
+        ["powershell"] = PowerShellGuidelines(exposeSessionEnvironment: true),
         ["edit"] =
         [
             "Use edit for targeted changes. Batch changes to one file in a single call.",
@@ -38,6 +40,10 @@ public static class BuiltinToolPrompts
     /// <summary>Source createShellToolDefinition: <c>exposeSessionEnvironment &amp;&amp; config.promptGuidelines</c>.</summary>
     public static ImmutableArray<string> BashGuidelines(bool exposeSessionEnvironment) => exposeSessionEnvironment
         ? ["You can inspect PI_* environment variables for current model and session details."] : [];
+
+    /// <summary>PowerShell tool guidelines: same PI_* session environment guideline when exposed.</summary>
+    public static ImmutableArray<string> PowerShellGuidelines(bool exposeSessionEnvironment) =>
+        BashGuidelines(exposeSessionEnvironment);
 
     /// <summary>Source DEFAULT_TOOL_NAMES: tools enabled at startup when defaultTools does not change them.</summary>
     public static ImmutableArray<string> DefaultToolNames { get; } = ["read", "bash", "edit", "write"];

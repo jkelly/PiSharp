@@ -11,7 +11,8 @@ internal static class FdFindExecutorTests
 {
     public static (string Name, Func<Task> Run)[] Cases() =>
     [
-        ("fd exact basename and Windows full-path argv preserve repository ignore flags", Arguments),
+        ("fd exact basename and anchored path argv preserve repository ignore flags", Arguments),
+        ("fd anchors relative path patterns at search root and excludes ancestor or nested mismatches", AnchoringParity),
         ("fd explicit host admission bytes and unknown repository context refuse process launch", Admission),
         ("fd separated original pipe chunks preserve UTF8 and independent capture limits", SeparateCapture),
         ("fd exit stderr partial stdout and empty output follow bounded source handling", Exits),
@@ -29,13 +30,138 @@ internal static class FdFindExecutorTests
         Names(["--glob", "--color=never", "--hidden", "--no-require-git", "--max-results", "7", "--", "*.txt", fixture.Root], fixture.Runner.Last!.Arguments);
         fixture.Repository = FdRepositoryPresence.InsideGitRepository;
         await executor.FindAsync(Request(fixture, "src/**/*.cs", 4), default);
-        Names(["--glob", "--color=never", "--hidden", "--max-results", "4", "--full-path", "--", @"**[/\\]src[/\\]**[/\\]*.cs", fixture.Root], fixture.Runner.Last!.Arguments);
-        await executor.FindAsync(Request(fixture, "**/*.json", 3), default);
-        Check(fixture.Runner.Last!.Arguments[^2] == @"**[/\\]*.json", "Existing double-star prefix changed.");
+        if (OperatingSystem.IsWindows())
+        {
+            Names(["--color=never", "--hidden", "--", "", fixture.Root], fixture.Runner.Last!.Arguments);
+            Check(fixture.Runner.Last.StandardOutputLineFilter is not null && fixture.Runner.Last.StandardOutputMatchLimit == 4,
+                "Windows path pattern did not attach streaming stdout filter and match limit.");
+        }
+        else
+        {
+            Names(["--glob", "--color=never", "--hidden", "--max-results", "4", "--full-path", "--ignore-case", "--",
+                PiFindTool.EscapeGlob(fixture.Root.TrimEnd('/')) + "/src/**/*.cs", fixture.Root], fixture.Runner.Last!.Arguments);
+            Check(fixture.Runner.Last.StandardOutputLineFilter is null && fixture.Runner.Last.StandardOutputMatchLimit is null,
+                "Non-Windows path pattern unexpectedly attached Windows streaming filter.");
+        }
         await executor.FindAsync(Request(fixture, "[ab]?.{txt,md}", 3), default);
         Check(fixture.Runner.Last!.Arguments[^2] == "[ab]?.{txt,md}" && fixture.Runner.Last.TimeoutSeconds is null &&
+            fixture.Runner.Last.StandardOutputLineFilter is null && fixture.Runner.Last.StandardOutputMatchLimit is null &&
             fixture.Runner.Last.WorkingDirectory == fixture.Root && fixture.Runner.Last.Executable == fixture.Binary.Executable &&
             fixture.Runner.Last.Environment.Count == 0, "Pattern was approximated or ambient process configuration inferred.");
+    }
+    private static async Task AnchoringParity()
+    {
+        // POSIX argv: anchored relative to searchPath with glob escaping and smart case decided by user pattern
+        const string posixRoot = "/home/u/w*?[1]{x,y}/Upper/src/app";
+        Names(["--glob", "--color=never", "--hidden", "--max-results", "10", "--full-path", "--ignore-case", "--",
+            @"/home/u/w\*\?\[1\]\{x,y\}/Upper/src/app/src/*.ts", posixRoot],
+            FdFindExecutor.BuildArguments("src/*.ts", posixRoot, 10, FdRepositoryPresence.InsideGitRepository, windows: false));
+        Names(["--glob", "--color=never", "--hidden", "--max-results", "10", "--full-path", "--",
+            @"/home/u/w\*\?\[1\]\{x,y\}/Upper/src/app/src/B.ts", posixRoot],
+            FdFindExecutor.BuildArguments("src/B.ts", posixRoot, 10, FdRepositoryPresence.InsideGitRepository, windows: false));
+        Names(["--glob", "--color=never", "--hidden", "--no-require-git", "--max-results", "10", "--full-path", "--ignore-case", "--",
+            @"/home/u/w\*\?\[1\]\{x,y\}/Upper/src/app/**/src/*.ts", posixRoot],
+            FdFindExecutor.BuildArguments("././**/src/*.ts", posixRoot, 10, FdRepositoryPresence.OutsideGitRepository, windows: false));
+        Names(["--glob", "--color=never", "--hidden", "--max-results", "10", "--full-path", "--", "/abs/lib/*.ts", posixRoot],
+            FdFindExecutor.BuildArguments("/abs/lib/*.ts", posixRoot, 10, FdRepositoryPresence.InsideGitRepository, windows: false));
+        Names(["--glob", "--color=never", "--hidden", "--max-results", "10", "--", "*.ts", posixRoot],
+            FdFindExecutor.BuildArguments("./*.ts", posixRoot, 10, FdRepositoryPresence.InsideGitRepository, windows: false));
+
+        // Windows argv & ParseOutput filtering: src/*.ts matches only src/a.ts, never pkg/src/d.ts or ancestor folders
+        using var fixture = new Fixture();
+        var project = Path.Combine(fixture.Root, "src", "app");
+        Directory.CreateDirectory(Path.Combine(project, "src"));
+        Directory.CreateDirectory(Path.Combine(project, "pkg", "src"));
+        Directory.CreateDirectory(Path.Combine(project, "lib"));
+        var aTs = Path.Combine(project, "src", "a.ts");
+        var dTs = Path.Combine(project, "pkg", "src", "d.ts");
+        var bTs = Path.Combine(project, "lib", "b.ts");
+        await File.WriteAllTextAsync(aTs, "");
+        await File.WriteAllTextAsync(dTs, "");
+        await File.WriteAllTextAsync(bTs, "");
+        var listing = string.Join('\n', aTs, dTs, bTs) + "\n";
+
+        Names(["--color=never", "--hidden", "--no-require-git", "--", "", project],
+            FdFindExecutor.BuildArguments("src/*.ts", project, 10, FdRepositoryPresence.OutsideGitRepository, windows: true));
+
+        ImmutableArray<string> WinFilter(string pattern, int limit = 10) =>
+            FdFindExecutor.ParseOutput(listing, "", 0,
+                new FindExecutionRequest(pattern, project, limit, [], FindTool.MaximumResults, FindTool.MaximumResultPathCharacters),
+                windows: true);
+
+        Names([aTs], WinFilter("src/*.ts"));
+        Names([aTs], WinFilter("./src/*.ts"));
+        Names([aTs], WinFilter(@"src\*.ts"));
+        Names([], WinFilter("app/**/*.ts"));
+        Names([aTs, dTs], WinFilter("**/src/*.ts"));
+        Names([aTs], WinFilter("src/**"));
+        Names([aTs], WinFilter("**/src/*.ts", limit: 1));
+
+        // Streaming capture filters Windows path matches before the 1 MiB pipe cap so large workspaces do not truncate
+        var streamingFilter = FdFindExecutor.CreateWindowsPathFilter("src/*.ts", project, windows: true)!;
+        var original = Receipt("merged", "receipt", 0).Process;
+        using (var large = new SeparatedProcessCapture(1024, streamingFilter, matchLimit: 2))
+        {
+            var unrelated = Encoding.UTF8.GetBytes(Path.Combine(project, "pkg", "src", "unrelated-entry-padding-0123456789.ts") + "\r\n");
+            // Feed > 1 MiB of non-matching paths through a 1 KiB capture buffer in uneven chunks
+            for (var i = 0; i < 16_000; i++)
+                large.AppendAdmitted(false, unrelated);
+            Check(!large.ShouldStopProcess, "Non-matching paths triggered early stop.");
+            var match1 = Encoding.UTF8.GetBytes(aTs + "\r\n");
+            var bMatch = Path.Combine(project, "src", "ü.ts");
+            var match2 = Encoding.UTF8.GetBytes(bMatch + "\n" + Path.Combine(project, "src", "third.ts") + "\n");
+            // Split across CRLF and multi-byte UTF-8 boundaries
+            large.AppendAdmitted(false, match1.AsSpan(0, match1.Length - 1));
+            large.AppendAdmitted(false, match1.AsSpan(match1.Length - 1));
+            Check(!large.ShouldStopProcess, "Single match triggered early stop before limit=2.");
+            large.AppendAdmitted(false, match2.AsSpan(0, match2.IndexOf((byte)'\n') - 4));
+            large.AppendAdmitted(false, match2.AsSpan(match2.IndexOf((byte)'\n') - 4));
+            Check(large.ShouldStopProcess, "Reaching matchLimit did not signal early process stop.");
+            var captured = large.Result(original);
+            Check(!captured.StandardOutput.Truncated && !captured.StandardError.Truncated, "Filtered capture reported truncation despite tiny matched output.");
+            var parsed = FdFindExecutor.ParseOutput(captured.StandardOutput.Content, captured.StandardError.Content, 1,
+                new FindExecutionRequest("src/*.ts", project, 2, [], FindTool.MaximumResults, FindTool.MaximumResultPathCharacters),
+                windows: true);
+            Names([aTs, bMatch], parsed);
+        }
+        // Final line without a trailing newline is flushed when the process ends before matchLimit
+        using (var trailing = new SeparatedProcessCapture(1024, streamingFilter, matchLimit: 5))
+        {
+            trailing.AppendAdmitted(false, Encoding.UTF8.GetBytes(dTs + "\n" + aTs));
+            var captured = trailing.Result(original);
+            Check(!captured.StandardOutput.Truncated && captured.StandardOutput.Content == aTs + "\n",
+                "Trailing match without newline was dropped: " + captured.StandardOutput.Content);
+        }
+        // Nonzero exit with only non-matching stdout preserves partial-output empty result, while genuinely empty stdout still fails
+        using (var nonMatching = new SeparatedProcessCapture(1024, streamingFilter, matchLimit: 5))
+        {
+            nonMatching.AppendAdmitted(false, Encoding.UTF8.GetBytes(dTs + "\n" + bTs + "\n"));
+            var captured = nonMatching.Result(Receipt("", "partial warning", 1).Process);
+            Check(captured.StandardOutput.Content.Length == 0 && captured.StandardOutputFilteredNonEmpty,
+                "Filtered non-matching stdout did not record raw non-empty provenance.");
+            var parsed = FdFindExecutor.ParseOutput(captured.StandardOutput.Content, captured.StandardError.Content, 1,
+                new FindExecutionRequest("src/*.ts", project, 5, [], FindTool.MaximumResults, FindTool.MaximumResultPathCharacters),
+                windows: true, stdoutHadFilteredPaths: captured.StandardOutputFilteredNonEmpty);
+            Names([], parsed);
+        }
+        using (var trulyEmpty = new SeparatedProcessCapture(1024, streamingFilter, matchLimit: 5))
+        {
+            var captured = trulyEmpty.Result(Receipt("", "permission denied", 1).Process);
+            Check(!captured.StandardOutputFilteredNonEmpty, "Empty stdout falsely set filtered provenance.");
+            await Throws<IOException>(() =>
+            {
+                FdFindExecutor.ParseOutput(captured.StandardOutput.Content, captured.StandardError.Content, 1,
+                    new FindExecutionRequest("src/*.ts", project, 5, [], FindTool.MaximumResults, FindTool.MaximumResultPathCharacters),
+                    windows: true, stdoutHadFilteredPaths: captured.StandardOutputFilteredNonEmpty);
+                return Task.CompletedTask;
+            });
+        }
+
+        // FindTool declaration matches Pi 1.6.0's relative-pattern wording
+        var findTool = new FindTool(fixture.Root, fixture.Root, fixture.Executor());
+        var patternDesc = findTool.Declaration.Value.GetProperty("parameters").GetProperty("properties").GetProperty("pattern").GetProperty("description").GetString();
+        Check(patternDesc == "Glob pattern relative to the search directory, e.g. 'src/**/*.ts'. Without '/', e.g. '*.ts', it matches file names at any depth",
+            "FindTool pattern description differs: " + patternDesc);
     }
     private static async Task Admission()
     {

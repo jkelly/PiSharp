@@ -114,6 +114,9 @@ public sealed class CompletionsHttpSseTransport : IChatTransport
         private Exception? _preparationCleanupFailure;
         private bool _prepared;
         public CompletionsPublicFailure? PublicFailure { get; private set; }
+        public bool LastFailureNonTransport { get; private set; }
+        public bool RetryUnexpectedEof => !LastFailureNonTransport && !_receivedDone;
+        internal void MarkNonTransportFailure() => LastFailureNonTransport = true;
         private bool _receivedDone;
         private ReaderCleanupFault _readerCleanupFault;
         private CompletionsStartupHandoff? _startup;
@@ -138,17 +141,22 @@ public sealed class CompletionsHttpSseTransport : IChatTransport
             if (_prepared) throw new InvalidOperationException("Completions HTTP preparation runs once.");
             _prepared = true;
             _token.ThrowIfCancellationRequested(); cancellationToken.ThrowIfCancellationRequested();
-            _request = await owner._requestFactory(request, _token).ConfigureAwait(false) ?? throw Protocol();
+            try { _request = await owner._requestFactory(request, _token).ConfigureAwait(false) ?? throw Protocol(); }
+            catch { LastFailureNonTransport = true; throw; }
             _token.ThrowIfCancellationRequested();
             var accepted = await SendPreparedAsync().ConfigureAwait(false);
             if (_startup is not null)
             {
                 _response = new(accepted, owner._framing);
                 _input = new(await _response.AcquireBodyAsync(_token).ConfigureAwait(false), owner._framing.ReadBufferBytes,
-                    owner._options.OnInputPublished, _token, _startup.AwaitDeliveryAsync);
+                    GuardObserver(owner._options.OnInputPublished), _token, _startup.AwaitDeliveryAsync);
                 if (owner._options.Hooks?.OnResponse is not null)
-                    await _response.InspectAsync((response, token) => owner.ObserveResponseAsync(response, request.Model, token), _token)
-                        .ConfigureAwait(false);
+                    try
+                    {
+                        await _response.InspectAsync((response, token) => owner.ObserveResponseAsync(response, request.Model, token), _token)
+                            .ConfigureAwait(false);
+                    }
+                    catch { LastFailureNonTransport = true; throw; }
                 _token.ThrowIfCancellationRequested();
             }
             else
@@ -156,7 +164,8 @@ public sealed class CompletionsHttpSseTransport : IChatTransport
                 try
                 {
                     if (owner._options.Hooks?.OnResponse is not null)
-                        await owner.ObserveResponseAsync(accepted, request.Model, _token).ConfigureAwait(false);
+                        try { await owner.ObserveResponseAsync(accepted, request.Model, _token).ConfigureAwait(false); }
+                        catch { LastFailureNonTransport = true; throw; }
                     _token.ThrowIfCancellationRequested(); _response = new(accepted, owner._framing);
                 }
                 catch { DisposeRejected(accepted); throw; }
@@ -184,6 +193,8 @@ public sealed class CompletionsHttpSseTransport : IChatTransport
                     status = (int)response.StatusCode; failure = new HttpSseRejectedException(response.StatusCode);
                 }
                 catch (HttpRequestException error) { failure = error; status = error.StatusCode is { } code ? (int)code : null; }
+                catch (IOException error) when (TransportRetryClassifier.IsTransientConnectionFailure(error, _token.IsCancellationRequested)) { failure = error; status = null; }
+                catch (System.Net.Sockets.SocketException error) when (TransportRetryClassifier.IsTransientConnectionFailure(error, _token.IsCancellationRequested)) { failure = error; status = null; }
                 catch (OperationCanceledException error) when (!_token.IsCancellationRequested) { failure = error; status = null; }
                 catch { if (response is not null) DisposeRejected(response); throw; }
                 try
@@ -192,6 +203,7 @@ public sealed class CompletionsHttpSseTransport : IChatTransport
                     if (options is null || retryIndex >= options.MaxRetries || !CompletionsRetryPolicy.Retryable(options, status,
                         response is null ? null : CompletionsRetryPolicy.Header(response, "x-should-retry", owner._options.MaximumResponseHeaderCharacters)))
                     {
+                        if (status is >= 400 and < 500 and not 408 and not 429) LastFailureNonTransport = true;
                         if (response is not null) failure = await owner.StatusFailureAsync(response, failure, _token).ConfigureAwait(false);
                         throw failure;
                     }
@@ -202,13 +214,20 @@ public sealed class CompletionsHttpSseTransport : IChatTransport
                 // callbacks are outside this loop; no streamed result is ever replayed.
                 try { _request!.Dispose(); } catch (Exception error) { _preparationCleanupFailure ??= error; throw; }
                 _request = null;
-                options.OnRetry?.Invoke(new(retryIndex, status, delay));
+                try { options.OnRetry?.Invoke(new(retryIndex, status, delay)); }
+                catch { LastFailureNonTransport = true; throw; }
                 _token.ThrowIfCancellationRequested();
                 await Task.Delay(delay, options.TimeProvider, _token).ConfigureAwait(false);
                 _token.ThrowIfCancellationRequested();
                 _request = replay!.Create(); retryIndex++;
             }
         }
+
+        private static Action<T>? GuardObserver<T>(Action<T>? observer) => observer is null ? null : value =>
+        {
+            try { observer(value); }
+            catch (Exception error) { TransportRetryClassifier.MarkNonRetryable(error); throw; }
+        };
 
         private CancellationTokenSource? CreateRequestDeadline()
         {
@@ -229,16 +248,23 @@ public sealed class CompletionsHttpSseTransport : IChatTransport
             var body = _input ?? await _response!.AcquireBodyAsync(token).ConfigureAwait(false);
             if (owner._options.BodyResultReaderFactory is { } resultFactory)
             {
-                var executor = await resultFactory(body, token).ConfigureAwait(false);
+                ICompletionsResponseBodyResultReader executor;
+                try { executor = await resultFactory(body, token).ConfigureAwait(false); }
+                catch { LastFailureNonTransport = true; throw; }
                 _reader = CompletionsReaderStream.FromResultReader(executor ?? throw Protocol(), owner._framing.ReadBufferBytes,
-                    owner._options.MaximumConsecutiveEmptyBodyReads, owner._options.OnBodyRead, _startup, _input is not null);
+                    owner._options.MaximumConsecutiveEmptyBodyReads, GuardObserver(owner._options.OnBodyRead), _startup, _input is not null);
             }
             else
             {
-                var executor = owner._options.BodyReaderFactory is { } factory
-                    ? await factory(body, token).ConfigureAwait(false)
-                    : CompletionsResponseBodyReader.FromStream(body);
-                _reader = new(executor ?? throw Protocol(), owner._framing.ReadBufferBytes, owner._options.OnBodyRead, _startup, _input is not null);
+                ICompletionsResponseBodyReader executor;
+                if (owner._options.BodyReaderFactory is { } factory)
+                {
+                    try { executor = await factory(body, token).ConfigureAwait(false); }
+                    catch { LastFailureNonTransport = true; throw; }
+                }
+                else
+                    executor = CompletionsResponseBodyReader.FromStream(body);
+                _reader = new(executor ?? throw Protocol(), owner._framing.ReadBufferBytes, GuardObserver(owner._options.OnBodyRead), _startup, _input is not null);
             }
             token.ThrowIfCancellationRequested();
             return _reader;
@@ -428,14 +454,16 @@ public sealed class CompletionsHttpSseTransport : IChatTransport
                     ?? new CompletionsPublicFailureException(new("(no status code or body)"));
             }
             if (_options.Hooks?.OnProviderStreamEvent is { } observe)
-                await observe(chunk, model, cancellationToken).ConfigureAwait(false);
+                try { await observe(chunk, model, cancellationToken).ConfigureAwait(false); }
+                catch { invocation.MarkNonTransportFailure(); throw; }
             cancellationToken.ThrowIfCancellationRequested();
             if (_options.Hooks?.OnProviderStreamEventSnapshot is { } observeSnapshot)
             {
                 var snapshot = new CompletionsSourceSnapshot(JsonData.Parse("{\"value\":" + chunk.ToString() + ",\"ownUndefinedPaths\":[]}"),
                     _options.MaximumSourceValueCharacters, _options.MaximumSourceValueBytes);
                 cancellationToken.ThrowIfCancellationRequested();
-                await observeSnapshot(snapshot, model, cancellationToken).ConfigureAwait(false);
+                try { await observeSnapshot(snapshot, model, cancellationToken).ConfigureAwait(false); }
+                catch { invocation.MarkNonTransportFailure(); throw; }
                 cancellationToken.ThrowIfCancellationRequested();
             }
             yield return chunk;

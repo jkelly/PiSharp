@@ -381,8 +381,8 @@ internal static partial class GenerationPhases
             OnPayload = await ProviderPayloadAsync(runtime, context).ConfigureAwait(false),
             Telemetry = context.Telemetry,
         };
-        var message = await StreamResponseAsync(runtime, model, messages, request, attempt, context).ConfigureAwait(false);
-        await ClassifyAsync(runtime, new Request(attempt, compacted, reference, thinkingLevel, cutoff) { Messages = view.Messages }, message, context)
+        var (message, retryableTransportFailure) = await StreamResponseAsync(runtime, model, messages, request, attempt, context).ConfigureAwait(false);
+        await ClassifyAsync(runtime, new Request(attempt, compacted, reference, thinkingLevel, cutoff) { Messages = view.Messages }, message, context, retryableTransportFailure)
             .ConfigureAwait(false);
     }
 

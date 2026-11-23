@@ -17,6 +17,18 @@ public sealed partial class ExtensionRegistry
         }
     }
 
+    /// <summary>The owner's current command registrations (raw registered names) in registration order.</summary>
+    public ImmutableArray<string> CaptureOwnedCommandNames(RegistrationScope scope)
+    {
+        ArgumentNullException.ThrowIfNull(scope);
+        lock (gate)
+        {
+            EnsureScope(scope, "capture-owned-commands");
+            return [.. scope.Staged.Entries.Where(entry => entry.Kind == RegistrationKind.Command)
+                .Select(entry => entry.Name)];
+        }
+    }
+
     /// <summary>Stages an exact owned tool subset replacement. Preview has future entries and cannot
     /// dispatch until committed. No callbacks, publication or current registration changes occur here.</summary>
     public ToolCatalogReplacementPlan PrepareToolCatalogReplacement(RegistrationScope scope,

@@ -7,6 +7,14 @@ namespace PiSharp.Cli.Interactive.Mode;
 internal sealed record InteractiveStartup(string AgentDir, string Home, string Cwd, string? SessionDir, bool UsesDefaultSessionDir,
     PiResources Resources, bool ProjectTrusted, string SessionMode)
 {
+    private PiResources? currentResources;
+
+    /// <summary>The latest discovered resources (updated by <c>/reload</c>; starts as <see cref="Resources"/>).</summary>
+    public PiResources CurrentResources => Volatile.Read(ref currentResources) ?? Resources;
+
+    /// <summary>Publishes freshly discovered resources after <c>/reload</c>.</summary>
+    public void UpdateResources(PiResources updated) => Volatile.Write(ref currentResources, updated);
+
     /// <summary>The live host objects the RPC host publishes once its session exists (in-process access for features the RPC
     /// protocol does not carry: share, JSONL export, labels, bug reports, cache statistics).</summary>
     public InteractiveHostLink Host { get; } = new();

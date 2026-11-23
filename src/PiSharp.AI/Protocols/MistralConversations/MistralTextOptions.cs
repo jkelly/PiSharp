@@ -80,6 +80,7 @@ public sealed record MistralTextOptions(Uri BaseUrl, bool SupportsText, MistralT
 public sealed class MistralTextException(NativeChatFailureCode code, string message) : Exception(message)
 {
     public NativeChatFailureCode Code { get; } = code;
+    internal bool IsRetryableTransportFailure { get; init; }
 }
 public static class MistralNativeDiagnostics
 {

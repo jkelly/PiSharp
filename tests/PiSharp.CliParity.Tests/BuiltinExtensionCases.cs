@@ -126,9 +126,22 @@ internal static partial class Program
         Names(["read", "codemode"], await BuiltinTools(sandbox), "a project +builtin:<name> overrides the user setting");
         sandbox.Write(Path.Combine(sandbox.Cwd, ".pi", "settings.json"), """{"extensions":["!builtin:codemode"]}""");
         Names(["read"], await BuiltinTools(sandbox), "a project !builtin:<name>");
+        // A plain builtin:<name> listed alongside -builtin:<name> honors the disable override.
+        sandbox.Write(Path.Combine(sandbox.AgentDir, "settings.json"), """{"extensions":["builtin:codemode","-builtin:codemode"]}""");
+        File.Delete(Path.Combine(sandbox.Cwd, ".pi", "settings.json"));
+        Names(["read", "tool_search"], await BuiltinTools(sandbox), "plain builtin:<name> honors -builtin:<name> override");
+        // A builtin:* glob in extensions must not act as a file include pattern that disables local extension files.
+        var localExt = Path.Combine(sandbox.AgentDir, "custom-ext.js");
+        sandbox.Write(localExt, "export default function() {}");
+        sandbox.Write(Path.Combine(sandbox.AgentDir, "settings.json"), """{"extensions":["./custom-ext.js","builtin:*"]}""");
+        var packageManager = new PiSharp.Cli.Packages.PiPackageManager(sandbox.Cwd, sandbox.AgentDir, sandbox.Home,
+            PiSettings.Load(sandbox.Cwd, sandbox.AgentDir, true), name => sandbox.Vars.GetValueOrDefault(name));
+        var resolved = await packageManager.ResolveAsync();
+        var customEntry = resolved.Extensions.SingleOrDefault(item => PiSharp.Cli.Pi.PiPaths.PathsEqual(item.Path, localExt));
+        Check(customEntry is { Enabled: true }, "builtin:* glob disabled named local extension file.");
+        File.Delete(localExt);
         // An entry naming no built-in extension is not one (resolve() lists only the known names).
         sandbox.Write(Path.Combine(sandbox.AgentDir, "settings.json"), """{"extensions":["+builtin:nope"]}""");
-        File.Delete(Path.Combine(sandbox.Cwd, ".pi", "settings.json"));
         Names(["read", "codemode", "tool_search"], await BuiltinTools(sandbox), "+builtin:<unknown> in settings");
     }
 

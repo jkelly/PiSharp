@@ -27,6 +27,7 @@ internal static partial class Program
         ("native.llama-command-in-rpc-mode-notifies", NativeLlamaRpcNotify),
         ("native.classifier-provider-without-api-key-needs-a-credential", NativeProviderWithoutKey),
         ("native.classifier-and-image-callbacks-run-under-the-owner-callback-lease", NativeProviderCallbackLease),
+        ("native.replaces-builtin-codemode-tool-search-and-mcp-with-warnings", NativeReplacesBuiltins),
     ];
 
     // extensions/llama/index.ts: outside interactive mode the built-in /llama only warns through ctx.ui.notify (an RPC
@@ -387,6 +388,66 @@ internal static partial class Program
             log.Where(line => !line.StartsWith("shutdown quit", StringComparison.Ordinal)), "native lifecycle across the reload; records " +
             string.Join("\n", records.Select(item => item.ToJsonString()).Where(text => text.Contains("response", StringComparison.Ordinal) || text.Contains("error", StringComparison.Ordinal))));
     }
+
+    // Wave 4.4: a native C# extension registering codemode, tool_search or /mcp displaces the corresponding built-in extension with
+    // the exact same warning as a TypeScript extension, without Node.
+    private static async Task NativeReplacesBuiltins()
+    {
+        using var sandbox = NativeSandbox("native-replaces-builtins");
+        var manifest = NativeExtensionFolder(Path.Combine(sandbox.Root, "override-ext"), typeof(ParityNativeBuiltinOverrideExtension));
+        sandbox.Vars["PATH"] = Path.Combine(sandbox.Root, "empty-bin");
+        sandbox.Vars["PISHARP_NODE"] = Path.Combine(sandbox.Root, "no-node");
+
+        // 1. Running /mcp invokes the native C# extension command and prints all three built-in replacement warnings.
+        var (code, _, stderr) = await sandbox.Run([.. new[] { "-p" }, .. Model, "-e", manifest, "/mcp status"]);
+        Equal(0, code, "exit; " + stderr);
+        Equal(0, sandbox.Requests.Count, "/mcp was handled by native extension");
+        Check(NativeLog(sandbox).Contains("native-mcp status"), "native /mcp command did not run: " + string.Join("|", NativeLog(sandbox)));
+        foreach (var (builtin, registration) in new[] { ("codemode", "tool `codemode`"), ("tool-search", "tool `tool_search`"), ("mcp", "command `/mcp`") })
+            Check(stderr.Contains($"Extension package \"builtin:{builtin}\": Extension {manifest} registers {registration}, so built-in extension `{builtin}` was not loaded.", StringComparison.Ordinal),
+                $"missing replacement warning for {builtin}; stderr:\n{stderr}");
+
+        // 2. Calling codemode executes the native C# extension tool, not built-in Jint codemode.
+        sandbox.Respond = (_, index) => index == 0 ? AnthropicToolCall("codemode", new { script = "1+1" }) : AnthropicText("done");
+        (code, _, stderr) = await sandbox.Run([.. new[] { "-p" }, .. Model, "-e", manifest, "run codemode"]);
+        Equal(0, code, "codemode exit; " + stderr);
+        Check(sandbox.Requests[0].Json.GetProperty("tools").EnumerateArray().Count(tool => tool.GetProperty("name").GetString() == "codemode") == 1,
+            "native codemode declared once without built-in duplicate");
+        Equal("native-codemode: 1+1", ToolResultText(sandbox.Requests[1]), "native codemode tool executed");
+    }
+}
+
+/// <summary>Native C# extension overriding built-in codemode, tool_search and /mcp.</summary>
+public sealed class ParityNativeBuiltinOverrideExtension : IPiSharpExtension
+{
+    private static void Log(string line)
+    {
+        if (Environment.GetEnvironmentVariable("PISHARP_EXTENSION_PARITY_NATIVE_LOG") is { } path) File.AppendAllText(path, line + "\n");
+    }
+
+    public ValueTask InitializeAsync(IExtensionRegistry registry, CancellationToken cancellationToken)
+    {
+        registry.RegisterCommand(new("native-mcp", "mcp", "Native MCP replacement", (arguments, context, token) =>
+        {
+            Log("native-mcp " + (arguments.Value.ValueKind == JsonValueKind.String ? arguments.Value.GetString() : ""));
+            return ValueTask.CompletedTask;
+        }));
+        registry.RegisterTool(new("native-codemode", "codemode", "Custom native codemode",
+            JsonData.Parse("""{"type":"object","properties":{"script":{"type":"string"}}}"""),
+            (arguments, context, token) => ValueTask.FromResult(JsonData.Parse(JsonSerializer.Serialize(new
+            {
+                content = new[] { new { type = "text", text = "native-codemode: " + arguments.Value.GetProperty("script").GetString() } }, details = new { }
+            })))));
+        registry.RegisterTool(new("native-tool-search", "tool_search", "Custom native tool_search",
+            JsonData.Parse("""{"type":"object","properties":{"query":{"type":"string"}}}"""),
+            (arguments, context, token) => ValueTask.FromResult(JsonData.Parse(JsonSerializer.Serialize(new
+            {
+                content = new[] { new { type = "text", text = "native-tool-search" } }, details = new { }
+            })))));
+        return ValueTask.CompletedTask;
+    }
+
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 }
 
 /// <summary>The native C# extension the cases load (from a copy of this assembly in its own load context).</summary>
