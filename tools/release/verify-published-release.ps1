@@ -74,13 +74,10 @@ while ($true) {
     Start-Sleep -Seconds $PollIntervalSeconds
 }
 
-# 2. Download GitHub release assets
-$existingGh = @(Get-ChildItem -Path $ghDir -Filter "*.$Version.nupkg" -ErrorAction SilentlyContinue).Count
-if ($existingGh -lt $packages.Count) {
-    Write-Host "Downloading GitHub release assets for v$Version..."
-    gh release download "v$Version" --repo $Repo --dir $ghDir --pattern '*.nupkg' --clobber
-    if ($LASTEXITCODE -ne 0) { throw "gh release download failed with exit code $LASTEXITCODE" }
-}
+# 2. Download GitHub release assets (always refresh so reused -WorkDir never compares stale payloads)
+Write-Host "Downloading GitHub release assets for v$Version..."
+gh release download "v$Version" --repo $Repo --dir $ghDir --pattern '*.nupkg' --clobber
+if ($LASTEXITCODE -ne 0) { throw "gh release download failed with exit code $LASTEXITCODE" }
 
 if ([string]::IsNullOrWhiteSpace($PublishedAt)) {
     $relInfo = gh release view "v$Version" --repo $Repo --json publishedAt | ConvertFrom-Json
@@ -105,22 +102,22 @@ foreach ($pkg in $packages) {
     if (-not (Test-Path -LiteralPath $ghFile)) { throw "Missing GitHub asset: $ghFile" }
 
     $nugetFile = Join-Path $nugetDir "$id.$Version.nupkg"
-    if (-not (Test-Path -LiteralPath $nugetFile)) {
-        Invoke-WebRequest -Uri "https://api.nuget.org/v3-flatcontainer/$id/$Version/$id.$Version.nupkg" -OutFile $nugetFile -TimeoutSec 180
-    }
+    Invoke-WebRequest -Uri "https://api.nuget.org/v3-flatcontainer/$id/$Version/$id.$Version.nupkg" -OutFile $nugetFile -TimeoutSec 180
 
     $ghZip = [System.IO.Compression.ZipFile]::OpenRead($ghFile)
     $ngZip = [System.IO.Compression.ZipFile]::OpenRead($nugetFile)
     try {
-        $ghEntries = @{}
+        $ghEntries = [hashtable]::new([System.StringComparer]::Ordinal)
         foreach ($e in $ghZip.Entries) {
-            if ($e.FullName -eq '.signature.p7s') { continue }
+            if ($e.FullName -ceq '.signature.p7s') { continue }
+            if ($ghEntries.ContainsKey($e.FullName)) { throw "${pkg}: duplicate GitHub archive entry '$($e.FullName)'" }
             $s = $e.Open(); try { $ghEntries[$e.FullName] = Get-StreamSha256 $s } finally { $s.Dispose() }
         }
-        $ngEntries = @{}
+        $ngEntries = [hashtable]::new([System.StringComparer]::Ordinal)
         $hasSig = $false; $nuspecVersion = $null; $nuspecCommit = $null
         foreach ($e in $ngZip.Entries) {
-            if ($e.FullName -eq '.signature.p7s') { $hasSig = $true; continue }
+            if ($e.FullName -ceq '.signature.p7s') { $hasSig = $true; continue }
+            if ($ngEntries.ContainsKey($e.FullName)) { throw "${pkg}: duplicate NuGet archive entry '$($e.FullName)'" }
             $s = $e.Open()
             try {
                 if ($e.FullName.EndsWith('.nuspec', [System.StringComparison]::OrdinalIgnoreCase)) {
@@ -141,10 +138,10 @@ foreach ($pkg in $packages) {
         }
         if ($ghEntries.Count -ne $ngEntries.Count) { throw "${pkg}: entry count mismatch (GH=$($ghEntries.Count), NuGet=$($ngEntries.Count))" }
         foreach ($k in $ghEntries.Keys) {
-            if (-not $ngEntries.ContainsKey($k) -or $ghEntries[$k] -ne $ngEntries[$k]) { throw "${pkg}: payload mismatch on $k" }
+            if (-not $ngEntries.ContainsKey($k) -or $ghEntries[$k] -cne $ngEntries[$k]) { throw "${pkg}: payload mismatch on $k" }
         }
-        if ($nuspecVersion -ne $Version) { throw "${pkg}: nuspec version '$nuspecVersion' != '$Version'" }
-        if ($nuspecCommit -ne $ExpectedCommit) { throw "${pkg}: nuspec commit '$nuspecCommit' != '$ExpectedCommit'" }
+        if ($nuspecVersion -cne $Version) { throw "${pkg}: nuspec version '$nuspecVersion' != '$Version'" }
+        if ($nuspecCommit -cne $ExpectedCommit) { throw "${pkg}: nuspec commit '$nuspecCommit' != '$ExpectedCommit'" }
         if (-not $hasSig) { throw "${pkg}: NuGet package missing .signature.p7s" }
 
         $pkgResults += [ordered]@{
