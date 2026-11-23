@@ -13,7 +13,7 @@ on:
         required: true
         default: '1.6.0'
       skip_tests:
-        description: Skip the 22 release-list suites (dry runs only; core/Durable validation still runs)
+        description: Skip the 23 release-list suites (dry runs only; core/Durable validation still runs)
         type: boolean
         default: false
       include_standalone:
@@ -80,7 +80,7 @@ jobs:
           fi
           echo "version=$v" >> "$GITHUB_OUTPUT"
 
-      # 22 explicitly selected suites; core and Durable gates run at this exact SHA.
+      # 23 explicitly selected suites; core and Durable gates run at this exact SHA.
       - name: Verify historical model catalog evidence
         if: github.event_name == 'push' || !inputs.skip_tests
         run: node tools/ci/ensure-historical-ai-archive.mjs

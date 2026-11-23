@@ -85,12 +85,13 @@ The package list is written out in several places. A new library needs all of th
 
 ## Dry run
 
-Run the release workflow by hand from the Actions tab to build and check a version without publishing anything. Set `version` explicitly to the intended version; `1.6.0` is the latest published version. It takes two inputs:
+Run the release workflow by hand from the Actions tab to build and check a version without publishing anything. Set `version` explicitly to the intended version; `1.6.0` is the latest published version. It takes three inputs:
 
 | Input | Default | Effect |
 | --- | --- | --- |
 | `version` | `1.6.0` | The version to build and validate. |
-| `skip_tests` | `false` | Skip the 22 release-list suites in a dry run. Core and Durable validation still run. |
+| `skip_tests` | `false` | Skip the 23 release-list suites in a dry run. Core and Durable validation still run. |
+| `include_standalone` | `false` | Also build self-contained standalone archives (`win-x64`, `linux-x64`, `osx-arm64`) and Homebrew/Scoop/Winget manifests. |
 
 A dry run runs the build and the reusable validation gates. The publish and GitHub release jobs run only for a pushed tag.
 
@@ -118,16 +119,17 @@ git push origin v1.6.0
 | `gap-validation` / `gap-regressions.yml` | Registered gap/Chord/Env suites, exact case/skip ledgers, production Pi runtime installer and fresh-cache provenance. |
 | `native-env-validation` / `env-native.yml` | Native daemon publish, notices/integrity and real platform smoke/PTY checks. Windows verifies explicit PTY `ENOTSUP`. |
 
-The build/package validation is also required. The 29-package inventory and new-library consumer gate must pass against the intended candidate sources. A successful platform job covers its tested toolchain/ABI, not additional RIDs or older operating systems. Review actual logs and artifacts before marking the candidate ready.
+The build/package validation is also required. The package inventory (29 packages in published 1.6.0; 31 packages from 1.6.0.1 with `PiSharp.Extensions.AI` and `PiSharp.Templates`) and new-library consumer gate must pass against the intended candidate sources. A successful platform job covers its tested toolchain/ABI, not additional RIDs or older operating systems. Review actual logs and artifacts before marking the candidate ready.
 
 ### Build
 
 The build job runs on Ubuntu with the SDK from `global.json` and Node.js 22. It takes the version from the tag, without the `v`, and then:
 
-1. Runs the 22 offline release suites with `dotnet run`: the 19 suites the macOS workflow runs, plus `Durable`, `DurableCli` and `CustomAgents`. A tag push always runs them. See [Tests](/docs/contribute/testing/#release-suites).
+1. Runs the 23 offline release suites with `dotnet run`: the 20 suites the macOS workflow runs, plus `Durable`, `DurableCli` and `CustomAgents`. A tag push always runs them. See [Tests](/docs/contribute/testing/#release-suites).
 2. Runs `build-release-packages.ps1` with the version and the commit. See [Build the packages](#build-the-packages).
-3. Checks the CLI tool's durable payload: the durable and SQLite assemblies and their license files must be in the package, and the `e_sqlite3` native library for `win-x64`, `linux-x64`, `linux-musl-x64` and `osx-arm64` must match the SQLitePCLRaw package byte for byte.
-4. Uploads the packages and the validation reports as the `packages` artifact.
+3. Smoke-tests `PiSharp.Templates` via `tools/ci/test-templates.ps1` (installs the packed template package into an isolated hive, scaffolds, builds, and runs all three templates against the local packages).
+4. Checks the CLI tool's durable payload: the durable and SQLite assemblies and their license files must be in the package, the `e_sqlite3` native library for `win-x64`, `linux-x64`, `linux-musl-x64` and `osx-arm64` must match the SQLitePCLRaw package byte for byte, no native `.pdb` files may be present, and the archive must stay within the 80 MiB budget.
+5. Uploads the packages and the validation reports as the `packages` artifact.
 
 ### Publish
 
@@ -156,10 +158,11 @@ After the publish job succeeds, the release job creates the GitHub release for t
 
 It writes provenance files to `artifacts/release-inputs/`, recording the commit, version, Pi baseline and SDK. Then it packs:
 
-- The current 28-library admission list, with `tools/release/PiSharp.NativeSdk.targets`. The targets file sets the package id, version, description, license, readme and notices, embeds the provenance, and fails without a version, a commit, the provenance file or `net10.0`. Each package is checked by `Assert-PiSharpNativeSdkPackage`: its members, its dependencies (PiSharp siblings at exactly the release version, `[<version>]`, so a consumer can't mix packages from different releases, as Pi pins its own packages from 1.3.0; third-party packages at their pinned versions) and its assembly. The targets file is what makes `dotnet pack` write `[<version>]` for project references; NuGet would otherwise write the release version as a minimum.
+- The current 29-library admission list (28 libraries in published 1.6.0, plus `PiSharp.Extensions.AI` from 1.6.0.1), with `tools/release/PiSharp.NativeSdk.targets`. The targets file sets the package id, version, description, license, readme and notices, embeds the provenance, and fails without a version, a commit, the provenance file or `net10.0`. Each package is checked by `Assert-PiSharpNativeSdkPackage`: its members, its dependencies (PiSharp siblings at exactly the release version, `[<version>]`, so a consumer can't mix packages from different releases, as Pi pins its own packages from 1.3.0; third-party packages at their pinned versions or approved inclusive minimum ranges) and its assembly. The targets file is what makes `dotnet pack` write `[<version>]` for project references; NuGet would otherwise write the release version as a minimum.
 - The CLI, as the `PiSharp.Cli` tool with the command `pisharp`, with `tools/packaging/PiSharp.Distribution.targets`, checked by `tools/packaging/validate-distribution.ps1`.
+- The `PiSharp.Templates` `dotnet new` template package (`templates/PiSharp.Templates.csproj`), checked by `Assert-PiSharpTemplatesPackage`.
 
-The reports go to `artifacts/validation/`. From 1.5.0.1 the list contains 28 libraries and the CLI tool (29 packages). The script checks its exact library-list count. The earlier 1.5.0 release contained 24 packages; its release notes remain historical. Chord, Chord.Hosting, Durable.Store, Env.Protocol and Env additionally require the package-only external consumer gate documented in `docs/contracts/gap-package-admission.md`. The Env daemon is a separately verified native artifact, never a library package.
+The reports go to `artifacts/validation/`. From 1.6.0.1 the list contains 29 libraries, the CLI tool, and the template package (31 packages; 1.5.0.1 through 1.6.0 contained 29 packages, and earlier 1.5.0 contained 24 packages). The script checks its exact library-list count. Chord, Chord.Hosting, Durable.Store, Env.Protocol and Env additionally require the package-only external consumer gate documented in `docs/contracts/gap-package-admission.md`. The Env daemon is a separately verified native artifact, never a library package.
 
 ## After the release
 
