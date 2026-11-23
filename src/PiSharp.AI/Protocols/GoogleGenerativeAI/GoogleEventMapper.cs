@@ -216,8 +216,9 @@ internal sealed class GoogleEventMapper
         var message = aborted ? "Request was aborted" : error is GoogleGenerativeAIException known ? known.Message :
             error is JsonException ? "Invalid Google streamed JSON." : "Google provider operation failed.";
         var extra = _extra.Set("errorMessage", JsonData.Parse(JsonSerializer.Serialize(message)));
+        var retryable = !aborted && (FailureKind == GoogleFailure.UnexpectedEof || TransportRetryClassifier.IsTransientConnectionFailure(error));
         return new(reason, Message(reason) with { ExtraProperties = extra })
-        { NativeDiagnostic = GoogleNativeDiagnostics.FromException(error, aborted) };
+        { NativeDiagnostic = GoogleNativeDiagnostics.FromException(error, aborted), IsRetryableTransportFailure = retryable };
     }
 }
 

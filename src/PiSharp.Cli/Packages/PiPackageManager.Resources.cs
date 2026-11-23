@@ -128,6 +128,12 @@ internal sealed partial class PiPackageManager
         if (entries.Count == 0) return;
         var plain = entries.Where(entry => !IsPattern(entry)).ToList();
         var patterns = entries.Where(IsPattern).ToList();
+        if (resourceType == "extensions")
+        {
+            foreach (var builtin in plain.Where(entry => entry.StartsWith(BuiltinPathPrefix, StringComparison.Ordinal)))
+                AddResource(target, builtin, new() { Source = "builtin", Scope = metadata.Scope, Origin = "top-level" }, true);
+            plain = plain.Where(entry => !entry.StartsWith(BuiltinPathPrefix, StringComparison.Ordinal)).ToList();
+        }
         var allFiles = CollectFilesFromPaths([.. plain.Select(entry => ResolvePathFromBase(entry, baseDir))], resourceType);
         var enabled = ApplyPatterns(allFiles, patterns, baseDir);
         foreach (var file in allFiles) AddResource(target, file, metadata, enabled.Contains(file));

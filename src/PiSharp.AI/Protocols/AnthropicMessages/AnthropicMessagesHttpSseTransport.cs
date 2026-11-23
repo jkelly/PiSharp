@@ -305,7 +305,9 @@ public sealed class AnthropicMessagesHttpSseTransport : IChatTransport
                     PrimaryError is ProviderDisplayException shown ? shown.Message : "Anthropic stream did not complete."))
                 .Set("anthropicFailure",JsonData.Parse(JsonSerializer.Serialize(failure.ToString())));
             var message = partial ?? new(request.Model.Api,request.Model.Provider,request.Model.Id,request.Timestamp,[],TokenUsage.Zero,reason);
-            return new StreamError(reason,message with {StopReason=reason,ExtraProperties=properties});
+            var retryable = reason == StopReason.Error &&
+                (failure == AnthropicMessagesFailure.UnexpectedEof || TransportRetryClassifier.IsTransientConnectionFailure(PrimaryError));
+            return new StreamError(reason,message with {StopReason=reason,ExtraProperties=properties}) { IsRetryableTransportFailure = retryable };
         }
     }
 

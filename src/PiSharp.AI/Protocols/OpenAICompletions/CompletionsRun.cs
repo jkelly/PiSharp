@@ -162,7 +162,8 @@ public sealed class CompletionsRun : IAsyncDisposable
             _semanticTerminal = new StreamError(native.StopReason, native with { ExtraProperties = (native.ExtraProperties ?? JsonFields.Empty)
                 .Set("errorMessage", JsonData.Parse(aborted ? "\"Completions stream was cancelled.\"" : "\"Completions stream did not complete.\"")) })
             { NativeDiagnostic = OpenAICompletionsWireSource.Diagnostic(aborted ? OpenAICompletionsWireFailure.Cancelled :
-                error is StreamLimitException ? OpenAICompletionsWireFailure.ResourceLimit : OpenAICompletionsWireFailure.SourceFailed) };
+                error is StreamLimitException ? OpenAICompletionsWireFailure.ResourceLimit : OpenAICompletionsWireFailure.SourceFailed),
+              IsRetryableTransportFailure = !aborted && PiSharp.AI.Protocols.ProviderShared.TransportRetryClassifier.IsTransientConnectionFailure(error) };
             var captured = PublishMessage(_semanticTerminal);
             var source = SourceFrame(_semanticTerminal, captured);
             _semanticTerminal = ObserveTerminal(_semanticTerminal, source);
@@ -211,7 +212,8 @@ public sealed class CompletionsRun : IAsyncDisposable
             terminal.Reason == StopReason.Aborted ? "Completions stream was cancelled." : "Completions stream did not complete.")
             { NativeDiagnostic = terminal.NativeDiagnostic } : null;
         _semanticTerminal = terminal; _canonical.TrySetResult(new(terminal.Message, chatFailure)
-        { NativeDiagnostic = terminal.NativeDiagnostic, NativeCleanupDiagnostic = terminal.NativeCleanupDiagnostic });
+        { NativeDiagnostic = terminal.NativeDiagnostic, NativeCleanupDiagnostic = terminal.NativeCleanupDiagnostic,
+          IsRetryableTransportFailure = terminal.IsRetryableTransportFailure });
     }
 
     private StreamTerminalEvent ProjectAdmittedCanonicalFailure(StreamTerminalEvent terminal)

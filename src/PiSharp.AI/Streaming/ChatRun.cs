@@ -160,6 +160,7 @@ public sealed class ChatRun : IAsyncDisposable
         NativeChatDiagnostic? googleCleanupDiagnostic = null;
         var googleConsumerFailed = false;
         ChatFailure? failure = null;
+        var retryableTransportFailure = false;
         try
         {
             _cancellation.Token.ThrowIfCancellationRequested();
@@ -262,16 +263,21 @@ public sealed class ChatRun : IAsyncDisposable
             { NativeDiagnostic = PiMessagesData.Diagnostic(exception) }; }
         catch (Exception exception) when (_googleDiagnostics)
         { failure = new(ChatFailureKind.Provider, "Google provider operation failed.")
-            { NativeDiagnostic = GoogleNativeDiagnostics.FromException(exception) }; }
+            { NativeDiagnostic = GoogleNativeDiagnostics.FromException(exception) };
+          retryableTransportFailure = PiSharp.AI.Protocols.ProviderShared.TransportRetryClassifier.IsTransientConnectionFailure(exception, _cancellation.IsCancellationRequested); }
         catch (Exception exception) when (_mistralDiagnostics)
         { failure = new(ChatFailureKind.Provider, "Mistral provider operation failed.")
-            { NativeDiagnostic = MistralNativeDiagnostics.FromException(exception) }; }
-        catch (Exception)
+            { NativeDiagnostic = MistralNativeDiagnostics.FromException(exception) };
+          retryableTransportFailure = PiSharp.AI.Protocols.ProviderShared.TransportRetryClassifier.IsTransientConnectionFailure(exception, _cancellation.IsCancellationRequested); }
+        catch (Exception exception)
         { failure = new(ChatFailureKind.Provider, "Provider transport failed.")
-            { NativeDiagnostic = ProtocolDiagnostic(NativeChatFailureCode.SourceFailed) }; }
+            { NativeDiagnostic = ProtocolDiagnostic(NativeChatFailureCode.SourceFailed) };
+          retryableTransportFailure = PiSharp.AI.Protocols.ProviderShared.TransportRetryClassifier.IsTransientConnectionFailure(exception, _cancellation.IsCancellationRequested); }
         finally
         {
             terminal ??= reducer.Failure(failure ?? new(ChatFailureKind.Provider, "Provider stream failed."));
+            if (retryableTransportFailure && terminal is StreamError { Reason: StopReason.Error } && !terminal.IsRetryableTransportFailure)
+                terminal = terminal with { IsRetryableTransportFailure = true };
             if (failure?.Kind == ChatFailureKind.Cancelled && terminal.Reason == StopReason.Aborted)
             {
                 var primary = terminal.NativeDiagnostic ?? abortedDiagnostic;
@@ -329,7 +335,11 @@ public sealed class ChatRun : IAsyncDisposable
             ObserveResult(terminal.Message);
             _terminal.TrySetResult(terminal);
             _completion.TrySetResult(new(terminal.Message, failure)
-            { NativeDiagnostic = terminal.NativeDiagnostic, NativeCleanupDiagnostic = terminal.NativeCleanupDiagnostic });
+            {
+                NativeDiagnostic = terminal.NativeDiagnostic,
+                NativeCleanupDiagnostic = terminal.NativeCleanupDiagnostic,
+                IsRetryableTransportFailure = terminal.IsRetryableTransportFailure,
+            });
             _progress.Writer.TryComplete();
         }
     }

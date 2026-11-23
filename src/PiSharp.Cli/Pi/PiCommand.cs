@@ -224,6 +224,8 @@ internal static class PiCommand
             {
                 var listTrusted = parsed.ProjectTrustOverride ?? new ProjectTrustStore(agentDir, home).Get(cwd) ?? !ProjectTrustStore.HasTrustRequiringProjectResources(cwd, home);
                 listRun = await PiExtensionRun.LoadAsync(host, parsed, cwd, agentDir, home, listTrusted, "print", false, null, token, packageRun).ConfigureAwait(false);
+                if (listRun.Host is { NativeExtensions.IsEmpty: false })
+                    await listRun.PreSessionAsync(token).ConfigureAwait(false);
                 PiSharp.Cli.Packages.PiResolvedPaths listPackages;
                 try
                 {
@@ -232,7 +234,7 @@ internal static class PiCommand
                 }
                 catch (PiSharp.Cli.Packages.PiPackageException) { listPackages = PiSharp.Cli.Packages.PiResolvedPaths.Empty; }
                 var listBuiltins = new PiBuiltinExtensions(PiBuiltinExtensions.Resolve(parsed.Extensions, listPackages, parsed.NoExtensions,
-                    parsed.NoMcp ? [PiBuiltinExtensions.Mcp] : [], listRun.Host?.Extensions ?? []).Enabled);
+                    parsed.NoMcp ? [PiBuiltinExtensions.Mcp] : [], listRun.Host?.Extensions ?? [], listRun.Host?.NativeExtensions).Enabled);
                 listRuntime = listRuntime with { LlamaProvider = () => listBuiltins.IsEnabled(PiBuiltinExtensions.Llama) };
                 if (listRun.Host is { } listHost)
                 {
@@ -337,7 +339,8 @@ internal static class PiCommand
         // resource-loader.ts: the builtin: extension paths of -e and resolve() (main.ts disabledBuiltinExtensions: --no-mcp leaves mcp
         // out), less the replaceable ones another loaded extension takes over from.
         string[] disabledBuiltins = parsed.NoMcp ? [PiBuiltinExtensions.Mcp] : [];
-        var builtinResolution = PiBuiltinExtensions.Resolve(parsed.Extensions, packageResources, parsed.NoExtensions, disabledBuiltins, extensionRun?.Host?.Extensions ?? []);
+        var builtinResolution = PiBuiltinExtensions.Resolve(parsed.Extensions, packageResources, parsed.NoExtensions, disabledBuiltins,
+            extensionRun?.Host?.Extensions ?? [], extensionRun?.Host?.NativeExtensions);
         var builtins = new PiBuiltinExtensions(builtinResolution.Enabled);
         builtins.SetScopes(packageResources);
         runtimeDiagnostics.AddRange([.. builtinResolution.Errors, .. builtinResolution.Warnings]);
@@ -383,9 +386,16 @@ internal static class PiCommand
         // resource-loader.ts reload(): the same discovery for /reload and ctx.reload(), with resources_discover reason "reload".
         async Task<PiReloadedResources> ReloadResources(PiSharp.Cli.Extensions.NativeExtensionActivation? activation, CancellationToken reloadToken)
         {
+            var reloadExtensionDiagnostics = new List<PiSharp.Cli.Interactive.Mode.ResourceDiagnostic>();
             var reloadSettings = PiSettings.Load(sessionCwd, agentDir, projectTrusted);
+            foreach (var diagnostic in reloadSettings.DrainDiagnostics())
+                reloadExtensionDiagnostics.Add(new(diagnostic.Type, diagnostic.Message));
             var reloadDiscovered = activation is null ? PiDiscoveredResources.Empty : await PiExtensionEvents.ResourcesDiscoverAsync(activation.Registry,
-                activation.Registry.CaptureSnapshot(), sessionCwd, "reload", (_, _) => ValueTask.CompletedTask, reloadToken).ConfigureAwait(false);
+                activation.Registry.CaptureSnapshot(), sessionCwd, "reload", (path, message) =>
+                {
+                    reloadExtensionDiagnostics.Add(new("error", $"Extension error ({path}): {message}", path));
+                    return ValueTask.CompletedTask;
+                }, reloadToken).ConfigureAwait(false);
             PiSharp.Cli.Packages.PiResolvedPaths reloadPackages;
             try
             {
@@ -393,12 +403,24 @@ internal static class PiCommand
                 // and goes to stderr in the other modes, as at startup.
                 reloadPackages = await packageRun.CreateManager(host, sessionCwd, agentDir, home, reloadSettings, err, err, PiBuiltinExtensions.Names)
                     .ResolveAsync(cancellationToken: reloadToken).ConfigureAwait(false);
+                foreach (var failure in reloadPackages.InstallFailures)
+                    reloadExtensionDiagnostics.Add(new("warning", PiExtensionRun.DescribePackageInstallFailure(failure), failure.Source));
             }
-            catch (PiSharp.Cli.Packages.PiPackageException) { reloadPackages = packageResources; }
-            // The reload resolves the built-in extensions again over the reloaded settings and extensions.
-            builtins.Set(PiBuiltinExtensions.Resolve(parsed.Extensions, reloadPackages, parsed.NoExtensions, disabledBuiltins,
-                activation?.Pi?.Extensions ?? extensionRun?.Host?.Extensions ?? []).Enabled);
+            catch (PiSharp.Cli.Packages.PiPackageException error)
+            {
+                reloadExtensionDiagnostics.Add(new("error", error.Message));
+                reloadPackages = packageResources;
+            }
+            // The reload resolves the built-in extensions again over the reloaded settings and extensions (TypeScript and native C#).
+            var reloadBuiltinResolution = PiBuiltinExtensions.Resolve(parsed.Extensions, reloadPackages, parsed.NoExtensions, disabledBuiltins,
+                activation?.Pi?.Extensions ?? extensionRun?.Host?.Extensions ?? [],
+                activation?.Pi?.NativeExtensions ?? extensionRun?.Host?.NativeExtensions);
+            builtins.Set(reloadBuiltinResolution.Enabled);
             builtins.SetScopes(reloadPackages);
+            foreach (var diagnostic in reloadBuiltinResolution.Errors)
+                reloadExtensionDiagnostics.Add(new("error", diagnostic.Message));
+            foreach (var diagnostic in reloadBuiltinResolution.Warnings)
+                reloadExtensionDiagnostics.Add(new("warning", diagnostic.Message));
             var reloadSources = await ExtensionSourcesAsync(reloadSettings, err, err, reloadToken).ConfigureAwait(false) ?? extensionSources;
             var reloaded = PiResources.WithDiscovered(PiResources.Discover(new(sessionCwd, agentDir, home, reloadSettings, projectTrusted)
             {
@@ -415,8 +437,25 @@ internal static class PiCommand
             var reloadPrompts = new PromptTemplateCliConfiguration([.. reloaded.PromptPaths.Select(path => new PromptTemplatePathSelection(path.Path,
                 new(path.Path, path.Source, path.Scope switch { "user" => PromptTemplateSourceScope.User, "project" => PromptTemplateSourceScope.Project, _ => PromptTemplateSourceScope.Temporary },
                     PromptTemplateSourceOrigin.TopLevel), ReportMissingPath: path.ReportMissing))]);
+            var skillDiagnostics = (reloadSkills?.Resources.Diagnostics ?? [])
+                .Select(diagnostic => diagnostic.Type == "collision" && diagnostic.Name is not null
+                    ? new PiSharp.Cli.Interactive.Mode.ResourceDiagnostic("collision", $"name \"{diagnostic.Name}\" collision", diagnostic.Path, diagnostic.Name, diagnostic.WinnerPath, diagnostic.Path)
+                    : new PiSharp.Cli.Interactive.Mode.ResourceDiagnostic(diagnostic.Type, diagnostic.Code, diagnostic.Path))
+                .ToArray();
+            var themeDiagnostics = reloaded.ThemeDiagnostics
+                .Select(diagnostic => new PiSharp.Cli.Interactive.Mode.ResourceDiagnostic(diagnostic.Type, diagnostic.Message, diagnostic.Path, diagnostic.CollisionName, diagnostic.WinnerPath, diagnostic.LoserPath))
+                .ToArray();
+            foreach (var diagnostic in reloaded.Diagnostics.Where(item =>
+                !item.Message.Contains("collision", StringComparison.Ordinal) &&
+                !item.Message.StartsWith("Theme file", StringComparison.Ordinal) &&
+                !item.Message.StartsWith("Failed to load theme", StringComparison.Ordinal)))
+            {
+                var message = diagnostic.Message.StartsWith("Warning: ", StringComparison.Ordinal) ? diagnostic.Message["Warning: ".Length..] : diagnostic.Message;
+                reloadExtensionDiagnostics.Add(new(diagnostic.Type == "error" ? "error" : "warning", message));
+            }
+            var reloadDiagnostics = new PiSharp.Cli.Interactive.Mode.ResourceDiagnostics(skillDiagnostics, [], reloadExtensionDiagnostics, themeDiagnostics);
             return new(PiSystemPrompt.Admission(reloaded, reloadSkills?.Resources, host.ApplicationDirectory ?? (host.GetEnvironment("PI_PACKAGE_DIR") is { Length: > 0 } reloadPackageDir ? PiPaths.NormalizePath(reloadPackageDir, home) : null)),
-                reloadSkills, reloadPrompts);
+                reloadSkills, reloadPrompts, reloaded, reloadDiagnostics);
         }
 
         // Model (source buildSessionOptions), then the --api-key runtime override for its provider.

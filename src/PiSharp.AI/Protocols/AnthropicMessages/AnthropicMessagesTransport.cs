@@ -80,7 +80,12 @@ public sealed partial class AnthropicMessagesTransport : IChatTransport
         var state = new State(request, _options, RequestDiagnostics);
         IAsyncEnumerator<JsonData>? enumerator = null; AnthropicMessagesFailure? failure = null;
         try { enumerator = (_source(request, cancellationToken) ?? throw Protocol()).GetAsyncEnumerator(cancellationToken); }
-        catch (Exception) { failure = cancellationToken.IsCancellationRequested ? AnthropicMessagesFailure.Cancelled : AnthropicMessagesFailure.SourceFailed; }
+        catch (Exception error)
+        {
+            failure = cancellationToken.IsCancellationRequested ? AnthropicMessagesFailure.Cancelled : AnthropicMessagesFailure.SourceFailed;
+            if (failure == AnthropicMessagesFailure.SourceFailed && TransportRetryClassifier.IsTransientConnectionFailure(error))
+                state.RetryableTransportFailure = true;
+        }
         if (enumerator is null) { yield return state.Finish(failure ?? AnthropicMessagesFailure.SourceFailed); yield break; }
         try
         {
@@ -125,7 +130,12 @@ public sealed partial class AnthropicMessagesTransport : IChatTransport
     private static AnthropicMessagesFailure SourceFailure(State state, Exception error, CancellationToken token)
     {
         if (token.IsCancellationRequested) return AnthropicMessagesFailure.Cancelled;
-        if (error is not ProviderDisplayException shown) return AnthropicMessagesFailure.SourceFailed;
+        if (error is not ProviderDisplayException shown)
+        {
+            if (TransportRetryClassifier.IsTransientConnectionFailure(error))
+                state.RetryableTransportFailure = true;
+            return AnthropicMessagesFailure.SourceFailed;
+        }
         state.SourceMessage ??= shown.Message;
         return shown.InStream ? AnthropicMessagesFailure.ProviderError : AnthropicMessagesFailure.SourceFailed;
     }
@@ -173,6 +183,7 @@ public sealed partial class AnthropicMessagesTransport : IChatTransport
         private StopReason _reason = StopReason.Pending;
         private string? _stopErrorMessage;
         internal string? SourceMessage;
+        internal bool RetryableTransportFailure;
         public StreamStarted Start { get; }
         public State(ChatRequest request, AnthropicMessagesOptions options, AnthropicRequestDiagnostics? requestDiagnostics = null)
         {
@@ -417,7 +428,9 @@ public sealed partial class AnthropicMessagesTransport : IChatTransport
                     ? _stopErrorMessage : "Anthropic stream did not complete."))
                 .Set("anthropicFailure", TextData(failure.Value.ToString()));
             var final = snapshot with { Content = content.ToImmutable(), Usage = _usage, StopReason = reason, ExtraProperties = properties };
-            StreamTerminalEvent terminal = failure is null ? new StreamDone(reason, final) : new StreamError(reason, final);
+            StreamTerminalEvent terminal = failure is null
+                ? new StreamDone(reason, final)
+                : new StreamError(reason, final) { IsRetryableTransportFailure = reason == StopReason.Error && (RetryableTransportFailure || failure == AnthropicMessagesFailure.UnexpectedEof) };
             _reducer.Apply(terminal); return (StreamTerminalEvent)CaptureEmission(terminal);
         }
         private static readonly JsonElement NoUsage = JsonDocument.Parse("{}").RootElement.Clone();

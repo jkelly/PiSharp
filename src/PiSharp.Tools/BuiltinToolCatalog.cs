@@ -25,7 +25,8 @@ public sealed class BuiltinToolCatalog
     public BuiltinToolCatalog(string workingDirectory, string homeDirectory, IDirectoryFileOperations? operations = null,
         ReadWriteToolOptions? readWriteOptions = null, EditToolOptions? editOptions = null,
         BashTool? bash = null, IFindExecutor? find = null, IGrepExecutor? grep = null, IFileAccessProbe? editAccessProbe = null,
-        IGrepContextReader? grepContextReader = null, PiGrepTool? piGrep = null, PiFindTool? piFind = null, bool pi = false)
+        IGrepContextReader? grepContextReader = null, PiGrepTool? piGrep = null, PiFindTool? piFind = null, bool pi = false,
+        PowerShellTool? powerShell = null)
     {
         var files = operations ?? new LocalFileOperations();
         _workingDirectory = workingDirectory; _homeDirectory = homeDirectory; _files = files;
@@ -42,6 +43,7 @@ public sealed class BuiltinToolCatalog
         var tools = ImmutableArray.CreateBuilder<BuiltinToolRegistration>();
         tools.Add(new(readWrite.Declarations[0], readWrite.Adapters[0]));
         if (bash is not null) tools.Add(new(bash.Declaration, bash));
+        if (powerShell is not null) tools.Add(new(powerShell.Declaration, powerShell));
         tools.Add(new(edit.Declaration, edit));
         tools.Add(new(readWrite.Declarations[1], readWrite.Adapters[1]));
         if (piGrep is not null) tools.Add(new(piGrep.Declaration, piGrep));

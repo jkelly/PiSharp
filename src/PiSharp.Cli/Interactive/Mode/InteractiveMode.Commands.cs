@@ -484,7 +484,7 @@ internal sealed partial class InteractiveMode
             keybindings.Reload();
             ConfigureExtensionEditor();
             if ((customHeader ?? builtInHeader) is IExpandable header) header.SetExpanded(toolOutputExpanded);
-            Themes.SetRegisteredThemes(context.Startup.Resources.Themes.Select(registered => (registered.Name, registered.Path)));
+            Themes.SetRegisteredThemes(context.Startup.CurrentResources.Themes.Select(registered => (registered.Name, registered.Path)));
             ApplyRuntimeSettings();
             themeController.ApplyFromSettings();
             SetupAutocompleteProvider();

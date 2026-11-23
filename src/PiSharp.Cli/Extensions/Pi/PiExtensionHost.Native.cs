@@ -55,7 +55,16 @@ internal sealed partial class PiExtensionHost
     /// <summary>Activates one native extension in the registry with a fresh instance; a failure is reported as the extension's error.</summary>
     private async Task<RegistrationScope?> ActivateNativeAsync(ExtensionRegistry registry, PiNativeExtension native, CancellationToken token)
     {
-        try { return await registry.ActivateAsync(native.OwnerId, native.CreateInstance(), token).ConfigureAwait(false); }
+        try
+        {
+            var scope = await registry.ActivateAsync(native.OwnerId, native.CreateInstance(), token).ConfigureAwait(false);
+            native.RegisteredNames =
+            [
+                .. registry.CaptureOwnedTools(scope).Select(tool => "tool:" + tool.Descriptor.Name),
+                .. registry.CaptureOwnedCommandNames(scope).Select(name => "command:" + name)
+            ];
+            return scope;
+        }
         catch (Exception error) when (error is ExtensionRegistrationException or InvalidOperationException or System.Reflection.TargetInvocationException or MissingMethodException)
         {
             var message = error is ExtensionRegistrationException { InnerException: { } inner } ? inner.Message : error.InnerException?.Message ?? error.Message;

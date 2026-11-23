@@ -45,6 +45,36 @@ internal sealed partial class OfflineSessionProfile
         catch (ArgumentException) { return (null, null, null, null); }
     }
 
+    /// <summary>The PowerShell tool of the <c>pi</c> tool policy: discovers <c>pwsh</c> (PowerShell 7) then Windows PowerShell 5.1,
+    /// sharing the process-cleanup runner and environment with <see cref="PiBash"/>. Off by default; selectable via <c>--tools +powershell</c>.</summary>
+    private static (PowerShellTool? PowerShell, OwnedProcessCleanup? Cleanup, string? Shell) PiPowerShell(
+        PiSharp.Cli.Pi.PiToolPolicy policy, BuiltinToolSettings settings, string workspace,
+        OwnedProcessCleanup? existingCleanup, Func<BashSessionEnvironment?> session)
+    {
+        if (!OperatingSystem.IsWindows() && !OperatingSystem.IsLinux() && !OperatingSystem.IsMacOS()) return (null, existingCleanup, null);
+        ShellConfiguration shell; string? shellError = null;
+        try { shell = PowerShellDiscovery.Resolve(); }
+        catch (ShellDiscoveryException error)
+        {
+            if (!OperatingSystem.IsWindows()) return (null, existingCleanup, null);
+            shell = PowerShellDiscovery.ForPowerShell("powershell.exe");
+            shellError = error.Message;
+        }
+        var spill = Path.TrimEndingDirectorySeparator(Path.GetFullPath(Path.GetTempPath()));
+        var environment = ShellDiscovery.ShellEnvironment(policy.Environment ?? ProcessEnvironment(), ShellDiscovery.BinDirectory(), OperatingSystem.IsWindows());
+        var unboundedOutput = new ProcessRunnerOptions(MaximumRawBytes: int.MaxValue);
+        var cleanup = existingCleanup ?? new OwnedProcessCleanup(OperatingSystem.IsWindows() ? new NativeProcessRunner(unboundedOutput)
+            : new PiSharp.Tools.Processes.Unix.UnixProcessRunner(new PiSharp.Tools.Processes.Unix.PosixSpawnProcessAdmission(), unboundedOutput));
+        try
+        {
+            var options = shellError is null ? BashToolOptions.FromShell(shell, workspace, environment, spill)
+                : BashToolOptions.Unavailable(shellError, shell.Shell, workspace, environment, spill);
+            var tool = new PowerShellTool(cleanup, options with { CommandPrefix = settings.ShellCommandPrefix, SessionEnvironment = session });
+            return (tool, cleanup, shell.Shell);
+        }
+        catch (ArgumentException) { return (null, existingCleanup, null); }
+    }
+
     /// <summary>Source createLocalShellOperations exec when getShellConfig throws ("Custom shell path not found", "No bash shell found"):
     /// the command fails with that message before anything runs.</summary>
     private sealed class UnavailableShellOperations(string message) : IShellOperations

@@ -405,7 +405,8 @@ public sealed class NativeDurableModels : IDurableModels, IDisposable
     private static StreamError TimedOut(StreamTerminalEvent terminal)
     {
         var properties = (terminal.Message.ExtraProperties ?? JsonFields.Empty).Set("errorMessage", JsonData.Parse("\"Request timed out.\""));
-        return new StreamError(StopReason.Error, terminal.Message with { StopReason = StopReason.Error, ExtraProperties = properties });
+        return new StreamError(StopReason.Error, terminal.Message with { StopReason = StopReason.Error, ExtraProperties = properties })
+        { IsRetryableTransportFailure = true };
     }
 
     /// <summary>A prepared request: the transport it streams through, the native provider that owns it (null for a host route) and the

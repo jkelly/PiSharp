@@ -52,15 +52,22 @@ internal static class InteractiveHostServices
                 // runner.ts getShortcuts: the handlers run with a fresh extension context (IMPL-E's PiExtensionHost.CreateContext).
                 GetExtensionShortcuts = keybindings => [.. options.Extensions!.ResolveShortcuts(keybindings).Shortcuts.Select(shortcut =>
                     new ExtensionShortcut(shortcut.Key, shortcut.Description, shortcut.ExtensionPath,
-                        () => options.Extensions!.RunShortcutAsync(shortcut.Extension, shortcut.Shortcut, CancellationToken.None)))],
-                GetResourceDiagnostics = () =>
-                {
-                    var diagnostics = resourceDiagnostics?.Invoke() ?? new ResourceDiagnostics([], [], [], []);
-                    return diagnostics with { Extensions = [.. diagnostics.Extensions, .. extensions.Diagnostics()] };
-                }
+                        () => options.Extensions!.RunShortcutAsync(shortcut.Extension, shortcut.Shortcut, CancellationToken.None)))]
             };
         return context with
         {
+            GetResourceDiagnostics = () =>
+            {
+                var baseDiagnostics = Profile()?.LatestReloadDiagnostics ?? resourceDiagnostics?.Invoke() ?? new ResourceDiagnostics([], [], [], []);
+                if (extensions is null) return baseDiagnostics;
+                var seen = new HashSet<(string Type, string Message, string? Path)>(
+                    baseDiagnostics.Extensions.Select(item => (item.Type, item.Message, item.Path)));
+                var mergedExtensions = baseDiagnostics.Extensions.ToList();
+                foreach (var diagnostic in extensions.Diagnostics())
+                    if (seen.Add((diagnostic.Type, diagnostic.Message, diagnostic.Path)))
+                        mergedExtensions.Add(diagnostic);
+                return baseDiagnostics with { Extensions = mergedExtensions };
+            },
             RefreshModelCatalogs = async token =>
             {
                 await registryLoad.ConfigureAwait(false);
@@ -104,8 +111,15 @@ internal static class InteractiveHostServices
                     if (errors.TryGetValue(PiSharp.Cli.Llama.LlamaCatalog.ProviderId, out var failure)) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Throw(failure);
                 }
             },
-            // agent-session.ts reload(): extensions, skills, prompt templates and context files (IMPL-E's in-place Pi reload).
-            ReloadSession = _ => Profile()?.SupportsPiReload == true ? Profile()!.PiReloadAsync(CancellationToken.None) : Task.CompletedTask,
+            // agent-session.ts reload(): extensions, skills, prompt templates, themes, built-ins and context files (IMPL-E's in-place Pi reload).
+            ReloadSession = async _ =>
+            {
+                if (Profile() is { SupportsPiReload: true } profile)
+                {
+                    await profile.PiReloadAsync(CancellationToken.None).ConfigureAwait(false);
+                    if (profile.LatestReloadedResources is { } updated) startup.UpdateResources(updated);
+                }
+            },
             // model-runtime.ts: credentials or catalogs changed, so the available snapshot (and the session's selectable models) is re-read.
             OnCredentialsChanged = async _ =>
             {

@@ -184,6 +184,8 @@ public sealed class CompletionsHttpSseTransport : IChatTransport
                     status = (int)response.StatusCode; failure = new HttpSseRejectedException(response.StatusCode);
                 }
                 catch (HttpRequestException error) { failure = error; status = error.StatusCode is { } code ? (int)code : null; }
+                catch (IOException error) when (TransportRetryClassifier.IsTransientConnectionFailure(error, _token.IsCancellationRequested)) { failure = error; status = null; }
+                catch (System.Net.Sockets.SocketException error) when (TransportRetryClassifier.IsTransientConnectionFailure(error, _token.IsCancellationRequested)) { failure = error; status = null; }
                 catch (OperationCanceledException error) when (!_token.IsCancellationRequested) { failure = error; status = null; }
                 catch { if (response is not null) DisposeRejected(response); throw; }
                 try

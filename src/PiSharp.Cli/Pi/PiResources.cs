@@ -10,6 +10,7 @@ namespace PiSharp.Cli.Pi;
 internal sealed record PiContextFile(string Path, string Content);
 internal sealed record PiResourcePath(string Path, string Scope, string Source, bool ReportMissing);
 internal sealed record PiTheme(string Name, string Path);
+internal sealed record PiThemeDiagnostic(string Type, string Message, string? Path = null, string? CollisionName = null, string? WinnerPath = null, string? LoserPath = null);
 
 /// <summary>The run's resource inputs, found as upstream finds them. Paths only: nothing here grants tool or read authority.</summary>
 internal sealed class PiResources
@@ -25,6 +26,7 @@ internal sealed class PiResources
     internal ImmutableArray<PiResourcePath> ThemePaths { get; init; } = [];
     internal ImmutableArray<PiTheme> Themes { get; init; } = [];
     internal ImmutableArray<PiDiagnostic> Diagnostics { get; init; } = [];
+    internal ImmutableArray<PiThemeDiagnostic> ThemeDiagnostics { get; init; } = [];
 
     private static readonly string[] ContextCandidates = ["AGENTS.override.md", "AGENTS.md", "AGENTS.MD", "CLAUDE.md", "CLAUDE.MD"];
 
@@ -252,12 +254,13 @@ internal sealed class PiResources
         var appendSources = request.AppendSystemPrompt is { IsDefault: false } explicitAppend ? explicitAppend :
             DiscoverPromptFile(cwd, agentDir, request.ProjectTrusted, "APPEND_SYSTEM.md") is { } discovered ? [discovered] : [];
         var append = appendSources.Select(source => ResolvePromptInput(source, "append system prompt", warnings)).OfType<string>().ToImmutableArray();
-        var (loadedThemes, themeDiagnostics) = LoadThemes(themes);
+        var (loadedThemes, themeDiagnostics, structuredThemeDiagnostics) = LoadThemesDetailed(themes);
         warnings.AddRange(themeDiagnostics);
         return new()
         {
             ContextFiles = contextFiles, SystemPrompt = system, SystemPromptSource = systemSource is not null && Path.Exists(systemSource) ? Path.GetFullPath(systemSource) : null,
-            AppendSystemPrompt = append, SkillPaths = skills, PromptPaths = prompts, ThemePaths = themes, Themes = loadedThemes, Diagnostics = [.. warnings]
+            AppendSystemPrompt = append, SkillPaths = skills, PromptPaths = prompts, ThemePaths = themes, Themes = loadedThemes, Diagnostics = [.. warnings],
+            ThemeDiagnostics = structuredThemeDiagnostics
         };
     }
 
@@ -274,13 +277,14 @@ internal sealed class PiResources
                 .Where(item => seen.Add(PiSharp.Cli.Extensions.Pi.PiSourceInfo.ResourcePathKey(item.Path)))];
         }
         var themePaths = Append(resources.ThemePaths, discovered.ThemePaths);
-        var (themes, themeDiagnostics) = LoadThemes(themePaths);
+        var (themes, themeDiagnostics, structuredThemeDiagnostics) = LoadThemesDetailed(themePaths);
         return new()
         {
             ContextFiles = resources.ContextFiles, SystemPrompt = resources.SystemPrompt, SystemPromptSource = resources.SystemPromptSource,
             AppendSystemPrompt = resources.AppendSystemPrompt, SkillPaths = Append(resources.SkillPaths, discovered.SkillPaths),
             PromptPaths = Append(resources.PromptPaths, discovered.PromptPaths), ThemePaths = themePaths, Themes = themes,
-            Diagnostics = [.. resources.Diagnostics.Where(diagnostic => !diagnostic.Message.Contains("collision", StringComparison.Ordinal) && !diagnostic.Message.StartsWith("Theme file", StringComparison.Ordinal) && !diagnostic.Message.StartsWith("Failed to load theme", StringComparison.Ordinal)), .. themeDiagnostics]
+            Diagnostics = [.. resources.Diagnostics.Where(diagnostic => !diagnostic.Message.Contains("collision", StringComparison.Ordinal) && !diagnostic.Message.StartsWith("Theme file", StringComparison.Ordinal) && !diagnostic.Message.StartsWith("Failed to load theme", StringComparison.Ordinal)), .. themeDiagnostics],
+            ThemeDiagnostics = structuredThemeDiagnostics
         };
     }
 
@@ -293,7 +297,13 @@ internal sealed class PiResources
     /// <c>name</c> field. The first theme of a name wins; later ones are reported as collisions, as upstream does.</summary>
     internal static (ImmutableArray<PiTheme> Themes, ImmutableArray<PiDiagnostic> Diagnostics) LoadThemes(IEnumerable<PiResourcePath> paths)
     {
-        var themes = new List<PiTheme>(); var diagnostics = new List<PiDiagnostic>();
+        var (themes, diagnostics, _) = LoadThemesDetailed(paths);
+        return (themes, diagnostics);
+    }
+
+    internal static (ImmutableArray<PiTheme> Themes, ImmutableArray<PiDiagnostic> Diagnostics, ImmutableArray<PiThemeDiagnostic> Structured) LoadThemesDetailed(IEnumerable<PiResourcePath> paths)
+    {
+        var themes = new List<PiTheme>(); var diagnostics = new List<PiDiagnostic>(); var structured = new List<PiThemeDiagnostic>();
         var names = new Dictionary<string, PiTheme>(StringComparer.Ordinal);
         foreach (var source in paths)
         {
@@ -303,15 +313,29 @@ internal sealed class PiResources
                 try
                 {
                     var name = JsonNode.Parse(PiPaths.ReadText(file))?["name"]?.GetValue<string>();
-                    if (string.IsNullOrEmpty(name)) { diagnostics.Add(new("warning", $"Theme file has no name: {file}")); continue; }
-                    if (BuiltinThemes.Contains(name) || names.ContainsKey(name)) { diagnostics.Add(new("warning", $"name \"{name}\" collision: {file}")); continue; }
+                    if (string.IsNullOrEmpty(name))
+                    {
+                        diagnostics.Add(new("warning", $"Theme file has no name: {file}"));
+                        structured.Add(new("warning", "Theme file has no name", file));
+                        continue;
+                    }
+                    if (BuiltinThemes.Contains(name) || names.ContainsKey(name))
+                    {
+                        var winner = names.TryGetValue(name, out var existing) ? existing.Path : $"builtin:{name}";
+                        diagnostics.Add(new("warning", $"name \"{name}\" collision: {file}"));
+                        structured.Add(new("collision", $"name \"{name}\" collision", file, name, winner, file));
+                        continue;
+                    }
                     var theme = new PiTheme(name, file); names[name] = theme; themes.Add(theme);
                 }
                 catch (Exception error) when (error is System.Text.Json.JsonException or IOException or UnauthorizedAccessException or InvalidOperationException)
-                { diagnostics.Add(new("warning", $"Failed to load theme {file}: {error.Message}")); }
+                {
+                    diagnostics.Add(new("warning", $"Failed to load theme {file}: {error.Message}"));
+                    structured.Add(new("warning", $"Failed to load theme: {error.Message}", file));
+                }
             }
         }
-        return ([.. themes], [.. diagnostics]);
+        return ([.. themes], [.. diagnostics], [.. structured]);
     }
 }
 

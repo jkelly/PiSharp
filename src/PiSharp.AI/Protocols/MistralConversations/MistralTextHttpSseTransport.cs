@@ -131,7 +131,10 @@ public sealed partial class MistralTextHttpSseTransport : IChatTransport, IModel
         else if (reason == StopReason.Pending) { reason = StopReason.Error; code = NativeChatFailureCode.UnexpectedEof; text = "Mistral stream ended without a finish reason"; }
         else if (reason == StopReason.Error) { code = NativeChatFailureCode.ProviderError; text = state.ProviderError; }
         if (cleanup is not null && text is null) { reason = StopReason.Error; code = NativeChatFailureCode.CleanupFailed; text = "Mistral invocation cleanup failed."; }
-        StreamTerminalEvent terminal = text is null ? new StreamDone(reason, state.Message(reason)) : new StreamError(reason, state.Message(reason, text)) { NativeDiagnostic = MistralNativeDiagnostics.FromCode(code) };
+        var retryable = reason == StopReason.Error && (code == NativeChatFailureCode.UnexpectedEof ||
+            failure is MistralTextException { IsRetryableTransportFailure: true } ||
+            PiSharp.AI.Protocols.ProviderShared.TransportRetryClassifier.IsTransientConnectionFailure(failure, caller.IsCancellationRequested));
+        StreamTerminalEvent terminal = text is null ? new StreamDone(reason, state.Message(reason)) : new StreamError(reason, state.Message(reason, text)) { NativeDiagnostic = MistralNativeDiagnostics.FromCode(code), IsRetryableTransportFailure = retryable };
         if (cleanup is not null) terminal = terminal with { NativeCleanupDiagnostic = MistralNativeDiagnostics.FromCode(NativeChatFailureCode.CleanupFailed) };
         yield return terminal;
     }
@@ -148,7 +151,8 @@ public sealed partial class MistralTextHttpSseTransport : IChatTransport, IModel
         if (headerTimeout.IsCancellationRequested && !caller.IsCancellationRequested)
         {
             response?.Dispose();
-            throw Fail(NativeChatFailureCode.SourceFailed, $"Mistral response headers timed out after {timeoutMilliseconds}ms");
+            throw new MistralTextException(NativeChatFailureCode.SourceFailed, $"Mistral response headers timed out after {timeoutMilliseconds}ms")
+            { IsRetryableTransportFailure = true };
         }
         return response!;
     }
@@ -313,13 +317,21 @@ public sealed partial class MistralTextHttpSseTransport : IChatTransport, IModel
     {
         try { return await action().ConfigureAwait(false); }
         catch (OperationCanceledException) { throw; }
-        catch (Exception) { throw Fail(NativeChatFailureCode.SourceFailed, "Mistral source operation failed."); }
+        catch (Exception error)
+        {
+            throw new MistralTextException(NativeChatFailureCode.SourceFailed, "Mistral source operation failed.")
+            { IsRetryableTransportFailure = PiSharp.AI.Protocols.ProviderShared.TransportRetryClassifier.IsTransientConnectionFailure(error) };
+        }
     }
     private static async ValueTask AwaitSource(Func<ValueTask> action)
     {
         try { await action().ConfigureAwait(false); }
         catch (OperationCanceledException) { throw; }
-        catch (Exception) { throw Fail(NativeChatFailureCode.SourceFailed, "Mistral source operation failed."); }
+        catch (Exception error)
+        {
+            throw new MistralTextException(NativeChatFailureCode.SourceFailed, "Mistral source operation failed.")
+            { IsRetryableTransportFailure = PiSharp.AI.Protocols.ProviderShared.TransportRetryClassifier.IsTransientConnectionFailure(error) };
+        }
     }
     internal static void Limit(long value, long maximum) { if (value > maximum) throw Fail(NativeChatFailureCode.ResourceLimit, "Mistral data exceeds configured limits."); }
     internal static MistralTextException Fail(NativeChatFailureCode code, string message) => new(code, message);

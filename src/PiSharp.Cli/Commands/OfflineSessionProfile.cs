@@ -278,7 +278,7 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
             .Select(tool => new SessionRegisteredTool(tool.Declaration, tool.Adapter) { DefaultActive = false }));
         // Tool results follow Pi's budgets (owner decision 0004): a read image of up to 4.5MB of base64 plus its note. Arguments admit a
         // whole-file write (WriteArgumentCharacters) and its prepared action, which adds the resolved and display paths.
-        var invokerOptions = (bash is null
+        var invokerOptions = (bash is null && !tools.Registered.Any(tool => tool.Name == "powershell")
             ? new ToolInvokerOptions(MaximumResultCharacters: PiPayloadBudget.ToolResultCharacters)
             : new ToolInvokerOptions(MaximumResultCharacters: PiPayloadBudget.ToolResultCharacters, MaximumActionEntries: 1026)) with
             {
@@ -621,11 +621,13 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
             userBash = new(new(operations, canonicalSpill), toolSettings.ShellCommandPrefix);
         }
         var piPolicy = toolPolicy is { Mode: PiSharp.Cli.Pi.PiToolPolicyMode.Pi } ? toolPolicy : null;
-        string? piShell = null;
+        string? piShell = null; PowerShellTool? powerShellTool = null; string? piPowerShell = null;
         if (piPolicy is not null && bashTool is null)
             (bashTool, userBash, processCleanup, piShell) = PiBash(piPolicy, toolSettings, canonicalWorkspace, () => CurrentBashSession(bashOwner));
+        if (piPolicy is not null)
+            (powerShellTool, processCleanup, piPowerShell) = PiPowerShell(piPolicy, toolSettings, canonicalWorkspace, processCleanup, () => CurrentBashSession(bashOwner));
         var policy = new FilePolicy(canonicalWorkspace, reads, writes, reserved, grant, grepHost)
-        { Pi = piPolicy, PiShell = piShell, ProtectedRoots = [.. extension is null ? [] : new[] { extension.Package, extension.SnapshotRoot }] };
+        { Pi = piPolicy, PiShell = piShell, PiPowerShell = piPowerShell, ProtectedRoots = [.. extension is null ? [] : new[] { extension.Package, extension.SnapshotRoot }] };
         // The pi tool policy resolves ~ to the user's home directory (path-utils.ts expandPath uses os.homedir()).
         var toolHome = piPolicy is null ? canonicalWorkspace : Path.TrimEndingDirectorySeparator(Path.GetFullPath(
             piPolicy.Home ?? (Environment.GetFolderPath(Environment.SpecialFolder.UserProfile) is { Length: > 0 } userHome ? userHome : canonicalWorkspace)));
@@ -686,7 +688,7 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
                 editOptions: new(MaximumInputBytes: 64 * 1024 * 1024, MaximumOutputBytes: 64 * 1024 * 1024, MaximumArgumentCharacters: 65_536,
                     DiffOptions: new(MaximumOutputCharacters: 4096)), bash: bashTool,
                 grep: grepHost?.Executor, grepContextReader: grepReader,
-                piGrep: piSearch?.Grep(files), piFind: piSearch?.Find(files), pi: piPolicy is not null), policy,
+                piGrep: piSearch?.Grep(files), piFind: piSearch?.Find(files), pi: piPolicy is not null, powerShell: powerShellTool), policy,
                 new Handler(turns, beforeSendAsync, model), model, bashTool, activation, modelDefinition, processCleanup, connection, toolSelection,
                 deferCatalogValidation: mcpAdmission is not null || registeredMcpAdmission is not null || readApplicationHost is not null,
                 originalSystemPrompt: originalSystemPrompt, piEntry: piEntry);
@@ -796,6 +798,7 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
         /// <summary>The <c>pi</c> tool policy (decision 0004): any path and any bash command, except the protected targets.</summary>
         public PiSharp.Cli.Pi.PiToolPolicy? Pi { get; init; }
         public string? PiShell { get; init; }
+        public string? PiPowerShell { get; init; }
         public ImmutableArray<string> ProtectedRoots { get; init; } = [];
         public static bool Within(string root, string target) =>
             target.StartsWith(Path.TrimEndingDirectorySeparator(root) + Path.DirectorySeparatorChar, Comparison);
@@ -817,6 +820,9 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
             if (action.ToolName == "bash")
                 allow = action.Operation == "bash" && action.Kind == PreparedToolActionKind.Command && PiShell is not null &&
                     Comparer.Equals(action.Target, PiShell);
+            else if (action.ToolName == "powershell")
+                allow = action.Operation == "powershell" && action.Kind == PreparedToolActionKind.Command && PiPowerShell is not null &&
+                    Comparer.Equals(action.Target, PiPowerShell);
             else
             {
                 string? target = null;
@@ -857,7 +863,7 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
                 Actions.Add(new { action.ToolName, action.Operation, action.Target, allowed = granted });
                 return new(granted);
             }
-            if (Pi is not null && action.ToolName is "bash" or "read" or "ls" or "edit" or "write" or "grep" or "find") return AuthorizePi(action);
+            if (Pi is not null && action.ToolName is "bash" or "powershell" or "read" or "ls" or "edit" or "write" or "grep" or "find") return AuthorizePi(action);
             if (action.ToolName == "bash")
             {
                 var granted = bash is not null && await bash.AuthorizeAsync(action, token).ConfigureAwait(false);

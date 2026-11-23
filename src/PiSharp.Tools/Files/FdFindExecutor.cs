@@ -114,21 +114,41 @@ public sealed class FdFindExecutor : IFindExecutor
         return paths;
     }
 
-    internal static ImmutableArray<string> BuildArguments(string pattern, string searchPath, int limit, FdRepositoryPresence repository)
+    internal static ImmutableArray<string> BuildArguments(string pattern, string searchPath, int limit, FdRepositoryPresence repository) =>
+        BuildArguments(pattern, searchPath, limit, repository, OperatingSystem.IsWindows());
+
+    internal static ImmutableArray<string> BuildArguments(string pattern, string searchPath, int limit, FdRepositoryPresence repository, bool windows)
     {
         var args = ImmutableArray.CreateBuilder<string>();
+        var effectivePattern = PiFindTool.EffectivePattern(pattern, windows);
+        var isPathPattern = effectivePattern.Contains('/');
+        if (windows && isPathPattern)
+        {
+            // fd before 10.5.1 fails --full-path globs on Windows and workarounds break on fd 10.5.1; list entries and filter with WindowsFindGlob.
+            args.Add("--color=never"); args.Add("--hidden");
+            if (repository == FdRepositoryPresence.OutsideGitRepository) args.Add("--no-require-git");
+            args.Add("--"); args.Add(""); args.Add(searchPath);
+            return args.ToImmutable();
+        }
         args.Add("--glob"); args.Add("--color=never"); args.Add("--hidden");
         if (repository == FdRepositoryPresence.OutsideGitRepository) args.Add("--no-require-git");
         args.Add("--max-results"); args.Add(limit.ToString(System.Globalization.CultureInfo.InvariantCulture));
-        if (pattern.Contains('/'))
+        if (isPathPattern)
         {
             args.Add("--full-path");
-            if (!pattern.StartsWith('/') && !pattern.StartsWith("**/", StringComparison.Ordinal) && pattern != "**") pattern = "**/" + pattern;
-            pattern = pattern.Replace("/", @"[/\\]", StringComparison.Ordinal);
+            if (!PiFindTool.IsAbsolutePattern(effectivePattern, windows))
+            {
+                if (PiFindTool.IgnoreCase(effectivePattern)) args.Add("--ignore-case");
+                effectivePattern = PiFindTool.EscapeGlob(searchPath.TrimEnd('/')) + "/" + effectivePattern;
+            }
         }
-        args.Add("--"); args.Add(pattern); args.Add(searchPath); return args.ToImmutable();
+        args.Add("--"); args.Add(effectivePattern); args.Add(searchPath); return args.ToImmutable();
     }
-    private static ImmutableArray<string> ParseOutput(string stdout, string stderr, int exitCode, FindExecutionRequest request)
+
+    internal static ImmutableArray<string> ParseOutput(string stdout, string stderr, int exitCode, FindExecutionRequest request) =>
+        ParseOutput(stdout, stderr, exitCode, request, OperatingSystem.IsWindows());
+
+    internal static ImmutableArray<string> ParseOutput(string stdout, string stderr, int exitCode, FindExecutionRequest request, bool windows)
     {
         if (stdout.Length > 2 * 1024 * 1024 || stderr.Length > 2 * 1024 * 1024 || stdout.Contains('\0') || stderr.Contains('\0'))
             throw new IOException("Fd stream receipt exceeds the supported text profile.");
@@ -139,6 +159,26 @@ public sealed class FdFindExecutor : IFindExecutor
         if (raw.Length == 0) return [];
         var paths = lines.Select(line => line.Trim()).Where(line => line.Length != 0).ToImmutableArray();
         if (paths.IsEmpty) throw new IOException("Whitespace-only fd path output is outside the supported domain.");
+        var effectivePattern = PiFindTool.EffectivePattern(request.Pattern, windows);
+        if (windows && effectivePattern.Contains('/'))
+        {
+            var relativePathPattern = !PiFindTool.IsAbsolutePattern(effectivePattern, windows: true);
+            var ignoreCase = PiFindTool.IgnoreCase(effectivePattern);
+            var matchPattern = effectivePattern.EndsWith("/**", StringComparison.Ordinal) ? effectivePattern + "/*" : effectivePattern;
+            var filtered = ImmutableArray.CreateBuilder<string>();
+            long chars = 0;
+            foreach (var line in paths)
+            {
+                var candidate = relativePathPattern ? PiFindTool.Relativize(line, request.SearchPath) : line;
+                if (!WindowsFindGlob.Match(candidate, matchPattern, ignoreCase)) continue;
+                chars += line.Length;
+                if (chars > request.MaximumTotalPathCharacters)
+                    throw new IOException("Fd output exceeded the admitted path bounds.");
+                filtered.Add(line);
+                if (filtered.Count >= request.Limit) break;
+            }
+            return filtered.ToImmutable();
+        }
         if (paths.Length > request.Limit || paths.Sum(path => (long)path.Length) > request.MaximumTotalPathCharacters)
             throw new IOException("Fd output exceeded the admitted path bounds.");
         return paths;

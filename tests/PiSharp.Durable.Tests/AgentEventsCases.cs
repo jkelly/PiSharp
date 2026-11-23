@@ -306,6 +306,26 @@ internal static partial class EventTests
             await harness.CloseAsync(Context);
         });
 
+        yield return Case(prefix + "retries-sanitized-transport-failure-via-internal-retry-flag", async () =>
+        {
+            var setup = Setup();
+            var attempts = 0;
+            setup.Faux.SetResponses(FauxAssistantMessage([FauxText("recovered")]));
+            setup.Models = new SanitizedTransientFailureOnceModels(setup.Faux, () => Interlocked.Increment(ref attempts));
+            var (harness, root) = await OpenChat(await fresh(), setup);
+            setup.Retry = new RetrySettings { Enabled = true, MaxRetries = 1, BaseDelayMs = 1 };
+            var listening = await Listen(harness, root);
+            var submission = await root.SubmitAsync(SubmissionDraft.Input("hi"), Context);
+            Equal(SubmissionStatus.Done, (await submission.WaitAsync(Context)).Status, "submission status");
+            await ViewTests.Drained(harness);
+            Equal(2, attempts, "model calls");
+            var types = listening.Events().Select(item => item.Type).ToList();
+            Check(types.Contains("auto_retry_start"), "auto_retry_start");
+            Check(types.Contains("auto_retry_end"), "auto_retry_end");
+            await listening.Stream.StopAsync();
+            await harness.CloseAsync(Context);
+        });
+
         // Pi v1.5.0 (area watch-folding, d8d99950a): the stream is a NativeWatch, so pending batches are not folded as state watches are.
         yield return Case(prefix + "delivers-each-of-100-pending-batches-in-its-own-call-in-order-unlike-state-watches", async () =>
         {
@@ -847,5 +867,34 @@ internal static partial class StructuredTests
             await stream.StopAsync();
             await harness.CloseAsync(Context);
         });
+    }
+}
+
+file sealed class SanitizedTransientFailureOnceModels(IDurableModels inner, Func<int> nextAttempt) : IDurableModels
+{
+    public DurableModel? GetModel(string provider, string modelId) => inner.GetModel(provider, modelId);
+    public IAsyncEnumerable<PiSharp.Contracts.StreamEvent> StreamSimple(DurableModel model,
+        System.Collections.Immutable.ImmutableArray<JsonValue> messages, DurableStreamOptions? options, CancellationToken cancellationToken)
+    {
+        if (nextAttempt() == 1) return EmitTransientAsync(model);
+        return inner.StreamSimple(model, messages, options, cancellationToken);
+    }
+    public Task<PiSharp.Contracts.AssistantMessage> CompleteSimpleAsync(DurableModel model,
+        System.Collections.Immutable.ImmutableArray<JsonValue> messages, DurableStreamOptions? options, CancellationToken cancellationToken) =>
+        inner.CompleteSimpleAsync(model, messages, options, cancellationToken);
+    public IAsyncEnumerable<PiSharp.Contracts.StreamEvent> StreamDeferred(DurableModel model, DurableDeferredHandle handle, CancellationToken cancellationToken) =>
+        inner.StreamDeferred(model, handle, cancellationToken);
+    public Task<PiSharp.Contracts.AssistantMessage> FetchDeferredAsync(DurableModel model, DurableDeferredHandle handle, CancellationToken cancellationToken) =>
+        inner.FetchDeferredAsync(model, handle, cancellationToken);
+    public Task CancelDeferredAsync(DurableModel model, DurableDeferredHandle handle, CancellationToken cancellationToken) =>
+        inner.CancelDeferredAsync(model, handle, cancellationToken);
+
+    private static async IAsyncEnumerable<PiSharp.Contracts.StreamEvent> EmitTransientAsync(DurableModel model)
+    {
+        var extra = PiSharp.Contracts.JsonFields.Empty.Set("errorMessage", PiSharp.Contracts.JsonData.Parse("\"Anthropic stream did not complete.\""));
+        var message = new PiSharp.Contracts.AssistantMessage(model.Api, model.Provider, model.Id, 1, [],
+            PiSharp.Contracts.TokenUsage.Zero, PiSharp.Contracts.StopReason.Error, extra);
+        yield return new PiSharp.Contracts.StreamError(PiSharp.Contracts.StopReason.Error, message) { IsRetryableTransportFailure = true };
+        await Task.CompletedTask;
     }
 }

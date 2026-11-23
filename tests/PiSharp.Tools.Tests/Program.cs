@@ -18,7 +18,7 @@ internal static class Program
         EditDifferentialTests.Configure(Path.GetFullPath(Environment.CurrentDirectory));
         EditPreviewTests.Configure(Path.GetFullPath(Environment.CurrentDirectory));
         var tests = ReadWriteToolsTests.Cases().Concat(EditToolTests.Cases()).Concat(EditDifferentialTests.Cases()).Concat(EditPreviewTests.Cases())
-            .Concat(NativeProcessRunnerTests.Cases()).Concat(BashToolTests.Cases())
+            .Concat(NativeProcessRunnerTests.Cases()).Concat(BashToolTests.Cases()).Concat(PowerShellToolTests.Cases())
             .Concat(BashProgressDeliveryTests.Cases()).Concat(LsToolTests.Cases()).Concat(FindToolTests.Cases()).Concat(FdFindExecutorTests.Cases()).Concat(GrepToolTests.Cases())
             .Concat(GrepContextHostAdapterTests.Cases())
             .Concat(UnixProcessRunnerTests.Cases())
@@ -35,6 +35,7 @@ internal static class Program
                 if (test.Run.Method.DeclaringType == typeof(LsToolTests) || test.Run.Method.DeclaringType == typeof(FindToolTests) ||
                     test.Run.Method.DeclaringType == typeof(FdFindExecutorTests) || test.Run.Method.DeclaringType == typeof(GrepToolTests) ||
                     test.Run.Method.DeclaringType == typeof(GrepContextHostAdapterTests) ||
+                    test.Run.Method.DeclaringType == typeof(PowerShellToolTests) ||
                     test.Name.StartsWith("Unix ", StringComparison.Ordinal) ||
                     test.Name.StartsWith("owned child ", StringComparison.Ordinal) ||
                     test.Name == "Bash abort timeout spawn capture cleanup and foreign failures retain bounded known output") await test.Run();

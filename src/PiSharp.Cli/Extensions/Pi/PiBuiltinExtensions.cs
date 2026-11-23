@@ -73,7 +73,7 @@ internal sealed class PiBuiltinExtensions
     /// <paramref name="noExtensions"/>) without <paramref name="disabled"/>; an unknown name is a load error, and a replaceable built-in
     /// whose tool, command or flag another loaded extension registers is left out with a warning (omitReplacedExtensions).</summary>
     internal static Resolution Resolve(IEnumerable<string>? cliSources, PiSharp.Cli.Packages.PiResolvedPaths? resolved, bool noExtensions,
-        IEnumerable<string> disabled, IEnumerable<PiLoadedExtension> loaded)
+        IEnumerable<string> disabled, IEnumerable<PiLoadedExtension> loaded, IEnumerable<PiNativeExtension>? nativeLoaded = null)
     {
         var off = disabled.ToHashSet(StringComparer.Ordinal);
         var paths = (cliSources ?? []).Where(source => source.StartsWith(PathPrefix, StringComparison.Ordinal))
@@ -88,6 +88,9 @@ internal sealed class PiBuiltinExtensions
         var taken = new Dictionary<string, string>(StringComparer.Ordinal);
         foreach (var extension in loaded)
             foreach (var name in Registered(extension.Descriptor)) taken[name] = extension.Path;
+        if (nativeLoaded is not null)
+            foreach (var native in nativeLoaded)
+                foreach (var name in native.RegisteredNames) taken[name] = native.Path;
         foreach (var builtin in All.Where(builtin => !builtin.Replaceable && names.Contains(builtin.Name)))
             foreach (var name in builtin.Registers) taken[name] = PathPrefix + builtin.Name;
         var warnings = ImmutableArray.CreateBuilder<PiDiagnostic>();

@@ -94,6 +94,43 @@ internal static class Sync150CliCases
             Equal(0, await pi.Quit(), "exit code");
         });
 
+        // Wave 4.4: /reload surfaces skill collisions, prompt conflicts, theme conflicts, and unknown built-in / extension diagnostics,
+        // and clears them once resolved on a subsequent /reload.
+        yield return ("wave4.reload-surfaces-builtin-skill-prompt-and-theme-diagnostics", async () =>
+        {
+            await using var pi = new InteractiveHarness("wave4-reload-diagnostics", columns: 140, rows: 50);
+            pi.Start("--provider", "anthropic", "--model", "claude-sonnet-4-5", "--tui-mode", "regular");
+            await pi.WaitFor("claude-sonnet-4-5");
+
+            var userSkill = pi.Write(Path.Combine(pi.AgentDir, "skills", "dup-skill", "SKILL.md"), "---\nname: dup-skill\ndescription: User skill.\n---\n\n# User\n");
+            var projSkill = pi.Write(Path.Combine(pi.Cwd, ".pi", "skills", "dup-skill", "SKILL.md"), "---\nname: dup-skill\ndescription: Project skill.\n---\n\n# Project\n");
+            var userPrompt = pi.Write(Path.Combine(pi.AgentDir, "prompts", "dup.md"), "---\ndescription: User prompt\n---\nHello from user");
+            var projPrompt = pi.Write(Path.Combine(pi.Cwd, ".pi", "prompts", "dup.md"), "---\ndescription: Project prompt\n---\nHello from project");
+            var dupTheme = pi.Write(Path.Combine(pi.Cwd, ".pi", "themes", "dark.json"), """{"name":"dark","colors":{}}""");
+            var settingsPath = pi.Write(Path.Combine(pi.AgentDir, "settings.json"), """{"extensions":["builtin:does-not-exist"]}""");
+
+            await pi.Submit("/reload");
+            var screen = await pi.WaitFor("Reloaded keybindings, extensions, skills, prompts, themes, and context files");
+            Check(screen.Contains("[Skill warnings]", StringComparison.Ordinal) && screen.Contains("dup-skill", StringComparison.Ordinal), "missing skill collision after /reload:\n" + screen);
+            Check(screen.Contains("[Prompt conflicts]", StringComparison.Ordinal) && screen.Contains("dup", StringComparison.Ordinal), "missing prompt conflict after /reload:\n" + screen);
+            Check(screen.Contains("[Theme conflicts]", StringComparison.Ordinal) && screen.Contains("dark", StringComparison.Ordinal), "missing theme conflict after /reload:\n" + screen);
+            Check(screen.Contains("[Extension issues]", StringComparison.Ordinal) && screen.Contains("Unknown built-in extension: builtin:does-not-exist", StringComparison.Ordinal),
+                "missing unknown built-in diagnostic after /reload:\n" + screen);
+
+            File.Delete(projSkill); File.Delete(userSkill);
+            File.Delete(projPrompt); File.Delete(userPrompt);
+            File.Delete(dupTheme);
+            File.WriteAllText(settingsPath, "{}");
+
+            await pi.Submit("/reload");
+            var cleaned = await pi.WaitUntil(text => !text.Contains("Unknown built-in extension: builtin:does-not-exist", StringComparison.Ordinal), "clean reload");
+            Check(!cleaned.Contains("[Skill warnings]", StringComparison.Ordinal) &&
+                  !cleaned.Contains("[Prompt conflicts]", StringComparison.Ordinal) &&
+                  !cleaned.Contains("[Theme conflicts]", StringComparison.Ordinal),
+                "stale reload diagnostics remained after clean /reload:\n" + cleaned);
+            Equal(0, await pi.Quit(), "exit code");
+        });
+
         // external-editor.ts (6454d07ec, #11627): a failed editor run says why the prompt is unchanged; the extension editor shows the
         // message under its editor (and clears it after a later success).
         yield return ("sync150.external-editor-failures-say-why-the-prompt-is-unchanged", async () =>

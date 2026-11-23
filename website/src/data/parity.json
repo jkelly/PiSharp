@@ -199,7 +199,7 @@
         {
           "area": "Native C# extensions",
           "status": "ported",
-          "notes": "A folder with a pisharp-extension.json loads from the same places as Pi extensions, without Node, and shares the session and command list with TypeScript extensions. All 41 v1.5.0 events reach native handlers, and native extensions can register classifier and image providers. Difference: a C# extension that registers codemode, tool_search or /mcp doesn't replace the built-in one; only TypeScript extensions do.",
+          "notes": "A folder with a pisharp-extension.json loads from the same places as Pi extensions, without Node, and shares the session and command list with TypeScript extensions. All 41 v1.5.0 events reach native handlers, native extensions can register classifier and image providers, and a C# extension that registers codemode, tool_search or /mcp replaces the built-in extension with the same warning as a TypeScript extension.",
           "evidence": "https://github.com/jkelly/PiSharp/tree/main/tests/PiSharp.ExtensionParity.Tests"
         }
       ]
@@ -271,14 +271,6 @@
         {
           "title": "/reload and MCP",
           "notes": "/reload keeps MCP servers connected, and doesn't re-read mcp.json, unless the mcp, codemode or tool-search built-ins changed. Pi reconnects every server on every reload."
-        },
-        {
-          "title": "/reload diagnostics",
-          "notes": "After /reload, only extension load errors are shown. Pi also shows built-in replacement warnings, unknown built-in names, package resolution problems and skill, prompt and theme conflicts."
-        },
-        {
-          "title": "Built-in replacement",
-          "notes": "A built-in extension yields only to a TypeScript extension that registers codemode, tool_search or /mcp. A C# extension that registers one doesn't replace the built-in."
         },
         {
           "title": "JSON depth 1,000",
