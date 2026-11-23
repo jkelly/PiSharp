@@ -50,14 +50,20 @@ public sealed class PowerShellTool : IToolArgumentSchemaAdapter
 
     public ToolInvoker CreateInvoker(IToolActionPolicy policy, IEnumerable<ToolActionTransform>? transforms = null,
         IEnumerable<ToolResultTransform>? resultTransforms = null) =>
-        new([this], policy, transforms, resultTransforms, new(MaximumArgumentCharacters: _options.MaximumArgumentCharacters,
+        new([this], policy, transforms, resultTransforms, new(MaximumArgumentCharacters: MaximumNormalizedArgumentCharacters(),
             MaximumActionCharacters: MaximumActionCharacters(), MaximumActionEntries: 1026, MaximumResultCharacters: 512 * 1024)
             { MaximumStructuredContentCharacters = 8 * 1024 * 1024 });
+
+    private int MaximumNormalizedArgumentCharacters() =>
+        // Normalized arguments re-serialize command, optional timeout, and spill outputPath (up to 4096 chars).
+        // Allow for System.Text.Json escaping (up to 6 chars per char) while PrepareAsync still enforces
+        // _options.MaximumArgumentCharacters on the incoming user arguments.
+        (int)Math.Max((long)_options.MaximumArgumentCharacters, _options.MaximumCommandCharacters * 6L) + 25_000;
 
     private int MaximumActionCharacters()
     {
         var encodedCommandMax = ((_options.MaximumCommandCharacters * 3L + 2) / 3) * 4;
-        var argumentsMax = Math.Max((long)_options.MaximumArgumentCharacters, _options.MaximumCommandCharacters * 6L) + 4_500;
+        var argumentsMax = (long)MaximumNormalizedArgumentCharacters();
         var wrapperOverhead = PowerShellDiscovery.Utf8OutputPreamble.Length + (_options.CommandPrefix?.Length ?? 0) + 256;
         var shellOverhead = _options.Executable.Length + _options.ShellArguments.Sum(arg => (long)arg.Length) + 8_192;
         var envMax = OperatingSystem.IsWindows() ? 32_768L : 131_072L;
@@ -201,7 +207,8 @@ public sealed class PowerShellTool : IToolArgumentSchemaAdapter
     {
         if (arguments is null) throw Invalid();
         var raw = arguments.ToString();
-        if (raw.Length > _options.MaximumArgumentCharacters) throw Invalid();
+        var maxArguments = normalized ? MaximumNormalizedArgumentCharacters() : _options.MaximumArgumentCharacters;
+        if (raw.Length > maxArguments) throw Invalid();
         using var document = JsonDocument.Parse(raw, new JsonDocumentOptions { MaxDepth = 4 });
         var value = document.RootElement;
         if (value.ValueKind != JsonValueKind.Object) throw Invalid();
