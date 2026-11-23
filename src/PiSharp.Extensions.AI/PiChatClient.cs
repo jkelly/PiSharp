@@ -77,7 +77,8 @@ public sealed class PiChatClient : IChatClient
         {
             MessageId = responseId,
             CreatedAt = ToTimestamp(completed.Timestamp),
-            RawRepresentation = completed
+            RawRepresentation = completed,
+            AdditionalProperties = CreateOriginProperties(completed.Api, completed.Provider, completed.Model)
         };
 
         var response = new ChatResponse(message)
@@ -103,6 +104,8 @@ public sealed class PiChatClient : IChatClient
         ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed) != 0, this);
         var request = BuildRequest(messages, options);
         var responseId = Guid.NewGuid().ToString("N");
+        var api = request.Model.Api;
+        var provider = request.Model.Provider;
         var modelId = request.Model.Id;
         DateTimeOffset? createdAt = ToTimestamp(request.Timestamp);
         var streamedBlocks = new HashSet<int>();
@@ -133,6 +136,8 @@ public sealed class PiChatClient : IChatClient
             switch (ev)
             {
                 case StreamStarted started:
+                    api = started.Partial.Api;
+                    provider = started.Partial.Provider;
                     modelId = started.Partial.Model;
                     createdAt = ToTimestamp(started.Partial.Timestamp);
                     break;
@@ -140,13 +145,13 @@ public sealed class PiChatClient : IChatClient
                 case TextStarted started when !string.IsNullOrEmpty(started.Content.Text):
                     streamedBlocks.Add(started.ContentIndex);
                     RecordEmittedText(started.ContentIndex, started.Content.Text);
-                    yield return CreateUpdate(responseId, modelId, createdAt, new AiTextContent(started.Content.Text), started);
+                    yield return CreateUpdate(responseId, api, provider, modelId, createdAt, new AiTextContent(started.Content.Text), started);
                     break;
 
                 case TextDelta delta when !string.IsNullOrEmpty(delta.Delta):
                     streamedBlocks.Add(delta.ContentIndex);
                     RecordEmittedText(delta.ContentIndex, delta.Delta);
-                    yield return CreateUpdate(responseId, modelId, createdAt, new AiTextContent(delta.Delta), delta);
+                    yield return CreateUpdate(responseId, api, provider, modelId, createdAt, new AiTextContent(delta.Delta), delta);
                     break;
 
                 case TextEnded ended:
@@ -156,7 +161,7 @@ public sealed class PiChatClient : IChatClient
                     streamedBlocks.Add(ended.ContentIndex);
                     if (suffix.Length > 0 || textSignature is not null)
                     {
-                        yield return CreateUpdate(responseId, modelId, createdAt,
+                        yield return CreateUpdate(responseId, api, provider, modelId, createdAt,
                             CreateTextContent(suffix, ended.Properties), ended);
                     }
                     break;
@@ -165,14 +170,14 @@ public sealed class PiChatClient : IChatClient
                 case ThinkingStarted started when !string.IsNullOrEmpty(started.Content.Thinking):
                     streamedBlocks.Add(started.ContentIndex);
                     RecordEmittedText(started.ContentIndex, started.Content.Thinking);
-                    yield return CreateUpdate(responseId, modelId, createdAt,
+                    yield return CreateUpdate(responseId, api, provider, modelId, createdAt,
                         CreateReasoningContent(started.Content.Thinking, started.Content.ExtraProperties), started);
                     break;
 
                 case ThinkingDelta delta when !string.IsNullOrEmpty(delta.Delta):
                     streamedBlocks.Add(delta.ContentIndex);
                     RecordEmittedText(delta.ContentIndex, delta.Delta);
-                    yield return CreateUpdate(responseId, modelId, createdAt,
+                    yield return CreateUpdate(responseId, api, provider, modelId, createdAt,
                         new TextReasoningContent(delta.Delta), delta);
                     break;
 
@@ -184,7 +189,7 @@ public sealed class PiChatClient : IChatClient
                     streamedBlocks.Add(ended.ContentIndex);
                     if (suffix.Length > 0 || signature is not null || redacted)
                     {
-                        yield return CreateUpdate(responseId, modelId, createdAt,
+                        yield return CreateUpdate(responseId, api, provider, modelId, createdAt,
                             CreateReasoningContent(suffix, ended.Properties), ended);
                     }
                     break;
@@ -193,7 +198,7 @@ public sealed class PiChatClient : IChatClient
                 case ToolCallEnded ended:
                     streamedBlocks.Add(ended.ContentIndex);
                     emittedToolCallIds.Add(ended.ToolCall.Id);
-                    yield return CreateUpdate(responseId, modelId, createdAt,
+                    yield return CreateUpdate(responseId, api, provider, modelId, createdAt,
                         MapToolCall(ended.ToolCall), ended);
                     break;
 
@@ -207,7 +212,7 @@ public sealed class PiChatClient : IChatClient
                             var suffix = ResolveAuthoritativeSuffix(finalized.ContentIndex, ft.Text);
                             var textSig = ExtractString(ft.ExtraProperties, "textSignature");
                             if (suffix.Length > 0 || textSig is not null)
-                                yield return CreateUpdate(responseId, modelId, createdAt,
+                                yield return CreateUpdate(responseId, api, provider, modelId, createdAt,
                                     CreateTextContent(suffix, ft.ExtraProperties, ft), finalized);
                             break;
                         }
@@ -217,13 +222,13 @@ public sealed class PiChatClient : IChatClient
                             var sig = ExtractString(fk.ExtraProperties, "thinkingSignature");
                             var redacted = ExtractBool(fk.ExtraProperties, "redacted");
                             if (suffix.Length > 0 || sig is not null || redacted)
-                                yield return CreateUpdate(responseId, modelId, createdAt,
+                                yield return CreateUpdate(responseId, api, provider, modelId, createdAt,
                                     CreateReasoningContent(suffix, fk.ExtraProperties, fk), finalized);
                             break;
                         }
                         case PiToolCallContent ftc:
                             if (emittedToolCallIds.Add(ftc.Id))
-                                yield return CreateUpdate(responseId, modelId, createdAt, MapToolCall(ftc), finalized);
+                                yield return CreateUpdate(responseId, api, provider, modelId, createdAt, MapToolCall(ftc), finalized);
                             break;
                     }
                     break;
@@ -232,6 +237,8 @@ public sealed class PiChatClient : IChatClient
                 case StreamDone done:
                 {
                     sawTerminal = true;
+                    api = done.Message.Api;
+                    provider = done.Message.Provider;
                     modelId = done.Message.Model;
                     createdAt = ToTimestamp(done.Message.Timestamp);
 
@@ -243,25 +250,27 @@ public sealed class PiChatClient : IChatClient
                         if (block is PiToolCallContent tc && !emittedToolCallIds.Add(tc.Id)) continue;
                         var mapped = MapAssistantContent(block);
                         if (mapped is not null)
-                            yield return CreateUpdate(responseId, modelId, createdAt, mapped, done);
+                            yield return CreateUpdate(responseId, api, provider, modelId, createdAt, mapped, done);
                     }
 
                     var terminalContents = new List<AIContent>(1);
                     if (MapUsage(done.Message.Usage) is { } usage)
                         terminalContents.Add(new UsageContent(usage));
 
-                    var terminalUpdate = new ChatResponseUpdate(ChatRole.Assistant, terminalContents)
+                    var terminalProps = CreateOriginProperties(api, provider, modelId);
+                    if (!string.IsNullOrEmpty(request.SessionId))
+                        terminalProps[PiChatAdditionalProperties.SessionId] = request.SessionId;
+
+                    yield return new ChatResponseUpdate(ChatRole.Assistant, terminalContents)
                     {
                         ResponseId = responseId,
                         MessageId = responseId,
                         ModelId = modelId,
                         CreatedAt = createdAt,
                         FinishReason = MapStopReason(done.Reason),
-                        RawRepresentation = done.Message
+                        RawRepresentation = done.Message,
+                        AdditionalProperties = terminalProps
                     };
-                    if (!string.IsNullOrEmpty(request.SessionId))
-                        terminalUpdate.AdditionalProperties = new AdditionalPropertiesDictionary { [PiChatAdditionalProperties.SessionId] = request.SessionId };
-                    yield return terminalUpdate;
                     yield break;
                 }
 
@@ -431,12 +440,13 @@ public sealed class PiChatClient : IChatClient
                 }
             }
 
+            var (originApi, originProvider, originModel) = ResolveAssistantOrigin(message, model);
             var assistantObj = new JsonObject
             {
                 ["role"] = "assistant",
-                ["api"] = model.Api,
-                ["provider"] = model.Provider,
-                ["model"] = model.Id,
+                ["api"] = originApi,
+                ["provider"] = originProvider,
+                ["model"] = originModel,
                 ["content"] = contentBlocks,
                 ["usage"] = new JsonObject
                 {
@@ -633,11 +643,22 @@ public sealed class PiChatClient : IChatClient
 
     private static ChatResponseUpdate CreateUpdate(
         string responseId,
+        string api,
+        string provider,
         string modelId,
         DateTimeOffset? createdAt,
         AIContent content,
-        object raw) =>
-        new(ChatRole.Assistant, [content])
+        object raw)
+    {
+        // Carry originating model identity on the emitted content item so streaming aggregators
+        // (such as ToChatResponseAsync) preserve the assistant turn's origin even if the caller
+        // switches ChatOptions.ModelId on subsequent turns.
+        var props = content.AdditionalProperties ??= [];
+        props.TryAdd(PiChatAdditionalProperties.Api, api);
+        props.TryAdd(PiChatAdditionalProperties.Provider, provider);
+        props.TryAdd(PiChatAdditionalProperties.ModelId, modelId);
+
+        return new(ChatRole.Assistant, [content])
         {
             ResponseId = responseId,
             MessageId = responseId,
@@ -645,6 +666,38 @@ public sealed class PiChatClient : IChatClient
             CreatedAt = createdAt,
             RawRepresentation = raw
         };
+    }
+
+    internal static AdditionalPropertiesDictionary CreateOriginProperties(string api, string provider, string modelId) =>
+        new()
+        {
+            [PiChatAdditionalProperties.Api] = api,
+            [PiChatAdditionalProperties.Provider] = provider,
+            [PiChatAdditionalProperties.ModelId] = modelId
+        };
+
+    private static (string Api, string Provider, string Model) ResolveAssistantOrigin(ChatMessage message, ModelDescriptor fallback)
+    {
+        if (message.RawRepresentation is AssistantMessage raw)
+            return (raw.Api, raw.Provider, raw.Model);
+
+        string? api = ExtractAdditionalString(message.AdditionalProperties, PiChatAdditionalProperties.Api, "api");
+        string? provider = ExtractAdditionalString(message.AdditionalProperties, PiChatAdditionalProperties.Provider, "provider");
+        string? modelId = ExtractAdditionalString(message.AdditionalProperties, PiChatAdditionalProperties.ModelId, "model");
+
+        if (api is null || provider is null || modelId is null)
+        {
+            foreach (var item in message.Contents)
+            {
+                api ??= ExtractAdditionalString(item.AdditionalProperties, PiChatAdditionalProperties.Api, "api");
+                provider ??= ExtractAdditionalString(item.AdditionalProperties, PiChatAdditionalProperties.Provider, "provider");
+                modelId ??= ExtractAdditionalString(item.AdditionalProperties, PiChatAdditionalProperties.ModelId, "model");
+                if (api is not null && provider is not null && modelId is not null) break;
+            }
+        }
+
+        return (api ?? fallback.Api, provider ?? fallback.Provider, modelId ?? fallback.Id);
+    }
 
     private static AIContent? MapAssistantContent(AssistantContent content) => content switch
     {

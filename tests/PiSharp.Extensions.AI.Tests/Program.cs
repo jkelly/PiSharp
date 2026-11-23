@@ -32,6 +32,7 @@ internal static class Program
             ("pi-chat-client.errors-abort-eof-and-dispose", TestPiChatClientErrorsAndDisposeAsync),
             ("pi-chat-client.get-service-and-metadata", TestPiChatClientMetadataAsync),
             ("pi-chat-client.preserves-tool-call-and-text-signatures-roundtrip", TestSignatureRoundTripAsync),
+            ("pi-chat-client.retains-originating-model-identity-on-model-switch", TestAssistantOriginRetainedOnModelSwitchAsync),
             ("pi-chat-client.streaming-authoritative-suffix-and-bedrock-finalized-metadata", TestStreamingAuthoritativeSuffixAndFinalizedMetadataAsync),
             ("pi-chat-client.non-object-tool-arguments-marked-with-exception", TestNonObjectToolArgumentsAsync),
             ("transport-adapter.streaming-reducer-conformance-and-dedup", TestTransportAdapterReducerConformanceAsync),
@@ -509,6 +510,84 @@ internal static class Program
         var fc = resp.Messages[0].Contents.OfType<FunctionCallContent>().Single();
         Check(fc.Arguments is null, "non-object arguments not silently coerced to empty dictionary");
         Check(fc.Exception is JsonException, "non-object arguments surfaced on FunctionCallContent.Exception");
+
+        // Wrapping PiChatClient inside ChatClientTransportAdapter must convert the failed FunctionCallContent
+        // into StreamError(Error) rather than executing an empty {} call.
+        using var adapter = new ChatClientTransportAdapter(client);
+        var adaptedEvents = new List<StreamEvent>();
+        await foreach (var ev in adapter.StreamAsync(new ChatRequest(TestModel, [UserEntry("go")], 99)))
+            adaptedEvents.Add(ev);
+        Check(adaptedEvents.OfType<ToolCallEnded>().Count() == 0, "failed FunctionCallContent never emits ToolCallEnded");
+        Check(adaptedEvents.OfType<StreamDone>().Count() == 0, "failed FunctionCallContent never emits StreamDone");
+        var err = adaptedEvents.OfType<StreamError>().Single();
+        Equal(StopReason.Error, err.Reason, "failed FunctionCallContent settles as StreamError(Error)");
+    }
+
+    private static async Task TestAssistantOriginRetainedOnModelSwitchAsync()
+    {
+        ChatRequest? turn2Req = null;
+        var turn = 0;
+        var transport = new ScriptedTransport((req, _) =>
+        {
+            turn++;
+            if (turn <= 2)
+            {
+                var sigProps = JsonFields.Empty.Set("thinkingSignature", JsonData.Parse("\"orig-sig\""));
+                var msg = new AssistantMessage("anthropic-messages", "anthropic", "claude-orig", req.Timestamp,
+                    [new ThinkingContent("orig thought", sigProps), new PiTextContent("First reply")], TokenUsage.Zero, StopReason.Stop);
+                return
+                [
+                    new StreamStarted(new AssistantMessage("anthropic-messages", "anthropic", "claude-orig", req.Timestamp, [], TokenUsage.Zero, StopReason.Pending)),
+                    new ThinkingStarted(0, new ThinkingContent("")),
+                    new ThinkingDelta(0, "orig thought"),
+                    new ThinkingEnded(0, "orig thought", sigProps),
+                    new TextStarted(1, new PiTextContent("")),
+                    new TextDelta(1, "First reply"),
+                    new TextEnded(1, "First reply"),
+                    new StreamDone(StopReason.Stop, msg)
+                ];
+            }
+            turn2Req = req;
+            var reply = new AssistantMessage(req.Model.Api, req.Model.Provider, req.Model.Id, req.Timestamp,
+                [new PiTextContent("Second reply")], TokenUsage.Zero, StopReason.Stop);
+            return
+            [
+                new StreamStarted(new AssistantMessage(req.Model.Api, req.Model.Provider, req.Model.Id, req.Timestamp, [], TokenUsage.Zero, StopReason.Pending)),
+                new StreamDone(StopReason.Stop, reply)
+            ];
+        });
+
+        using var client = new PiChatClient(transport, new ModelDescriptor("claude-orig", "anthropic-messages", "anthropic"));
+
+        // 1. Non-streaming response passed back after switching ChatOptions.ModelId.
+        var firstResp = await client.GetResponseAsync([new ChatMessage(ChatRole.User, "Hi")]);
+        // 2. Streaming response aggregated into a fresh ChatMessage without RawRepresentation (simulating ToChatResponseAsync).
+        var streamedContents = new List<AIContent>();
+        await foreach (var u in client.GetStreamingResponseAsync([new ChatMessage(ChatRole.User, "Hi")]))
+            streamedContents.AddRange(u.Contents.Where(c => c is not UsageContent));
+        var streamedAssistant = new ChatMessage(ChatRole.Assistant, streamedContents);
+
+        // Turn 3 switches to a different ModelId while replaying both historical assistant turns.
+        await client.GetResponseAsync(
+        [
+            new ChatMessage(ChatRole.User, "Hi"),
+            firstResp.Messages[0],
+            new ChatMessage(ChatRole.User, "Again"),
+            streamedAssistant,
+            new ChatMessage(ChatRole.User, "Switch model")
+        ], new ChatOptions { ModelId = "claude-new" });
+
+        Check(turn2Req is not null, "turn 3 request captured");
+        Equal("claude-new", turn2Req!.Model.Id, "request targets new model");
+        var hist1 = JsonNode.Parse(turn2Req.Messages[1].WireBody.ToString())!.AsObject();
+        Equal("claude-orig", hist1["model"]!.GetValue<string>(), "non-streaming history keeps originating model id");
+        Equal("anthropic-messages", hist1["api"]!.GetValue<string>(), "non-streaming history keeps originating api");
+        Equal("anthropic", hist1["provider"]!.GetValue<string>(), "non-streaming history keeps originating provider");
+
+        var hist2 = JsonNode.Parse(turn2Req.Messages[3].WireBody.ToString())!.AsObject();
+        Equal("claude-orig", hist2["model"]!.GetValue<string>(), "streamed history keeps originating model id");
+        Equal("anthropic-messages", hist2["api"]!.GetValue<string>(), "streamed history keeps originating api");
+        Equal("anthropic", hist2["provider"]!.GetValue<string>(), "streamed history keeps originating provider");
     }
 
     private static async Task TestAdapterEdgeCasesAsync()

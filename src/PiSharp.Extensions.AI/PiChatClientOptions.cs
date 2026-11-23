@@ -39,6 +39,15 @@ public static class PiChatAdditionalProperties
 
     /// <summary>Boolean flag marking a redacted thinking block (<c>redacted: true</c>).</summary>
     public const string ThinkingRedacted = "pisharp.thinkingRedacted";
+
+    /// <summary>Originating PiSharp wire API identifier recorded on assistant history messages.</summary>
+    public const string Api = "pisharp.api";
+
+    /// <summary>Originating PiSharp provider identifier recorded on assistant history messages.</summary>
+    public const string Provider = "pisharp.provider";
+
+    /// <summary>Originating PiSharp model identifier recorded on assistant history messages.</summary>
+    public const string ModelId = "pisharp.modelId";
 }
 
 /// <summary>Default request configuration and lifecycle options for <see cref="PiChatClient"/>.</summary>

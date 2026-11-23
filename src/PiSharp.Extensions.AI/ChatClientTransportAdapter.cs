@@ -180,6 +180,13 @@ public sealed class ChatClientTransportAdapter : IChatTransport, IDisposable
                         case FunctionCallContent call:
                         {
                             if (call.InformationalOnly) break;
+                            if (call.Exception is { } callError)
+                            {
+                                streamErrorMessage = string.IsNullOrWhiteSpace(callError.Message)
+                                    ? $"Tool call '{call.Name}' failed argument parsing."
+                                    : callError.Message;
+                                break;
+                            }
                             if (openTextIndex is { } txtIdx)
                             {
                                 var endedText = CloseText(txtIdx, textBuffer, textSignature, blocks);
@@ -501,7 +508,19 @@ public sealed class ChatClientTransportAdapter : IChatTransport, IDisposable
                 }
             }
         }
-        return new ChatMessage(ChatRole.Assistant, contents);
+        var assistantMessage = new ChatMessage(ChatRole.Assistant, contents);
+        var api = GetString(body, "api");
+        var provider = GetString(body, "provider");
+        var model = GetString(body, "model");
+        if (!string.IsNullOrEmpty(api) || !string.IsNullOrEmpty(provider) || !string.IsNullOrEmpty(model))
+        {
+            var props = new AdditionalPropertiesDictionary();
+            if (!string.IsNullOrEmpty(api)) props[PiChatAdditionalProperties.Api] = api;
+            if (!string.IsNullOrEmpty(provider)) props[PiChatAdditionalProperties.Provider] = provider;
+            if (!string.IsNullOrEmpty(model)) props[PiChatAdditionalProperties.ModelId] = model;
+            assistantMessage.AdditionalProperties = props;
+        }
+        return assistantMessage;
     }
 
     private static ChatMessage ConvertToolResultMessage(JsonObject body)
