@@ -677,34 +677,107 @@ internal static partial class Program
             await CreateRoot(storage);
             var taskId = await storage.MintIdAsync<TaskId>();
             var docId = await storage.MintIdAsync<DocumentId>();
-            await Commit(storage, new TaskWrite(PendingTask(taskId, "live")),
+            var pendingTask = PendingTask(taskId, "live");
+            await Commit(storage, new TaskWrite(pendingTask),
                 new DocumentCreateWrite(SessionDocument(docId), DocumentContent.Base(1, JO("{\"v\":1}"))));
 
             // Pause the cold GetTaskAsync inside sidecar path resolution while a concurrent commit makes the task terminal and reclaims its sidecar.
             fs.PauseOnce($"task-{taskId}.jsonl", taskPaused, taskRelease.Task);
             var taskRead = storage.GetTaskAsync(taskId, JsonlContext);
-            await taskPaused.Task;
-            var terminalCommit = Commit(storage, new TaskWrite(TerminalTask(taskId)));
-            await Task.Delay(50);
-            Check(File.Exists(Path.Combine(directory, $"task-{taskId}.jsonl")), "sidecar stays until in-flight cold task read finishes");
-            taskRelease.SetResult();
-            var readTask = await taskRead;
-            Check(readTask is not null && readTask.Id == taskId, "in-flight cold task read succeeds");
-            await terminalCommit;
+            try
+            {
+                await Task.WhenAny(taskPaused.Task, taskRead).WaitAsync(TimeSpan.FromSeconds(5));
+                Check(taskPaused.Task.IsCompleted, "cold task read reached sidecar path resolution");
+                var terminalReceipt = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+                var terminalCommit = storage.CommitAsync([[new TaskWrite(TerminalTask(taskId))]], (_, _) => terminalReceipt.TrySetResult(), JsonlContext);
+                await terminalReceipt.Task.WaitAsync(TimeSpan.FromSeconds(5));
+                Check(File.Exists(Path.Combine(directory, $"task-{taskId}.jsonl")), "sidecar stays until in-flight cold task read finishes");
+                taskRelease.TrySetResult();
+                var readTask = await taskRead;
+                Equal<TaskRecord?>(pendingTask, readTask, "in-flight cold task read returns the pending record selected before reclamation");
+                await terminalCommit;
+            }
+            finally
+            {
+                taskRelease.TrySetResult();
+            }
             Check(!File.Exists(Path.Combine(directory, $"task-{taskId}.jsonl")), "sidecar is reclaimed after reader finishes");
             Equal<TaskRecord?>(TerminalTask(taskId), await storage.GetTaskAsync(taskId, JsonlContext), "subsequent read sees terminal task from main");
 
             // Pause a cold GetDocumentAsync while a concurrent commit rewrites the current-only document base and reclaims its sidecar.
             fs.PauseOnce($"doc-{docId}.jsonl", docPaused, docRelease.Task);
             var docRead = storage.GetDocumentAsync(docId, DocumentPoint.Current, JsonlContext);
-            await docPaused.Task;
-            var baseCommit = Commit(storage, new DocumentChangeWrite(docId, DocumentContent.Base(1, JO("{\"v\":2}"))));
-            await Task.Delay(50);
-            docRelease.SetResult();
-            var readDoc = await docRead;
-            Check(readDoc is not null, "in-flight cold document read succeeds across concurrent base reclamation");
-            await baseCommit;
+            try
+            {
+                await Task.WhenAny(docPaused.Task, docRead).WaitAsync(TimeSpan.FromSeconds(5));
+                Check(docPaused.Task.IsCompleted, "cold document read reached sidecar path resolution");
+                var baseReceipt = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+                var baseCommit = storage.CommitAsync([[new DocumentChangeWrite(docId, DocumentContent.Base(1, JO("{\"v\":2}")))]],
+                    (_, _) => baseReceipt.TrySetResult(), JsonlContext);
+                await baseReceipt.Task.WaitAsync(TimeSpan.FromSeconds(5));
+                docRelease.TrySetResult();
+                var readDoc = await docRead;
+                Check(readDoc is not null, "in-flight cold document read succeeds across concurrent base reclamation");
+                Same("{\"v\":1}", readDoc!.Value, "in-flight cold document read returns the original base selected before reclamation");
+                await baseCommit;
+            }
+            finally
+            {
+                docRelease.TrySetResult();
+            }
             Same("{\"v\":2}", (await storage.GetDocumentAsync(docId, DocumentPoint.Current, JsonlContext))!.Value, "subsequent read sees reclaimed base");
+        });
+
+        yield return JsonlCase("retries-filtered-task-scan-when-cold-task-status-changes-mid-page", async fixture =>
+        {
+            var directory = fixture.NewDirectory();
+            var taskPaused = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var taskRelease = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var fs = new PausingJoinFileSystem(directory);
+            var storage = await fixture.Open(directory, fs);
+            await CreateRoot(storage);
+            var taskA = await storage.MintIdAsync<TaskId>();
+            var taskB = await storage.MintIdAsync<TaskId>();
+            await Commit(storage, new TaskWrite(PendingTask(taskA, "a")), new TaskWrite(PendingTask(taskB, "b")));
+
+            // Pause the pending-only scan while loading taskA; concurrently make taskB terminal before taskB is loaded.
+            fs.PauseOnce($"task-{taskA}.jsonl", taskPaused, taskRelease.Task);
+            var scan = storage.ScanTasksAsync(new TaskQuery { Status = DurableTaskStatus.Pending }, 10, null, JsonlContext);
+            try
+            {
+                await Task.WhenAny(taskPaused.Task, scan).WaitAsync(TimeSpan.FromSeconds(5));
+                Check(taskPaused.Task.IsCompleted, "filtered scan paused on taskA");
+                await Commit(storage, new TaskWrite(TerminalTask(taskB)));
+                taskRelease.TrySetResult();
+                var page = await scan;
+                Equal(1, page.Items.Length, "retried pending scan excludes taskB after it became terminal");
+                Equal(taskA, page.Items[0].Id, "only pending taskA remains");
+                Equal(DurableTaskStatus.Pending, page.Items[0].State.Status, "returned task matches pending filter");
+            }
+            finally
+            {
+                taskRelease.TrySetResult();
+            }
+        });
+
+        yield return JsonlCase("cancels-sidecar-deletion-when-later-batch-in-same-commit-writes-live-task", async fixture =>
+        {
+            var directory = fixture.NewDirectory();
+            var storage = await fixture.Open(directory);
+            await CreateRoot(storage);
+            var taskId = await storage.MintIdAsync<TaskId>();
+            await Commit(storage, new TaskWrite(PendingTask(taskId, "initial")));
+
+            // Batch 1 makes taskId terminal (scheduling sidecar deletion); batch 2 replaces it with a live task in the same CommitAsync.
+            var liveAgain = PendingTask(taskId, "reborn");
+            var result = await storage.CommitAsync([[new TaskWrite(TerminalTask(taskId))], [new TaskWrite(liveAgain)]], (_, _) => { }, JsonlContext);
+            Equal(new CommitResult(2), result, "both batches committed");
+            Check(File.Exists(Path.Combine(directory, $"task-{taskId}.jsonl")), "live replacement cancels pending sidecar deletion");
+            Equal<TaskRecord?>(liveAgain, await storage.GetTaskAsync(taskId, JsonlContext), "live task readable from sidecar");
+            await storage.CloseAsync(JsonlContext);
+
+            var reopened = await fixture.Open(directory);
+            Equal<TaskRecord?>(liveAgain, await reopened.GetTaskAsync(taskId, JsonlContext), "directory reopens cleanly with live task");
         });
     }
 

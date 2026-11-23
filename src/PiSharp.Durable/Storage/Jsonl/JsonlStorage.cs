@@ -221,13 +221,13 @@ public sealed partial class JsonlStorage : IStorage
                 {
                     var mainOffset = fileSizes.GetValueOrDefault(MainFile);
                     commit = EncodeCommit(prepared.Seq, prepared.Writes, writes, mainOffset);
-                    // A sidecar an earlier batch replaces keeps what later batches append, unless they replace it again.
+                    // A sidecar an earlier batch replaces keeps what later batches append, unless they replace it again;
+                    // a later batch appending new live sidecar records cancels any pending deletion from an earlier batch.
                     foreach (var (file, sidecar) in commit.Sidecars)
                     {
-                        if (reclamations.TryGetValue(file, out var existingPlan) && existingPlan.Bytes.Length > 0)
-                        {
-                            reclamations[file] = AppendToReclaimPlan(existingPlan, sidecar);
-                        }
+                        if (!reclamations.TryGetValue(file, out var existingPlan)) continue;
+                        if (existingPlan.Bytes.Length > 0) reclamations[file] = AppendToReclaimPlan(existingPlan, sidecar);
+                        else reclamations.Remove(file);
                     }
                     foreach (var (file, plan) in PlanReclamations(prepared.Writes, commit)) reclamations[file] = plan;
                     ApplyCommittedBatch(prepared.Seq, prepared.Writes, prepared.Actions, commit, pendingSidecarBytes);
@@ -416,35 +416,46 @@ public sealed partial class JsonlStorage : IStorage
                 : null);
 
     /// <inheritdoc/>
-    public Task<Page<TaskRecord>> ScanTasksAsync(TaskQuery query, int limit, JsonObjectValue? cursor, DurableContext context)
+    public async Task<Page<TaskRecord>> ScanTasksAsync(TaskQuery query, int limit, JsonObjectValue? cursor, DurableContext context)
     {
         ArgumentNullException.ThrowIfNull(query);
         var start = StorageScan.Start(query.Order, cursor, ScanOrder.Ascending);
-        return ReadableSnapshotAsync(
-            () =>
-            {
-                var matched = new List<(long Id, TaskLocation Location, int Generation)>();
-                var ids = query.Status is { } status ? taskIdsByStatus[status] : taskIds;
-                foreach (var index in JsonlSortedIndex.ScanIndexes(ids, start))
+        while (true)
+        {
+            var matched = await ReadableSnapshotAsync(
+                () =>
                 {
-                    if (matched.Count > limit) break;
-                    var taskId = ids[index];
-                    var meta = tasks[taskId];
-                    if (query.ConversationId is { } conversationId && meta.ConversationId != conversationId) continue;
-                    if (query.Kind is { } kind && !string.Equals(meta.Kind, kind, StringComparison.Ordinal)) continue;
-                    if (query.AbortRequested is { } abortRequested && meta.AbortRequested != abortRequested) continue;
-                    if (query.Background is { } background && meta.Background != background) continue;
-                    matched.Add((taskId, meta, meta.InMain ? 0 : sidecarGenerations.GetValueOrDefault(SidecarName("task", taskId))));
-                }
-                return matched;
-            },
-            async matched =>
+                    var selected = new List<(long Id, TaskLocation Location, int Generation)>();
+                    var ids = query.Status is { } status ? taskIdsByStatus[status] : taskIds;
+                    foreach (var index in JsonlSortedIndex.ScanIndexes(ids, start))
+                    {
+                        if (selected.Count > limit) break;
+                        var taskId = ids[index];
+                        var meta = tasks[taskId];
+                        if (query.ConversationId is { } conversationId && meta.ConversationId != conversationId) continue;
+                        if (query.Kind is { } kind && !string.Equals(meta.Kind, kind, StringComparison.Ordinal)) continue;
+                        if (query.AbortRequested is { } abortRequested && meta.AbortRequested != abortRequested) continue;
+                        if (query.Background is { } background && meta.Background != background) continue;
+                        selected.Add((taskId, meta, meta.InMain ? 0 : sidecarGenerations.GetValueOrDefault(SidecarName("task", taskId))));
+                    }
+                    return selected;
+                },
+                static selected => Task.FromResult(selected)).ConfigureAwait(false);
+
+            var values = new List<TaskRecord>(matched.Count);
+            var stale = false;
+            foreach (var (taskId, location, generation) in matched)
             {
-                var values = new List<TaskRecord>(matched.Count);
-                foreach (var (taskId, location, generation) in matched)
-                    values.Add(await LoadTaskAsync(taskId, location, generation, context).ConfigureAwait(false));
-                return StorageRules.MakePage(values, limit, start.Order, value => value.Id.Value);
-            });
+                var (loaded, record) = await TryLoadTaskAtSnapshotAsync(taskId, location, generation, context).ConfigureAwait(false);
+                if (!loaded)
+                {
+                    stale = true;
+                    break;
+                }
+                values.Add(record!);
+            }
+            if (!stale) return StorageRules.MakePage(values, limit, start.Order, value => value.Id.Value);
+        }
     }
 
     /// <inheritdoc/>
@@ -997,14 +1008,30 @@ public sealed partial class JsonlStorage : IStorage
         {
             using (await AcquireSidecarReclaimAsync(file).ConfigureAwait(false))
             {
-                await fs.RemoveAsync(path.Value, new RemoveOptions { Force = true }, context).ConfigureAwait(false);
-                lock (indexGate)
+                var removed = await fs.RemoveAsync(path.Value, new RemoveOptions { Force = true }, context).ConfigureAwait(false);
+                if (removed.IsOk)
                 {
-                    fileSizes.Remove(file);
-                    sidecarGenerations[file] = sidecarGenerations.GetValueOrDefault(file) + 1;
-                    if (plan.DocumentId >= 0 && documents.TryGetValue(plan.DocumentId, out var doc)) doc.Generation++;
+                    ClearRemovedSidecarIndex(file, plan.DocumentId);
                 }
-                sidecarCache.RemoveWhere(key => string.Equals(key.File, file, StringComparison.Ordinal));
+                else
+                {
+                    var info = await fs.FileInfoAsync(path.Value, context).ConfigureAwait(false);
+                    if (info.IsOk)
+                    {
+                        // Confirmed still present on disk: retain its actual size so future appends index at EOF.
+                        lock (indexGate) fileSizes[file] = info.Value.Size;
+                    }
+                    else if (info.Error.Code == FileErrorCode.NotFound)
+                    {
+                        // Post-removal failure (FailureMode.After): the file is confirmed absent.
+                        ClearRemovedSidecarIndex(file, plan.DocumentId);
+                    }
+                    else
+                    {
+                        // On-disk state cannot be verified; require reopening before further reads/appends use stale sizes.
+                        Poison(ErrorFromFile($"reclaim removal check of {file}", info.Error));
+                    }
+                }
             }
             return;
         }
@@ -1021,28 +1048,57 @@ public sealed partial class JsonlStorage : IStorage
         using (await AcquireSidecarReclaimAsync(file).ConfigureAwait(false))
         {
             var renamed = await fs.RenameFileAsync(temporaryPath.Value, path.Value, context).ConfigureAwait(false);
-            var applied = renamed.IsOk;
-            if (!applied)
+            if (renamed.IsOk)
             {
-                // A post-rename failure (FailureMode.After) may still have swapped the file on disk.
-                var info = await fs.FileInfoAsync(path.Value, context).ConfigureAwait(false);
-                applied = info.IsOk && info.Value.Size == plan.Bytes.Length;
+                ApplyReclaimedSidecarIndex(file, plan);
             }
-            if (applied)
+            else
             {
-                lock (indexGate)
+                var info = await fs.FileInfoAsync(path.Value, context).ConfigureAwait(false);
+                long previousSize;
+                lock (indexGate) previousSize = fileSizes.GetValueOrDefault(file, -1);
+                if (info.IsOk && info.Value.Size == plan.Bytes.Length && info.Value.Size != previousSize)
                 {
-                    fileSizes[file] = plan.Bytes.Length;
-                    sidecarGenerations[file] = sidecarGenerations.GetValueOrDefault(file) + 1;
-                    if (plan.DocumentId >= 0 && plan.RewrittenRevisions is { } rewritten && documents.TryGetValue(plan.DocumentId, out var doc))
-                    {
-                        doc.Revisions = [.. rewritten];
-                        doc.Generation++;
-                    }
+                    // Confirmed post-rename failure (FailureMode.After): file was replaced on disk.
+                    ApplyReclaimedSidecarIndex(file, plan);
                 }
-                sidecarCache.RemoveWhere(key => string.Equals(key.File, file, StringComparison.Ordinal));
+                else if (info.IsOk && info.Value.Size == previousSize && info.Value.Size != plan.Bytes.Length)
+                {
+                    // Confirmed pre-rename failure (FailureMode.Before): original file and offsets remain intact.
+                }
+                else
+                {
+                    // Inconclusive rename state: do not allow subsequent reads/appends to use potentially stale offsets.
+                    Poison(ErrorFromFile($"reclaim rename verification of {file}", info.IsOk ? renamed.Error : info.Error));
+                }
             }
         }
+    }
+
+    private void ClearRemovedSidecarIndex(string file, long documentId)
+    {
+        lock (indexGate)
+        {
+            fileSizes.Remove(file);
+            sidecarGenerations[file] = sidecarGenerations.GetValueOrDefault(file) + 1;
+            if (documentId >= 0 && documents.TryGetValue(documentId, out var doc)) doc.Generation++;
+        }
+        sidecarCache.RemoveWhere(key => string.Equals(key.File, file, StringComparison.Ordinal));
+    }
+
+    private void ApplyReclaimedSidecarIndex(string file, ReclaimPlan plan)
+    {
+        lock (indexGate)
+        {
+            fileSizes[file] = plan.Bytes.Length;
+            sidecarGenerations[file] = sidecarGenerations.GetValueOrDefault(file) + 1;
+            if (plan.DocumentId >= 0 && plan.RewrittenRevisions is { } rewritten && documents.TryGetValue(plan.DocumentId, out var doc))
+            {
+                doc.Revisions = [.. rewritten];
+                doc.Generation++;
+            }
+        }
+        sidecarCache.RemoveWhere(key => string.Equals(key.File, file, StringComparison.Ordinal));
     }
 
     // ---- Recovery ----
@@ -1435,6 +1491,55 @@ public sealed partial class JsonlStorage : IStorage
     {
         var writes = await LoadMainWritesAsync(location.LineOffset, location.LineLength, context).ConfigureAwait(false);
         return ((SubmissionWrite)StorageWrite.FromJson(writes[location.WriteIndex])).Value;
+    }
+
+    private async Task<(bool Loaded, TaskRecord? Record)> TryLoadTaskAtSnapshotAsync(long taskId, TaskLocation location, int generation, DurableContext context)
+    {
+        var file = SidecarName("task", taskId);
+        if (location.InMain)
+        {
+            var writes = await LoadMainWritesAsync(location.Offset, location.Length, context).ConfigureAwait(false);
+            return (true, ((TaskWrite)StorageWrite.FromJson(writes[location.WriteIndex])).Value);
+        }
+        if (pinnedReadOnlyTasks is not null && pinnedReadOnlyTasks.TryGetValue(taskId, out var pinned)) return (true, pinned);
+        var key = (file, generation, location.Offset, location.Length);
+        if (sidecarCache.TryGet(key, out var cached)) return (true, (TaskRecord)cached);
+
+        await WaitForWritingAsync().ConfigureAwait(false);
+        AssertUsable();
+        using (await AcquireSidecarReadAsync(file).ConfigureAwait(false))
+        {
+            lock (readGate)
+            {
+                if (writing is not null) return (false, null);
+                AssertUsable();
+                lock (indexGate)
+                {
+                    if (!tasks.TryGetValue(taskId, out var current) || current != location || sidecarGenerations.GetValueOrDefault(file) != generation)
+                        return (false, null);
+                }
+            }
+            if (sidecarCache.TryGet(key, out cached)) return (true, (TaskRecord)cached);
+
+            var path = await ResolveFileAsync(file, context).ConfigureAwait(false);
+            var opened = await fs.OpenBinaryReaderAsync(path, null, context).ConfigureAwait(false);
+            if (!opened.IsOk) throw ErrorFromFile($"open of {file}", opened.Error);
+            byte[] bytes;
+            try
+            {
+                var read = await opened.Value.ReadAsync(location.Offset, location.Length, context).ConfigureAwait(false);
+                if (!read.IsOk) throw ErrorFromFile($"positional read of {file}", read.Error);
+                if (read.Value.Length < location.Length) throw new JsonlCorruptionException($"Truncated read in {file} at offset {location.Offset}");
+                bytes = read.Value;
+            }
+            finally
+            {
+                await opened.Value.CloseAsync(context).ConfigureAwait(false);
+            }
+            var record = ParseSidecarTask(bytes.AsSpan(0, location.Length));
+            sidecarCache.Set(key, record, location.Length);
+            return (true, record);
+        }
     }
 
     private async Task<TaskRecord> LoadTaskAsync(long taskId, TaskLocation location, int generation, DurableContext context)
