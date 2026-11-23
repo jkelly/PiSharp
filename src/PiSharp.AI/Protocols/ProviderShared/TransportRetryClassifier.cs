@@ -32,8 +32,20 @@ internal static class TransportRetryClassifier
                 or SocketError.OperationAborted or SocketError.NoData;
         }
 
-        if (error is HttpIOException)
-            return true;
+        if (error is HttpIOException httpIo)
+        {
+            if (httpIo.HttpRequestError is HttpRequestError.ResponseEnded or HttpRequestError.ConnectionError
+                or HttpRequestError.NameResolutionError or HttpRequestError.ProxyTunnelError
+                or HttpRequestError.HttpProtocolError)
+                return true;
+            if (httpIo.HttpRequestError is HttpRequestError.InvalidResponse or HttpRequestError.ConfigurationLimitExceeded
+                or HttpRequestError.UserAuthenticationError or HttpRequestError.ExtendedConnectNotSupported
+                or HttpRequestError.VersionNegotiationError)
+                return false;
+            if (httpIo.InnerException is not null && Inspect(httpIo.InnerException, depth + 1))
+                return true;
+            return httpIo.HttpRequestError == HttpRequestError.Unknown && MatchesNetworkText(httpIo.Message);
+        }
 
         if (error is HttpRequestException http)
         {

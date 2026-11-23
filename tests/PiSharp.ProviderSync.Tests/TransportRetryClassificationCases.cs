@@ -71,6 +71,19 @@ internal static partial class Program
                 Check(!result.IsRetryableTransportFailure, $"{scenario.Name}: InvalidOperationException must NOT be marked retryable.");
             }
 
+            // 4b. Non-transient HttpIOException protocol/resource-limit errors -> NOT retryable.
+            foreach (var nonTransientKind in new[] { HttpRequestError.InvalidResponse, HttpRequestError.ConfigurationLimitExceeded })
+            {
+                using var scope = scenario.Build(_ => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StreamContent(new ThrowingReadStream(
+                        new HttpIOException(nonTransientKind, "protocol or configuration limit")))
+                }));
+                var result = await new ChatClient(scope.Transport).CompleteAsync(new(scenario.Model, [Ask], 1)).WaitAsync(Deadline);
+                Equal(StopReason.Error, result.Message.StopReason);
+                Check(!result.IsRetryableTransportFailure, $"{scenario.Name}: HttpIOException({nonTransientKind}) must NOT be marked retryable.");
+            }
+
             // 5. Caller cancellation -> Aborted, NOT retryable.
             using (var cts = new CancellationTokenSource())
             {
@@ -81,6 +94,40 @@ internal static partial class Program
                 Equal(StopReason.Aborted, result.Message.StopReason);
                 Check(!result.IsRetryableTransportFailure, $"{scenario.Name}: caller cancellation must NOT be marked retryable.");
             }
+        }
+
+        // 6. Mistral permanent 401 whose error-body read drops -> NOT retryable (status stays authoritative).
+        {
+            var mistralModel = new ModelDescriptor("mistral-large-latest", "mistral-conversations", "mistral");
+            using var client = new HttpClient(new Handler(_ => Task.FromResult(new HttpResponseMessage(HttpStatusCode.Unauthorized)
+            {
+                Content = new StreamContent(new ThrowingReadStream(
+                    new IOException("Connection reset while reading 401 body", new SocketException((int)SocketError.ConnectionReset))))
+            })));
+            var transport = new MistralTextHttpSseTransport(client, mistralModel, new MistralTextOptions(new("https://api.mistral.ai/"), true, new(0, 0, 0, 0), "offline-fixture") { ApiKey = Key });
+            var result = await new ChatClient(transport).CompleteAsync(new(mistralModel, [Ask], 1)).WaitAsync(Deadline);
+            Equal(StopReason.Error, result.Message.StopReason);
+            Check(!result.IsRetryableTransportFailure, "Mistral 401 with mid-error-body IOException must NOT be marked retryable.");
+        }
+
+        // 7. Completions observer callback throwing TimeoutException -> NOT retryable.
+        {
+            var completionsModel = new ModelDescriptor("gpt-4o", "openai-completions", "openai");
+            using var client = new HttpClient(new Handler(_ => Task.FromResult(Sse(null,
+                """data: {"id":"cmpl-1","choices":[{"index":0,"delta":{"role":"assistant","content":"hi"},"finish_reason":"stop"}]}""" + "\n\n" +
+                "data: [DONE]\n\n"))));
+            var transport = new CompletionsHttpSseTransport(client,
+                (_, _) => new HttpRequestMessage(HttpMethod.Post, "https://openai.invalid/v1/chat/completions"),
+                options: new CompletionsHttpSseOptions
+                {
+                    Hooks = new CompletionsLifecycleHooks
+                    {
+                        OnSourcePublished = _ => throw new TimeoutException("observer callback timeout")
+                    }
+                });
+            var result = await new ChatClient(transport).CompleteAsync(new(completionsModel, [Ask], 1)).WaitAsync(Deadline);
+            Equal(StopReason.Error, result.Message.StopReason);
+            Check(!result.IsRetryableTransportFailure, "Completions OnSourcePublished TimeoutException must NOT be marked retryable.");
         }
     }
 

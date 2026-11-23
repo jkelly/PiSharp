@@ -445,10 +445,7 @@ internal static class PiCommand
             var themeDiagnostics = reloaded.ThemeDiagnostics
                 .Select(diagnostic => new PiSharp.Cli.Interactive.Mode.ResourceDiagnostic(diagnostic.Type, diagnostic.Message, diagnostic.Path, diagnostic.CollisionName, diagnostic.WinnerPath, diagnostic.LoserPath))
                 .ToArray();
-            foreach (var diagnostic in reloaded.Diagnostics.Where(item =>
-                !item.Message.Contains("collision", StringComparison.Ordinal) &&
-                !item.Message.StartsWith("Theme file", StringComparison.Ordinal) &&
-                !item.Message.StartsWith("Failed to load theme", StringComparison.Ordinal)))
+            foreach (var diagnostic in reloaded.NonThemeDiagnostics)
             {
                 var message = diagnostic.Message.StartsWith("Warning: ", StringComparison.Ordinal) ? diagnostic.Message["Warning: ".Length..] : diagnostic.Message;
                 reloadExtensionDiagnostics.Add(new(diagnostic.Type == "error" ? "error" : "warning", message));

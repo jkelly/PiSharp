@@ -26,6 +26,7 @@ internal sealed class PiResources
     internal ImmutableArray<PiResourcePath> ThemePaths { get; init; } = [];
     internal ImmutableArray<PiTheme> Themes { get; init; } = [];
     internal ImmutableArray<PiDiagnostic> Diagnostics { get; init; } = [];
+    internal ImmutableArray<PiDiagnostic> NonThemeDiagnostics { get; init; } = [];
     internal ImmutableArray<PiThemeDiagnostic> ThemeDiagnostics { get; init; } = [];
 
     private static readonly string[] ContextCandidates = ["AGENTS.override.md", "AGENTS.md", "AGENTS.MD", "CLAUDE.md", "CLAUDE.MD"];
@@ -254,13 +255,14 @@ internal sealed class PiResources
         var appendSources = request.AppendSystemPrompt is { IsDefault: false } explicitAppend ? explicitAppend :
             DiscoverPromptFile(cwd, agentDir, request.ProjectTrusted, "APPEND_SYSTEM.md") is { } discovered ? [discovered] : [];
         var append = appendSources.Select(source => ResolvePromptInput(source, "append system prompt", warnings)).OfType<string>().ToImmutableArray();
+        var nonThemeDiagnostics = warnings.ToImmutableArray();
         var (loadedThemes, themeDiagnostics, structuredThemeDiagnostics) = LoadThemesDetailed(themes);
         warnings.AddRange(themeDiagnostics);
         return new()
         {
             ContextFiles = contextFiles, SystemPrompt = system, SystemPromptSource = systemSource is not null && Path.Exists(systemSource) ? Path.GetFullPath(systemSource) : null,
             AppendSystemPrompt = append, SkillPaths = skills, PromptPaths = prompts, ThemePaths = themes, Themes = loadedThemes, Diagnostics = [.. warnings],
-            ThemeDiagnostics = structuredThemeDiagnostics
+            NonThemeDiagnostics = nonThemeDiagnostics, ThemeDiagnostics = structuredThemeDiagnostics
         };
     }
 
@@ -283,7 +285,8 @@ internal sealed class PiResources
             ContextFiles = resources.ContextFiles, SystemPrompt = resources.SystemPrompt, SystemPromptSource = resources.SystemPromptSource,
             AppendSystemPrompt = resources.AppendSystemPrompt, SkillPaths = Append(resources.SkillPaths, discovered.SkillPaths),
             PromptPaths = Append(resources.PromptPaths, discovered.PromptPaths), ThemePaths = themePaths, Themes = themes,
-            Diagnostics = [.. resources.Diagnostics.Where(diagnostic => !diagnostic.Message.Contains("collision", StringComparison.Ordinal) && !diagnostic.Message.StartsWith("Theme file", StringComparison.Ordinal) && !diagnostic.Message.StartsWith("Failed to load theme", StringComparison.Ordinal)), .. themeDiagnostics],
+            Diagnostics = [.. resources.NonThemeDiagnostics, .. themeDiagnostics],
+            NonThemeDiagnostics = resources.NonThemeDiagnostics,
             ThemeDiagnostics = structuredThemeDiagnostics
         };
     }

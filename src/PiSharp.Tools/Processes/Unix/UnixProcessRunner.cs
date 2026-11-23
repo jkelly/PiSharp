@@ -33,7 +33,10 @@ public sealed class UnixProcessRunner : ISeparatedProcessRunner
     public async ValueTask<SeparatedProcessRunResult> RunSeparatedAsync(ProcessRequest request, CancellationToken cancellationToken = default)
     {
         using var capture = request.CaptureLimitBytes is { } limit
-            ? new SeparatedProcessCapture(_options.StructuredMaxBytes, limit) : new SeparatedProcessCapture(_options.StructuredMaxBytes);
+            ? new SeparatedProcessCapture(_options.StructuredMaxBytes, limit)
+            : request.StandardOutputLineFilter is { } lineFilter
+                ? new SeparatedProcessCapture(_options.StructuredMaxBytes, lineFilter, request.StandardOutputMatchLimit)
+                : new SeparatedProcessCapture(_options.StructuredMaxBytes);
         return capture.Result(await StartCore(request, null, capture, cancellationToken).Completion.ConfigureAwait(false));
     }
     private UnixProcessOperation StartCore(ProcessRequest request, ProcessOutputCallback? onUpdate,
@@ -182,8 +185,8 @@ public sealed class UnixProcessRunner : ISeparatedProcessRunner
                     if (read == 0) break;
                     if (read != bytes.Length) Array.Resize(ref bytes, read);
                     var admitted = capture?.AppendAdmitted(standardError, bytes) ?? bytes.Length;
-                    // A reached capture limit stops the process group; the status still follows its actual exit.
-                    if (capture is { LimitReached: true }) stop.TrySetResult(ProcessRunStatus.Exited);
+                    // A reached capture or filtered match limit stops the process group; the status still follows its actual exit.
+                    if (capture is { ShouldStopProcess: true }) stop.TrySetResult(ProcessRunStatus.Exited);
                     if (admitted == 0) continue;
                     if (admitted != bytes.Length) Array.Resize(ref bytes, admitted);
                     var originalWrite = chunks.Writer.WriteAsync(bytes, reads.Token).AsTask();

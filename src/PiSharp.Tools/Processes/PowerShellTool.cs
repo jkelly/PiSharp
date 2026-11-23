@@ -108,8 +108,12 @@ public sealed class PowerShellTool : IToolArgumentSchemaAdapter
 
     private string Resolve(string command)
     {
-        var prefixed = string.IsNullOrEmpty(_options.CommandPrefix) ? command : _options.CommandPrefix + "\n" + command;
-        return PowerShellDiscovery.Utf8OutputPreamble + "\n" + prefixed;
+        var setup = string.IsNullOrEmpty(_options.CommandPrefix)
+            ? PowerShellDiscovery.Utf8OutputPreamble
+            : PowerShellDiscovery.Utf8OutputPreamble + "\n" + _options.CommandPrefix;
+        // Parse the user command in its own scriptblock boundary so leading `using` statements remain valid.
+        var escaped = command.Replace("'", "''", StringComparison.Ordinal);
+        return $"{setup}\n. ([scriptblock]::Create('{escaped}'))";
     }
 
     public ValueTask<bool> ValidateAsync(PreparedToolAction action, CancellationToken cancellationToken)
@@ -226,7 +230,7 @@ public sealed class PowerShellTool : IToolArgumentSchemaAdapter
     private static bool EnvironmentValid(ImmutableDictionary<string, string>? values)
     {
         if (values is null || values.Count > 1024) return false;
-        var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase); long characters = 2;
+        var names = new HashSet<string>(OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal); long characters = 2;
         foreach (var (key, value) in values)
         {
             if (!Text(key) || key.Length == 0 || key.Contains('=') || !names.Add(key) || !Text(value)) return false;

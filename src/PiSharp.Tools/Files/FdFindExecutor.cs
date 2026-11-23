@@ -89,7 +89,13 @@ public sealed class FdFindExecutor : IFindExecutor
             token.ThrowIfCancellationRequested();
             if (_binary.Executable != await _files.CanonicalizeAsync(_binary.Executable, token).ConfigureAwait(false))
                 throw new IOException("Fd binary launch path identity changed.");
-            var result = await _runner.RunSeparatedAsync(new(_binary.Executable, arguments, _workspace, _environment, lease.SpillPath), token).ConfigureAwait(false);
+            var lineFilter = CreateWindowsPathFilter(request.Pattern, request.SearchPath, OperatingSystem.IsWindows());
+            var processRequest = new ProcessRequest(_binary.Executable, arguments, _workspace, _environment, lease.SpillPath)
+            {
+                StandardOutputLineFilter = lineFilter,
+                StandardOutputMatchLimit = lineFilter is not null ? request.Limit : null,
+            };
+            var result = await _runner.RunSeparatedAsync(processRequest, token).ConfigureAwait(false);
             // No process/pump/output disposal is raced against cancellation; the original receipt is already joined.
             if (result?.Process is null || result.StandardOutput is null || result.StandardError is null ||
                 !result.Process.CleanupConfirmed || !result.Process.CapturedOutputComplete || result.StandardOutput.Truncated || result.StandardError.Truncated ||
@@ -159,18 +165,14 @@ public sealed class FdFindExecutor : IFindExecutor
         if (raw.Length == 0) return [];
         var paths = lines.Select(line => line.Trim()).Where(line => line.Length != 0).ToImmutableArray();
         if (paths.IsEmpty) throw new IOException("Whitespace-only fd path output is outside the supported domain.");
-        var effectivePattern = PiFindTool.EffectivePattern(request.Pattern, windows);
-        if (windows && effectivePattern.Contains('/'))
+        var lineFilter = CreateWindowsPathFilter(request.Pattern, request.SearchPath, windows);
+        if (lineFilter is not null)
         {
-            var relativePathPattern = !PiFindTool.IsAbsolutePattern(effectivePattern, windows: true);
-            var ignoreCase = PiFindTool.IgnoreCase(effectivePattern);
-            var matchPattern = effectivePattern.EndsWith("/**", StringComparison.Ordinal) ? effectivePattern + "/*" : effectivePattern;
             var filtered = ImmutableArray.CreateBuilder<string>();
             long chars = 0;
             foreach (var line in paths)
             {
-                var candidate = relativePathPattern ? PiFindTool.Relativize(line, request.SearchPath) : line;
-                if (!WindowsFindGlob.Match(candidate, matchPattern, ignoreCase)) continue;
+                if (!lineFilter(line)) continue;
                 chars += line.Length;
                 if (chars > request.MaximumTotalPathCharacters)
                     throw new IOException("Fd output exceeded the admitted path bounds.");
@@ -182,6 +184,22 @@ public sealed class FdFindExecutor : IFindExecutor
         if (paths.Length > request.Limit || paths.Sum(path => (long)path.Length) > request.MaximumTotalPathCharacters)
             throw new IOException("Fd output exceeded the admitted path bounds.");
         return paths;
+    }
+
+    internal static Func<string, bool>? CreateWindowsPathFilter(string pattern, string searchPath, bool windows)
+    {
+        var effectivePattern = PiFindTool.EffectivePattern(pattern, windows);
+        if (!windows || !effectivePattern.Contains('/')) return null;
+        var relativePathPattern = !PiFindTool.IsAbsolutePattern(effectivePattern, windows: true);
+        var ignoreCase = PiFindTool.IgnoreCase(effectivePattern);
+        var matchPattern = effectivePattern.EndsWith("/**", StringComparison.Ordinal) ? effectivePattern + "/*" : effectivePattern;
+        return line =>
+        {
+            var trimmed = line.Trim();
+            if (trimmed.Length == 0) return false;
+            var candidate = relativePathPattern ? PiFindTool.Relativize(trimmed, searchPath) : trimmed;
+            return WindowsFindGlob.Match(candidate, matchPattern, ignoreCase);
+        };
     }
     private static bool Absolute(string? value) => Text(value, 4096) && Path.IsPathFullyQualified(value!) && Path.GetFullPath(value!) == value;
     private static bool Text(string? value, int maximum) => value is { Length: > 0 } && value.Length <= maximum && !value.Any(char.IsControl) &&

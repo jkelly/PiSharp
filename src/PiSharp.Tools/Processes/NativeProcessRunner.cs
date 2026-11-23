@@ -26,6 +26,10 @@ public sealed record ProcessRequest(string Executable, ImmutableArray<string> Ar
     /// <summary>Separated runs only: stop the process when stdout and stderr together exceed this many bytes, keeping the bytes
     /// within it (source execCommand maxBuffer). Replaces the per-pipe and raw-output limits for this capture; null keeps them.</summary>
     [System.Diagnostics.CodeAnalysis.Experimental("PISHARP_EXEC001")] public long? CaptureLimitBytes { get; init; }
+    /// <summary>Separated runs only: when set, stdout lines are filtered as they stream before entering the bounded capture buffer.</summary>
+    internal Func<string, bool>? StandardOutputLineFilter { get; init; }
+    /// <summary>Separated runs only: optional cap on matched stdout lines when <see cref="StandardOutputLineFilter"/> is set.</summary>
+    internal int? StandardOutputMatchLimit { get; init; }
 }
 
 public sealed record ProcessRunnerOptions(int MaximumRawBytes = 64 * 1024 * 1024,
@@ -130,7 +134,10 @@ public sealed class NativeProcessRunner : ISeparatedProcessRunner
     public async ValueTask<SeparatedProcessRunResult> RunSeparatedAsync(ProcessRequest request, CancellationToken cancellationToken = default)
     {
         using var capture = request.CaptureLimitBytes is { } limit
-            ? new SeparatedProcessCapture(_options.StructuredMaxBytes, limit) : new SeparatedProcessCapture(_options.StructuredMaxBytes);
+            ? new SeparatedProcessCapture(_options.StructuredMaxBytes, limit)
+            : request.StandardOutputLineFilter is { } lineFilter
+                ? new SeparatedProcessCapture(_options.StructuredMaxBytes, lineFilter, request.StandardOutputMatchLimit)
+                : new SeparatedProcessCapture(_options.StructuredMaxBytes);
         var original = await RunCoreAsync(request, null, capture, cancellationToken).ConfigureAwait(false);
         return capture.Result(original);
     }
@@ -288,8 +295,8 @@ public sealed class NativeProcessRunner : ISeparatedProcessRunner
                     if (count == 0) break;
                     if (count != bytes.Length) Array.Resize(ref bytes, count);
                     var admitted = capture?.AppendAdmitted(standardError, bytes) ?? bytes.Length;
-                    // A reached capture limit stops the process; the status still follows its actual exit.
-                    if (capture is { LimitReached: true }) stop.TrySetResult(ProcessRunStatus.Exited);
+                    // A reached capture or filtered match limit stops the process; the status still follows its actual exit.
+                    if (capture is { ShouldStopProcess: true }) stop.TrySetResult(ProcessRunStatus.Exited);
                     Interlocked.Exchange(ref lastActivity, _clock.GetTimestamp());
                     activity.Writer.TryWrite(0);
                     if (admitted == 0) continue;

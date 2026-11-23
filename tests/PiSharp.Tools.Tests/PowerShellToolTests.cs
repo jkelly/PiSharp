@@ -142,6 +142,11 @@ internal static class PowerShellToolTests
         Check(hello.Content[0].Text.Contains("hello-pisharp-ps café", StringComparison.Ordinal), "Unexpected output: " + hello.Content[0].Text);
         Equal(0, hello.StructuredContent!.Value.GetProperty("exit_code").GetInt32());
 
+        // 1b. Leading `using namespace` statements parse cleanly in their own scriptblock boundary
+        var usingResult = await Run("using namespace System.Text; [StringBuilder]::new('using-ok').ToString()");
+        Check(!usingResult.IsError, "Expected using namespace command to succeed: " + usingResult.Content[0].Text);
+        Check(usingResult.Content[0].Text.Contains("using-ok", StringComparison.Ordinal), "Unexpected using output: " + usingResult.Content[0].Text);
+
         // 2. Non-zero exit code
         var fail = await Run("Write-Output 'before-fail'; exit 7");
         Check(fail.IsError, "Expected IsError on non-zero exit.");

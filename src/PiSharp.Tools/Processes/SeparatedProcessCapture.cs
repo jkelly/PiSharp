@@ -23,16 +23,30 @@ public sealed class SeparatedProcessCapture : IDisposable
 {
     // Same byte bound as native pi.exec, below both MemoryStream's and the runtime's string limit.
     internal const long MaximumCombinedBytes = 0x3FFFFFDF;
+    private const int MaximumPendingLineBytes = 4 * 1024 * 1024;
     private readonly int _maximumBytes;
     private readonly long? _combinedLimit;
+    private readonly Func<string, bool>? _stdoutLineFilter;
+    private readonly int? _stdoutMatchLimit;
     private readonly object _gate = new();
     private readonly MemoryStream _stdout = new();
     private readonly MemoryStream _stderr = new();
-    private bool _stdoutTruncated, _stderrTruncated;
+    private readonly MemoryStream? _pendingStdoutLine;
+    private bool _stdoutTruncated, _stderrTruncated, _stdoutMatchLimitReached, _stdoutFlushed;
+    private int _stdoutMatchedLines;
     public SeparatedProcessCapture(int maximumBytes)
     {
         if (maximumBytes is < 1 or > 1024 * 1024) throw new ArgumentOutOfRangeException(nameof(maximumBytes));
         _maximumBytes = maximumBytes;
+    }
+    /// <summary>A capture whose stdout lines are filtered as they stream before entering the bounded stdout buffer.</summary>
+    internal SeparatedProcessCapture(int maximumBytes, Func<string, bool> standardOutputLineFilter, int? matchLimit = null) : this(maximumBytes)
+    {
+        ArgumentNullException.ThrowIfNull(standardOutputLineFilter);
+        if (matchLimit is <= 0) throw new ArgumentOutOfRangeException(nameof(matchLimit));
+        _stdoutLineFilter = standardOutputLineFilter;
+        _stdoutMatchLimit = matchLimit;
+        _pendingStdoutLine = new MemoryStream();
     }
     /// <summary>A capture bounded by both pipes together (source execCommand maxBuffer). The explicit combined limit replaces
     /// the ordinary per-pipe bound; exceeding it sets <see cref="LimitReached"/> so the runner stops the process.
@@ -46,18 +60,24 @@ public sealed class SeparatedProcessCapture : IDisposable
         _maximumBytes = (int)combinedLimit;
     }
     [Experimental("PISHARP_EXEC001")] public bool LimitReached { get; private set; }
+    internal bool ShouldStopProcess => LimitReached || _stdoutMatchLimitReached;
     public void Append(bool standardError, ReadOnlySpan<byte> bytes) => AppendAdmitted(standardError, bytes);
 
     // Return only the prefix admitted to an explicit capture. Pumps still drain both pipes, but must not send over-limit
     // bytes to the separate raw-output accumulator, where they could turn normal maxBuffer termination into an I/O failure.
     internal int AppendAdmitted(bool standardError, ReadOnlySpan<byte> bytes)
     {
-        if (_combinedLimit is null) { AppendCore(standardError, bytes); return bytes.Length; }
+        if (_combinedLimit is null) { return AppendCore(standardError, bytes); }
         lock (_gate) return AppendCore(standardError, bytes);
     }
     private int AppendCore(bool standardError, ReadOnlySpan<byte> bytes)
     {
         if (LimitReached) return 0;
+        if (!standardError && _stdoutLineFilter is not null)
+        {
+            AppendFilteredStdout(bytes);
+            return 0;
+        }
         // The pipes share the combined limit; the read that crosses it keeps only the bytes within it.
         if (_combinedLimit is { } limit && _stdout.Length + _stderr.Length + bytes.Length > limit)
         { bytes = bytes[..(int)(limit - _stdout.Length - _stderr.Length)]; LimitReached = true; }
@@ -69,13 +89,77 @@ public sealed class SeparatedProcessCapture : IDisposable
             if (standardError) _stderrTruncated = true; else _stdoutTruncated = true;
             if (_combinedLimit is not null) LimitReached = true;
         }
-        return count;
+        return _combinedLimit is null ? bytes.Length : count;
+    }
+    private void AppendFilteredStdout(ReadOnlySpan<byte> bytes)
+    {
+        if (_stdoutMatchLimitReached || _stdoutTruncated) return;
+        var pending = _pendingStdoutLine!;
+        var offset = 0;
+        while (offset < bytes.Length)
+        {
+            var remaining = bytes[offset..];
+            var newline = remaining.IndexOf((byte)'\n');
+            var segment = newline < 0 ? remaining : remaining[..newline];
+            if (pending.Length + segment.Length > MaximumPendingLineBytes)
+            {
+                _stdoutTruncated = true;
+                return;
+            }
+            if (segment.Length > 0) pending.Write(segment);
+            if (newline < 0) return;
+            offset += newline + 1;
+            ProcessPendingStdoutLine();
+            pending.SetLength(0);
+            if (_stdoutMatchLimitReached || _stdoutTruncated) return;
+        }
+    }
+    private void ProcessPendingStdoutLine()
+    {
+        var pending = _pendingStdoutLine!;
+        var length = (int)pending.Length;
+        if (length == 0) return;
+        var span = pending.GetBuffer().AsSpan(0, length);
+        if (span[^1] == (byte)'\r') span = span[..^1];
+        if (span.IsEmpty) return;
+        if (span.Contains((byte)0))
+        {
+            if (_stdout.Length < _maximumBytes) _stdout.WriteByte(0);
+            else _stdoutTruncated = true;
+            return;
+        }
+        var line = Encoding.UTF8.GetString(span);
+        if (!_stdoutLineFilter!(line)) return;
+        var needed = span.Length + 1;
+        if (_stdout.Length + needed > _maximumBytes)
+        {
+            var room = _maximumBytes - (int)_stdout.Length;
+            if (room > 0) _stdout.Write(span[..Math.Min(room, span.Length)]);
+            _stdoutTruncated = true;
+            return;
+        }
+        _stdout.Write(span);
+        _stdout.WriteByte((byte)'\n');
+        _stdoutMatchedLines++;
+        if (_stdoutMatchLimit is { } cap && _stdoutMatchedLines >= cap) _stdoutMatchLimitReached = true;
     }
     internal ProcessRunnerOptions OutputOptions(ProcessRunnerOptions options) => _combinedLimit is { } limit
         ? options with { MaximumRawBytes = Math.Max(options.MaximumRawBytes, (int)limit) } : options;
-    public SeparatedProcessRunResult Result(ProcessRunResult original) => new(original,
-        new(Decode(_stdout), _stdoutTruncated || LimitReached), new(Decode(_stderr), _stderrTruncated || LimitReached))
-    { CaptureLimitReached = LimitReached };
+    public SeparatedProcessRunResult Result(ProcessRunResult original)
+    {
+        if (_stdoutLineFilter is not null && !_stdoutFlushed)
+        {
+            _stdoutFlushed = true;
+            if (!_stdoutMatchLimitReached && !_stdoutTruncated && _pendingStdoutLine is { Length: > 0 })
+            {
+                ProcessPendingStdoutLine();
+                _pendingStdoutLine.SetLength(0);
+            }
+        }
+        return new(original,
+            new(Decode(_stdout), _stdoutTruncated || LimitReached), new(Decode(_stderr), _stderrTruncated || LimitReached))
+        { CaptureLimitReached = LimitReached };
+    }
     // A stopped capture drops an incomplete UTF-8 suffix rather than decoding it as a replacement character (source execCommand).
     private string Decode(MemoryStream buffer)
     {
@@ -93,5 +177,5 @@ public sealed class SeparatedProcessCapture : IDisposable
         }
         return bytes.Length;
     }
-    public void Dispose() { _stdout.Dispose(); _stderr.Dispose(); }
+    public void Dispose() { _stdout.Dispose(); _stderr.Dispose(); _pendingStdoutLine?.Dispose(); }
 }
