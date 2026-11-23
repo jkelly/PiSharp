@@ -688,14 +688,17 @@ internal static partial class Program
             {
                 await Task.WhenAny(taskPaused.Task, taskRead).WaitAsync(TimeSpan.FromSeconds(5));
                 Check(taskPaused.Task.IsCompleted, "cold task read reached sidecar path resolution");
-                var terminalReceipt = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-                var terminalCommit = storage.CommitAsync([[new TaskWrite(TerminalTask(taskId))]], (_, _) => terminalReceipt.TrySetResult(), JsonlContext);
-                await terminalReceipt.Task.WaitAsync(TimeSpan.FromSeconds(5));
+                var reclaimEntered = fs.NotifyJoinOnce($"task-{taskId}.jsonl");
+                var terminalCommit = storage.CommitAsync([[new TaskWrite(TerminalTask(taskId))]], (_, _) => { }, JsonlContext);
+                await reclaimEntered.WaitAsync(TimeSpan.FromSeconds(5));
+                // Give reclamation a brief window to prove it blocks on the reader gate rather than deleting the sidecar.
+                await Task.WhenAny(terminalCommit, Task.Delay(50));
+                Check(!terminalCommit.IsCompleted, "task sidecar reclamation waits for the in-flight cold reader");
                 Check(File.Exists(Path.Combine(directory, $"task-{taskId}.jsonl")), "sidecar stays until in-flight cold task read finishes");
                 taskRelease.TrySetResult();
-                var readTask = await taskRead;
+                var readTask = await taskRead.WaitAsync(TimeSpan.FromSeconds(5));
                 Equal<TaskRecord?>(pendingTask, readTask, "in-flight cold task read returns the pending record selected before reclamation");
-                await terminalCommit;
+                await terminalCommit.WaitAsync(TimeSpan.FromSeconds(5));
             }
             finally
             {
@@ -711,15 +714,16 @@ internal static partial class Program
             {
                 await Task.WhenAny(docPaused.Task, docRead).WaitAsync(TimeSpan.FromSeconds(5));
                 Check(docPaused.Task.IsCompleted, "cold document read reached sidecar path resolution");
-                var baseReceipt = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-                var baseCommit = storage.CommitAsync([[new DocumentChangeWrite(docId, DocumentContent.Base(1, JO("{\"v\":2}")))]],
-                    (_, _) => baseReceipt.TrySetResult(), JsonlContext);
-                await baseReceipt.Task.WaitAsync(TimeSpan.FromSeconds(5));
+                var reclaimWritten = fs.NotifyWriteOnce($"doc-{docId}.jsonl.reclaim");
+                var baseCommit = storage.CommitAsync([[new DocumentChangeWrite(docId, DocumentContent.Base(1, JO("{\"v\":2}")))]], (_, _) => { }, JsonlContext);
+                await reclaimWritten.WaitAsync(TimeSpan.FromSeconds(5));
+                await Task.WhenAny(baseCommit, Task.Delay(50));
+                Check(!baseCommit.IsCompleted, "document sidecar reclamation waits for the in-flight cold reader");
                 docRelease.TrySetResult();
-                var readDoc = await docRead;
+                var readDoc = await docRead.WaitAsync(TimeSpan.FromSeconds(5));
                 Check(readDoc is not null, "in-flight cold document read succeeds across concurrent base reclamation");
                 Same("{\"v\":1}", readDoc!.Value, "in-flight cold document read returns the original base selected before reclamation");
-                await baseCommit;
+                await baseCommit.WaitAsync(TimeSpan.FromSeconds(5));
             }
             finally
             {
@@ -747,9 +751,9 @@ internal static partial class Program
             {
                 await Task.WhenAny(taskPaused.Task, scan).WaitAsync(TimeSpan.FromSeconds(5));
                 Check(taskPaused.Task.IsCompleted, "filtered scan paused on taskA");
-                await Commit(storage, new TaskWrite(TerminalTask(taskB)));
+                await Commit(storage, new TaskWrite(TerminalTask(taskB))).WaitAsync(TimeSpan.FromSeconds(5));
                 taskRelease.TrySetResult();
-                var page = await scan;
+                var page = await scan.WaitAsync(TimeSpan.FromSeconds(5));
                 Equal(1, page.Items.Length, "retried pending scan excludes taskB after it became terminal");
                 Equal(taskA, page.Items[0].Id, "only pending taskA remains");
                 Equal(DurableTaskStatus.Pending, page.Items[0].State.Status, "returned task matches pending filter");
@@ -841,20 +845,38 @@ internal static partial class Program
     {
         private readonly Lock gate = new();
         private readonly Dictionary<string, (TaskCompletionSource Paused, Task Release)> pauses = new(StringComparer.Ordinal);
+        private readonly Dictionary<string, TaskCompletionSource> joinNotices = new(StringComparer.Ordinal);
+        private readonly Dictionary<string, TaskCompletionSource> writeNotices = new(StringComparer.Ordinal);
 
         public void PauseOnce(string fileName, TaskCompletionSource paused, Task release)
         {
             lock (gate) pauses[fileName] = (paused, release);
         }
 
+        public Task NotifyJoinOnce(string fileName)
+        {
+            var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            lock (gate) joinNotices[fileName] = tcs;
+            return tcs.Task;
+        }
+
+        public Task NotifyWriteOnce(string fileName)
+        {
+            var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            lock (gate) writeNotices[fileName] = tcs;
+            return tcs.Task;
+        }
+
         public override async Task<Result<string, FileError>> JoinPathAsync(IReadOnlyList<string> parts, DurableContext context)
         {
             (TaskCompletionSource Paused, Task Release)? match = null;
+            TaskCompletionSource? notice = null;
             if (parts.Count > 0)
             {
                 lock (gate)
                 {
                     if (pauses.Remove(parts[^1], out var found)) match = found;
+                    else joinNotices.Remove(parts[^1], out notice);
                 }
             }
             if (match is { } foundMatch)
@@ -862,7 +884,18 @@ internal static partial class Program
                 foundMatch.Paused.TrySetResult();
                 await foundMatch.Release;
             }
+            notice?.TrySetResult();
             return await base.JoinPathAsync(parts, context);
+        }
+
+        public override async Task<Result<Unit, FileError>> WriteFileAsync(string path, ReadOnlyMemory<byte> content, DurableContext context)
+        {
+            var result = await base.WriteFileAsync(path, content, context);
+            var name = Path.GetFileName(path);
+            TaskCompletionSource? notice = null;
+            lock (gate) writeNotices.Remove(name, out notice);
+            notice?.TrySetResult();
+            return result;
         }
     }
 

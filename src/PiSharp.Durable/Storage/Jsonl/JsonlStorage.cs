@@ -175,6 +175,7 @@ public sealed partial class JsonlStorage : IStorage
             try
             {
                 await storage.RecoverAsync(context).ConfigureAwait(false);
+                storage.AssertUsable();
                 return storage;
             }
             catch (JsonlCorruptionException)
