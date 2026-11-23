@@ -58,8 +58,12 @@ public sealed class GoogleGenerativeAIHttpTransport : IChatTransport
                     }
                     token.ThrowIfCancellationRequested();
                     if (permanentHttpStatus) allowTransportRetry = false;
-                    body = _options.BodyReaderFactory is { } acquire ? await acquire(response, token).ConfigureAwait(false) :
-                        await response.Content.ReadAsStreamAsync(token).ConfigureAwait(false);
+                    if (_options.BodyReaderFactory is { } acquire)
+                    {
+                        try { body = await acquire(response, token).ConfigureAwait(false); }
+                        catch { allowTransportRetry = false; throw; }
+                    }
+                    else body = await response.Content.ReadAsStreamAsync(token).ConfigureAwait(false);
                     if (body is null) throw GoogleData.Fail(GoogleFailure.SourceFailed);
                     if (response.IsSuccessStatusCode)
                     {

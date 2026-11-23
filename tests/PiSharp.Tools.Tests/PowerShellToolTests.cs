@@ -108,6 +108,22 @@ internal static class PowerShellToolTests
         var tightPrepared = await tightTool.PrepareAsync(new ToolInvocation(quotedAssistant, quotedCall, 0), CancellationToken.None);
         Check(await tightTool.ValidateAsync(tightPrepared, CancellationToken.None), "Tight MaximumCommandCharacters rejected valid user command due to wrapper overhead.");
 
+        // Large command near MaximumCommandCharacters (85,000 chars) fits within ToolInvoker's MaximumActionCharacters after Base64 encoding
+        var largeOptions = BashToolOptions.FromShell(shell, temp.Root, ImmutableDictionary<string, string>.Empty, temp.Spill) with
+        {
+            MaximumCommandCharacters = 96_000,
+            MaximumArgumentCharacters = 96_000
+        };
+        var largeTool = new PowerShellTool(runner, largeOptions);
+        var largePolicy = new RecordingDenyPolicy();
+        var largeInvoker = largeTool.CreateInvoker(largePolicy);
+        var bigCommand = new string('a', 85_000);
+        var bigCall = new ToolCallContent("ps-big", "powershell", JsonData.Parse(JsonSerializer.Serialize(new { command = bigCommand })));
+        var bigAssistant = new AssistantMessage("openai-responses", "openai", "m", 1, [bigCall], TokenUsage.Zero, StopReason.ToolUse);
+        var bigResult = await largeInvoker.ExecuteAsync(new ToolInvocation(bigAssistant, bigCall, 0), CancellationToken.None);
+        Check(largePolicy.Invoked && bigResult.IsError && runner.Calls == 0,
+            "Large valid PowerShell command was rejected before policy authorization (MaximumActionCharacters too small).");
+
         // UnavailableShellError fails without launching process
         var unavailable = new PowerShellTool(runner, BashToolOptions.Unavailable("No PowerShell installed.", "powershell.exe", temp.Root, ImmutableDictionary<string, string>.Empty, temp.Spill));
         var unavailInvoker = unavailable.CreateInvoker(new FixedPolicy(allow: true));
@@ -201,6 +217,16 @@ internal static class PowerShellToolTests
     {
         public ValueTask<ToolActionAuthorization> AuthorizeAsync(ToolInvocation invocation, PreparedToolAction action, CancellationToken cancellationToken) =>
             ValueTask.FromResult(new ToolActionAuthorization(allow));
+    }
+
+    private sealed class RecordingDenyPolicy : IToolActionPolicy
+    {
+        public bool Invoked;
+        public ValueTask<ToolActionAuthorization> AuthorizeAsync(ToolInvocation invocation, PreparedToolAction action, CancellationToken cancellationToken)
+        {
+            Invoked = true;
+            return ValueTask.FromResult(new ToolActionAuthorization(false));
+        }
     }
 
     private sealed class Temp : IDisposable

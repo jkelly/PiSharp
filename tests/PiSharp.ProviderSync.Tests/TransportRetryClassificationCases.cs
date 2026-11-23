@@ -169,6 +169,16 @@ internal static partial class Program
                 Check(terminal is StreamError { IsRetryableTransportFailure: false },
                     "Completions OnInputPublished TimeoutException must NOT be marked retryable.");
             }
+            // Completions BodyReaderFactory / BodyResultReaderFactory failures -> NOT retryable.
+            using (var client = new HttpClient(new Handler(_ => Task.FromResult(CompletionsOk()))))
+            {
+                var transport = new CompletionsHttpSseTransport(client,
+                    (_, _) => new HttpRequestMessage(HttpMethod.Post, "https://openai.invalid/v1/chat/completions"),
+                    options: new CompletionsHttpSseOptions { BodyReaderFactory = (_, _) => ValueTask.FromException<ICompletionsResponseBodyReader>(new TimeoutException("factory timeout")) });
+                var result = await new ChatClient(transport).CompleteAsync(new(completionsModel, [Ask], 1)).WaitAsync(Deadline);
+                Equal(StopReason.Error, result.Message.StopReason);
+                Check(!result.IsRetryableTransportFailure, "Completions BodyReaderFactory TimeoutException must NOT be marked retryable.");
+            }
             // Completions premature EOF without finish_reason -> retryable UnexpectedEof.
             using (var client = new HttpClient(new Handler(_ => Task.FromResult(Sse(null,
                 """data: {"id":"cmpl-1","choices":[{"index":0,"delta":{"role":"assistant","content":"partial"},"finish_reason":null}]}""" + "\n\n")))))

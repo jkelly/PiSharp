@@ -51,8 +51,18 @@ public sealed class PowerShellTool : IToolArgumentSchemaAdapter
     public ToolInvoker CreateInvoker(IToolActionPolicy policy, IEnumerable<ToolActionTransform>? transforms = null,
         IEnumerable<ToolResultTransform>? resultTransforms = null) =>
         new([this], policy, transforms, resultTransforms, new(MaximumArgumentCharacters: _options.MaximumArgumentCharacters,
-            MaximumActionCharacters: 192_000, MaximumActionEntries: 1026, MaximumResultCharacters: 512 * 1024)
+            MaximumActionCharacters: MaximumActionCharacters(), MaximumActionEntries: 1026, MaximumResultCharacters: 512 * 1024)
             { MaximumStructuredContentCharacters = 8 * 1024 * 1024 });
+
+    private int MaximumActionCharacters()
+    {
+        var encodedCommandMax = ((_options.MaximumCommandCharacters * 3L + 2) / 3) * 4;
+        var argumentsMax = Math.Max((long)_options.MaximumArgumentCharacters, _options.MaximumCommandCharacters * 6L) + 4_500;
+        var wrapperOverhead = PowerShellDiscovery.Utf8OutputPreamble.Length + (_options.CommandPrefix?.Length ?? 0) + 256;
+        var shellOverhead = _options.Executable.Length + _options.ShellArguments.Sum(arg => (long)arg.Length) + 8_192;
+        var envMax = OperatingSystem.IsWindows() ? 32_768L : 131_072L;
+        return (int)Math.Max(192_000L, argumentsMax + encodedCommandMax + wrapperOverhead + shellOverhead + envMax);
+    }
 
     public ToolDefinition CreateDefinition(ToolInvoker invoker) =>
         new(Name, invoker ?? throw new ArgumentNullException(nameof(invoker)));

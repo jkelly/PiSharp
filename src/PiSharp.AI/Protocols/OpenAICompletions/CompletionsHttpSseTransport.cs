@@ -247,15 +247,22 @@ public sealed class CompletionsHttpSseTransport : IChatTransport
             var body = _input ?? await _response!.AcquireBodyAsync(token).ConfigureAwait(false);
             if (owner._options.BodyResultReaderFactory is { } resultFactory)
             {
-                var executor = await resultFactory(body, token).ConfigureAwait(false);
+                ICompletionsResponseBodyResultReader executor;
+                try { executor = await resultFactory(body, token).ConfigureAwait(false); }
+                catch { LastFailureNonTransport = true; throw; }
                 _reader = CompletionsReaderStream.FromResultReader(executor ?? throw Protocol(), owner._framing.ReadBufferBytes,
                     owner._options.MaximumConsecutiveEmptyBodyReads, GuardObserver(owner._options.OnBodyRead), _startup, _input is not null);
             }
             else
             {
-                var executor = owner._options.BodyReaderFactory is { } factory
-                    ? await factory(body, token).ConfigureAwait(false)
-                    : CompletionsResponseBodyReader.FromStream(body);
+                ICompletionsResponseBodyReader executor;
+                if (owner._options.BodyReaderFactory is { } factory)
+                {
+                    try { executor = await factory(body, token).ConfigureAwait(false); }
+                    catch { LastFailureNonTransport = true; throw; }
+                }
+                else
+                    executor = CompletionsResponseBodyReader.FromStream(body);
                 _reader = new(executor ?? throw Protocol(), owner._framing.ReadBufferBytes, GuardObserver(owner._options.OnBodyRead), _startup, _input is not null);
             }
             token.ThrowIfCancellationRequested();
