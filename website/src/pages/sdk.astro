@@ -50,7 +50,7 @@ const groups = [
 						.map((p) => (
 							<li>
 								<div class="name">
-									<a class="ps-mono" href={p.unpublished ? `https://github.com/jkelly/PiSharp/tree/main/src/${p.id}` : `https://www.nuget.org/packages/${p.id}/${versions.pisharp}`}>{p.id}</a>
+									<a class="ps-mono" href={p.unpublished ? (p.template ? 'https://github.com/jkelly/PiSharp/tree/main/templates' : `https://github.com/jkelly/PiSharp/tree/main/src/${p.id}`) : `https://www.nuget.org/packages/${p.id}/${versions.pisharp}`}>{p.id}</a>
 									{p.experimental && <a class="ps-chip" data-tone="experimental" href={p.docs ?? '/docs/guides/durable/'}>Experimental</a>}
 									{p.optional && <span class="ps-chip">Optional</span>}
 								</div>

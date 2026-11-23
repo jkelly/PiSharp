@@ -17,6 +17,10 @@ The owner's decisions that set PiSharp's scope, targets and designs, newest last
 | [0011](0011-web-agent.md) | PiSharp Web Agent: a local chat app and model playground on durable sessions | `main` |
 | [0012](0012-custom-agents.md) | Custom agents, workflows and subagents on the durable harness (released as experimental in 1.2.0.2) | `main` |
 | [0013](0013-pi-1.5.0-sync.md) | Pi v1.5.0 sync, straight from v1.2.0, with every upstream package in scope. Supersedes the package exclusions of 0006. Released in 1.5.0 (phases 0 to 4 and the close-out); phases 5 to 7 follow in 1.5.0.x | `main` |
+| [0014](0014-pi-1.5.2-sync.md) | Pi v1.5.2 sync, including v1.5.1, released in 1.5.2 | `main` |
+| [0015](0015-pi-1.6.0-sync.md) | Pi v1.6.0 and Pi Durable 1.6.0 sync, released in 1.6.0 | `main` |
+| [0016](0016-transport-retry-classification.md) | Internal transport retry classification alongside sanitized error messages (effective in 1.6.0.1) | `main` |
+| [0017](0017-experimental-graduation-tier1.md) | Tier-1 `[Experimental]` API graduation (effective in 1.6.0.1) | `main` |
 
 Technical notes kept beside the numbered records:
 - [ecmascript-json-boundary.md](ecmascript-json-boundary.md): the explicit boundary between PiSharp's native JSON values and JavaScript's parsed JSON.
