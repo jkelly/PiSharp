@@ -53,8 +53,8 @@ When your application hosts multiple reactive domains, HTTP routes, or hot-reloa
 - **`RegistryReader.Create`** projects plugin-contributed extensions from the real Chord host into Durable's registry, tracking reloads and retirements.
 - **`ViewBridge`** bridges typed immutable Durable conversation/task views into Chord JSON members with automatic observer cleanup (`Durable.Chord.Examples` 35–37).
 
-:::note[1.6.0 source candidate: storage format & signals]
-On `sync/pi-1.6.0` (unreleased), Durable advances `pi.tool` to version 4 and `pi.generation` to version 3 to support **typed signals**, **sleeps without an `until` deadline**, **parked tools** (waiting on webhooks, polls, or human approval without holding a thread), and **hooks that start tasks**. Databases written by 1.6.0 cannot be reopened by PiSharp 1.5.2; keep a backup before testing 1.6.0 against an existing SQLite file. See [Durable 1.6.0 candidate notes](/docs/embed/durable/#the-160-source-candidate).
+:::note[New in 1.6.0: storage format & signals]
+In PiSharp 1.6.0, Durable advances `pi.tool` to version 4 and `pi.generation` to version 3 to support **typed signals**, **sleeps without an `until` deadline**, **parked tools** (waiting on webhooks, polls, or human approval without holding a thread), and **hooks that start tasks**. Databases written by 1.6.0 cannot be reopened by PiSharp 1.5.2; keep a backup before upgrading an existing SQLite file. See [Durable 1.6.0 notes](/docs/embed/durable/#new-in-160).
 :::
 
 ## Related guides

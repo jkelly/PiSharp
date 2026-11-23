@@ -8,8 +8,8 @@ description: "Embed the full coding agent: persistent sessions, settings, prompt
 ## Install
 
 ```powershell
-dotnet add package PiSharp.CodingAgent --version 1.5.2
-dotnet add package PiSharp.Tools --version 1.5.2
+dotnet add package PiSharp.CodingAgent --version 1.6.0
+dotnet add package PiSharp.Tools --version 1.6.0
 ```
 
 `PiSharp.CodingAgent` references `PiSharp.Agent` and `PiSharp.Sessions`, but not `PiSharp.Tools`. Add `PiSharp.Tools` yourself to get the built-in tools. Your project targets `net10.0`.
@@ -524,8 +524,8 @@ Once your policy allows a `bash` command, the command runs with your process's r
 | `AutoResizeImages` (`init`) | `true` | Resize large images, like `images.autoResize`. |
 | `ImageResizeOptions` (`init`) | `null` | Size limits for images. See [Images](#images). |
 | `ImageCodec` (`init`) | `null` | The image codec. `null` uses `BuiltinImageCodec`. |
-| `CurrentModelSupportsImages` (`init`) | `null` | Returns `false` when the model can't see images. In 1.5.2, `read` then adds a note to the result. In the unreleased 1.6.0 source candidate it stores no note and sets `details.imageUnsupportedByModel` instead (`ReadWriteTools.ImageUnsupportedByModelProperty`), for a renderer to show. |
-| `CurrentModelId` (`init`, 1.6.0 source candidate) | `null` | Returns the model id that the detail names. Without it the detail reads `The current model`. |
+| `CurrentModelSupportsImages` (`init`) | `null` | Returns `false` when the model can't see images. From 1.6.0, `read` stores no note and sets `details.imageUnsupportedByModel` instead (`ReadWriteTools.ImageUnsupportedByModelProperty`), for a renderer to show. In 1.5.2 and earlier it added a note to the result. |
+| `CurrentModelId` (`init`, from 1.6.0) | `null` | Returns the model id that the detail names. Without it the detail reads `The current model`. |
 
 `EditToolOptions` sets the same input, output, argument and path limits for `edit`, plus `MaximumEdits` (no limit by default).
 

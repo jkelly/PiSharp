@@ -52,8 +52,8 @@ var result = await run;
 
 Once settled, you can continue the conversation with `PromptAsync(newUserInput)` — or call `agent.ContinueAsync()` to resume directly from a trailing `user`, `toolResult`, or queued steering/follow-up message.
 
-:::note[1.6.0 source candidate: aborted tool batches]
-On `sync/pi-1.6.0` (unreleased), pressing `Esc` in the CLI while a tool batch is executing writes an explicit `Operation aborted` tool result for **every** call in the batch so the transcript stays structurally valid for follow-up turns.
+:::note[New in 1.6.0: aborted tool batches]
+From PiSharp 1.6.0, pressing `Esc` in the CLI while a tool batch is executing writes an explicit `Operation aborted` tool result for **every** call in the batch so the transcript stays structurally valid for follow-up turns.
 :::
 
 ## Recipe 3: Durable inbox steering & urgent team messages

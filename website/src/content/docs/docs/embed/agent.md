@@ -8,7 +8,7 @@ description: Run PiSharp.Agent's tool-calling loop with your own tools, hooks an
 ## Install
 
 ```powershell
-dotnet add package PiSharp.Agent --version 1.5.2
+dotnet add package PiSharp.Agent --version 1.6.0
 ```
 
 `PiSharp.Agent` brings `PiSharp.AI` and `PiSharp.Contracts`. Everything on this page is in the `PiSharp.Agent` namespace. [Chat and providers](/docs/embed/chat/) explains transports, models and transcript entries.

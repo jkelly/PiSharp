@@ -362,16 +362,16 @@
       "version": "1.6.0",
       "kind": "sync",
       "baseline": "v1.6.0",
-      "status": "release-candidate",
+      "status": "published",
       "branch": "release/1.6.0",
-      "ships": "PR #63: Pi and Pi Durable v1.6.0 source sync from v1.5.2; 28 libraries and the CLI.",
+      "ships": "PR #63: Pi and Pi Durable v1.6.0 source sync from v1.5.2, plus PR #66 MCP HTTP close fix and PR #65 Chord worker-retry fix; 28 libraries and the CLI.",
       "decision": "docs/decisions/0015-pi-1.6.0-sync.md",
       "applicability": "compatibility/sync-1.6.0-applicability.json",
       "notes": "docs/release-notes/1.6.0.md",
       "changelog": "website/src/content/changelog/1.6.0.md",
-      "blockers": [
-        "Post-merge workflows at c250e24f (PR #66), exact-tag release gates and verified publication."
-      ]
+      "blockers": [],
+      "publishedOn": "2026-11-23",
+      "tag": "v1.6.0 (711aa190dc2f4e339cf9232db48f70d8102504ff), release run 45087319788"
     }
   },
   "messageCaps": {

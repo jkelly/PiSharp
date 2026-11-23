@@ -43,7 +43,7 @@ Reads a text file or an image.
 
 The result carries the image and a note about any resize. An image that can't fit is left out with `[Image omitted: could not be resized below the inline image size limit.]`. If the model doesn't take images, PiSharp 1.5.2 and earlier add the note `[Current model does not support images. The image will be omitted from this request.]` to the result. `images.blockImages` keeps every image away from the provider. See [Settings](/docs/reference/settings/#tools-and-shell).
 
-In the unreleased 1.6.0 source candidate, as in Pi 1.6.0, `read` stores no such note, because it stayed in the session and was replayed to the model after a switch to a vision model. The image is still replaced with a placeholder for each request to a model without image input. The result names the model in `details.imageUnsupportedByModel`, and the terminal UI shows `[<model> does not support images; it saw a placeholder instead]` from that detail, also when the result is collapsed. A `read` that is cancelled while the file is being opened returns a cancelled result with `Operation aborted`.
+From PiSharp 1.6.0, as in Pi 1.6.0, `read` stores no such note, because it stayed in the session and was replayed to the model after a switch to a vision model. The image is still replaced with a placeholder for each request to a model without image input. The result names the model in `details.imageUnsupportedByModel`, and the terminal UI shows `[<model> does not support images; it saw a placeholder instead]` from that detail, also when the result is collapsed. A `read` that is cancelled while the file is being opened returns a cancelled result with `Operation aborted`.
 
 ## write
 
@@ -113,7 +113,7 @@ The command runs with `-c`. The old WSL `bash.exe` gets it on stdin with `-s` in
 ### Output
 
 - The model sees the last 2000 lines or 50 KB of combined stdout and stderr. When output is cut, the full output is saved to `pi-bash-<id>.log` in the system temp folder and the notice names it.
-- Output that ends in one line longer than the kept tail shows the end of that line in the 1.6.0 source candidate. PiSharp 1.5.2 returned no output for it, with a notice like `[Showing lines 3-2 of 2]`.
+- From PiSharp 1.6.0, output that ends in one line longer than the kept tail shows the end of that line (PiSharp 1.5.2 returned no output for it, with a notice like `[Showing lines 3-2 of 2]`).
 - A non-zero exit code makes the result an error that ends with `Command exited with code N`.
 - A timeout ends with `Command timed out after N seconds`, and an abort with `Command aborted`.
 - The structured result, which code mode scripts get, is `{ output, truncated, full_output_path?, exit_code, wall_time_seconds }`.
@@ -151,9 +151,9 @@ How a pattern with a `/` is matched differs by version:
 | Version | A pattern with a `/` |
 | --- | --- |
 | PiSharp 1.5.2 and earlier | Matches the whole path (`--full-path`), with `**/` added in front when needed. `src/*.ts` also finds `pkg/src/a.ts`, and a pattern can match through folders above the search folder. |
-| 1.6.0 source candidate (unreleased), as Pi 1.6.0 | Is relative to the search folder, like `grep`'s `glob`. `src/*.ts` finds `src/a.ts` and not `pkg/src/a.ts`; use `**/src/*.ts` to match at any depth. A leading `./` is accepted. No folder above the search folder can match. |
+| PiSharp 1.6.0 and later, as Pi 1.6.0 | Is relative to the search folder, like `grep`'s `glob`. `src/*.ts` finds `src/a.ts` and not `pkg/src/a.ts`; use `**/src/*.ts` to match at any depth. A leading `./` is accepted. No folder above the search folder can match. |
 
-In the 1.6.0 source candidate, PiSharp gives `fd` the pattern behind the escaped search folder on Linux and macOS, and adds `--ignore-case` when the pattern is all lower case. On Windows `fd` lists the entries and PiSharp matches the relative path itself, because `fd` does not match `--full-path` globs there. The Linux and macOS arguments were checked as values; no `fd` run on those systems is recorded for the candidate.
+From PiSharp 1.6.0, PiSharp gives `fd` the pattern behind the escaped search folder on Linux and macOS, and adds `--ignore-case` when the pattern is all lower case. On Windows `fd` lists the entries and PiSharp matches the relative path itself, because `fd` does not match `--full-path` globs there. The Linux and macOS arguments were checked as values; no `fd` run on those systems is recorded locally.
 
 ## ls
 
@@ -197,7 +197,7 @@ There is no `powershell` tool in the PiSharp CLI. Pi v1.5.0 has one for Windows;
 
 ## Tool corrections in 1.5.0.1
 
-PiSharp 1.5.0.1 preserves mixed line endings during edits, bounds large-file read/search output, corrects relative search globs and argument expansion, preserves Unicode truncation boundaries, and avoids repeated whole-history copying of streamed tool arguments. Process capture is bounded while cleanup retains ownership of the complete child tree. See the [source/test mapping](https://github.com/jkelly/PiSharp/blob/main/compatibility/gap-status-2026-11-08.json) for the corresponding tool and provider cases. Install or update the CLI at version 1.5.2 to use these corrections.
+PiSharp 1.5.0.1 preserves mixed line endings during edits, bounds large-file read/search output, corrects relative search globs and argument expansion, preserves Unicode truncation boundaries, and avoids repeated whole-history copying of streamed tool arguments. Process capture is bounded while cleanup retains ownership of the complete child tree. See the [source/test mapping](https://github.com/jkelly/PiSharp/blob/main/compatibility/gap-status-2026-11-08.json) for the corresponding tool and provider cases. Install or update the CLI at version 1.6.0 to use these corrections.
 
 ## Selecting tools
 

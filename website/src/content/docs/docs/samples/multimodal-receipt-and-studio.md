@@ -88,4 +88,4 @@ And notice how `--self-test` verifies the entire request/response/base64-decode 
 
 1. **Try `--image` without `--live` on sample 16:** verify it fails fast (`Image extraction requires --live and a vision-capable model.`) rather than silently pretending OCR ran.
 2. **Try `--generate-image` without `--approve` on sample 27:** confirm `prepare_visual_asset` blocks the paid image API call.
-3. **Explore `PiSharp.AI.Media` and 1.6.0 `FitImages`:** for video, TTS speech, STT transcription, embeddings, and reranking, see [Media library](/docs/embed/media/); on the **1.6.0 source candidate**, run `dotnet run --project samples/Durable.Examples -- 47-fit-images` to see automatic image fitting for durable tool results.
+3. **Explore `PiSharp.AI.Media` and 1.6.0 `FitImages`:** for video, TTS speech, STT transcription, embeddings, and reranking, see [Media library](/docs/embed/media/); run `dotnet run --project samples/Durable.Examples -- 47-fit-images` to see automatic image fitting for durable tool results.

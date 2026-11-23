@@ -10,7 +10,7 @@ Below the agent loops sits PiSharp's infrastructure layer: native LLM transports
 `PiSharp.AI` implements streaming transports directly over .NET's `HttpClient` for every API Pi supports — Anthropic Messages, OpenAI Responses and Chat Completions, OpenAI Codex, Azure OpenAI, Amazon Bedrock Converse, Google Gemini and Vertex, Mistral Conversations, GitHub Copilot, OpenRouter, xAI, Qwen, local [llama.cpp](/docs/guides/llama-cpp/) routers, and Pi Messages.
 
 - **Catalog composition order** (lowest to highest precedence):
-  1. Pinned upstream catalog (1,853 entries across 43 providers on the `sync/pi-1.6.0` candidate: 1,698 chat, 74 image, 81 classifier).
+  1. Pinned upstream catalog (1,853 entries across 43 providers in PiSharp 1.6.0: 1,698 chat, 74 image, 81 classifier).
   2. Remote catalog (if enabled).
   3. Maintained overlay (`catalog-maintained/models.overlay.json`, optionally pointed elsewhere with `PISHARP_MAINTAINED_CATALOG`) — refreshed by sample [31-ModelCatalogMaintainer](/samples/?q=31-ModelCatalogMaintainer) without touching pinned hashes.
   4. User `models.json` configuration.
@@ -19,8 +19,8 @@ Below the agent loops sits PiSharp's infrastructure layer: native LLM transports
 - **Service tiers (`PISHARP_TIERS001`):** attach per-request or per-conversation latency/cost tiers (`auto`, `normal`, `economy`, `priority`, `fast`, `ultrafast`) via `ChatRequest.ServiceTier`, `AgentConfiguration.ServiceTier`, or `/tier` in `pisharp durable`.
 - **Anthropic message threads:** bounded process-local continuation cache (`AnthropicMessageThreadStore`, default 10,000 sessions) that hashes normalized transcript prefixes so repeated turns send only the new suffix plus the prior reply ID, automatically falling back to full requests if the endpoint rejects continuation. See [Anthropic message threads](/docs/embed/anthropic-threads/).
 
-:::note[1.6.0 source candidate transport improvements]
-On `sync/pi-1.6.0` (unreleased): retries cover socket error codes, closed connections, and the 60-minute Codex limit; strict tool schemas are enabled only where models support them cleanly; the 1,000,000 output-token ceiling is lifted; and default `openai`/`azure`/`openai-codex` model selection updates to `gpt-6.2-sol`.
+:::note[New in 1.6.0: transport improvements]
+In PiSharp 1.6.0: retries cover socket error codes, closed connections, and the 60-minute Codex limit; strict tool schemas are enabled only where models support them cleanly; the 1,000,000 output-token ceiling is lifted; and default `openai`/`azure`/`openai-codex` model selection updates to `gpt-6.2-sol`.
 :::
 
 ## Media models & multimodal inputs (`PiSharp.AI.Media`)

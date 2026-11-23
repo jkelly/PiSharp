@@ -86,10 +86,10 @@ var ordersV2 = Workflow.For<OrderData>("orders")
 
 Bumping the version *without* a migration intentionally blocks older stored runs as `MigrationFailed`, preventing silent corruption.
 
-## Recipe 4: Parked webhook & polling tools *(1.6.0 source candidate)*
+## Recipe 4: Parked webhook & polling tools *(from 1.6.0)*
 
-:::note[1.6.0 source candidate (unreleased)]
-On `sync/pi-1.6.0`, Durable tools can **park** between polls or while awaiting an external webhook without holding a thread (`40-tool-waits-for-webhook`, `41-tool-polls`). When the webhook signal arrives (or the deadline expires), the tool task wakes cleanly — even if the host restarted while it was parked.
+:::note[New in 1.6.0]
+From PiSharp 1.6.0, Durable tools can **park** between polls or while awaiting an external webhook without holding a thread (`40-tool-waits-for-webhook`, `41-tool-polls`). When the webhook signal arrives (or the deadline expires), the tool task wakes cleanly — even if the host restarted while it was parked.
 :::
 
 ## Pitfalls & limits

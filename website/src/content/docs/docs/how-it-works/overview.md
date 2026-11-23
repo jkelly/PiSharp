@@ -16,7 +16,7 @@ PiSharp intentionally maintains **two distinct agent stacks** over the same prov
 | **Execution model** | In-memory turn loop (`Agent`) optionally backed by append-only Pi JSONL session trees (`PiSharp.Sessions`). | Commit-first state machine (`IHarness`): every turn, streamed progress, tool call, document and timer commits before display. |
 | **Crash mid-turn** | Loses the in-flight turn; committed prior entries remain in the JSONL tree. | Reopening the SQLite/JSONL/Chord store resumes unfinished turns and tasks automatically. |
 | **Interoperability with Pi** | Shares `~/.pi/agent`, `.pi`, JSONL session format, RPC wire protocol and TypeScript extensions with Pi. | Ports `pi-durable` (`pisharp durable`); `PiSharp.CustomAgents` adds C# workflows and teams on top. |
-| **API stability** | Stable (`1.5.2` on NuGet). | Experimental (`PISHARP_DURABLE001`, `PISHARP_AGENTS001`). |
+| **API stability** | Stable (`1.6.0` on NuGet). | Experimental (`PISHARP_DURABLE001`, `PISHARP_AGENTS001`). |
 
 ## Pick the right layer for your project
 
@@ -65,8 +65,8 @@ var summarize = Workflow.For<Note>("summarize")
 4. **Trust boundaries are explicit:** built-in tools enforce an action policy, JavaScript tools run in a Jint sandbox (and worker process for model-written code), and C# scripts / native plugins require explicit host trust.
 5. **Everything can be tested offline:** both stacks support deterministic scripted models (`FauxAgentModels`, `ScriptedModels`, and the fixture host used across all 62 practical agent samples) so CI and local development need no provider credentials.
 
-:::note[1.6.0 source candidate]
-The published NuGet inventory is **1.5.2** (29 packages). Capabilities added on the `sync/pi-1.6.0` candidate branch — including Durable signals, parked tools, `BeforeTool` approval gates, `OnYield`/`AfterTools` `HookTask`s, extension-declared code-mode namespaces, `FitImages`, and Durable examples `38–47` — are marked **(1.6.0 source candidate, unreleased)** throughout these guides.
+:::note[PiSharp 1.6.0 highlights]
+The published NuGet inventory is **1.6.0** (29 packages). PiSharp 1.6.0 ships Durable signals, parked tools, `BeforeTool` approval gates, `OnYield`/`AfterTools` `HookTask`s, extension-declared code-mode namespaces, `FitImages`, and Durable examples `38–47`, alongside Chord events, named queries, lists and admission.
 :::
 
 ## Continue reading

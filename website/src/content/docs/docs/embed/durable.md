@@ -9,8 +9,8 @@ description: "Build crash-safe agents on PiSharp.Durable: the harness, storage, 
 The durable libraries ship as experimental from PiSharp 1.2.0.1, the members marked "(from 1.2.0.2)" from 1.2.0.2, and those marked "(from 1.5.0)" from 1.5.0. Every public type carries `[Experimental("PISHARP_DURABLE001")]`, and the API may change or be removed in any release without notice. PiSharp 1.5.0 follows `pi-durable` v1.5.0 and breaks code and storage written for 1.2.0.x: see [Upgrading from 1.2.0.x](#upgrading-from-120x).
 :::
 
-:::note[Unreleased 1.6.0 source candidate]
-The source on `main` follows `pi-durable` v1.6.0: signals, tools that park, gates, hooks that start tasks, code-mode namespaces declared by extensions, and image fitting. It is not released, and it breaks some 1.5.2 code and storage. This page describes the published 1.5.2 packages, except [The 1.6.0 source candidate](#the-160-source-candidate).
+:::note[Updated in 1.6.0]
+PiSharp 1.6.0 follows `pi-durable` v1.6.0: signals, tools that park, gates, hooks that start tasks, code-mode namespaces declared by extensions, and image fitting. Opening a session written by 1.6.0 in 1.5.2 is not supported. See [New in 1.6.0](#new-in-160).
 :::
 
 ## Install
@@ -23,9 +23,9 @@ Add the packages and suppress the experimental diagnostic:
   <NoWarn>$(NoWarn);PISHARP_DURABLE001</NoWarn>
 </PropertyGroup>
 <ItemGroup>
-  <PackageReference Include="PiSharp.Durable" Version="1.5.2" />
-  <PackageReference Include="PiSharp.Durable.Sqlite" Version="1.5.2" />
-  <PackageReference Include="PiSharp.Durable.Tools" Version="1.5.2" />
+  <PackageReference Include="PiSharp.Durable" Version="1.6.0" />
+  <PackageReference Include="PiSharp.Durable.Sqlite" Version="1.6.0" />
+  <PackageReference Include="PiSharp.Durable.Tools" Version="1.6.0" />
 </ItemGroup>
 ```
 
@@ -35,7 +35,7 @@ Add the packages and suppress the experimental diagnostic:
 | `PiSharp.Durable.Sqlite` | `PiSharp.Durable.Sqlite` | SQLite storage over `Microsoft.Data.Sqlite` |
 | `PiSharp.Durable.Tools` | `PiSharp.Durable.Tools`, `PiSharp.Durable.Tools.Env` | The local execution environment, the coding tools, `tool_search`, durable code mode, and, from 1.2.0.2, the media tools |
 
-The harness's telemetry types come from `PiSharp.Telemetry`, which `PiSharp.Durable` references. PiSharp **1.5.0.1** includes [Chord and native hosting](/docs/embed/chord/) and [PiSharp.Durable.Store](/docs/embed/durable-store/). Use version 1.5.2 for every PiSharp sibling package.
+The harness's telemetry types come from `PiSharp.Telemetry`, which `PiSharp.Durable` references. PiSharp **1.5.0.1** includes [Chord and native hosting](/docs/embed/chord/) and [PiSharp.Durable.Store](/docs/embed/durable-store/). Use version 1.6.0 for every PiSharp sibling package.
 
 ## Upgrading from 1.2.0.x
 
@@ -52,9 +52,9 @@ PiSharp 1.5.0 follows `pi-durable` v1.5.0, which changed the API and the stored 
 - **Streamed progress is deferred.** Partial answers and tool output are stored about once a second, so a crash loses up to about a second of streamed text. `ProgressSettings.PersistWithinMs = 0` stores each one at once.
 - **The examples were renumbered** to upstream v1.5.0's names (see [Samples](#samples)).
 
-## The 1.6.0 source candidate
+## New in 1.6.0
 
-The source on `main` follows `pi-durable` v1.6.0. It is unreleased: the packages on NuGet are 1.5.2, and the rest of this page describes them. Build from source to use what this section describes. The [candidate notes](https://github.com/jkelly/PiSharp/blob/main/docs/release-notes/1.6.0.md) list what was tested and what was not.
+PiSharp 1.6.0 follows `pi-durable` v1.6.0. The [1.6.0 release notes](https://github.com/jkelly/PiSharp/blob/main/docs/release-notes/1.6.0.md) list what was tested and what was not.
 
 ### What breaks
 
@@ -649,7 +649,7 @@ AfterRun = async (run, api, hookContext) =>
 },
 ```
 
-In the unreleased 1.6.0 source candidate `Define.RunEndTask` is `Define.HookTask`, and `AfterTools` and `OnYield` hooks may return tasks too: see [Hooks that start tasks](#hooks-that-start-tasks).
+In PiSharp 1.6.0 `Define.RunEndTask` is `Define.HookTask`, and `AfterTools` and `OnYield` hooks may return tasks too: see [Hooks that start tasks](#hooks-that-start-tasks).
 
 `IHookApi.EntryAsync` and `ITaskRuntime.EntriesAsync` read the same history. A tool round whose result asks for a handoff no longer ends the run: the reset entry is written and the same run continues in the new context, so the submission settles with the eventual answer. Example `32-tests-after-edits` runs a project's tests after every run that edited files.
 
@@ -884,18 +884,18 @@ PiSharp 1.2.0.x numbered them as upstream v1.2.0 did: v1.5.0 dropped `04-chord-s
 | `32-tests-after-edits` | (from 1.5.0) An `AfterRun` hook runs the tests after every run that edited files; a failure starts a fix run. |
 | `33-turn-limit-and-continue` | (from 1.5.0) A turn limit stops a long run; a continue resumes it without a user message. |
 | `34-submit-in-commit` | (from 1.5.0) Messages that only steer a running agent, admitted inside the host's own commit. |
-| `38-signals` | (1.6.0 source candidate) A typed JSON value delivered to a live task, and what each delivery returns. |
-| `39-ask-a-person` | (1.6.0 source candidate) A task that sleeps until a person answers. |
-| `40-tool-waits-for-webhook` | (1.6.0 source candidate) A tool that parks until a webhook reports, with a deadline and a `Cancel`. |
-| `41-tool-polls` | (1.6.0 source candidate) A tool that parks between polls. |
-| `42-parallel-children` | (1.6.0 source candidate) A tool that starts nested calls and parks until they end. |
-| `43-subagent-waits` | (1.6.0 source candidate) A subagent tool that parks until its child conversation answers. |
-| `44-approval-gate` | (1.6.0 source candidate) A `BeforeTool` gate that parks a risky call until it is approved. |
-| `45-review-on-yield` | (1.6.0 source candidate) An `OnYield` task that reviews an answer before it stands. |
-| `46-after-tools-terminate` | (1.6.0 source candidate) An `AfterTools` task that ends the run. |
-| `47-fit-images` | (1.6.0 source candidate) Images fitted to the model's limits before they are stored. |
+| `38-signals` | (from 1.6.0) A typed JSON value delivered to a live task, and what each delivery returns. |
+| `39-ask-a-person` | (from 1.6.0) A task that sleeps until a person answers. |
+| `40-tool-waits-for-webhook` | (from 1.6.0) A tool that parks until a webhook reports, with a deadline and a `Cancel`. |
+| `41-tool-polls` | (from 1.6.0) A tool that parks between polls. |
+| `42-parallel-children` | (from 1.6.0) A tool that starts nested calls and parks until they end. |
+| `43-subagent-waits` | (from 1.6.0) A subagent tool that parks until its child conversation answers. |
+| `44-approval-gate` | (from 1.6.0) A `BeforeTool` gate that parks a risky call until it is approved. |
+| `45-review-on-yield` | (from 1.6.0) An `OnYield` task that reviews an answer before it stands. |
+| `46-after-tools-terminate` | (from 1.6.0) An `AfterTools` task that ends the run. |
+| `47-fit-images` | (from 1.6.0) Images fitted to the model's limits before they are stored. |
 
-Examples 38 to 47 are in the source on `main` only. Their expected output is written from the upstream example source and checked against the C# run; they were not run under Node.
+Examples 38 to 47 ship with PiSharp 1.6.0. Their expected output is written from the upstream example source and checked against the C# run; they were not run under Node.
 
 PiSharp 1.5.0.1 adds `35-durable-on-the-store`, `36-durable-views` and `37-harness-registry` in the separate [Durable.Chord.Examples project](/docs/embed/durable-store/#run-examples-3537), using the real host and SQLite.
 

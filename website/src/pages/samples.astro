@@ -166,8 +166,7 @@ const serializedSamples = JSON.stringify(allSamples).replace(/</g, '\\u003c');
 						<div class="card-top">
 							<span class="ps-mono ps-fine">{s.badgeLabel} · {s.runtime}</span>
 							<div class="card-chips">
-								{s.unreleased160 && <span class="ps-chip" data-tone="planned">1.6.0 candidate</span>}
-								{s.experimental && !s.unreleased160 && <span class="ps-chip" data-tone="experimental">Experimental</span>}
+								{s.experimental && <span class="ps-chip" data-tone="experimental">Experimental</span>}
 								{s.requiresApproval && <span class="ps-chip" data-tone="partial">Approval gate</span>}
 								{s.walkthroughUrl && <span class="ps-chip" data-tone="ported">Walkthrough</span>}
 							</div>
@@ -249,7 +248,6 @@ const serializedSamples = JSON.stringify(allSamples).replace(/</g, '\\u003c');
 		summary: string;
 		requiresApproval?: boolean;
 		experimental?: boolean;
-		unreleased160?: boolean;
 		demoCommand: string;
 		approveCommand?: string;
 		liveCommand?: string;
@@ -356,7 +354,6 @@ const serializedSamples = JSON.stringify(allSamples).replace(/</g, '\\u003c');
 			inspBadges.appendChild(makeChip('Offline-ready', 'ported'));
 			if (sample.requiresApproval) inspBadges.appendChild(makeChip('Approval gate', 'partial'));
 			if (sample.experimental) inspBadges.appendChild(makeChip('Experimental', 'experimental'));
-			if (sample.unreleased160) inspBadges.appendChild(makeChip('1.6.0 source candidate', 'planned'));
 		}
 
 		if (inspTools) {

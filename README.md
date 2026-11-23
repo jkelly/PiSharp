@@ -1,6 +1,6 @@
 # PiSharp
 
-**PiSharp [1.6.0](https://github.com/jkelly/PiSharp/releases/tag/v1.6.0) targets Pi v1.6.0 and Pi Durable 1.6.0.** The [release notes](docs/release-notes/1.6.0.md) cover the model catalog, provider, CLI, terminal UI, Durable and Chord updates, the breaking changes and migration requirements. Source validation, package qualification and publication evidence are recorded separately.
+**Published release: PiSharp [1.6.0](https://github.com/jkelly/PiSharp/releases/tag/v1.6.0) targets Pi v1.6.0 and Pi Durable 1.6.0.** The [release notes](docs/release-notes/1.6.0.md) cover the model catalog, provider, CLI, terminal UI, Durable and Chord updates, the breaking changes and migration requirements. Source validation, package qualification and publication evidence are recorded separately.
 
 The package set contains 28 libraries plus the CLI tool (29 packages), including the experimental `PiSharp.Chord`, `PiSharp.Chord.Hosting`, `PiSharp.Durable.Store`, `PiSharp.Env.Protocol` and `PiSharp.Env` libraries introduced in 1.5.0.1. See [package admission](docs/contracts/gap-package-admission.md) for dependencies, opt-in diagnostics and the external package-consumer gate. Native daemon ZIPs from the earlier 1.5.0.1 release retain their own [release assets and qualification records](https://github.com/jkelly/PiSharp/releases/tag/v1.5.0.1); they are separate from the 1.6.0 NuGet packages. Windows PTY creation remains explicitly unsupported; live provider accounts, real SSH hosts and physical macOS key behavior retain separate qualification boundaries.
 

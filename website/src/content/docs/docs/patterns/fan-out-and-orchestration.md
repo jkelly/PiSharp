@@ -78,10 +78,10 @@ team.Catalog.Register(new AgentDefinition
 - Use **`spawn(agent, task, name?)`** when the orchestrator should keep working immediately and collect results later via mailbox messages or `wait_agent(agent)`.
 - Every orchestration tool (`delegate`, `spawn`, `wait_agent`, `stop_agent`) is **replay-safe**: if the process crashes while 3 of 4 researchers have already finished, restarting resumes only the unfinished 4th researcher.
 
-## Recipe 3: Durable parallel child tools *(1.6.0 source candidate)*
+## Recipe 3: Durable parallel child tools *(from 1.6.0)*
 
-:::note[1.6.0 source candidate (unreleased)]
-On `sync/pi-1.6.0` (unreleased), Durable examples `42-parallel-children` and `43-subagent-waits` demonstrate custom tools that spawn nested child tasks or subagent conversations and **park** cleanly until all children settle, without blocking a thread.
+:::note[New in 1.6.0]
+From PiSharp 1.6.0, Durable examples `42-parallel-children` and `43-subagent-waits` demonstrate custom tools that spawn nested child tasks or subagent conversations and **park** cleanly until all children settle, without blocking a thread.
 :::
 
 ## Safety guards & pitfalls

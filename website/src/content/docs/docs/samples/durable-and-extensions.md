@@ -39,8 +39,8 @@ dotnet run --project samples/Durable.Examples -- --storage sqlite 38 39 40 41 42
 
 ### Signals, parked tools, approval gates & hook tasks (`38–47`)
 
-:::note[1.6.0 source candidate (unreleased)]
-Examples `38–47` are on `sync/pi-1.6.0` (source only; not yet in the 1.5.2 NuGet packages). They demonstrate the `pi-durable` v1.6.0 primitives.
+:::note[Added in PiSharp 1.6.0]
+Examples `38–47` ship with PiSharp 1.6.0 and demonstrate the `pi-durable` v1.6.0 primitives.
 :::
 
 | Example | What it proves |

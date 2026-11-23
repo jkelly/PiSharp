@@ -8,7 +8,7 @@ description: Build terminal interfaces with PiSharp.Tui's components, layout and
 ## Install
 
 ```powershell
-dotnet add package PiSharp.Tui --version 1.5.2
+dotnet add package PiSharp.Tui --version 1.6.0
 ```
 
 The package targets net10.0 and has no dependencies. Its main API is in the `PiSharp.Tui.Pi` namespace; every type on this page is there unless the section says otherwise.
@@ -178,8 +178,8 @@ The return type of `Render` changes with Pi 1.6.0, which made render output read
 
 | Version | `IComponent.Render` | Contract |
 | --- | --- | --- |
-| PiSharp 1.5.2 and earlier (the published packages) | `List<string> Render(int width)` | A container copies its children's lines on every frame. |
-| 1.6.0 source candidate (unreleased) | `IReadOnlyList<string> Render(int width)` | Render output is read-only. `Container` and `Box` return the same list while their children are unchanged, as `Text` and `Markdown` do. |
+| PiSharp 1.5.2 and earlier | `List<string> Render(int width)` | A container copies its children's lines on every frame. |
+| PiSharp 1.6.0 and later | `IReadOnlyList<string> Render(int width)` | Render output is read-only. `Container` and `Box` return the same list while their children are unchanged, as `Text` and `Markdown` do. |
 
 To move a component to 1.6.0:
 
@@ -468,7 +468,7 @@ Heights only exist in fullscreen. There, `LayoutEngine.RenderFrame(root, width, 
 | `QueryTerminalColors(timeoutMs, onLateReply)` | Asks the terminal for its foreground, background and palette. |
 | `OnTerminalColorSchemeChange`, `SetTerminalColorSchemeNotifications` | Follow the terminal's dark and light mode reports. |
 | `OnDebug` | Called on Shift+Ctrl+D. |
-| `SetSuspendSignalHandler(Action?)` | 1.6.0 source candidate (unreleased), experimental (`PISHARP_TUI001`). Sets a handler called when the process receives `SIGTSTP` while the TUI owns the terminal, from `Start()` until `Stop()`. See [Suspend from outside](#suspend-from-outside). |
+| `SetSuspendSignalHandler(Action?)` | From 1.6.0, experimental (`PISHARP_TUI001`). Sets a handler called when the process receives `SIGTSTP` while the TUI owns the terminal, from `Start()` until `Stop()`. See [Suspend from outside](#suspend-from-outside). |
 | `Mode`, `Terminal`, `Loop`, `FullRedraws`, `Invalidate()` | The renderer kind, its terminal and loop, a redraw counter, and invalidation of every component. |
 
 Both renderers take `(ITerminal terminal, UiLoop loop, bool? showHardwareCursor = null, string? logDirectory = null, ...)`. The log directory is where crash and debug logs go. `TuiMainScreen` also takes an environment lookup, and `TuiAltScreen` its options.
@@ -477,7 +477,7 @@ Input goes through the TUI in this order: replies to the TUI's color queries, in
 
 ### Suspend from outside
 
-This section describes the unreleased 1.6.0 source candidate. `kill -TSTP <pid>` from another process stops a terminal program without giving it a chance to restore the terminal, which leaves mouse tracking and the Kitty keyboard protocol on at the shell prompt. `SetSuspendSignalHandler` lets the application suspend the way its own Ctrl+Z handling does:
+Added in PiSharp 1.6.0 (`PISHARP_TUI001`). `kill -TSTP <pid>` from another process stops a terminal program without giving it a chance to restore the terminal, which leaves mouse tracking and the Kitty keyboard protocol on at the shell prompt. `SetSuspendSignalHandler` lets the application suspend the way its own Ctrl+Z handling does:
 
 ```csharp
 ui.SetSuspendSignalHandler(() => SuspendLikeCtrlZ());   // your own stop, suspend and redraw

@@ -21,4 +21,4 @@ Real agent workflows fail and branch in predictable ways: models pass bad argume
 ## How to read these patterns
 
 - **Start with the simplest layer that meets your failure tolerance.** If losing an in-flight turn on process restart is acceptable, `PiSharp.Agent` hooks and policies take twenty lines of code. If approvals or external side effects must survive crashes or wait hours/days for a human, use `PiSharp.Durable` or `PiSharp.CustomAgents`.
-- **Every 1.6.0 addition is called out explicitly.** Patterns that use unreleased capabilities on `sync/pi-1.6.0` (such as Durable `BeforeTool` gates, parked webhook/polling tools, `OnYield` review tasks, and examples `38–47`) include a clear **1.6.0 source candidate** callout alongside the published 1.5.2 approach.
+- **PiSharp 1.6.0 capabilities are called out clearly.** Patterns that use Durable 1.6.0 primitives (such as `BeforeTool` gates, parked webhook/polling tools, `OnYield` review tasks, and examples `38–47`) note their 1.6.0 origin alongside the core `PiSharp.Agent` and `PiSharp.CustomAgents` approaches.

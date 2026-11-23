@@ -35,7 +35,6 @@ export interface SampleEntry {
 	summary: string;
 	requiresApproval?: boolean;
 	experimental?: boolean;
-	unreleased160?: boolean;
 	demoCommand: string;
 	approveCommand?: string;
 	liveCommand?: string;
@@ -596,9 +595,8 @@ export const platformSamples: SampleEntry[] = [
 		patterns: ['Approval gate', 'Steering & signals', 'Crash & resume', 'Multimodal & media'],
 		tools: ['Signals', 'Parked webhook/poll tools', 'BeforeTool gate', 'OnYield/AfterTools HookTask', 'FitImages'],
 		summary:
-			'10 unreleased 1.6.0 source-candidate examples: typed signals, ask-a-person sleeps, webhook/polling parked tools, parallel children, BeforeTool approval gates, OnYield review tasks and image fitting.',
+			'10 PiSharp 1.6.0 examples: typed signals, ask-a-person sleeps, webhook/polling parked tools, parallel children, BeforeTool approval gates, OnYield review tasks and image fitting.',
 		experimental: true,
-		unreleased160: true,
 		demoCommand: 'dotnet run --project samples/Durable.Examples -- --storage sqlite 38 39 40 44 45 47',
 		selfTestCommand: 'dotnet run --project samples/Durable.Examples -- 38 39 40 41 42 43 44 45 46 47',
 		repoPath: 'samples/Durable.Examples',

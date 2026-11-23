@@ -4,11 +4,11 @@ description: The experimental Chord v2 host, native plugins, HTTP and worker pro
 ---
 
 :::caution[Experimental — from 1.5.0.1]
-`PiSharp.Chord` and `PiSharp.Chord.Hosting` are available on NuGet at version **1.5.2**. Their public APIs use `PISHARP_CHORD001`; hosting also requires the ASP.NET Core shared framework. Keep all PiSharp sibling references at the same exact version. See the [package contract](https://github.com/jkelly/PiSharp/blob/main/docs/contracts/gap-package-admission.md).
+`PiSharp.Chord` and `PiSharp.Chord.Hosting` are available on NuGet at version **1.6.0**. Their public APIs use `PISHARP_CHORD001`; hosting also requires the ASP.NET Core shared framework. Keep all PiSharp sibling references at the same exact version. See the [package contract](https://github.com/jkelly/PiSharp/blob/main/docs/contracts/gap-package-admission.md).
 :::
 
-:::note[Unreleased 1.6.0 source candidate]
-The source on `main` follows Chord 1.6.0: events, named queries, lists, column sets, shared holds, admission, and sign-ins in place of the app kit's sessions. It is not released, everyone signs in again after the update, and 1.5.x and 1.6.0 hosts do not interoperate over trusted links. See [The 1.6.0 source candidate](#the-160-source-candidate).
+:::note[Updated in 1.6.0]
+PiSharp 1.6.0 follows Chord 1.6.0: events, named queries, lists, column sets, shared holds, admission, and sign-ins in place of the app kit's sessions. Everyone signs in again after the update, and 1.5.x and 1.6.0 hosts do not interoperate over trusted links. See [New in 1.6.0](#new-in-160).
 :::
 
 Chord is the reactive host and store used by the [Durable.Store adapter](/docs/embed/durable-store/). The v2 implementation includes host roots and resources, facet loading/reload, jobs, links, remote routes, registries, state watches and a SQLite store. See [host source](https://github.com/jkelly/PiSharp/tree/main/src/PiSharp.Chord/Host) and the [current mapping](https://github.com/jkelly/PiSharp/blob/main/compatibility/gap-status-2026-11-08.json) for implementation and test boundaries.
@@ -39,9 +39,9 @@ The entry implements `IChordPlugin.CreateFacet(PluginContext)`; `PluginContext.K
 
 Worker crash/retry, reload and retained process-tree cleanup are tested with real child processes in [hosting tests](https://github.com/jkelly/PiSharp/tree/main/tests/PiSharp.Chord.Hosting.Tests). The framing is distinct from Node IPC. The package does not provide JavaScript module evaluation, npm installation, browser asset compilation or arbitrary Node child compatibility.
 
-## The 1.6.0 source candidate
+## New in 1.6.0
 
-The source on `main` follows Chord 1.6.0. It is unreleased: the packages on NuGet are 1.5.2, and the sections above describe them. The [candidate notes](https://github.com/jkelly/PiSharp/blob/main/docs/release-notes/1.6.0.md) list every change, what was tested and what was not. Everything below is experimental (`PISHARP_CHORD001`).
+PiSharp 1.6.0 follows Chord 1.6.0. The [1.6.0 release notes](https://github.com/jkelly/PiSharp/blob/main/docs/release-notes/1.6.0.md) list every change, what was tested and what was not. Everything below is experimental (`PISHARP_CHORD001`).
 
 ### Before you update
 

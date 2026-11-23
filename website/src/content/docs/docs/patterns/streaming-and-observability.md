@@ -77,8 +77,8 @@ await using var watch = await root.WatchAsync(call =>
 
 `PiSharp.Telemetry` records spans and metrics **only** when your host explicitly creates and passes a telemetry span (for instance, with its `InMemoryTelemetry` adapter for tests or your own OpenTelemetry bridge). Nothing is ever transmitted externally by PiSharp itself.
 
-:::note[1.6.0 source candidate: `OnYield` & `AfterTools` review hooks]
-On `sync/pi-1.6.0` (unreleased), Durable adds `GenerationHooks.OnYield` (`45-review-on-yield`) and `GenerationHooks.AfterTools` (`46-after-tools-terminate`), letting an extension launch a durable `HookTask` to audit, gate, or terminate an assistant response before it is finalized for the user.
+:::note[New in 1.6.0: `OnYield` & `AfterTools` review hooks]
+From PiSharp 1.6.0, Durable adds `GenerationHooks.OnYield` (`45-review-on-yield`) and `GenerationHooks.AfterTools` (`46-after-tools-terminate`), letting an extension launch a durable `HookTask` to audit, gate, or terminate an assistant response before it is finalized for the user.
 :::
 
 ## Pitfalls & limits
@@ -93,6 +93,6 @@ On `sync/pi-1.6.0` (unreleased), Durable adds `GenerationHooks.OnYield` (`45-rev
 dotnet run --project samples/Durable.Examples -- --storage sqlite 04-watches
 dotnet run --project samples/Durable.Chord.Examples -- 36
 
-# 1.6.0 source candidate: OnYield answer review & AfterTools termination hooks
+# PiSharp 1.6.0: OnYield answer review & AfterTools termination hooks
 dotnet run --project samples/Durable.Examples -- --storage sqlite 45-review-on-yield 46-after-tools-terminate
 ```
