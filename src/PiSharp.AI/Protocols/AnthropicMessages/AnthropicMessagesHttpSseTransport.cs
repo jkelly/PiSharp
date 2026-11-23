@@ -405,7 +405,17 @@ public sealed class AnthropicMessagesHttpSseTransport : IChatTransport
     /// (anthropic-messages.ts shows error.message unchanged). A body over the stream budget keeps the status-only rejection.</summary>
     private async ValueTask<Exception> RejectAsync(HttpResponseMessage response, CancellationToken token)
     {
-        var bytes = await ProviderErrorText.ReadBodyAsync(response, _options.MaximumTotalDataCharacters, token).ConfigureAwait(false);
+        var permanentStatus = (int)response.StatusCode is >= 400 and < 500 and not 408 and not 429;
+        byte[]? bytes;
+        try
+        {
+            bytes = await ProviderErrorText.ReadBodyAsync(response, _options.MaximumTotalDataCharacters, token).ConfigureAwait(false);
+        }
+        catch (Exception error) when (permanentStatus)
+        {
+            TransportRetryClassifier.MarkNonRetryable(error);
+            throw;
+        }
         if (bytes is null) return new HttpSseRejectedException(response.StatusCode);
         var text = ProviderErrorText.FetchText(bytes);
         return new ProviderDisplayException(ProviderErrorText.AnthropicStatus((int)response.StatusCode, text))

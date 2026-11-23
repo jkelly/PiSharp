@@ -213,7 +213,8 @@ public sealed class CompletionsHttpSseTransport : IChatTransport
                 // callbacks are outside this loop; no streamed result is ever replayed.
                 try { _request!.Dispose(); } catch (Exception error) { _preparationCleanupFailure ??= error; throw; }
                 _request = null;
-                options.OnRetry?.Invoke(new(retryIndex, status, delay));
+                try { options.OnRetry?.Invoke(new(retryIndex, status, delay)); }
+                catch { LastFailureNonTransport = true; throw; }
                 _token.ThrowIfCancellationRequested();
                 await Task.Delay(delay, options.TimeProvider, _token).ConfigureAwait(false);
                 _token.ThrowIfCancellationRequested();

@@ -2,6 +2,7 @@
 // replace raw exception text with fixed sanitized error messages.
 using System.Net;
 using System.Net.Sockets;
+using System.Runtime.CompilerServices;
 using System.Text.Json;
 using PiSharp.Contracts;
 
@@ -10,6 +11,13 @@ namespace PiSharp.AI.Protocols.ProviderShared;
 internal static class TransportRetryClassifier
 {
     private const int MaximumDepth = 16;
+    private static readonly ConditionalWeakTable<Exception, object> NonRetryable = new();
+    private static readonly object NonRetryableMarker = new();
+
+    internal static void MarkNonRetryable(Exception? error)
+    {
+        if (error is not null) NonRetryable.AddOrUpdate(error, NonRetryableMarker);
+    }
 
     internal static bool IsTransientConnectionFailure(Exception? error, bool callerCancelled = false)
     {
@@ -20,6 +28,7 @@ internal static class TransportRetryClassifier
     private static bool Inspect(Exception error, int depth)
     {
         if (depth > MaximumDepth) return false;
+        if (NonRetryable.TryGetValue(error, out _)) return false;
         if (error is StreamLimitException or StreamProtocolException or JsonException or ArgumentException or InvalidOperationException)
             return false;
 

@@ -132,11 +132,40 @@ internal static partial class Program
                 Equal(StopReason.Error, result.Message.StopReason);
                 Check(!result.IsRetryableTransportFailure, $"Completions {label} must NOT be marked retryable.");
             }
+            using (var client = new HttpClient(new Handler(_ => Task.FromResult(new HttpResponseMessage(HttpStatusCode.ServiceUnavailable)))))
+            {
+                var transport = new CompletionsHttpSseTransport(client,
+                    (_, _) => new HttpRequestMessage(HttpMethod.Post, "https://openai.invalid/v1/chat/completions") { Content = new StringContent("{}") },
+                    options: new CompletionsHttpSseOptions
+                    {
+                        Retry = new CompletionsRetryOptions(MaxRetries: 1, MaxRetryDelayMilliseconds: 100)
+                        {
+                            OnRetry = _ => throw new TimeoutException("retry observer timeout")
+                        }
+                    });
+                var result = await new ChatClient(transport).CompleteAsync(new(completionsModel, [Ask], 1)).WaitAsync(Deadline);
+                Equal(StopReason.Error, result.Message.StopReason);
+                Check(!result.IsRetryableTransportFailure, "Completions Retry.OnRetry TimeoutException must NOT be marked retryable.");
+            }
         }
 
-        // 8. Anthropic hooks (OnPayload, OnResponse, OnProviderStreamEvent) throwing TimeoutException or unrequested OCE -> NOT retryable.
+        // 8. Anthropic hooks (OnPayload, OnResponse, OnProviderStreamEvent) and permanent 401 error-body IO failures -> NOT retryable.
         {
             var anthropicModel = new ModelDescriptor("claude-3-5-haiku-latest", "anthropic-messages", "anthropic");
+            foreach (var (withHooks, label) in new[] { (false, "plain"), (true, "hooks") })
+            {
+                using var client = new HttpClient(new Handler(_ => Task.FromResult(new HttpResponseMessage(HttpStatusCode.Unauthorized)
+                {
+                    Content = new StreamContent(new ThrowingReadStream(
+                        new IOException("Connection reset while reading 401 body", new SocketException((int)SocketError.ConnectionReset))))
+                })));
+                var transport = new AnthropicMessagesHttpSseTransport(client,
+                    (_, _) => new HttpRequestMessage(HttpMethod.Post, "https://anthropic.invalid/v1/messages"),
+                    hooks: withHooks ? new AnthropicMessagesHooks { OnResponse = (_, _, _) => Task.CompletedTask } : null);
+                var result = await new ChatClient(transport).CompleteAsync(new(anthropicModel, [Ask], 1)).WaitAsync(Deadline);
+                Equal(StopReason.Error, result.Message.StopReason);
+                Check(!result.IsRetryableTransportFailure, $"Anthropic ({label}) 401 with mid-error-body IOException must NOT be marked retryable.");
+            }
             foreach (var (label, hooks) in new (string, AnthropicMessagesHooks)[]
             {
                 ("OnResponse-Timeout", new() { OnResponse = (_, _, _) => Task.FromException(new TimeoutException("response hook timeout")) }),
