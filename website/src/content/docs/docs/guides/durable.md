@@ -10,12 +10,8 @@ sidebar:
 :::caution[Experimental]
 Pi Durable ships as experimental from PiSharp 1.2.0.1: the `pisharp durable` command and the `PiSharp.Durable`, `PiSharp.Durable.Tools` and `PiSharp.Durable.Sqlite` packages. PiSharp 1.2.0.2 adds questions, plan mode, service tiers, the media tools and the [device server](#device-server). PiSharp 1.5.0 moves the libraries to `pi-durable` v1.5.0, whose session format older PiSharp versions can't open (see [Upgrading to 1.5.0](#upgrading-to-150)). Its command, session format and library API may change or be removed in any release, without notice or a deprecation period.
 
-:::note[Updated in 1.5.2]
-PiSharp 1.5.2 targets Pi Durable 1.5.2, including 1.5.1 changes to read-only JSONL recovery, SQLite batching, compaction and scheduling. Source and hosted validation retain explicit suite and platform limitations. The earlier compatibility and upgrade evidence below remains historical. The [1.5.2 overlay](https://github.com/jkelly/PiSharp/blob/main/compatibility/durable-sync-1.5.2-overlay.json) preserves that earlier map and records current source work separately.
-:::
-
-:::note[Unreleased 1.6.0 source candidate]
-The source on `main` targets Pi Durable 1.6.0: signals, tools that park, gates, hooks that start tasks, code-mode namespaces declared by extensions and image fitting. It is not released; the published release is PiSharp 1.5.2. A session written by the 1.6.0 source is not meant to be opened by PiSharp 1.5.2 (`pi.tool` version 4, `pi.generation` version 3). In `pisharp durable` a parked tool call shows as sleeping or waiting, but no host delivers a signal yet and none installs image fitting. Local source validation is recorded with explicit limitations. See [The 1.6.0 source candidate](/docs/embed/durable/#the-160-source-candidate) and the [1.6.0 overlay](https://github.com/jkelly/PiSharp/blob/main/compatibility/durable-sync-1.6.0-overlay.json).
+:::note[Updated in 1.6.0]
+PiSharp 1.6.0 targets Pi Durable 1.6.0: signals, tools that park, gates, hooks that start tasks, code-mode namespaces declared by extensions and image fitting. A session written by 1.6.0 is not meant to be opened by PiSharp 1.5.2 (`pi.tool` version 4, `pi.generation` version 3). In `pisharp durable` a parked tool call shows as sleeping or waiting, though no host delivers a signal yet and none installs image fitting. Source and hosted validation retain explicit suite and platform limitations. See [New in 1.6.0](/docs/embed/durable/#new-in-160), the [1.6.0 overlay](https://github.com/jkelly/PiSharp/blob/main/compatibility/durable-sync-1.6.0-overlay.json), and the preserved [1.5.2 overlay](https://github.com/jkelly/PiSharp/blob/main/compatibility/durable-sync-1.5.2-overlay.json).
 :::
 :::
 
@@ -202,9 +198,9 @@ Every public type is marked `[Experimental("PISHARP_DURABLE001")]`, so the compi
   <NoWarn>$(NoWarn);PISHARP_DURABLE001</NoWarn>
 </PropertyGroup>
 <ItemGroup>
-  <PackageReference Include="PiSharp.Durable" Version="1.5.2" />
-  <PackageReference Include="PiSharp.Durable.Sqlite" Version="1.5.2" />
-  <PackageReference Include="PiSharp.Durable.Tools" Version="1.5.2" />
+  <PackageReference Include="PiSharp.Durable" Version="1.6.0" />
+  <PackageReference Include="PiSharp.Durable.Sqlite" Version="1.6.0" />
+  <PackageReference Include="PiSharp.Durable.Tools" Version="1.6.0" />
 </ItemGroup>
 ```
 

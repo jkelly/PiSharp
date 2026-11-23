@@ -5,9 +5,7 @@ description: What PiSharp is, what it targets, and where to start.
 
 PiSharp is an independent native .NET implementation of the [Pi coding agent](https://pi.dev). It targets .NET 10. The agent itself runs without Node; Node is only needed for TypeScript extensions.
 
-The published **PiSharp 1.5.2** release follows **Pi v1.5.2**, pinned to `b4afdddf`, including v1.5.1. Source, hosted and package validation retain explicit limitations; matching the version does not claim complete parity. See [How versions work](/docs/versioning/) and the [release notes](https://github.com/jkelly/PiSharp/blob/main/docs/release-notes/1.5.2.md).
-
-The current **unreleased source candidate targets Pi v1.6.0**, pinned to `faac5858`. Its local source validation is recorded with explicit limitations; the source version does not claim completed parity, and nothing of it is on NuGet. See the [candidate notes](https://github.com/jkelly/PiSharp/blob/main/docs/release-notes/1.6.0.md).
+The published **PiSharp 1.6.0** release follows **Pi v1.6.0** and **Pi Durable 1.6.0**, pinned to `faac5858`. Source, hosted and package validation retain explicit limitations; matching the version does not claim complete parity. See [How versions work](/docs/versioning/) and the [1.6.0 release notes](https://github.com/jkelly/PiSharp/blob/main/docs/release-notes/1.6.0.md).
 
 ## What's included
 
@@ -33,9 +31,13 @@ PiSharp 1.5.0 moves from Pi v1.2.0 to Pi v1.5.0, with Pi 1.3.0 and 1.4.0 in betw
 
 The custom agents, media tools, service tiers and the durable device server, new in 1.2.0.2, are still PiSharp's own and experimental.
 
+## New in 1.6.0
+
+The [1.6.0 release notes](https://github.com/jkelly/PiSharp/blob/main/docs/release-notes/1.6.0.md) cover the complete Pi 1.6.0 model catalog (43 providers, 1,853 entries), provider retry and strict-tool updates, Durable signals, parked tools, `BeforeTool` gates, `OnYield`/`AfterTools` hook tasks and image fitting, Chord events, named queries, lists and admission, terminal UI read-only rendering and `SIGTSTP` support, and the exact Pi 1.6.0 extension runtime. All 29 NuGet packages share version 1.6.0.
+
 ## New in 1.5.2
 
-The [1.5.2 release notes](https://github.com/jkelly/PiSharp/blob/main/docs/release-notes/1.5.2.md) cover the updated model catalog, native provider behavior, CLI and MCP lifecycle fixes, read-only Durable recovery, Chord reload and hosting, terminal rendering, and the exact Pi 1.5.2 extension runtime. All 29 NuGet packages share version 1.5.2.
+The [1.5.2 release notes](https://github.com/jkelly/PiSharp/blob/main/docs/release-notes/1.5.2.md) cover the Pi 1.5.2 model catalog, native provider behavior, CLI and MCP lifecycle fixes, read-only Durable recovery, Chord reload and hosting, terminal rendering, and the exact Pi 1.5.2 extension runtime.
 
 ## New in 1.5.0.1
 

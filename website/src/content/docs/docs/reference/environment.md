@@ -133,7 +133,7 @@ Each provider reads its key from these variables. A key saved with `/login`, or 
 | `zai-coding-cn` | `ZAI_CODING_CN_API_KEY` |
 | `llama.cpp` (built-in extension) | `LLAMA_BASE_URL`, `LLAMA_API_KEY`. See [llama.cpp](/docs/guides/llama-cpp/). |
 
-The four per-plan Qwen Token Plan variables (`QWEN_TOKEN_PLAN_TEAM_API_KEY`, `QWEN_TOKEN_PLAN_TEAM_CN_API_KEY`, `QWEN_TOKEN_PLAN_INDIVIDUAL_API_KEY` and `QWEN_TOKEN_PLAN_INDIVIDUAL_CN_API_KEY`) are read by the unreleased 1.6.0 source candidate, before the shared variable of the region. PiSharp 1.5.2 reads only `QWEN_TOKEN_PLAN_API_KEY` and `QWEN_TOKEN_PLAN_CN_API_KEY`.
+From PiSharp 1.6.0, the four per-plan Qwen Token Plan variables (`QWEN_TOKEN_PLAN_TEAM_API_KEY`, `QWEN_TOKEN_PLAN_TEAM_CN_API_KEY`, `QWEN_TOKEN_PLAN_INDIVIDUAL_API_KEY` and `QWEN_TOKEN_PLAN_INDIVIDUAL_CN_API_KEY`) are read before the shared variable of the region. PiSharp 1.5.2 read only `QWEN_TOKEN_PLAN_API_KEY` and `QWEN_TOKEN_PLAN_CN_API_KEY`.
 
 ### Anthropic workload identity
 

@@ -72,9 +72,9 @@ Some providers need more than a key:
 | `zai` | Z.AI | `openai-completions` | `ZAI_API_KEY` | |
 | `zai-coding-cn` | Z.AI Coding CN | `openai-completions` | `ZAI_CODING_CN_API_KEY` | |
 
-The Qwen Token Plan rows describe the unreleased 1.6.0 source candidate, which follows Pi 1.6.0: the Team names, a key variable per plan read before the shared one, and the gateways `token-plan.maas.qwencloudapi.com` (international) and `token-plan.maas.qianwenaiapi.com` (China). PiSharp 1.5.2 names the Team providers "Qwen Token Plan" and "Qwen Token Plan CN" and reads only the shared `QWEN_TOKEN_PLAN_API_KEY` and `QWEN_TOKEN_PLAN_CN_API_KEY`. The shared variables keep working in 1.6.0.
+The Qwen Token Plan rows follow Pi 1.6.0 (from PiSharp 1.6.0): the Team names, a key variable per plan read before the shared one, and the gateways `token-plan.maas.qwencloudapi.com` (international) and `token-plan.maas.qianwenaiapi.com` (China). PiSharp 1.5.2 named the Team providers "Qwen Token Plan" and "Qwen Token Plan CN" and read only the shared `QWEN_TOKEN_PLAN_API_KEY` and `QWEN_TOKEN_PLAN_CN_API_KEY`. The shared variables keep working in 1.6.0.
 
-In the 1.6.0 source candidate, `openai`, `azure` and `openai-codex` default to `gpt-6.2-sol` when no model is selected; PiSharp 1.5.2 defaults to `gpt-6.1-sol`.
+From PiSharp 1.6.0, `openai`, `azure` and `openai-codex` default to `gpt-6.2-sol` when no model is selected (PiSharp 1.5.2 defaulted to `gpt-6.1-sol`).
 
 The `llama.cpp` provider comes from a [built-in extension](/docs/reference/configuration/#built-in-extensions), not this list. Extensions and `models.json` can add more providers.
 

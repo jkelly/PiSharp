@@ -14,7 +14,7 @@ description: Gate risky tool writes, pause workflows for multi-day approvals, as
 | Interactive multiple-choice decision or plan sign-off in terminal UI | `ask_user_question` and `/plan` (`exit_plan_mode`) | Yes | `pisharp durable` |
 | Pause a workflow for hours or days waiting for an external webhook or UI click | `Workflow.WaitForSignal<T>(..., timeout, onTimeout)` | Yes (SQLite / JSONL / Chord) | `PiSharp.CustomAgents` |
 | Let an autonomous team agent escalate ad-hoc questions to your app | `AgentDefinition.CanAskHost = true` + `session.Host.WatchMailboxAsync()` | Yes | `PiSharp.CustomAgents` |
-| Park a risky Durable tool call inside `BeforeTool` until approved or expired | `ToolHooks.BeforeTool` + typed `Signals.DefineSignal` *(1.6.0 source candidate)* | Yes | `PiSharp.Durable` *(unreleased 1.6.0)* |
+| Park a risky Durable tool call inside `BeforeTool` until approved or expired | `ToolHooks.BeforeTool` + typed `Signals.DefineSignal` *(from 1.6.0)* | Yes | `PiSharp.Durable` *(1.6.0)* |
 
 ## Recipe 1: Synchronous preflight policy (`PiSharp.Agent`)
 
@@ -77,10 +77,10 @@ await run!.SignalAsync("finance-decision", new ApprovalDecision(true, "finance@e
 
 The signal's `id` makes delivery idempotent (duplicate webhook clicks return `false` without applying twice), and the 2-day timeout deadline is stored in SQLite so restarts never reset the clock.
 
-## Recipe 3: Durable `BeforeTool` gate *(1.6.0 source candidate)*
+## Recipe 3: Durable `BeforeTool` gate *(from 1.6.0)*
 
-:::note[1.6.0 source candidate (unreleased)]
-Durable signals and `BeforeTool` gates ship on `sync/pi-1.6.0` (not yet on NuGet 1.5.2). See `samples/Durable.Examples/ExamplesGates.cs` (`44-approval-gate`).
+:::note[New in 1.6.0]
+Durable signals and `BeforeTool` gates ship in PiSharp 1.6.0. See `samples/Durable.Examples/ExamplesGates.cs` (`44-approval-gate`).
 :::
 
 In Durable 1.6.0, an extension can intercept a risky `bash` call inside `ToolHooks.BeforeTool`, key the decision by a canonical digest of the arguments, fix a deadline once with `api.MemoAsync`, and park the tool task on a typed signal (`Signals.DefineSignal`). Denial or expiry blocks the call cleanly and reports the reason back to the model.
@@ -108,7 +108,7 @@ dotnet run --project samples/agents/05-PersistentTaskManager -- --persist-demo -
 # Budget-routed purchase approval
 dotnet run --project samples/agents/40-PurchaseRequestCoordinator -- --demo --approve
 
-# Durable plan mode & (1.6.0 source candidate) BeforeTool approval gate
+# Durable plan mode & 1.6.0 BeforeTool approval gate
 dotnet run --project samples/Durable.Examples -- --storage sqlite 26-plan-mode
 dotnet run --project samples/Durable.Examples -- --storage sqlite 39-ask-a-person 44-approval-gate
 ```

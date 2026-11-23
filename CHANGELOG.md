@@ -1,8 +1,8 @@
 # Changelog
 
-## [1.6.0]
+## [1.6.0] - 2026-11-23
 
-**UNRELEASED:** Source candidate targeting Pi v1.6.0. See the [candidate notes](https://github.com/jkelly/PiSharp/blob/main/docs/release-notes/1.6.0.md) and [complete source applicability map](https://github.com/jkelly/PiSharp/blob/main/compatibility/sync-1.6.0-applicability.json) for validation status and limitations. This entry does not announce a release; the latest published version remains **1.5.2**.
+PiSharp 1.6.0 ports Pi v1.6.0 and Pi Durable 1.6.0. All 28 libraries and the CLI are available on NuGet. See the [release notes](https://github.com/jkelly/PiSharp/blob/main/docs/release-notes/1.6.0.md), [source applicability map](https://github.com/jkelly/PiSharp/blob/main/compatibility/sync-1.6.0-applicability.json) and [publication evidence](https://github.com/jkelly/PiSharp/blob/main/AI_DOCS/release-1.6.0-publication-results.md) for validation scope and limitations.
 
 ### Changes by area
 

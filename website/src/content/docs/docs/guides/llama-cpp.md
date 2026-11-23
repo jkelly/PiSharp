@@ -28,7 +28,7 @@ llama serve --no-models-autoload --host 127.0.0.1 --port 9931 -ngl all -c 32768
 
 ## Connect PiSharp
 
-In the terminal UI, run `/login llama.cpp` and enter the router's URL and an API key if the server needs one. The URL the prompt offers is `http://127.0.0.1:8080` in PiSharp 1.5.2 and earlier. The unreleased 1.6.0 source candidate offers `http://127.0.0.1:9931`, as Pi 1.6.0 does. Enter the URL your server listens on; a URL you saved earlier is still used. The URL and key are saved in `~/.pi/agent/auth.json`, which Pi uses too.
+In the terminal UI, run `/login llama.cpp` and enter the router's URL and an API key if the server needs one. From PiSharp 1.6.0 the prompt offers `http://127.0.0.1:9931`, as Pi 1.6.0 does (PiSharp 1.5.2 and earlier offered `http://127.0.0.1:8080`). Enter the URL your server listens on; a URL you saved earlier is still used. The URL and key are saved in `~/.pi/agent/auth.json`, which Pi uses too.
 
 The environment variables `LLAMA_BASE_URL` and `LLAMA_API_KEY` do the same without `/login`.
 

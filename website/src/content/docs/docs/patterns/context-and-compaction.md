@@ -39,8 +39,8 @@ var unlockBilling = AgentTool.Create("unlock_billing_tools", "Enables refund too
 
 For MCP servers in `mcp.json`, set `"exposure": "deferred"` (activates `tool_search` automatically) or `"exposure": "codemode"`.
 
-:::note[1.6.0 source candidate: persistent `tool_search` & extension namespaces]
-On `sync/pi-1.6.0` (unreleased):
+:::note[New in 1.6.0: persistent `tool_search` & extension namespaces]
+From PiSharp 1.6.0:
 - MCP tools activated via `tool_search` now survive session resume and `/reload`.
 - In Durable code mode, tool groups declare their namespace directly on the extension (`Extension.Namespace = new ToolNamespace("mcp__github", "GitHub issues and pull requests")`) instead of `CodemodeToolOptions.Namespaces`.
 :::

@@ -25,8 +25,8 @@ A standard CLI session activates `read`, `write`, `edit`, and `bash`, while `gre
 
 When embedding `PiSharp.Tools` in your own app, built-in tools run through `IPreparedToolAdapter` → `ToolInvoker` → **`IToolActionPolicy.AuthorizeAsync`**, letting your host inspect the resolved path or shell command before anything touches disk or spawns a process. See [Built-in tools reference](/docs/reference/tools/) and [Coding agent SDK](/docs/embed/coding-agent/#built-in-tools).
 
-:::note[1.6.0 source candidate tool updates]
-On `sync/pi-1.6.0` (unreleased): `find` path patterns are anchored at the search directory (use `**/src/*.ts` for any depth); `read` reports unsupported vision models in `details.imageUnsupportedByModel` instead of appending a text note; and `PiSharp.Durable.Tools` adds `FitImages.CreateExtension(...)` to fit tool-returned images before storage (`47-fit-images`).
+:::note[New in 1.6.0: tool updates]
+In PiSharp 1.6.0: `find` path patterns are anchored at the search directory (use `**/src/*.ts` for any depth); `read` reports unsupported vision models in `details.imageUnsupportedByModel` instead of appending a text note; and `PiSharp.Durable.Tools` adds `FitImages.CreateExtension(...)` to fit tool-returned images before storage (`47-fit-images`).
 :::
 
 ## 2. Typed C# tools & dynamic tool sources
@@ -50,8 +50,8 @@ If tools need to appear or disappear while agents are running (for feature flags
 - **`JsTool`** turns a pure or durable JS snippet into a first-class named tool with memory (`64 MB`), allocation (`256 MB`), recursion (`2000`), and wall-clock (`10 s`) ceilings.
 - **`JsAuthoring.Enable(team)`** lets agents marked `CanCreateTools = true` write persistent `js_*` tools at runtime via `create_tool` and `remove_tool`. By default, `RequireIsolation = true` insists on running model-authored scripts inside a separate worker process (`JsWorkerHost.Configure()`).
 
-:::note[1.6.0 source candidate: extension-declared namespaces]
-In Durable 1.6.0 (unreleased), `CodemodeToolOptions.Namespaces` is replaced by declaring `Extension.Namespace = new ToolNamespace(name, description, instructions)` directly on each extension that contributes tools.
+:::note[New in 1.6.0: extension-declared namespaces]
+From Durable 1.6.0, `CodemodeToolOptions.Namespaces` is replaced by declaring `Extension.Namespace = new ToolNamespace(name, description, instructions)` directly on each extension that contributes tools.
 :::
 
 ## 4. Roslyn C# scripts (`*.tool.csx`)
@@ -71,7 +71,7 @@ Because collectible load contexts are **not** security sandboxes, use `CSharpScr
 Connecting three MCP servers can easily expose 80+ tool schemas, consuming thousands of prompt tokens before the user types a word. PiSharp solves this with **deferred tools**:
 - Mark MCP servers (`"exposure": "deferred"` or `"codemode"`) or C# tools (`AgentToolOptions.Deferred = true`).
 - Hidden tools stay out of the prompt until the model calls `tool_search(query, limit)` (BM25 ranking with ICU word segmentation) or a tool returns `ToolControl.AddTools`.
-- On the **1.6.0 source candidate**, MCP tools activated by `tool_search` persist cleanly across session resume and `/reload`.
+- From **PiSharp 1.6.0**, MCP tools activated by `tool_search` persist cleanly across session resume and `/reload`.
 
 ## Trust boundary checklist
 

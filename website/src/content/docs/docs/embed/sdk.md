@@ -7,10 +7,10 @@ PiSharp is a set of .NET libraries, and the `pisharp` CLI is built from them. Yo
 
 ## Install
 
-Every library is a NuGet package that targets `net10.0`. The current release is 1.5.2:
+Every library is a NuGet package that targets `net10.0`. The current release is 1.6.0:
 
 ```powershell
-dotnet add package PiSharp.CodingAgent --version 1.5.2
+dotnet add package PiSharp.CodingAgent --version 1.6.0
 ```
 
 A package brings the packages it is built on, so `PiSharp.CodingAgent` also gives you `PiSharp.Agent`, `PiSharp.AI`, `PiSharp.Sessions` and `PiSharp.Contracts`. All PiSharp packages share one version number. Use the same version for every PiSharp package you reference. From 1.5.0, each package depends on its PiSharp packages at exactly its own version (`[1.5.0]`), so NuGet reports a conflict instead of mixing packages from different releases, as Pi pins its own packages since 1.3.0. [Versioning](/docs/versioning/) explains how the number relates to the Pi release it ports.
@@ -142,7 +142,7 @@ Some APIs carry `[Experimental("<ID>")]`. The compiler reports an error when you
 | `PISHARP_SCHEMA001` | The port of pi-schema in `PiSharp.Contracts` (namespace `PiSharp.Contracts.Schema`): `JsonSchemaValidator`, `CoercingJsonSchemaValidator`, `JsonSchemaCompileOptions`, `JsonSchemaFormats` and their results and errors. | Released as experimental in 1.5.0. |
 | `PISHARP_TELEMETRY001` | Every public type in `PiSharp.Telemetry`, and the telemetry members of `PiSharp.AI`. See [Telemetry](/docs/embed/telemetry/). | Released as experimental in 1.5.0. |
 | `PISHARP_TOOLSEARCH001` | `ToolSearchDocument.NamespaceText` in `PiSharp.Extensions.Abstractions`, which ranks a tool's namespace text. | Released as experimental in 1.5.0. |
-| `PISHARP_TUI001` | TUI additions in `PiSharp.Tui`: `KeybindingsManager.GetSelectPageIndex`, `Terminal.RestoreOnExit`, `TextUtils.ReplaceControlCharacters` and `IComponent.CapturesViewportInput`. The unreleased 1.6.0 source candidate adds `ChildLines`, `LayoutRenderCache`, `TuiBase.RequestViewRender`, `TuiBase.ConsumeContentChanged`, `ITui.SetSuspendSignalHandler`, `TuiBase.SetSuspendSignalHandler`, `TuiBase.SuspendSignalRegistrar`, and `TerminalImage.ImageLineExtent`, `GetImageLineExtent` and `StripImageSequences`. | Released as experimental in 1.5.0. The 1.6.0 additions are unreleased. |
+| `PISHARP_TUI001` | TUI additions in `PiSharp.Tui`: `KeybindingsManager.GetSelectPageIndex`, `Terminal.RestoreOnExit`, `TextUtils.ReplaceControlCharacters` and `IComponent.CapturesViewportInput` (from 1.5.0); and `ChildLines`, `LayoutRenderCache`, `TuiBase.RequestViewRender`, `TuiBase.ConsumeContentChanged`, `ITui.SetSuspendSignalHandler`, `TuiBase.SetSuspendSignalHandler`, `TuiBase.SuspendSignalRegistrar`, and `TerminalImage.ImageLineExtent`, `GetImageLineExtent` and `StripImageSequences` (from 1.6.0). | Released as experimental in 1.5.0; updated in 1.6.0. |
 
 Suppress the IDs you use in your project file:
 
