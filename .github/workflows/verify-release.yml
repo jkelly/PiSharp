@@ -1,0 +1,78 @@
+name: Verify published release
+
+# Post-publish verification workflow: polls api.nuget.org for all 29 packages, compares every NuGet
+# package byte-for-byte with its GitHub release asset, runs an isolated official-feed GapConsumer,
+# and smoke-tests a private PiSharp.Cli installation.
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Published PiSharp version to verify (e.g. 1.6.0)
+        required: true
+      source_commit:
+        description: Exact 40-character tagged commit SHA
+        required: true
+      release_run_url:
+        description: Optional URL of the tagged release workflow run
+        required: false
+        default: ''
+      max_wait_minutes:
+        description: Minutes to wait for NuGet indexing to settle
+        required: false
+        default: '35'
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Verify NuGet, GitHub assets and official-feed consumer
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+
+      - name: Verify all 29 published packages and consumer
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >
+          ./tools/release/verify-published-release.ps1
+          -Version '${{ inputs.version }}'
+          -ExpectedCommit '${{ inputs.source_commit }}'
+          -ReleaseRunUrl '${{ inputs.release_run_url }}'
+          -MaxWaitMinutes ([int]'${{ inputs.max_wait_minutes }}')
+          -OutputJson "$env:RUNNER_TEMP/release-${{ inputs.version }}-package-verification.json"
+
+      - name: Write summary
+        shell: bash
+        run: |
+          node -e '
+            const fs = require("fs");
+            const data = JSON.parse(fs.readFileSync(`${process.env.RUNNER_TEMP}/release-${process.env.VER}-package-verification.json`, "utf8"));
+            const lines = [
+              `# PiSharp ${data.version} Post-Publish Verification`,
+              ``,
+              `- **Packages verified:** ${data.verified}/${data.expected} byte-for-byte payload matches`,
+              `- **Source commit:** \`${data.sourceCommit}\``,
+              `- **Isolated official-feed consumer:** \`${data.consumer.status}\` (${data.consumer.resolvedPiSharpPackages.length} PiSharp packages at \`${data.version}\`)`,
+              `- **Private CLI smoke check:** \`pisharp --version\` → \`${data.consumer.cliVersion}\``,
+            ];
+            fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, lines.join("\n") + "\n");
+          '
+        env:
+          VER: ${{ inputs.version }}
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: release-${{ inputs.version }}-verification
+          path: ${{ runner.temp }}/release-${{ inputs.version }}-package-verification.json
+          if-no-files-found: error

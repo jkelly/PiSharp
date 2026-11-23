@@ -339,6 +339,9 @@ try {
     $files = New-FixtureFiles; $files['tools/net10.0/any/PiSharp.Cli.dll'] = [byte[]]@(9)
     $changed = Write-Fixture -Files $files -Name 'changed'
     Test-Case 'changed payload rejected' { Assert-Rejected { Assert-PiSharpReproduciblePayload -First $tool -Second $changed } 'payload differs' }
+    $files = New-FixtureFiles; $files['tools/net10.0/any/runtimes/win-x64/native/libSkiaSharp.pdb'] = [byte[]]@(1, 2, 3)
+    $bad = Write-Fixture -Files $files -Name 'native-pdb'
+    Test-Case 'reject native debug symbols under runtimes' { Assert-Rejected { Assert-PiSharpDistribution -Path $bad @argsTool } 'Forbidden native debug symbol' }
     Test-Case 'independent checksum tampering rejected' { Assert-Rejected { & (Join-Path $Repo 'tools/packaging/validate-distribution.ps1') -Artifact $tool -ExpectedSha256 ('0' * 64) @argsTool } 'independently supplied checksum' }
     $results | ConvertTo-Json -Depth 5
 } finally {

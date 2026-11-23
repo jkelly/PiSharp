@@ -71,7 +71,7 @@ jobs:
           node-version: '22'
       - name: Offline applicability and worklist structure
         run: |
-          node --test tools/CompatibilityReport/sync-applicability.test.mjs tools/CompatibilityReport/sync-1.5.2-applicability.test.mjs tools/CompatibilityReport/accept-sync-1.5.2.test.mjs tools/CompatibilityReport/sync-1.6.0-applicability.test.mjs tools/ci/validation-manifest.test.mjs tools/release/publish-github-release.test.mjs
+          node --test tools/CompatibilityReport/sync-applicability.test.mjs tools/CompatibilityReport/sync-1.5.2-applicability.test.mjs tools/CompatibilityReport/accept-sync-1.5.2.test.mjs tools/CompatibilityReport/sync-1.6.0-applicability.test.mjs tools/ci/validation-manifest.test.mjs tools/release/publish-github-release.test.mjs tools/release/generate-package-manifests.test.mjs
           node --test tools/ci/historical-ai-archive.test.mjs
           node tools/DurablePortMap/check-worklist.mjs --offline
       - name: Fetch immutable upstream objects

@@ -32,6 +32,9 @@ function Get-PiSharpArchiveInventory {
                 (-not $AllowNodeBridge -and $name -match '(?i)PiSharp\.Compatibility\.Node\.')) {
                 throw "Forbidden native distribution payload: $name"
             }
+            if ($name -match '(?i)(^|/)runtimes/[^/]+/native/.*\.pdb$') {
+                throw "Forbidden native debug symbol in distribution payload: $name"
+            }
             $stream = $entry.Open()
             $sha = [Security.Cryptography.SHA256]::Create()
             try { $hash = [Convert]::ToHexString($sha.ComputeHash($stream)).ToLowerInvariant() }
@@ -177,6 +180,10 @@ function Assert-PiSharpDistribution {
     if (-not $notices.Contains('Copyright (c) 2025 Mario Zechner') -or -not $notices.Contains($baseline.source.commit)) { throw 'Pinned Pi attribution missing.' }
     $prefix = ''
     if ($Kind -eq 'tool') {
+        $archiveBytes = ([IO.FileInfo]::new((Resolve-Path -LiteralPath $Path).Path)).Length
+        if ($archiveBytes -gt 80MB) {
+            throw "Tool package compressed size budget exceeded ($archiveBytes bytes > 80 MiB). Verify native PDBs and unsupported RIDs were pruned."
+        }
         $nuspecs = @($files.Keys | Where-Object { $_ -cmatch '^[^/]+\.nuspec$' })
         if ($nuspecs.Count -ne 1) { throw 'Exactly one root nuspec required.' }
         # Prohibit DTD/entity resolution even for hostile package XML.

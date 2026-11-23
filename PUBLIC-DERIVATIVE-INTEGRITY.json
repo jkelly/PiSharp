@@ -10681,8 +10681,8 @@
       "originalSha256": "6b228c2a1c550e664461250d372eb2b8dc58f730e83b9d4ccde3ec52338bf2c5"
     },
     {
-      "currentSha256": "5a3c7d1e80f59997aac1a81335c75628fdd33fa23da2154c9853063c406a5773",
-      "currentBytes": 30443,
+      "currentSha256": "c39618bf55d3662c0ceae824cdb42cad7217728810cc56dddc81f088d2cd5aa1",
+      "currentBytes": 30785,
       "originalBytes": 23480,
       "path": "tests/packaging/distribution-validation.tests.ps1",
       "originalSha256": "c4363ce0b9ca7570f27058d7177e8b45426fc3855896e79b15f00358913d0809"
@@ -17996,15 +17996,15 @@
       "originalSha256": "96aef982693de523a759cbd0254d1fe61f6eb57ec3f1a2727b9d2c54ebab8cdb"
     },
     {
-      "currentSha256": "6de354f9710cdae72fc5bb5ad84c8f6eb47b45fabb50499dd4920c455a81fd68",
-      "currentBytes": 22553,
+      "currentSha256": "922bcc200b124439b96a7c7b921ed751a9384e2bde2cbf0179bc84755f14342e",
+      "currentBytes": 23016,
       "originalBytes": 15911,
       "path": "tools/packaging/distribution-validation.ps1",
       "originalSha256": "e5659e7a525ec6b21387c1a9dc2085f7107627ea2e001b4dcc5913ab36f71b3a"
     },
     {
-      "currentSha256": "fd7f5541220ed740db66fb3c05d79137e5da98d70575ff55a825eab00a4d5ce3",
-      "currentBytes": 2563,
+      "currentSha256": "0bc1516153cd1e22a66cc6fcdd9d25b69dd527bd5e08b5d33e29a0e0435080d5",
+      "currentBytes": 5388,
       "originalBytes": 2563,
       "path": "tools/packaging/PiSharp.Distribution.targets",
       "originalSha256": "fd7f5541220ed740db66fb3c05d79137e5da98d70575ff55a825eab00a4d5ce3"
