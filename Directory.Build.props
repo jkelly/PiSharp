@@ -28,7 +28,7 @@
     <PiSharpMarkdigVersion>[0.41.3]</PiSharpMarkdigVersion>
     <PiSharpHtmlSanitizerVersion>[9.1.973]</PiSharpHtmlSanitizerVersion>
     <PiSharpPlaywrightVersion>[1.63.0]</PiSharpPlaywrightVersion>
-    <PiSharpExtensionsAIAbstractionsVersion>[10.11.1]</PiSharpExtensionsAIAbstractionsVersion>
-    <PiSharpDependencyInjectionAbstractionsVersion>[10.0.0]</PiSharpDependencyInjectionAbstractionsVersion>
+    <PiSharpExtensionsAIAbstractionsVersion>10.11.1</PiSharpExtensionsAIAbstractionsVersion>
+    <PiSharpDependencyInjectionAbstractionsVersion>10.0.0</PiSharpDependencyInjectionAbstractionsVersion>
   </PropertyGroup>
 </Project>

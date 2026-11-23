@@ -179,6 +179,7 @@ public sealed class ChatClientTransportAdapter : IChatTransport, IDisposable
 
                         case FunctionCallContent call:
                         {
+                            if (call.InformationalOnly) break;
                             if (openTextIndex is { } txtIdx)
                             {
                                 var endedText = CloseText(txtIdx, textBuffer, textSignature, blocks);
@@ -239,8 +240,29 @@ public sealed class ChatClientTransportAdapter : IChatTransport, IDisposable
         finally
         {
             if (enumerator is not null)
-                await enumerator.DisposeAsync().ConfigureAwait(false);
+            {
+                try
+                {
+                    await enumerator.DisposeAsync().ConfigureAwait(false);
+                }
+                catch (OperationCanceledException ex)
+                {
+                    if (!aborted && streamErrorMessage is null)
+                    {
+                        aborted = true;
+                        streamErrorMessage = ex.Message;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    if (!aborted && streamErrorMessage is null)
+                        streamErrorMessage = ex.Message;
+                }
+            }
         }
+
+        if (!aborted && streamErrorMessage is null && finishReason == ChatFinishReason.ContentFilter)
+            streamErrorMessage = "Response blocked by content filter.";
 
         var tokenUsage = BuildTokenUsage(inputTokens, outputTokens, cacheReadTokens, cacheWriteTokens, totalTokens, reasoningTokens);
 
@@ -292,8 +314,12 @@ public sealed class ChatClientTransportAdapter : IChatTransport, IDisposable
     {
         var chatOptions = _options.BaseOptions?.Clone() ?? new ChatOptions();
         chatOptions.ModelId = request.Model.Id;
-        if (!string.IsNullOrEmpty(request.SessionId))
-            chatOptions.ConversationId = request.SessionId;
+        if (request.DisableContinuation)
+        {
+            // Independent replay must not resume server-side continuation state from BaseOptions.
+            chatOptions.ContinuationToken = null;
+            chatOptions.ConversationId = null;
+        }
         if (MapThinkingLevel(request.ThinkingLevel) is { } effort)
             chatOptions.Reasoning = new ReasoningOptions { Effort = effort };
 
@@ -311,7 +337,10 @@ public sealed class ChatClientTransportAdapter : IChatTransport, IDisposable
 
         var systemParts = new List<string>();
         var sections = new List<KeyValuePair<string, string>>();
-        var tools = new List<JsonObject>();
+        // Start from a detached copy of BaseOptions.Tools so transcript tool deltas remove/replace
+        // baseline definitions without mutating BaseOptions.
+        var workingTools = chatOptions.Tools is { Count: > 0 } ? new List<AITool>(chatOptions.Tools) : new List<AITool>();
+        var sawToolDelta = false;
         var conversation = new List<ChatMessage>();
 
         foreach (var entry in request.Messages.IsDefault ? [] : request.Messages)
@@ -341,7 +370,8 @@ public sealed class ChatClientTransportAdapter : IChatTransport, IDisposable
                         }
                     }
                 }
-                ApplyToolDeltas(body, tools);
+                if (ApplyToolDeltas(body, workingTools))
+                    sawToolDelta = true;
             }
             else if (role == "user")
             {
@@ -368,43 +398,42 @@ public sealed class ChatClientTransportAdapter : IChatTransport, IDisposable
             messages.Add(new ChatMessage(ChatRole.System, fullSystem));
         messages.AddRange(conversation);
 
-        if (tools.Count > 0)
-        {
-            var toolList = chatOptions.Tools ??= [];
-            foreach (var tool in tools)
-            {
-                var name = GetString(tool, "name");
-                if (string.IsNullOrWhiteSpace(name)) continue;
-                var description = GetString(tool, "description");
-                var schemaText = tool["parameters"]?.ToJsonString() ?? "{\"type\":\"object\",\"properties\":{}}";
-                using var doc = JsonDocument.Parse(schemaText, JsonData.DocumentOptions);
-                toolList.Add(AIFunctionFactory.CreateDeclaration(name, description, doc.RootElement.Clone()));
-            }
-        }
+        if (sawToolDelta || workingTools.Count > 0)
+            chatOptions.Tools = workingTools;
 
         return (messages, chatOptions);
     }
 
-    private static void ApplyToolDeltas(JsonObject systemBody, List<JsonObject> tools)
+    private static bool ApplyToolDeltas(JsonObject systemBody, List<AITool> tools)
     {
+        var changed = false;
         if (systemBody["toolsRemoved"] is JsonArray removed)
         {
+            changed = true;
             foreach (var item in removed.OfType<JsonObject>())
             {
                 var name = GetString(item, "name");
-                if (name is not null) tools.RemoveAll(existing => GetString(existing, "name") == name);
+                if (name is not null)
+                    tools.RemoveAll(existing => string.Equals(existing.Name, name, StringComparison.Ordinal));
             }
         }
         if (systemBody["toolsAdded"] is JsonArray added)
         {
+            changed = true;
             foreach (var item in added.OfType<JsonObject>())
             {
                 var name = GetString(item, "name");
-                var idx = name is null ? -1 : tools.FindIndex(existing => GetString(existing, "name") == name);
-                if (idx >= 0) tools[idx] = (JsonObject)item.DeepClone();
-                else tools.Add((JsonObject)item.DeepClone());
+                if (string.IsNullOrWhiteSpace(name)) continue;
+                var description = GetString(item, "description");
+                var schemaText = item["parameters"]?.ToJsonString() ?? "{\"type\":\"object\",\"properties\":{}}";
+                using var doc = JsonDocument.Parse(schemaText, JsonData.DocumentOptions);
+                var decl = AIFunctionFactory.CreateDeclaration(name, description, doc.RootElement.Clone());
+                var idx = tools.FindIndex(existing => string.Equals(existing.Name, name, StringComparison.Ordinal));
+                if (idx >= 0) tools[idx] = decl;
+                else tools.Add(decl);
             }
         }
+        return changed;
     }
 
     private static ChatMessage ConvertUserMessage(JsonObject body)

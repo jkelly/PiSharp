@@ -348,7 +348,7 @@ Two other start methods change abort handling:
 
 ## Service tiers
 
-`ChatRequest.ServiceTier` picks a provider's processing tier for one request: `auto`, `normal`, `economy`, `priority`, `fast` or `ultrafast` (`ServiceTiers.All`). Each protocol maps the tier to its own field, and protocols without tiers ignore it. Null keeps the transport's own setting. [Service tiers](/docs/guides/service-tiers/) explains what each provider supports.
+`ChatRequest.ServiceTier` picks a provider's processing tier for one request: `auto`, `normal`, `economy`, `priority`, `fast` or `ultrafast` (`ServiceTiers.All`). Each protocol maps the tier to its own field, and protocols without tiers ignore it. Null keeps the transport's own setting. Service tiers graduate to stable in 1.6.0.1 (ADR 0017); on published 1.6.0 NuGet packages, suppress `PISHARP_TIERS001`. [Service tiers](/docs/guides/service-tiers/) explains what each provider supports.
 
 ## Compared with Pi
 

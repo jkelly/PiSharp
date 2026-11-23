@@ -52,8 +52,10 @@ public sealed class PiEmbeddingGenerator : IEmbeddingGenerator<string, Embedding
         if (inputs.IsEmpty)
             return new GeneratedEmbeddings<Embedding<float>>();
 
-        var effectiveModel = !string.IsNullOrWhiteSpace(options?.ModelId)
-            ? _model with { Id = options.ModelId }
+        var isOverriddenModel = !string.IsNullOrWhiteSpace(options?.ModelId)
+            && !string.Equals(options.ModelId, _model.Id, StringComparison.Ordinal);
+        var effectiveModel = isOverriddenModel
+            ? _model with { Id = options!.ModelId!, Dimensions = null }
             : _model;
 
         string? taskType = null;
@@ -75,7 +77,7 @@ public sealed class PiEmbeddingGenerator : IEmbeddingGenerator<string, Embedding
 
         var request = new EmbeddingRequest(inputs)
         {
-            Dimensions = options?.Dimensions ?? _model.Dimensions,
+            Dimensions = options?.Dimensions ?? effectiveModel.Dimensions,
             TaskType = taskType,
             Options = extraOptions
         };
@@ -88,16 +90,17 @@ public sealed class PiEmbeddingGenerator : IEmbeddingGenerator<string, Embedding
         if (result.StopReason == ModelOperationStopReason.Error)
             throw new InvalidOperationException(result.ErrorMessage ?? "Embedding request failed.");
 
-        var embeddings = new GeneratedEmbeddings<Embedding<float>>(result.Vectors.IsDefault ? 0 : result.Vectors.Length);
-        if (!result.Vectors.IsDefault)
+        var returnedCount = result.Vectors.IsDefault ? 0 : result.Vectors.Length;
+        if (returnedCount != inputs.Length)
+            throw new InvalidOperationException($"Embedding API returned {returnedCount} vector(s) for {inputs.Length} input(s).");
+
+        var embeddings = new GeneratedEmbeddings<Embedding<float>>(returnedCount);
+        foreach (var vector in result.Vectors)
         {
-            foreach (var vector in result.Vectors)
+            embeddings.Add(new Embedding<float>(vector)
             {
-                embeddings.Add(new Embedding<float>(vector)
-                {
-                    ModelId = result.Model
-                });
-            }
+                ModelId = result.Model
+            });
         }
 
         if (result.InputTokens is { } inputTokens)

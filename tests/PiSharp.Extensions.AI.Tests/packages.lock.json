@@ -41,8 +41,8 @@
       "pisharp.extensions.ai": {
         "type": "Project",
         "dependencies": {
-          "Microsoft.Extensions.AI.Abstractions": "[10.11.1, 10.11.1]",
-          "Microsoft.Extensions.DependencyInjection.Abstractions": "[10.0.0, 10.0.0]",
+          "Microsoft.Extensions.AI.Abstractions": "[10.11.1, )",
+          "Microsoft.Extensions.DependencyInjection.Abstractions": "[10.0.0, )",
           "PiSharp.AI": "[1.6.0, )",
           "PiSharp.Contracts": "[1.6.0, )"
         }

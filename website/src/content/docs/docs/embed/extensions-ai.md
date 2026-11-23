@@ -10,12 +10,16 @@ description: Use PiSharp transports through Microsoft.Extensions.AI IChatClient 
 - **`PiEmbeddingGenerator`** exposes `PiSharp.AI.Media.IEmbeddingsApi` as `IEmbeddingGenerator<string, Embedding<float>>` (marked `[Experimental("PISHARP_MEDIA001")]` to match the media contract).
 - **`ServiceCollectionExtensions`** registers clients, keyed multi-model clients, adapted transports, and embedding generators in ASP.NET Core and Generic Host DI containers.
 
-The package depends only on `Microsoft.Extensions.AI.Abstractions` (10.11.1) and `Microsoft.Extensions.DependencyInjection.Abstractions` (10.0.0), with zero additional third-party dependencies on `net10.0`.
+The package depends only on `Microsoft.Extensions.AI.Abstractions` (`>= 10.11.1`) and `Microsoft.Extensions.DependencyInjection.Abstractions` (`>= 10.0.0`), with zero additional third-party dependencies on `net10.0`.
+
+:::note[Availability]
+`PiSharp.Extensions.AI` is prepared on `main` for the upcoming **1.6.0.1** release and is not part of the published 1.6.0 NuGet inventory. Build from source on `main` until 1.6.0.1 is published.
+:::
 
 ## Install
 
 ```powershell
-dotnet add package PiSharp.Extensions.AI --version {{PISHARP_VERSION}}
+dotnet add package PiSharp.Extensions.AI --version 1.6.0.1
 ```
 
 ## Use a PiSharp transport as `IChatClient`
@@ -64,7 +68,7 @@ await foreach (var update in client.GetStreamingResponseAsync(
 | `ChatOptions.ModelId` | Overrides `ModelDescriptor.Id` |
 | `ChatOptions.Instructions` | Leading `system` transcript entry |
 | `ChatOptions.Tools` (`AIFunctionDeclaration` / `AIFunction`) | `toolsAdded` JSON Schema entries |
-| `ChatOptions.ConversationId` | `ChatRequest.SessionId` |
+| `ChatOptions.ConversationId` | Fallback affinity key for `ChatRequest.SessionId` (not echoed back as stateful `ChatResponse.ConversationId`) |
 | `ChatOptions.Reasoning.Effort` | `ChatRequest.ThinkingLevel` (`None` -> `off`, `Low` -> `low`, `Medium` -> `medium`, `High` -> `high`, `ExtraHigh` -> `xhigh`) |
 | `AdditionalProperties["pisharp.thinkingLevel"]` | Explicit PiSharp thinking level (overrides `Reasoning.Effort`) |
 | `AdditionalProperties["pisharp.serviceTier"]` | `ChatRequest.ServiceTier` (`ServiceTiers.*`) |

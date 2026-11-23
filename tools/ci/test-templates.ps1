@@ -104,7 +104,8 @@ try {
         throw "Templates package not found: $templatesPkg"
     }
 
-    # Write a standalone NuGet.Config in the temp workspace pointing at local packages + upstream NuGet.
+    # Write a standalone NuGet.Config in the temp workspace mapping PiSharp.* exclusively to local-pisharp
+    # and all third-party dependencies to the upstream NuGet source.
     $escapedPkgDir = [Security.SecurityElement]::Escape($pkgDir)
     $escapedSource = [Security.SecurityElement]::Escape($PackageSource)
     $nugetConfig = @"
@@ -115,6 +116,14 @@ try {
     <add key="local-pisharp" value="$escapedPkgDir" />
     <add key="nuget.org" value="$escapedSource" />
   </packageSources>
+  <packageSourceMapping>
+    <packageSource key="local-pisharp">
+      <package pattern="PiSharp.*" />
+    </packageSource>
+    <packageSource key="nuget.org">
+      <package pattern="*" />
+    </packageSource>
+  </packageSourceMapping>
 </configuration>
 "@
     [IO.File]::WriteAllText((Join-Path $projectsDir 'NuGet.Config'), $nugetConfig + "`n", [Text.UTF8Encoding]::new($false))

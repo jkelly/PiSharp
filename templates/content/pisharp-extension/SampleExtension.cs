@@ -16,7 +16,13 @@ public sealed class SampleExtension : IPiSharpExtension
             "hello",
             "hello",
             "Prints a greeting from this native extension.",
-            (arguments, context, token) => ValueTask.CompletedTask));
+            async (arguments, context, token) =>
+            {
+                var raw = arguments.Value.ValueKind == JsonValueKind.String ? arguments.Value.GetString() : null;
+                var target = string.IsNullOrWhiteSpace(raw) ? "world" : raw.Trim();
+                if (context is IExtensionUiContext ui)
+                    await ui.Ui.PublishAsync(new ExtensionUiNotify($"Hello, {target}! (from MyPiSharpExtension)", ExtensionUiNotifyKind.Info), token);
+            }));
 
         registry.RegisterTool(new(
             "echo",

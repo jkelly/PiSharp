@@ -189,6 +189,70 @@ internal static partial class Program
             });
             Equal(99, result, "unsampled result");
         }),
+        ("telemetry.diagnostics: uses W3C format even when host DefaultIdFormat is Hierarchical", async () =>
+        {
+            var previousFormat = Activity.DefaultIdFormat;
+            var previousForce = Activity.ForceDefaultIdFormat;
+            var name = "PiSharp.Telemetry.W3C." + Guid.NewGuid().ToString("N");
+            using var listener = new ActivityListener
+            {
+                ShouldListenTo = s => s.Name == name,
+                Sample = (ref ActivityCreationOptions<ActivityContext> _) => ActivitySamplingResult.AllDataAndRecorded
+            };
+            ActivitySource.AddActivityListener(listener);
+            Activity.DefaultIdFormat = ActivityIdFormat.Hierarchical;
+            Activity.ForceDefaultIdFormat = false;
+            try
+            {
+                using var adapter = new DiagnosticsTelemetry(name);
+                IReadOnlyDictionary<string, string>? carrier = null;
+                await adapter.StartSpanAsync("root", span =>
+                {
+                    carrier = adapter.Inject(span);
+                });
+                Check(carrier is not null && carrier.TryGetValue("traceparent", out var tp) && tp.StartsWith("00-", StringComparison.Ordinal),
+                    "W3C traceparent injected under Hierarchical DefaultIdFormat");
+                // Round-trip Extract must preserve the parent trace id.
+                string? childTraceId = null;
+                await adapter.Extract(carrier!).StartSpanAsync("child", _ =>
+                {
+                    childTraceId = Activity.Current?.TraceId.ToHexString();
+                });
+                Equal(carrier!["traceparent"].Split('-')[1], childTraceId, "extracted child joins W3C trace");
+            }
+            finally
+            {
+                Activity.DefaultIdFormat = previousFormat;
+                Activity.ForceDefaultIdFormat = previousForce;
+            }
+        }),
+        ("telemetry.diagnostics: stopped exemplar does not leak unrelated ambient Activity.Current", async () =>
+        {
+            var name = "PiSharp.Telemetry.Exemplar." + Guid.NewGuid().ToString("N");
+            using var activityListener = new ActivityListener
+            {
+                ShouldListenTo = s => s.Name == name,
+                Sample = (ref ActivityCreationOptions<ActivityContext> _) => ActivitySamplingResult.AllDataAndRecorded
+            };
+            ActivitySource.AddActivityListener(activityListener);
+            Activity? observedDuringRecord = null;
+            using var meterListener = new MeterListener();
+            meterListener.InstrumentPublished = (instrument, l) => { if (instrument.Meter.Name == name) l.EnableMeasurementEvents(instrument); };
+            meterListener.SetMeasurementEventCallback<double>((inst, value, tags, state) => observedDuringRecord = Activity.Current);
+            meterListener.Start();
+
+            using var adapter = new DiagnosticsTelemetry(name);
+            var hist = adapter.Histogram("test.duration");
+            ITelemetrySpan? settledSpan = null;
+            await adapter.StartSpanAsync("span-a", span => { settledSpan = span; });
+            await adapter.StartSpanAsync("span-b", spanB =>
+            {
+                Check(Activity.Current is not null, "span-b is ambient");
+                hist.Record(42, context: settledSpan);
+                Check(observedDuringRecord is null, "stopped span-a exemplar did not select ambient span-b");
+                Check(Activity.Current is not null, "ambient span-b restored after recording");
+            });
+        }),
         ("telemetry.conformance.memory: returns detached snapshots without exposing mutable recording state", async () =>
         {
             var context = new InMemoryTelemetryContext();

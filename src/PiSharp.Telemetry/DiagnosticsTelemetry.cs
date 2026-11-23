@@ -167,15 +167,18 @@ public sealed class DiagnosticsTelemetry : ITelemetryContext, ITelemetryPropagat
         Activity? activity = null;
         try
         {
-            // When starting a root span (parent is null), clear ambient Activity.Current so ActivitySource.StartActivity
-            // does not inherit an unrelated ambient parent.
+            // When starting a root span (parent is null), clear ambient Activity.Current so CreateActivity
+            // does not inherit an unrelated ambient parent. Always request W3C format so propagation works
+            // even if the host changed Activity.DefaultIdFormat to Hierarchical.
             if (parent is null) Activity.Current = null;
-            activity = _source.StartActivity(
+            activity = _source.CreateActivity(
                 options.Name,
                 ActivityKind.Internal,
                 parent?.Context ?? default,
                 initialTags,
-                initialLinks);
+                initialLinks,
+                ActivityIdFormat.W3C);
+            activity?.Start();
         }
         finally
         {
@@ -424,10 +427,11 @@ public sealed class DiagnosticsTelemetry : ITelemetryContext, ITelemetryPropagat
             var saved = Activity.Current;
             try
             {
-                if (context is not null && ContextIdentities.TryGetValue(context, out var identity) && identity.Activity is { } exemplar)
+                // Clear ambient activity first so a stopped or unusable exemplar cannot leak an
+                // unrelated ambient Activity.Current onto the measurement.
+                Activity.Current = null;
+                if (context is not null && ContextIdentities.TryGetValue(context, out var identity) && identity.Activity is { IsStopped: false } exemplar)
                     Activity.Current = exemplar;
-                else
-                    Activity.Current = null;
                 histogram.Record(value, tags);
             }
             finally

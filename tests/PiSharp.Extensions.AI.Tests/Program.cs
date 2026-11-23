@@ -32,10 +32,13 @@ internal static class Program
             ("pi-chat-client.errors-abort-eof-and-dispose", TestPiChatClientErrorsAndDisposeAsync),
             ("pi-chat-client.get-service-and-metadata", TestPiChatClientMetadataAsync),
             ("pi-chat-client.preserves-tool-call-and-text-signatures-roundtrip", TestSignatureRoundTripAsync),
+            ("pi-chat-client.streaming-authoritative-suffix-and-bedrock-finalized-metadata", TestStreamingAuthoritativeSuffixAndFinalizedMetadataAsync),
+            ("pi-chat-client.non-object-tool-arguments-marked-with-exception", TestNonObjectToolArgumentsAsync),
             ("transport-adapter.streaming-reducer-conformance-and-dedup", TestTransportAdapterReducerConformanceAsync),
             ("transport-adapter.transcript-system-sections-tool-deltas-and-images", TestTransportAdapterTranscriptProjectionAsync),
             ("transport-adapter.errors-and-cancellation", TestTransportAdapterErrorsAndCancellationAsync),
             ("transport-adapter.error-and-cancel-preserve-open-buffers", TestErrorAndCancelPreserveOpenBuffersAsync),
+            ("transport-adapter.informational-calls-content-filter-cleanup-and-base-options", TestAdapterEdgeCasesAsync),
             ("transport-adapter.usage-inclusive-uncached-roundtrip", TestUsageCacheAccountingAsync),
             ("transport-adapter.agent-multi-turn-tool-loop", TestTransportAdapterDrivesPiSharpAgentAsync),
             ("roundtrip.pi-chat-client-over-transport-adapter", TestRoundTripBridgeAsync),
@@ -131,7 +134,8 @@ internal static class Program
         Equal("user", captured.Messages[1].Role, "user entry");
 
         Equal("override-model", response.ModelId, "response model id");
-        Equal("sess-42", response.ConversationId, "response conversation id");
+        Check(response.ConversationId is null, "stateless PiChatClient does not echo affinity SessionId as stateful ConversationId");
+        Equal("sess-42", response.AdditionalProperties![PiChatAdditionalProperties.SessionId], "session id preserved in AdditionalProperties");
         Equal(ChatFinishReason.Stop, response.FinishReason, "finish reason");
         Equal("Final answer", response.Text, "assistant text");
         var reasoning = response.Messages[0].Contents.OfType<TextReasoningContent>().Single();
@@ -426,6 +430,172 @@ internal static class Program
         Equal("gs-2", adaptedDone.Message.Content[2].ExtraProperties!.TryGet("thoughtSignature", out var gs2) ? gs2!.Value.GetString() : null, "adapter thoughtSignature");
     }
 
+    private static async Task TestStreamingAuthoritativeSuffixAndFinalizedMetadataAsync()
+    {
+        // 1. TextEnded extending streamed delta emits the missing suffix; Bedrock ContentBlockFinalized emits metadata after ThinkingDelta.
+        var sigProps = JsonFields.Empty
+            .Set("thinkingSignature", JsonData.Parse("\"bedrock-sig-1\""))
+            .Set("redacted", JsonData.Parse("true"));
+        var transport = new ScriptedTransport((req, _) =>
+        {
+            var finalMsg = new AssistantMessage(req.Model.Api, req.Model.Provider, req.Model.Id, req.Timestamp,
+                [new ThinkingContent("deep thought", sigProps), new PiTextContent("Hello")],
+                TokenUsage.Zero, StopReason.Stop);
+            return
+            [
+                new StreamStarted(new AssistantMessage(req.Model.Api, req.Model.Provider, req.Model.Id, req.Timestamp, [], TokenUsage.Zero, StopReason.Pending)),
+                new ThinkingStarted(0, new ThinkingContent("")),
+                new ThinkingDelta(0, "deep thought"),
+                new ContentBlockFinalized(0, new ThinkingContent("deep thought", sigProps)),
+                new TextStarted(1, new PiTextContent("")),
+                new TextDelta(1, "Hel"),
+                new TextEnded(1, "Hello"),
+                new StreamDone(StopReason.Stop, finalMsg)
+            ];
+        });
+
+        using (var client = new PiChatClient(transport, TestModel))
+        {
+            var updates = new List<ChatResponseUpdate>();
+            await foreach (var u in client.GetStreamingResponseAsync([new ChatMessage(ChatRole.User, "hi")]))
+                updates.Add(u);
+
+            var allText = string.Concat(updates.SelectMany(u => u.Contents).OfType<AiTextContent>().Select(t => t.Text));
+            Equal("Hello", allText, "missing suffix emitted on TextEnded");
+            var reasoningItems = updates.SelectMany(u => u.Contents).OfType<TextReasoningContent>().ToList();
+            Equal("deep thought", string.Concat(reasoningItems.Select(r => r.Text)), "streamed thinking text");
+            Check(reasoningItems.Any(r => r.ProtectedData == "bedrock-sig-1"
+                && r.AdditionalProperties is not null
+                && r.AdditionalProperties.TryGetValue(PiChatAdditionalProperties.ThinkingRedacted, out var red)
+                && red is true), "ContentBlockFinalized metadata emitted after ThinkingDelta");
+        }
+
+        // 2. TextEnded contradicting already-streamed deltas throws StreamProtocolException instead of silently corrupting output.
+        var rewriteTransport = new ScriptedTransport((req, _) =>
+        [
+            new StreamStarted(new AssistantMessage(req.Model.Api, req.Model.Provider, req.Model.Id, req.Timestamp, [], TokenUsage.Zero, StopReason.Pending)),
+            new TextStarted(0, new PiTextContent("")),
+            new TextDelta(0, "Old"),
+            new TextEnded(0, "Replaced"),
+            new StreamDone(StopReason.Stop, new AssistantMessage(req.Model.Api, req.Model.Provider, req.Model.Id, req.Timestamp, [new PiTextContent("Replaced")], TokenUsage.Zero, StopReason.Stop))
+        ]);
+        using (var client = new PiChatClient(rewriteTransport, TestModel))
+        {
+            await ThrowsAsync<StreamProtocolException>(async () =>
+            {
+                await foreach (var _ in client.GetStreamingResponseAsync([new ChatMessage(ChatRole.User, "hi")])) { }
+            }, "non-prefix replacement throws StreamProtocolException");
+        }
+    }
+
+    private static async Task TestNonObjectToolArgumentsAsync()
+    {
+        var transport = new ScriptedTransport((req, _) =>
+        {
+            var arrayCall = new PiToolCallContent("call-arr", "bad_tool", JsonData.Parse("[1,2]"));
+            var msg = new AssistantMessage(req.Model.Api, req.Model.Provider, req.Model.Id, req.Timestamp,
+                [arrayCall], TokenUsage.Zero, StopReason.ToolUse);
+            return
+            [
+                new StreamStarted(new AssistantMessage(req.Model.Api, req.Model.Provider, req.Model.Id, req.Timestamp, [], TokenUsage.Zero, StopReason.Pending)),
+                new ToolCallStarted(0, new PiToolCallContent("call-arr", "bad_tool", JsonData.EmptyObject)),
+                new ToolCallEnded(0, arrayCall),
+                new StreamDone(StopReason.ToolUse, msg)
+            ];
+        });
+
+        using var client = new PiChatClient(transport, TestModel);
+        var resp = await client.GetResponseAsync([new ChatMessage(ChatRole.User, "go")]);
+        var fc = resp.Messages[0].Contents.OfType<FunctionCallContent>().Single();
+        Check(fc.Arguments is null, "non-object arguments not silently coerced to empty dictionary");
+        Check(fc.Exception is JsonException, "non-object arguments surfaced on FunctionCallContent.Exception");
+    }
+
+    private static async Task TestAdapterEdgeCasesAsync()
+    {
+        // 1. InformationalOnly function call must be skipped and never reach StreamDone.
+        var infoClient = new ScriptedChatClient((_, _) =>
+        [
+            new ChatResponseUpdate(ChatRole.Assistant, [new FunctionCallContent("info-1", "server_search", new Dictionary<string, object?> { ["q"] = "x" }) { InformationalOnly = true }]),
+            new ChatResponseUpdate(ChatRole.Assistant, "Answer") { FinishReason = ChatFinishReason.Stop }
+        ]);
+        using (var adapter = new ChatClientTransportAdapter(infoClient))
+        {
+            StreamDone? done = null;
+            await foreach (var ev in adapter.StreamAsync(new ChatRequest(TestModel, [UserEntry("go")], 1)))
+                if (ev is StreamDone d) done = d;
+            Check(done is not null, "stream completed");
+            Equal(StopReason.Stop, done!.Reason, "stop reason is Stop, not ToolUse");
+            Equal(0, done.Message.Content.OfType<PiToolCallContent>().Count(), "informational call excluded from executable blocks");
+        }
+
+        // 2. ChatFinishReason.ContentFilter must settle as StreamError, never StreamDone.
+        var filteredClient = new ScriptedChatClient((_, _) =>
+        [
+            new ChatResponseUpdate(ChatRole.Assistant, [new FunctionCallContent("c-filt", "danger", null)]),
+            new ChatResponseUpdate(ChatRole.Assistant, "blocked") { FinishReason = ChatFinishReason.ContentFilter }
+        ]);
+        using (var adapter = new ChatClientTransportAdapter(filteredClient))
+        {
+            var events = new List<StreamEvent>();
+            await foreach (var ev in adapter.StreamAsync(new ChatRequest(TestModel, [UserEntry("go")], 2)))
+                events.Add(ev);
+            Check(events.OfType<StreamDone>().Count() == 0, "filtered response never emits StreamDone");
+            var err = events.OfType<StreamError>().Single();
+            Equal(StopReason.Error, err.Reason, "filtered response emits StreamError(Error)");
+        }
+
+        // 3. DisposeAsync failure after ErrorContent preserves primary error; DisposeAsync failure after normal stream emits StreamError.
+        using (var adapter = new ChatClientTransportAdapter(new ThrowingDisposeChatClient(emitErrorFirst: true)))
+        {
+            var events = new List<StreamEvent>();
+            await foreach (var ev in adapter.StreamAsync(new ChatRequest(TestModel, [UserEntry("go")], 3)))
+                events.Add(ev);
+            var err = events.OfType<StreamError>().Single();
+            Equal("primary failure", err.Message.ExtraProperties!.TryGet("errorMessage", out var em) ? em!.Value.GetString() : null, "primary error preserved over cleanup failure");
+        }
+        using (var adapter = new ChatClientTransportAdapter(new ThrowingDisposeChatClient(emitErrorFirst: false)))
+        {
+            var events = new List<StreamEvent>();
+            await foreach (var ev in adapter.StreamAsync(new ChatRequest(TestModel, [UserEntry("go")], 4)))
+                events.Add(ev);
+            Check(events.OfType<StreamDone>().Count() == 0, "cleanup-only failure does not emit StreamDone");
+            var err = events.OfType<StreamError>().Single();
+            Equal("cleanup failed", err.Message.ExtraProperties!.TryGet("errorMessage", out var em) ? em!.Value.GetString() : null, "cleanup failure normalized to StreamError");
+        }
+
+        // 4. DisableContinuation clears BaseOptions.ContinuationToken & ConversationId; transcript tool deltas mutate cloned BaseOptions.Tools without mutating BaseOptions.
+        ChatOptions? capturedOpts = null;
+        var inspectClient = new ScriptedChatClient((_, opts) =>
+        {
+            capturedOpts = opts;
+            return [new ChatResponseUpdate(ChatRole.Assistant, "ok") { FinishReason = ChatFinishReason.Stop }];
+        });
+        var baseAlpha = AIFunctionFactory.Create((string s) => s, "alpha", "baseline alpha");
+        var baseBeta = AIFunctionFactory.Create((string s) => s, "beta", "baseline beta");
+        var baseOptions = new ChatOptions
+        {
+            ConversationId = "stateful-conv",
+            ContinuationToken = ResponseContinuationToken.FromBytes(new byte[] { 1, 2, 3 }),
+            Tools = [baseAlpha, baseBeta]
+        };
+        using (var adapter = new ChatClientTransportAdapter(inspectClient, new ChatClientTransportAdapterOptions { BaseOptions = baseOptions }))
+        {
+            var sys = new TranscriptEntry("system", JsonData.Parse("""
+                {"role":"system","content":"hi","toolsRemoved":[{"name":"alpha"}],"toolsAdded":[{"name":"beta","description":"updated beta","parameters":{"type":"object","properties":{}}}]}
+                """));
+            var req = new ChatRequest(TestModel, [sys, UserEntry("go")], 5) { DisableContinuation = true };
+            await foreach (var _ in adapter.StreamAsync(req)) { }
+        }
+        Check(capturedOpts is not null, "options captured");
+        Check(capturedOpts!.ContinuationToken is null, "ContinuationToken cleared on DisableContinuation");
+        Check(capturedOpts.ConversationId is null, "ConversationId cleared on DisableContinuation");
+        Equal(1, capturedOpts.Tools!.Count, "alpha removed, beta replaced in place");
+        Equal("beta", capturedOpts.Tools[0].Name, "remaining tool is beta");
+        Equal("updated beta", capturedOpts.Tools[0].Description, "beta replaced with transcript declaration");
+        Equal(2, baseOptions.Tools.Count, "BaseOptions.Tools was not mutated");
+    }
+
     private static async Task TestErrorAndCancelPreserveOpenBuffersAsync()
     {
         // Mid-stream ErrorContent after partial thinking + text deltas must retain both buffers in StreamError.
@@ -651,7 +821,8 @@ internal static class Program
         Equal("alpha", decl.Name, "remaining tool is alpha");
         Equal(ReasoningEffort.Medium, seenOptions.Reasoning?.Effort, "thinking level -> ReasoningEffort");
         Equal(ServiceTiers.Fast, seenOptions.AdditionalProperties![PiChatAdditionalProperties.ServiceTier], "service tier forwarded");
-        Equal("s-99", seenOptions.ConversationId, "session id forwarded");
+        Equal("s-99", seenOptions.AdditionalProperties![PiChatAdditionalProperties.SessionId], "session id forwarded in AdditionalProperties");
+        Check(seenOptions.ConversationId is null, "SessionId kept separate from stateful ConversationId");
     }
 
     private static async Task TestTransportAdapterErrorsAndCancellationAsync()
@@ -780,7 +951,8 @@ internal static class Program
                 return Task.FromResult(new EmbeddingResult(model.Provider, model.Id, [], ModelOperationStopReason.Error) { ErrorMessage = "bad request" });
             if (req.Input.Length == 1 && req.Input[0] == "ABORT")
                 return Task.FromResult(new EmbeddingResult(model.Provider, model.Id, [], ModelOperationStopReason.Aborted) { ErrorMessage = "cancelled" });
-            return Task.FromResult(new EmbeddingResult(model.Provider, model.Id, [[0.1f, 0.2f], [0.3f, 0.4f]], ModelOperationStopReason.Stop)
+            var vectors = req.Input.Select((_, i) => new[] { (i * 2 + 1) * 0.1f, (i * 2 + 2) * 0.1f }).ToImmutableArray();
+            return Task.FromResult(new EmbeddingResult(model.Provider, model.Id, vectors, ModelOperationStopReason.Stop)
             {
                 InputTokens = 14,
                 Cost = 0.0001
@@ -820,6 +992,17 @@ internal static class Program
 
         await ThrowsAsync<InvalidOperationException>(() => gen.GenerateAsync(["FAIL"]), "error stop reason throws");
         await ThrowsAsync<OperationCanceledException>(() => gen.GenerateAsync(["ABORT"]), "aborted stop reason throws");
+
+        // ModelId override without explicit Dimensions must not reuse the default model's Dimensions.
+        captured = null;
+        await gen.GenerateAsync(["one"], new EmbeddingGenerationOptions { ModelId = "other-embedding-model" });
+        Check(captured!.Dimensions is null, "overridden ModelId does not inherit default model Dimensions");
+
+        // Mismatched vector batch size must throw InvalidOperationException.
+        var shortApi = new FakeEmbeddingsApi((m, _, _, _, _) =>
+            Task.FromResult(new EmbeddingResult(m.Provider, m.Id, [[0.5f]], ModelOperationStopReason.Stop)));
+        using var shortGen = new PiEmbeddingGenerator(shortApi, model, endpoint);
+        await ThrowsAsync<InvalidOperationException>(() => shortGen.GenerateAsync(["a", "b"]), "mismatched vector count rejected");
     }
 
     private static Task TestServiceCollectionExtensionsAsync()
@@ -953,6 +1136,43 @@ internal static class Program
 
         public object? GetService(Type serviceType, object? serviceKey = null) => null;
         public void Dispose() { }
+    }
+
+    private sealed class ThrowingDisposeChatClient(bool emitErrorFirst) : IChatClient
+    {
+        public Task<ChatResponse> GetResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(
+            IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default) =>
+            new ThrowingEnumerable(emitErrorFirst);
+
+        public object? GetService(Type serviceType, object? serviceKey = null) => null;
+        public void Dispose() { }
+
+        private sealed class ThrowingEnumerable(bool emitErrorFirst) : IAsyncEnumerable<ChatResponseUpdate>
+        {
+            public IAsyncEnumerator<ChatResponseUpdate> GetAsyncEnumerator(CancellationToken cancellationToken = default) =>
+                new ThrowingEnumerator(emitErrorFirst);
+        }
+
+        private sealed class ThrowingEnumerator(bool emitErrorFirst) : IAsyncEnumerator<ChatResponseUpdate>
+        {
+            private bool _yielded;
+            public ChatResponseUpdate Current { get; private set; } = null!;
+
+            public ValueTask<bool> MoveNextAsync()
+            {
+                if (_yielded) return ValueTask.FromResult(false);
+                _yielded = true;
+                Current = emitErrorFirst
+                    ? new ChatResponseUpdate(ChatRole.Assistant, [new ErrorContent("primary failure")])
+                    : new ChatResponseUpdate(ChatRole.Assistant, "ok") { FinishReason = ChatFinishReason.Stop };
+                return ValueTask.FromResult(true);
+            }
+
+            public ValueTask DisposeAsync() => ValueTask.FromException(new InvalidOperationException("cleanup failed"));
+        }
     }
 
     private sealed class FakeEmbeddingsApi(Func<MediaModel, MediaEndpoint, EmbeddingRequest, MediaOptions, CancellationToken, Task<EmbeddingResult>> handler) : IEmbeddingsApi
