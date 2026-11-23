@@ -40,7 +40,11 @@ Releases are prepared on a `release/<version>` branch, such as `release/1.5.0`, 
 
 A separate commit then re-seals the derivative integrity table, because `Directory.Build.props`, `README.md`, `THIRD-PARTY-NOTICES.md` and other files above are pinned there. See [Derivative integrity pins](/docs/contribute/porting/#derivative-integrity-pins).
 
-### Published release: 1.6.0
+### Published release: 1.6.0.1
+
+Release **1.6.0.1** is a C#-only patch on the Pi v1.6.0 and Pi Durable 1.6.0 baseline, publishing 29 libraries, the CLI tool, and `PiSharp.Templates` (31 packages). Tag [`v1.6.0.1`](https://github.com/jkelly/PiSharp/releases/tag/v1.6.0.1) identifies source `1a74a207b30613444d5f8ef884957e7580860539`. The [publication record](https://github.com/jkelly/PiSharp/blob/main/AI_DOCS/release-1.6.0.1-publication-results.md) records exact-tag validation (run `45198502548`) and official NuGet verification (run `45207181360`).
+
+### Earlier release: 1.6.0
 
 Release **1.6.0** publishes 28 libraries plus the CLI (29 packages) on the Pi v1.6.0 and Pi Durable 1.6.0 baseline. Tag [`v1.6.0`](https://github.com/jkelly/PiSharp/releases/tag/v1.6.0) identifies source `711aa190dc2f4e339cf9232db48f70d8102504ff`. The [publication record](https://github.com/jkelly/PiSharp/blob/main/AI_DOCS/release-1.6.0-publication-results.md) records exact-tag validation and official NuGet verification.
 
@@ -85,11 +89,11 @@ The package list is written out in several places. A new library needs all of th
 
 ## Dry run
 
-Run the release workflow by hand from the Actions tab to build and check a version without publishing anything. Set `version` explicitly to the intended version; `1.6.0` is the latest published version. It takes three inputs:
+Run the release workflow by hand from the Actions tab to build and check a version without publishing anything. Set `version` explicitly to the intended version; `1.6.0.1` is the latest published version. It takes three inputs:
 
 | Input | Default | Effect |
 | --- | --- | --- |
-| `version` | `1.6.0` | The version to build and validate. |
+| `version` | `1.6.0.1` | The version to build and validate. |
 | `skip_tests` | `false` | Skip the 23 release-list suites in a dry run. Core and Durable validation still run. |
 | `include_standalone` | `false` | Also build self-contained standalone archives (`win-x64`, `linux-x64`, `osx-arm64`) and Homebrew/Scoop/Winget manifests. |
 

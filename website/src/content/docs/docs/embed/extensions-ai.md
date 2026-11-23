@@ -12,14 +12,10 @@ description: Use PiSharp transports through Microsoft.Extensions.AI IChatClient 
 
 The package depends only on `Microsoft.Extensions.AI.Abstractions` (`>= 10.11.1`) and `Microsoft.Extensions.DependencyInjection.Abstractions` (`>= 10.0.0`), with zero additional third-party dependencies on `net10.0`.
 
-:::note[Availability]
-`PiSharp.Extensions.AI` is prepared on `main` for the upcoming **1.6.0.1** release and is not part of the published 1.6.0 NuGet inventory. Build from source on `main` until 1.6.0.1 is published.
-:::
-
 ## Install
 
 ```powershell
-dotnet add package PiSharp.Extensions.AI --version 1.6.0.1
+dotnet add package PiSharp.Extensions.AI --version {{PISHARP_VERSION}}
 ```
 
 ## Use a PiSharp transport as `IChatClient`

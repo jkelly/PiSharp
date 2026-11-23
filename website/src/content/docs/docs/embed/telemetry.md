@@ -120,7 +120,7 @@ PiSharp redacts more than upstream does, under its rule that secrets never reach
 
 ## OpenTelemetry and `System.Diagnostics` (`DiagnosticsTelemetry`)
 
-`DiagnosticsTelemetry` (added on `main` for **PiSharp 1.6.0.1**) is a zero-dependency adapter in `PiSharp.Telemetry` that maps PiSharp spans, events, initial and late links, W3C `traceparent`/`tracestate` propagation, and metrics (`Counter`, `UpDownCounter`, and `Histogram` with bucket boundary advice) directly onto `System.Diagnostics.ActivitySource` and `System.Diagnostics.Metrics.Meter`.
+`DiagnosticsTelemetry` (added in **PiSharp 1.6.0.1**) is a zero-dependency adapter in `PiSharp.Telemetry` that maps PiSharp spans, events, initial and late links, W3C `traceparent`/`tracestate` propagation, and metrics (`Counter`, `UpDownCounter`, and `Histogram` with bucket boundary advice) directly onto `System.Diagnostics.ActivitySource` and `System.Diagnostics.Metrics.Meter`.
 
 Because it targets .NET's built-in diagnostics primitives, `PiSharp.Telemetry` stays dependency-free while plugging straight into the OpenTelemetry .NET SDK, .NET Aspire, Application Insights, Jaeger, or Grafana Tempo:
 
@@ -141,7 +141,7 @@ using var meterProvider = Sdk.CreateMeterProviderBuilder()
     .AddOtlpExporter()
     .Build();
 
-using var telemetry = new DiagnosticsTelemetry("PiSharp", version: "1.6.0");
+using var telemetry = new DiagnosticsTelemetry("PiSharp", version: "{{PISHARP_VERSION}}");
 
 await telemetry.StartSpanAsync("agent-turn", async parent =>
 {

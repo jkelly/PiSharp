@@ -23,10 +23,10 @@ dotnet tool install -g PiSharp.Cli
 
 ## Project templates
 
-Install `PiSharp.Templates` (prepared on `main` for the upcoming **1.6.0.1** release) to scaffold runnable starter projects with `dotnet new`:
+Install `PiSharp.Templates` to scaffold runnable starter projects with `dotnet new`:
 
 ```powershell
-dotnet new install PiSharp.Templates::1.6.0.1
+dotnet new install PiSharp.Templates@{{PISHARP_VERSION}}
 ```
 
 | Template | Short name | What it scaffolds |
@@ -68,7 +68,7 @@ dotnet new pisharp-workflow -n MyWorkflow
 
 ## Packages
 
-The published {{PISHARP_VERSION}} NuGet inventory is **28 libraries plus the CLI (29 packages)**. Two additional packages (`PiSharp.Extensions.AI` and `PiSharp.Templates`) are prepared on `main` for the upcoming **1.6.0.1** release (bringing the inventory to 31 packages upon release). The [SDK page](/sdk/) lists all packages with NuGet links and status. All sibling references must use the same exact release version.
+The published {{PISHARP_VERSION}} NuGet inventory is **29 libraries, the `PiSharp.Cli` tool, and `PiSharp.Templates` (31 packages)**. The [SDK page](/sdk/) lists all packages with NuGet links and status. All sibling references must use the same exact release version.
 
 | Package | Group | Purpose | Docs |
 | --- | --- | --- | --- |
@@ -150,8 +150,8 @@ They are experimental, from 1.2.0.2. [Custom agents](/docs/custom-agents/overvie
 
 Some APIs carry `[Experimental("<ID>")]`. The compiler reports an error when you use one, until you suppress its ID. An experimental API may change or be removed without notice.
 
-:::note[Tier-1 APIs graduating to stable in 1.6.0.1]
-Per [ADR 0017](https://github.com/jkelly/PiSharp/blob/main/docs/decisions/0017-experimental-graduation-tier1.md), seven proven Tier-1 diagnostic IDs graduate to stable on `main` for **PiSharp 1.6.0.1** and will no longer require suppression: `PISHARP_SCHEMA001` (`PiSharp.Contracts.Schema`), `PISHARP_IDENTITY001` (`ClientIdentity`), `PISHARP_TIERS001` (`ServiceTiers`), `PISHARP_AI001` (`StreamingJsonParser`), `PISHARP_AUTH001` (OAuth confirmation hints), `PISHARP_EXEC001` (`pi.exec` buffer limits), and `PISHARP_TOOLSEARCH001` (`ToolSearchDocument.NamespaceText`). Projects referencing the published **1.6.0** NuGet packages still need `<NoWarn>` for those IDs until 1.6.0.1 is published.
+:::note[Tier-1 APIs graduated to stable in 1.6.0.1]
+Per [ADR 0017](https://github.com/jkelly/PiSharp/blob/main/docs/decisions/0017-experimental-graduation-tier1.md), seven proven Tier-1 diagnostic IDs graduated to stable in **PiSharp 1.6.0.1** and no longer require suppression: `PISHARP_SCHEMA001` (`PiSharp.Contracts.Schema`), `PISHARP_IDENTITY001` (`ClientIdentity`), `PISHARP_TIERS001` (`ServiceTiers`), `PISHARP_AI001` (`StreamingJsonParser`), `PISHARP_AUTH001` (OAuth confirmation hints), `PISHARP_EXEC001` (`pi.exec` buffer limits), and `PISHARP_TOOLSEARCH001` (`ToolSearchDocument.NamespaceText`). Projects still referencing earlier **1.6.0** NuGet packages continue to need `<NoWarn>` for those IDs.
 :::
 
 | ID | Covers | Status |

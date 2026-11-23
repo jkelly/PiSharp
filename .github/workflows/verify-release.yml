@@ -1,13 +1,13 @@
 name: Verify published release
 
-# Post-publish verification workflow: polls api.nuget.org for all 29 packages, compares every NuGet
+# Post-publish verification workflow: polls api.nuget.org for all 31 packages, compares every NuGet
 # package byte-for-byte with its GitHub release asset, runs an isolated official-feed GapConsumer,
 # and smoke-tests a private PiSharp.Cli installation.
 on:
   workflow_dispatch:
     inputs:
       version:
-        description: Published PiSharp version to verify (e.g. 1.6.0)
+        description: Published PiSharp version to verify (e.g. 1.6.0.1)
         required: true
       source_commit:
         description: Exact 40-character tagged commit SHA
@@ -40,7 +40,7 @@ jobs:
         with:
           node-version: '22'
 
-      - name: Verify all 29 published packages and consumer
+      - name: Verify all 31 published packages and consumer
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}

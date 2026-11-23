@@ -3,11 +3,11 @@ title: Service tiers
 description: Choose normal, economy, priority, fast or ultrafast capacity for each request.
 ---
 
-:::note[Graduation in PiSharp 1.6.0.1]
-Per [decision 0017](https://github.com/jkelly/PiSharp/blob/main/docs/decisions/0017-experimental-graduation-tier1.md), service tiers graduate to stable in **PiSharp 1.6.0.1** (currently on `main`). If you are referencing the published **PiSharp 1.6.0** NuGet packages, the API still carries `[Experimental("PISHARP_TIERS001")]`, so suppress `PISHARP_TIERS001` in your project (`<NoWarn>$(NoWarn);PISHARP_TIERS001</NoWarn>`) until 1.6.0.1 is published.
+:::note[Graduated in PiSharp 1.6.0.1]
+Per [decision 0017](https://github.com/jkelly/PiSharp/blob/main/docs/decisions/0017-experimental-graduation-tier1.md), service tiers graduated to stable in **PiSharp 1.6.0.1** and no longer require `<NoWarn>`. Projects still referencing earlier **1.6.0** NuGet packages continue to need `<NoWarn>$(NoWarn);PISHARP_TIERS001</NoWarn>`.
 :::
 
-A service tier asks the provider for a class of capacity: cheaper and slower, steadier at a higher price, or the fastest output a model has. Providers name these differently. PiSharp gives them one set of names and maps each to the field the provider's API expects. Pi has no service tiers; this is a PiSharp addition ([decision 0007](https://github.com/jkelly/PiSharp/blob/main/docs/decisions/0007-media-generation.md), graduating to stable in [decision 0017](https://github.com/jkelly/PiSharp/blob/main/docs/decisions/0017-experimental-graduation-tier1.md)).
+A service tier asks the provider for a class of capacity: cheaper and slower, steadier at a higher price, or the fastest output a model has. Providers name these differently. PiSharp gives them one set of names and maps each to the field the provider's API expects. Pi has no service tiers; this is a PiSharp addition ([decision 0007](https://github.com/jkelly/PiSharp/blob/main/docs/decisions/0007-media-generation.md), graduated to stable in [decision 0017](https://github.com/jkelly/PiSharp/blob/main/docs/decisions/0017-experimental-graduation-tier1.md)).
 
 The `--tier` option and the `/tier` command are in `pisharp` from 1.2.0.2.
 
