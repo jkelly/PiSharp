@@ -591,6 +591,55 @@ internal static partial class Program
             Check(!PathExists(Path.Combine(directory, "task-2.jsonl")), "the terminal task's sidecar is removed");
             Equal("main.jsonl,doc-5.jsonl,doc-7.jsonl", string.Join(",", Directory.GetFiles(directory).Select(Path.GetFileName).OrderBy(name => name!.StartsWith("main") ? 0 : 1).ThenBy(name => name, StringComparer.Ordinal)), "files");
         });
+
+        yield return JsonlCase("bounds-retained-heap-under-large-payloads-and-reloads-lazily", async fixture =>
+        {
+            var directory = fixture.NewDirectory();
+            var storage = await fixture.Open(directory);
+            await CreateRoot(storage);
+            var payload = new string('A', 64 * 1024);
+            var ids = new List<EntryId>();
+            for (var index = 0; index < 80; index++)
+            {
+                var id = await storage.MintIdAsync<EntryId>();
+                ids.Add(id);
+                await Commit(storage, new EntryWrite(new()
+                {
+                    Id = id, ConversationId = ConversationId.Root, Kind = "large",
+                    Data = JsonValue.Object([KeyValuePair.Create("index", (JsonValue)index), KeyValuePair.Create("blob", (JsonValue)payload)]),
+                }));
+            }
+            var docId = await storage.MintIdAsync<DocumentId>();
+            await Commit(storage, new DocumentCreateWrite(SessionDocument(docId), DocumentContent.Base(1,
+                JsonValue.Object([KeyValuePair.Create("blob", (JsonValue)payload)]))));
+            await Commit(storage, new DocumentChangeWrite(docId, DocumentContent.Base(1,
+                JsonValue.Object([KeyValuePair.Create("blob", (JsonValue)("v2:" + payload))]))));
+
+            for (var round = 0; round < 3; round++)
+            {
+                GC.Collect(GC.MaxGeneration, GCCollectionMode.Forced, blocking: true, compacting: true);
+                GC.WaitForPendingFinalizers();
+            }
+            var retainedAfterWrites = GC.GetTotalMemory(forceFullCollection: true);
+            // ~5.1 MiB of payloads were written; only compact metadata + offsets should remain in RAM.
+            Check(retainedAfterWrites < 5 * 1024 * 1024 || retainedAfterWrites < new FileInfo(Path.Combine(directory, "main.jsonl")).Length,
+                $"retained heap should stay below raw main.jsonl payload size (heap {retainedAfterWrites}, main {new FileInfo(Path.Combine(directory, "main.jsonl")).Length})");
+
+            var first = await storage.GetEntryAsync(ids[0], JsonlContext);
+            var last = await storage.GetEntryAsync(ids[^1], JsonlContext);
+            Equal(payload, ((JsonStringValue)((JsonObjectValue)first!.Entry.Data!)["blob"]).Value, "first lazy entry");
+            Equal(payload, ((JsonStringValue)((JsonObjectValue)last!.Entry.Data!)["blob"]).Value, "last lazy entry");
+            var page = await storage.ScanEntriesAsync(new EntryQuery(ConversationId.Root), 10, null, JsonlContext);
+            Equal(10, page.Items.Length, "paged lazy scan");
+            var doc = await storage.GetDocumentAsync(docId, DocumentPoint.Current, JsonlContext);
+            Equal("v2:" + payload, ((JsonStringValue)doc!.Value["blob"]).Value, "reclaimed current-only document");
+
+            var reopened = await fixture.Open(directory);
+            var reloaded = await reopened.GetEntryAsync(ids[40], JsonlContext);
+            Equal(payload, ((JsonStringValue)((JsonObjectValue)reloaded!.Entry.Data!)["blob"]).Value, "entry after reopen");
+            Equal("v2:" + payload, ((JsonStringValue)(await reopened.GetDocumentAsync(docId, DocumentPoint.Current, JsonlContext))!.Value["blob"]).Value,
+                "document after reopen");
+        });
     }
 
     private static IEnumerable<(string, Func<Task>)> StorageJsonlBatchesCases()

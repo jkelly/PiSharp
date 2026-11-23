@@ -12,9 +12,8 @@ using static PiSharp.Chord.Store.Expressions;
 // Differences from upstream:
 // - The generator is mulberry32, step for step (Sync160Random), and the writes draw from it in upstream's order (JavaScript evaluates an
 //   object literal's values and a call's arguments left to right), so a seed writes the same rows here.
-// - Upstream's oracle queues one to three commits together, which its store writes as one backend transaction (group commit, S18). The
-//   native store has no group commit (it was not ported at 1.5.2), so the same commits run one transaction each. The oracle's assertion
-//   is the same; its counters are bounded from below as upstream bounds them, and the bounds hold.
+// - Upstream's oracle queues one to three commits together, which the store writes as one backend transaction (group commit, S18).
+//   The oracle's assertion and counter lower bounds match upstream.
 // - The deterministic cases assert upstream's exact { runs, probes, skips } triples; each commits alone, as upstream.
 internal static partial class Program
 {

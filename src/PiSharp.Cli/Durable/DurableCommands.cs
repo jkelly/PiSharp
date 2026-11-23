@@ -39,6 +39,9 @@ internal static partial class DurableRemote
             call => call.Client.ExecutionUsageAsync(call.Session, call.LongArg(0), call.Token)),
         new("executions", "artifacts", $"{InSession} <task>", "The artifacts an execution kept.", "artifacts",
             call => call.Client.ExecutionArtifactsAsync(call.Session, call.LongArg(0), call.Token)) { Columns = ["id", "kind", "title"] },
+        new("tasks", "signal", $"{InSession} <task> <signal> <key> [--payload <json>] [--file <payload.json>] [--request <id>]",
+            "Delivers a typed signal to a live task.", "signals",
+            call => call.Client.SignalTaskAsync(call.Session, call.LongArg(0), call.Arg(1), call.Arg(2), SignalPayload(call), call.Args.Option("--request"), call.Token)),
 
         // ─── Schedules and trigger credentials ──────────────────────────────
         new("schedules", "list", "", "Recurring schedules.", null, call => call.Client.SchedulesAsync(call.Token))
@@ -157,6 +160,16 @@ internal static partial class DurableRemote
         new("preferences", "delete", "<profile> --revision <n>", "Deletes a profile and its events.", "preferences",
             call => call.Client.DeletePreferenceAsync(call.Arg(0), call.Revision, call.Token)),
     ];
+
+    private static JsonNode? SignalPayload(RemoteCall call)
+    {
+        if (call.Args.Option("--payload") is { } raw && call.Args.Option("--file") is not null)
+            throw new RemoteUsageException("Pass either --payload or --file, not both.");
+        if (call.Args.Option("--file") is not null) return call.File("--file");
+        if (call.Args.Option("--payload") is not { } json) return new JsonObject();
+        try { return JsonNode.Parse(json); }
+        catch (System.Text.Json.JsonException failure) { throw new RemoteUsageException($"--payload is not valid JSON: {failure.Message}"); }
+    }
 
     private static int Limit(RemoteCall call, int fallback) =>
         call.Args.Long("--limit") is { } limit ? limit is >= 1 and <= 1000 ? (int)limit : throw new RemoteUsageException("--limit must be 1 to 1000.") : fallback;

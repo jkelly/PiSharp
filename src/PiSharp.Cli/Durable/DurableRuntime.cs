@@ -756,6 +756,29 @@ internal sealed class DurableSession : IOpenDurable, IDurableViewSource, IDurabl
         if (prompt is not null) WatchAnswer(await shown.SubmitAsync(SubmissionDraft.Input(prompt, WhenBusy.Steer), Context).ConfigureAwait(false));
     });
 
+    /// <inheritdoc/>
+    public Task SignalTaskAsync(TaskId taskId, string signalName, string key, JsonValue payload) => Command(async () =>
+    {
+        if (string.IsNullOrEmpty(signalName) || signalName.Contains('/', StringComparison.Ordinal))
+            throw new ArgumentException("Signal name must be non-empty without '/'.", nameof(signalName));
+        if (string.IsNullOrEmpty(key))
+            throw new ArgumentException("Signal key must be non-empty.", nameof(key));
+        var token = signalName == Signals.SubmissionSettled.Name
+            ? Signals.SubmissionSettled
+            : Signals.DefineSignal(new SignalDefinition { Name = signalName, Version = 1, Schema = JsonObjectValue.Empty });
+        var result = await harness.SignalAsync(taskId, token, key, payload, Context).ConfigureAwait(false);
+        var status = result switch
+        {
+            SignalResult.Delivered => "delivered",
+            SignalResult.Duplicate => "duplicate",
+            SignalResult.Invalid => "invalid",
+            SignalResult.Closed => "closed",
+            SignalResult.NotFound => "not_found",
+            _ => "invalid",
+        };
+        Notice(DurableNoticeLevel.Info, $"Signal {signalName}/{key} -> task #{taskId.Value}: {status}.");
+    });
+
     // ─── Close ──────────────────────────────────────────────────────────────
 
     /// <summary>Closes the Harness (writing no outcome: a running turn resumes with <c>--continue</c>), cleans up the environments and

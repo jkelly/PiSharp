@@ -16,6 +16,13 @@ else
           { <span class="fs-8 text-ps-faint ms-1">@phase</span> }</div>
         <div class="t-meta">#@task.Id @task.Kind · @agent@(task.Background ? " · background" : "")</div>
       </div>
+      @if (task.State.Status == "sleeping" && task.Aborting != true && task.State.Signals is { Count: > 0 } signals)
+      {
+        foreach (var signal in signals)
+        {
+          <button class="btn btn-icon" type="button" title="Send signal @signal.Signal / @signal.Key to task #@task.Id" aria-label="Send signal @signal.Signal to task @task.Id" data-action="send-signal" data-task="@task.Id" data-signal="@signal.Signal" data-key="@signal.Key"><i class="bi bi-send"></i></button>
+        }
+      }
       @if (task.ConversationId != Model.AgentId)
       {
         <a class="btn btn-icon" href="#" title="Open @agent" aria-label="Open @agent" data-action="open-agent" data-agent="@task.ConversationId"><i class="bi bi-box-arrow-up-right"></i></a>

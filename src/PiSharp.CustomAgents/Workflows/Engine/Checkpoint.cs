@@ -79,6 +79,14 @@ internal static class RunDocs
     public static SessionDocToken Index { get; } = Documents.DefineSessionDoc("pisharp.workflow.index", 1,
         () => JsonValue.Object([KeyValuePair.Create("runs", (JsonValue)JsonValue.Array())]), checkpointWhen: (_, _, _) => false);
 
+    /// <summary>Durable signal token waking a sleeping <c>WaitForSignal</c> step immediately upon delivery.</summary>
+    public static SignalToken WorkflowSignal { get; } = Signals.DefineSignal(new SignalDefinition
+    {
+        Name = "pisharp.workflow.signal",
+        Version = 1,
+        Schema = JsonObjectValue.Empty,
+    });
+
     public const int IndexLimit = 1000;
 
     public static string Key(TaskId task) => task.Value.ToString(CultureInfo.InvariantCulture);

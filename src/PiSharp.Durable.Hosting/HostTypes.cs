@@ -123,6 +123,29 @@ public sealed record SendRequest(string Content, string RequestId)
     public WhenBusy? WhenBusy { get; init; }
     /// <summary>How long to wait for the answer; null or zero returns once admitted.</summary>
     public TimeSpan? Wait { get; init; }
+    /// <summary>What an abort does with this input while queued (Pi Durable 1.6.0): null or <see cref="InputOnAbort.Withdraw"/> withdraws it;
+    /// <see cref="InputOnAbort.Keep"/> leaves it queued.</summary>
+    public InputOnAbort? OnAbort { get; init; }
+    /// <summary>Optional task and signal key to notify with <see cref="Signals.SubmissionSettled"/> when this submission settles (Pi Durable
+    /// 1.6.0).</summary>
+    public SubmissionNotify? Notify { get; init; }
+}
+
+/// <summary>Outcome of delivering a signal to a task through the host.</summary>
+/// <param name="Result">The Durable <see cref="SignalResult"/>.</param>
+/// <param name="Replayed">Whether an <c>Idempotency-Key</c> matched an earlier delivery and returned its recorded outcome.</param>
+public sealed record SignalDelivery(SignalResult Result, bool Replayed = false)
+{
+    /// <summary>Wire spelling: <c>delivered</c>, <c>duplicate</c>, <c>invalid</c>, <c>closed</c> or <c>not_found</c>.</summary>
+    public string Status => Result switch
+    {
+        SignalResult.Delivered => "delivered",
+        SignalResult.Duplicate => "duplicate",
+        SignalResult.Invalid => "invalid",
+        SignalResult.Closed => "closed",
+        SignalResult.NotFound => "not_found",
+        _ => "invalid",
+    };
 }
 
 /// <summary>Where a sent message stands.</summary>

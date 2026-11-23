@@ -81,6 +81,10 @@
       {
         <img class="msg-image mt-2" src="@image.DataUrl" alt="Image from @call.Name">
       }
+      @if (call.ImageUnsupportedByModel is { Length: > 0 } unsupported)
+      {
+        <div class="fs-8 text-ps-warn mt-2" data-image-unsupported="@unsupported"><i class="bi bi-image me-1" aria-hidden="true"></i>Image not sent to <code>@unsupported</code> (model does not support image input).</div>
+      }
     }
     else if (call.Output is { Length: > 0 } output)
     {

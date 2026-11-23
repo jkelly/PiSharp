@@ -330,7 +330,10 @@ public sealed class AgentViewHub : IAsyncDisposable
                 var approvals = hub.broker.Pending(sessionId);
                 var entries = model.Entries;
                 var run = new ChatRunState(model.Running || model.Generating, model.Generating,
-                    approvals.Any(approval => approval.Request.AgentId == agentId), model.Pending.Count > 0);
+                    approvals.Any(approval => approval.Request.AgentId == agentId), model.Pending.Count > 0)
+                {
+                    YieldAnswer = model.YieldAnswer,
+                };
                 // The ledger keys a chat's rows by its id; a session that is not a chat (an agent compare model's) has none under it.
                 var spend = chat is null ? ChatSpendFacts.Empty
                     : await hub.chats.SpendFactsAsync(binding, entries, run.Running, accountLabel, stop.Token).ConfigureAwait(false);
@@ -382,6 +385,7 @@ public sealed class AgentViewHub : IAsyncDisposable
                     ["running"] = model.Running,
                     ["busy"] = model.Running || model.Generating || waiting > 0 || hub.device.IsBusy(sessionId),
                     ["generating"] = model.Generating,
+                    ["yieldAnswer"] = model.YieldAnswer,
                     ["waiting"] = waiting,
                     ["approvals"] = approvals.Count,
                     ["queued"] = model.Inbox.Count,

@@ -263,6 +263,7 @@ class App {
     this.live = { ...this.live, ...s };
     const busy = !!s.busy;
     $('[data-status="working"]').hidden = !busy;
+    $('[data-status="reviewing"]').hidden = s.yieldAnswer == null;
     $('[data-status="waiting"]').hidden = !(s.waiting > 0);
     $('[data-action="interrupt"]').disabled = !busy;
     $('[data-working]').hidden = !(s.running && !s.generating && !(s.waiting > 0));
@@ -469,6 +470,25 @@ class App {
           await deviceApi(device).post(`/sessions/${enc(session)}/tasks/${data.task}/abort`);
           this.toast('Stopped.');
           this.jobsChanged();
+          break;
+        case 'send-signal':
+          this.dialogs.prompt({
+            title: `Send signal to task #${data.task}`,
+            text: `Signal ${data.signal} · key ${data.key}. Enter a JSON value (defaults to {}).`,
+            label: 'Payload (JSON)', value: '{}', placeholder: '{}', maxLength: 4000, submit: 'Send signal',
+            onSubmit: async (raw) => {
+              let payload = {};
+              if (raw) {
+                try { payload = JSON.parse(raw); }
+                catch { throw new Error('Payload must be valid JSON.'); }
+              }
+              const result = await deviceApi(device).post(
+                `/sessions/${enc(session)}/tasks/${data.task}/signals`,
+                { signal: data.signal, key: data.key, payload },
+                { idempotencyKey: uuid() });
+              this.toast(`Signal ${data.signal}/${data.key}: ${result?.status || 'sent'}.`, result?.status === 'delivered' ? 'ok' : undefined);
+            },
+          });
           break;
         case 'stop-all':
           await this.agentApi().post('/abort', { background: true });

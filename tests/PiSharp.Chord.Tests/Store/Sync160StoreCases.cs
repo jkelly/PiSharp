@@ -123,6 +123,103 @@ internal static partial class Program
                 Equal(1, errors.Count, "its error went to onError");
                 Equal(2L, store.LastSeq, "both commits stand");
             }),
+            Case("store.store.group-commit-coalesces-queued-commits-into-one-transaction-and-one-meta-update", async () =>
+            {
+                var db = new TestSqliteDatabase(":memory:");
+                var transactions = 0;
+                db.AfterTransaction = () => { Interlocked.Increment(ref transactions); return Task.CompletedTask; };
+                await using var store = await StoreOver(db, outbox: false);
+                var docId = await StoreCreated(store);
+                Interlocked.Exchange(ref transactions, 0);
+
+                var held = HoldNextCommit(store);
+                var events = new List<string>();
+                CommitFence Fence(string name) => new(() => true, (seq, _) => { lock (events) events.Add($"{name}:{seq}"); });
+                var telemetry = await ChordSupport.Metered();
+
+                var running = store.CommitAsync([StoreCreate("blocker")], Fence("blocker"), context);
+                await held.Entered;
+                // Three commits queued behind the running one coalesce into a single SQLite transaction.
+                var c1 = store.CommitAsync([StoreDelta(docId, 1, 1)], Fence("d1"), telemetry.Context);
+                var c2 = store.CommitAsync([StoreDelta(docId, 2, 2)], Fence("d2"), telemetry.Context);
+                var c3 = store.CommitAsync([StoreDelta(docId, 3, 3)], Fence("d3"), telemetry.Context);
+                held.Release();
+
+                Equal(2L, await running, "blocker seq");
+                Sequence([3L, 4L, 5L], await Task.WhenAll(c1, c2, c3), "group seqs");
+                Equal(2, Volatile.Read(ref transactions), "two transactions total (blocker + one coalesced group)");
+                Sequence(["blocker:2", "d1:3", "d2:4", "d3:5"], events, "adoptions in exact seq order");
+                // Without outbox: each delta is 2 statements (UPDATE chord_documents + INSERT chord_document_revisions), plus 1 shared UPDATE chord_meta.
+                Json("""{ "chord.store.commits": 3, "chord.store.statements": 7 }""", StoreCounts(telemetry.Counts()), "one shared chord_meta update");
+                Equal(5L, store.LastSeq, "last seq");
+            }),
+            Case("store.store.group-commit-isolates-a-refused-commit-and-commits-its-siblings", async () =>
+            {
+                await using var store = await MemoryStore();
+                var held = HoldNextCommit(store);
+                var events = new List<string>();
+                CommitFence Fence(string name) => new(() => true, (seq, ids) => { lock (events) events.Add($"{name}:{seq}:{string.Join(",", ids)}"); });
+
+                var running = store.CommitAsync([StoreCreate("a")], Fence("a"), context);
+                await held.Entered;
+                var first = store.CommitAsync([StoreCreate("b")], Fence("b"), context);
+                var broken = StoreRejection(store.CommitAsync([StoreBroken], Fence("broken"), context));
+                var second = store.CommitAsync([StoreCreate("c")], Fence("c"), context);
+                held.Release();
+
+                Equal(1L, await running, "blocker seq");
+                var error = await broken;
+                Check(StoreText(error).Contains("no such table", StringComparison.Ordinal), $"refused commit's own error: {StoreText(error)}");
+                Check(error is Exception and not ChordError, "not a ChordError");
+                Sequence([2L, 3L], await Task.WhenAll(first, second), "siblings commit cleanly");
+                Equal(3L, store.LastSeq, "last seq after isolated refusal");
+                Equal(3, events.Count, "all three valid commits adopted");
+                Check(!events.Any(e => e.StartsWith("broken:", StringComparison.Ordinal)), "refused commit never adopted");
+            }),
+            Case("store.store.group-commit-isolates-refused-admission-and-preserves-empty-commit-seq", async () =>
+            {
+                var db = new TestSqliteDatabase(":memory:");
+                var transactions = 0;
+                db.AfterTransaction = () => { Interlocked.Increment(ref transactions); return Task.CompletedTask; };
+                await using var store = await StoreOver(db);
+                Interlocked.Exchange(ref transactions, 0);
+
+                var held = HoldNextCommit(store);
+                var events = new List<string>();
+                CommitFence Fence(string name, bool admit = true) => new(() => admit, (seq, _) => { lock (events) events.Add($"{name}:{seq}"); });
+
+                var running = store.CommitAsync([StoreCreate("a")], Fence("a"), context);
+                await held.Entered;
+                var c1 = store.CommitAsync([StoreCreate("b")], Fence("b"), context);
+                var denied = StoreRejection(store.CommitAsync([StoreCreate("denied")], Fence("denied", admit: false), context));
+                var empty = store.CommitAsync([], Fence("empty"), context);
+                var c2 = store.CommitAsync([StoreCreate("c")], Fence("c"), context);
+                held.Release();
+
+                Equal(1L, await running, "blocker seq");
+                Rejected(await denied, "released", "discarded", "denied commit");
+                Sequence([2L, 2L, 3L], await Task.WhenAll(c1, empty, c2), "empty takes preceding seq, non-empty increments");
+                Equal(2, Volatile.Read(ref transactions), "all group members in one transaction");
+                Sequence(["a:1", "b:2", "empty:2", "c:3"], events, "adoption order");
+            }),
+            Case("store.store.group-commit-respects-series-barrier-fifo-order", async () =>
+            {
+                await using var store = await MemoryStore();
+                var held = HoldNextCommit(store);
+                var events = new List<string>();
+                CommitFence Fence(string name) => new(() => true, (seq, _) => { lock (events) events.Add($"{name}:{seq}"); });
+
+                var running = store.CommitAsync([StoreCreate("a")], Fence("a"), context);
+                await held.Entered;
+                var before = store.CommitAsync([StoreCreate("before")], Fence("before"), context);
+                var series = store.CommitSeriesAsync([StoreUnchecked(StoreCreate("s1")), StoreUnchecked(StoreCreate("s2"))],
+                    (index, seq, _) => { lock (events) events.Add($"series{index}:{seq}"); }, context);
+                var after = store.CommitAsync([StoreCreate("after")], Fence("after"), context);
+                held.Release();
+
+                await Task.WhenAll(running, before, series, after);
+                Sequence(["a:1", "before:2", "series0:3", "series1:4", "after:5"], events, "exact FIFO barrier ordering");
+            }),
         ];
     }
 

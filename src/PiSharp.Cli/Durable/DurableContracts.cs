@@ -166,6 +166,10 @@ internal interface IDurableController
     /// <c>exit_plan_mode</c> call <paramref name="exitCall"/> submitted (PiSharp-only, decision 0005). Failures are as
     /// <see cref="AnswerQuestionAsync"/>'s.</summary>
     Task ReviewPlanAsync(TaskId exitCall, DurablePlanDecision decision);
+
+    /// <summary>PiSharp-only (Pi Durable 1.6.0): delivers a signal to a live task.</summary>
+    Task SignalTaskAsync(TaskId taskId, string signalName, string key, JsonValue payload) =>
+        Task.FromException(new NotSupportedException("Signals are not supported here"));
 }
 
 /// <summary>What the user decided about a submitted plan (PiSharp-only, decision 0005).</summary>

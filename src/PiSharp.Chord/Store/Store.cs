@@ -16,10 +16,11 @@
 // seq past the safe range is an InvalidOperationException, and a close's abort is the context's OperationCanceledException (upstream's
 // awaitWithContext rejects with the signal's reason).
 //
-// 1.6.0: the store's reads (ReadIndex; upstream `reads`, a name the test seam Reads holds here), SettledAsync and OnCommitted. Upstream
-// announces a commit to its onCommitted listeners in a microtask; here the announcement is queued to the thread pool, one at a time, with
-// the lastSeq it finds when it runs. Upstream's group commit (S18) is not ported: every commit is a backend transaction of its own, as at
-// 1.5.2.
+// 1.6.0: the store's reads (ReadIndex; upstream `reads`, a name the test seam Reads holds here), SettledAsync, OnCommitted, and group
+// commit (S18). Upstream announces a commit to its onCommitted listeners in a microtask; here the announcement is queued to the thread
+// pool, one at a time, with the lastSeq it finds when it runs. Commits queued via CommitAsync while the queue is busy (or in the same
+// turn before the step starts) coalesce into one SQLite transaction with a single chord_meta update; a commit that throws a refusal (D4)
+// rolls back the group, rejects only itself, and retries the remaining commits in the group.
 using PiSharp.Chord.Data;
 using PiSharp.Chord.Sqlite;
 using PiSharp.Chord.State;
@@ -166,6 +167,8 @@ public sealed class ChordStore : IStore, IChordStore
     private bool diverged;
     /// <summary>The commit queue's tail: each step starts after the one before it settled; never faults.</summary>
     private Task tail = Task.CompletedTask;
+    /// <summary>Commits waiting for the next group turn (S18); closed once the group starts or a non-group step (series, replay, export) queues.</summary>
+    private List<PendingCommit>? pendingGroup;
     /// <summary>Reads and maintenance writes underway, which close waits for.</summary>
     private int underway;
     /// <summary>Completes close's wait once no read is underway.</summary>
@@ -397,6 +400,7 @@ public sealed class ChordStore : IStore, IChordStore
         }
         lock (gate)
         {
+            pendingGroup = null;
             held.Add(end);
             var taken = Taken(tail);
             tail = StoreInternal.Settled(Holding(taken));
@@ -406,9 +410,10 @@ public sealed class ChordStore : IStore, IChordStore
 
     /// <summary>Commits <paramref name="writes"/> as one seq when the commit queue reaches it: <c>fence.Admit()</c> at the step's entry, the
     /// writes in their order (retirements, creations, the rest), the outbox commit, <c>lastSeq</c> and the allocator's value,
-    /// <c>COMMIT</c>, then <c>fence.Adopt</c> before the next step starts. Returns the seq. A refused admission fails <c>released</c>. A
-    /// step the backend rolled back after the step's own code threw (a refusal, D4) fails with that error unchanged and the store goes on;
-    /// any other failure (<c>BEGIN</c>, <c>COMMIT</c>, <c>ROLLBACK</c>, a throwing adopt) is an unknown outcome that stops the store
+    /// <c>COMMIT</c>, then <c>fence.Adopt</c> before the next step starts. Commits queued together coalesce into one backend transaction
+    /// (group commit, S18). Returns the seq. A refused admission fails <c>released</c>. A step the backend rolled back after the step's own
+    /// code threw (a refusal, D4) fails with that error unchanged and the store goes on (retrying any remaining commits in the group); any
+    /// other failure (<c>BEGIN</c>, <c>COMMIT</c>, <c>ROLLBACK</c>, a throwing adopt) is an unknown outcome that stops the store
     /// (<c>storage_failed</c>). <paramref name="context"/> counts the step (no abort once queued).</summary>
     internal Task<long> CommitAsync(IReadOnlyList<IStagedWrite> writes, CommitFence fence, ChordContext context)
     {
@@ -426,7 +431,22 @@ public sealed class ChordStore : IStore, IChordStore
         {
             return Task.FromException<long>(error);
         }
-        return Enqueue(() => StepAsync(writes, fence, context));
+        var item = new PendingCommit(writes, fence, context);
+        lock (gate)
+        {
+            if (pendingGroup is not null)
+            {
+                pendingGroup.Add(item);
+            }
+            else
+            {
+                var group = new List<PendingCommit> { item };
+                pendingGroup = group;
+                var step = StoreInternal.After(tail, () => GroupAsync(group));
+                tail = StoreInternal.Settled(step);
+            }
+        }
+        return item.Completion.Task;
     }
 
     /// <summary>Commits <paramref name="commits"/> in one backend transaction when the commit queue reaches them, one seq each, in order:
@@ -571,6 +591,7 @@ public sealed class ChordStore : IStore, IChordStore
     {
         lock (gate)
         {
+            pendingGroup = null;
             var step = StoreInternal.After(tail, run);
             tail = StoreInternal.Settled(step);
             return step;
@@ -638,71 +659,233 @@ public sealed class ChordStore : IStore, IChordStore
         await db.CloseAsync().ConfigureAwait(false);
     }
 
-    private async Task<long> StepAsync(IReadOnlyList<IStagedWrite> writes, CommitFence fence, ChordContext context)
+    /// <summary>Runs one coalesced group of <see cref="CommitAsync"/> calls in one backend transaction (S18), isolating per-commit refusals
+    /// cleanly by rolling back and retrying the remaining commits in the group.</summary>
+    private async Task GroupAsync(List<PendingCommit> group)
     {
-        AssertUsable();
-        if (!fence.Admit()) throw new ChordError("released", "store: the commit's attempt ended", "discarded");
-        if (writes.Count == 0)
+        List<PendingCommit> batch;
+        lock (gate)
         {
-            // An empty commit takes no seq; a throwing adopt stops the store as for any commit.
+            if (ReferenceEquals(pendingGroup, group)) pendingGroup = null;
+            batch = [.. group];
+        }
+        try
+        {
+            AssertUsable();
+        }
+        catch (Exception error)
+        {
+            foreach (var item in batch) item.Completion.TrySetException(error);
+            return;
+        }
+        var admitted = new List<PendingCommit>(batch.Count);
+        foreach (var item in batch)
+        {
+            if (!item.Fence.Admit())
+            {
+                item.Completion.TrySetException(new ChordError("released", "store: the commit's attempt ended", "discarded"));
+                continue;
+            }
+            admitted.Add(item);
+        }
+        if (admitted.Count == 0) return;
+
+        var remaining = new List<PendingCommit>(admitted.Count);
+        var overflow = new List<PendingCommit>();
+        var plannedSeq = LastSeq;
+        foreach (var item in admitted)
+        {
+            if (overflow.Count > 0)
+            {
+                overflow.Add(item);
+                continue;
+            }
+            if (item.Writes.Count > 0)
+            {
+                if (plannedSeq + 1 > StoreInternal.MaxSafeIntegerLong)
+                {
+                    overflow.Add(item);
+                    continue;
+                }
+                plannedSeq++;
+            }
+            remaining.Add(item);
+        }
+
+        if (remaining.Count > 0)
+        {
+            var ok = await CommitGroupAsync(remaining).ConfigureAwait(false);
+            if (!ok)
+            {
+                if (overflow.Count > 0)
+                {
+                    Exception stopped;
+                    try { AssertUsable(); stopped = StorageFailed(new InvalidOperationException("store: stopped")); }
+                    catch (Exception error) { stopped = error; }
+                    foreach (var item in overflow) item.Completion.TrySetException(stopped);
+                }
+                return;
+            }
+        }
+
+        if (overflow.Count > 0)
+        {
+            var failed = Fail(new InvalidOperationException("store: no seq past Number.MAX_SAFE_INTEGER"));
+            foreach (var item in overflow) item.Completion.TrySetException(failed);
+        }
+    }
+
+    /// <summary>Commits <paramref name="remaining"/> in one backend transaction; returns <c>true</c> if the store remains usable.</summary>
+    private async Task<bool> CommitGroupAsync(List<PendingCommit> remaining)
+    {
+        while (remaining.Count > 0)
+        {
+            if (remaining.All(item => item.Writes.Count == 0))
+            {
+                // Empty commits take no seq; a throwing adopt stops the store as for any commit.
+                return AdoptEmpty(remaining);
+            }
+
+            Exception? thrown = null;
+            var failedIndex = -1;
+            GroupDone done;
             try
             {
-                fence.Rows?.Invoke(0);
-                fence.Adopt(LastSeq, []);
+                done = await db.TransactionAsync(async executor =>
+                {
+                    // One backend transaction: its steps share the token a read keeps a tentative run under until adoption.
+                    var transaction = new object();
+                    var seq = LastSeq;
+                    var nextId = Ids.Value;
+                    OrderedDictionary<string, TableRecord>? changed = null;
+                    Step? lastStep = null;
+                    var entries = new List<GroupEntry>(remaining.Count);
+                    for (var index = 0; index < remaining.Count; index++)
+                    {
+                        var item = remaining[index];
+                        if (item.Writes.Count == 0)
+                        {
+                            entries.Add(new GroupEntry(item, seq, null));
+                            continue;
+                        }
+                        var itemSeq = ++seq;
+                        try
+                        {
+                            var step = new Step(executor, itemSeq, Ids, changed ?? catalog) { Transaction = transaction };
+                            nextId = await WriteAsync(step, item.Writes).ConfigureAwait(false);
+                            if (step.Tables.Count > 0)
+                            {
+                                changed ??= new OrderedDictionary<string, TableRecord>(catalog, StringComparer.Ordinal);
+                                foreach (var (name, record) in step.Tables) changed[name] = record;
+                            }
+                            lastStep = step;
+                            entries.Add(new GroupEntry(item, itemSeq, step));
+                        }
+                        catch (Exception error)
+                        {
+                            thrown = error;
+                            failedIndex = index;
+                            throw;
+                        }
+                    }
+                    if (lastStep is not null)
+                    {
+                        try
+                        {
+                            await WriteMetaAsync(lastStep, nextId).ConfigureAwait(false);
+                        }
+                        catch (Exception error)
+                        {
+                            thrown = error;
+                            failedIndex = -1;
+                            throw;
+                        }
+                    }
+                    return new GroupDone(entries, lastStep?.Seq ?? LastSeq, nextId, changed);
+                }).ConfigureAwait(false);
             }
             catch (Exception error)
             {
-                throw Fail(error);
+                // The facade rolled back and fails with a single step's own error: a refusal, reject that commit and retry the rest (D4).
+                if (failedIndex >= 0 && ReferenceEquals(error, thrown))
+                {
+                    remaining[failedIndex].Completion.TrySetException(error);
+                    remaining.RemoveAt(failedIndex);
+                    continue;
+                }
+                var failed = Fail(error);
+                foreach (var item in remaining) item.Completion.TrySetException(failed);
+                return false;
             }
-            return LastSeq;
-        }
-        var seq = LastSeq + 1;
-        // Past the safe range seqs stop counting exactly (a later one would repeat): the store cannot number further.
-        if (seq > StoreInternal.MaxSafeIntegerLong) throw Fail(new InvalidOperationException("store: no seq past Number.MAX_SAFE_INTEGER"));
-        Exception? thrown = null;
-        (Step Step, long NextId) done;
-        try
-        {
-            done = await db.TransactionAsync(async executor =>
+
+            // COMMIT returned: the group is durable, and memory follows.
+            Interlocked.Exchange(ref lastSeq, done.LastSeq);
+            Interlocked.Exchange(ref committedNextId, done.NextId);
+            if (done.Changed is not null) AdoptTables(done.Changed);
+            Committed();
+            foreach (var entry in done.Entries)
             {
+                if (entry.Step is not { } step) continue;
+                entry.Item.Context.Count("chord.store.commits");
+                entry.Item.Context.Count("chord.store.statements", step.Statements);
+            }
+            var adopted = 0;
+            for (; adopted < done.Entries.Count; adopted++)
+            {
+                var entry = done.Entries[adopted];
                 try
                 {
-                    var step = new Step(executor, seq, Ids, catalog) { Transaction = new object() };
-                    var nextId = await WriteAsync(step, writes).ConfigureAwait(false);
-                    await WriteMetaAsync(step, nextId).ConfigureAwait(false);
-                    return (step, nextId);
+                    entry.Item.Fence.Rows?.Invoke(entry.Step?.Rows ?? 0);
+                    entry.Item.Fence.Adopt(entry.Seq, entry.Step?.Created ?? []);
                 }
                 catch (Exception error)
                 {
-                    thrown = error;
-                    throw;
+                    var failed = Fail(error);
+                    for (var prior = 0; prior < adopted; prior++) done.Entries[prior].Item.Completion.TrySetResult(done.Entries[prior].Seq);
+                    for (var rest = adopted; rest < done.Entries.Count; rest++) done.Entries[rest].Item.Completion.TrySetException(failed);
+                    return false;
                 }
-            }).ConfigureAwait(false);
+            }
+            for (var index = 0; index < adopted; index++) done.Entries[index].Item.Completion.TrySetResult(done.Entries[index].Seq);
+            return true;
         }
-        catch (Exception error)
-        {
-            // The facade rolled back and fails with the step's own error: a refusal, the store goes on (D4).
-            if (ReferenceEquals(error, thrown)) throw;
-            throw Fail(error);
-        }
-        // COMMIT returned: the commit is durable, and memory follows.
-        Interlocked.Exchange(ref lastSeq, seq);
-        Interlocked.Exchange(ref committedNextId, done.NextId);
-        AdoptTables(done.Step.Tables);
-        Committed();
-        context.Count("chord.store.commits");
-        context.Count("chord.store.statements", done.Step.Statements);
-        try
-        {
-            fence.Rows?.Invoke(done.Step.Rows);
-            fence.Adopt(seq, done.Step.Created);
-        }
-        catch (Exception error)
-        {
-            throw Fail(error);
-        }
-        return seq;
+        return true;
     }
+
+    private bool AdoptEmpty(List<PendingCommit> items)
+    {
+        var seq = LastSeq;
+        var adopted = 0;
+        for (; adopted < items.Count; adopted++)
+        {
+            try
+            {
+                items[adopted].Fence.Rows?.Invoke(0);
+                items[adopted].Fence.Adopt(seq, []);
+            }
+            catch (Exception error)
+            {
+                var failed = Fail(error);
+                for (var prior = 0; prior < adopted; prior++) items[prior].Completion.TrySetResult(seq);
+                for (var rest = adopted; rest < items.Count; rest++) items[rest].Completion.TrySetException(failed);
+                return false;
+            }
+        }
+        for (var index = 0; index < adopted; index++) items[index].Completion.TrySetResult(seq);
+        return true;
+    }
+
+    private sealed class PendingCommit(IReadOnlyList<IStagedWrite> writes, CommitFence fence, ChordContext context)
+    {
+        internal IReadOnlyList<IStagedWrite> Writes => writes;
+        internal CommitFence Fence => fence;
+        internal ChordContext Context => context;
+        internal TaskCompletionSource<long> Completion { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    }
+
+    private readonly record struct GroupEntry(PendingCommit Item, long Seq, Step? Step);
+
+    private sealed record GroupDone(List<GroupEntry> Entries, long LastSeq, long NextId, OrderedDictionary<string, TableRecord>? Changed);
 
     /// <summary>A series inside one backend transaction: per commit a step at the next seq, its check (a throw refuses it, unless one of
     /// its statements failed), then its writes; then, after <c>COMMIT</c>, memory and the receipts as after a commit step.</summary>
@@ -1029,6 +1212,13 @@ internal static partial class StoreInternal
             return true;
         }).ConfigureAwait(false);
         return meta with { Outbox = on ? 1 : 0, OutboxFloor = floor };
+    }
+
+    /// <summary>Runs <paramref name="run"/> once <paramref name="before"/> settled, never inline: a promise's <c>then</c>.</summary>
+    internal static async Task After(Task before, Func<Task> run)
+    {
+        await Turn(before);
+        await run().ConfigureAwait(false);
     }
 
     /// <summary>Runs <paramref name="run"/> once <paramref name="before"/> settled, never inline: a promise's <c>then</c>.</summary>

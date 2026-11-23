@@ -268,7 +268,9 @@ public sealed partial class HostedSession
         ISubmission submission;
         try
         {
-            submission = await conversation.SubmitAsync(SubmissionDraft.Input(request.Content, request.WhenBusy, request.RequestId), context).ConfigureAwait(false);
+            submission = await conversation.SubmitAsync(
+                SubmissionDraft.Input(request.Content, request.WhenBusy, request.RequestId, onAbort: request.OnAbort, notify: request.Notify),
+                context).ConfigureAwait(false);
         }
         catch (ConversationBusyException busy)
         {
@@ -470,6 +472,64 @@ public sealed partial class HostedSession
     /// <summary>Aborts one task, such as a job run; its owned work stops first.</summary>
     public async Task<TaskAbortResult> AbortTaskAsync(long taskId, CancellationToken cancellationToken = default) =>
         await GetHarness().AbortTaskAsync(new TaskId(taskId), Context(cancellationToken)).ConfigureAwait(false);
+
+    /// <summary>Delivers a signal by name to a task in this session, using any registered <see cref="SignalToken"/> schema from
+    /// <see cref="DurableDeviceOptions.Signals"/> (or an open JSON schema for unregistered signal names). With
+    /// <paramref name="idempotencyKey"/>, an exact repeat returns the recorded delivery status with <see cref="SignalDelivery.Replayed"/> set;
+    /// a different request under the same key throws <see cref="HostConflictException"/>.</summary>
+    public Task<SignalDelivery> DeliverSignalAsync(long taskId, string signalName, string key, JsonValue? payload = null,
+        string? idempotencyKey = null, CancellationToken cancellationToken = default) =>
+        DeliverSignalAsync(taskId, host.ResolveSignalToken(signalName), key, payload, idempotencyKey, cancellationToken);
+
+    /// <summary>Delivers a typed signal to a task in this session through <see cref="IHarness.SignalAsync"/>.</summary>
+    public async Task<SignalDelivery> DeliverSignalAsync(long taskId, SignalToken token, string key, JsonValue? payload = null,
+        string? idempotencyKey = null, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(token);
+        if (string.IsNullOrEmpty(key) || key.Length > 256)
+            throw new HostInvalidException("A signal key must have 1 to 256 characters.");
+        if (idempotencyKey is { Length: 0 or > 200 })
+            throw new HostInvalidException("An Idempotency-Key must have 1 to 200 characters.");
+        var value = payload ?? JsonObjectValue.Empty;
+        var opened = GetHarness();
+        var context = Context(cancellationToken);
+        if (idempotencyKey is null)
+        {
+            var result = await opened.SignalAsync(new TaskId(taskId), token, key, value, context).ConfigureAwait(false);
+            return new SignalDelivery(result);
+        }
+        var requestHash = CanonicalJson.Hash(JsonValue.Object([new("taskId", taskId), new("signal", token.Name), new("key", key), new("payload", value)]));
+        opened.Resume();
+        return await opened.CommitAsync(async tx =>
+        {
+            var receipt = await tx.DocAsync(SessionRecords.OperationDoc, idempotencyKey, JsonValue.Null).ConfigureAwait(false);
+            if (receipt.Get("status") is JsonStringValue recorded)
+            {
+                if (receipt.Get("requestHash") is JsonStringValue { Value: var earlier } && earlier == requestHash)
+                    return new SignalDelivery(ParseSignalResult(recorded.Value), Replayed: true);
+                throw new HostConflictException("This Idempotency-Key was already used for a different request.");
+            }
+            var delivered = await tx.SignalAsync(new TaskId(taskId), token, key, value).ConfigureAwait(false);
+            var delivery = new SignalDelivery(delivered);
+            receipt.Set("kind", "signal:" + token.Name);
+            receipt.Set("requestHash", requestHash);
+            receipt.Set("taskId", taskId);
+            receipt.Set("signal", token.Name);
+            receipt.Set("key", key);
+            receipt.Set("status", delivery.Status);
+            return delivery;
+        }, context).ConfigureAwait(false);
+    }
+
+    private static SignalResult ParseSignalResult(string status) => status switch
+    {
+        "delivered" => SignalResult.Delivered,
+        "duplicate" => SignalResult.Duplicate,
+        "invalid" => SignalResult.Invalid,
+        "closed" => SignalResult.Closed,
+        "not_found" => SignalResult.NotFound,
+        _ => SignalResult.Invalid,
+    };
 
     // ─── Extensions ─────────────────────────────────────────────────────────
 
@@ -720,7 +780,12 @@ public sealed partial class HostedSession
                 ? await open(DatabasePath).ConfigureAwait(false)
                 : await SqliteStorage.OpenAsync(DatabasePath).ConfigureAwait(false);
             var (apps, tasks) = DeviceApps.Create(host, this);
-            var sessionContext = new HostedSessionContext(Id, Cwd, DirectoryPath) { Apps = apps };
+            var sessionContext = new HostedSessionContext(Id, Cwd, DirectoryPath)
+            {
+                Apps = apps,
+                ImageProcessor = host.Options.ImageProcessor,
+                FitImages = host.Options.FitImages,
+            };
             var created = host.Options.CreateRegistry?.Invoke(sessionContext) ?? DurableDeviceHost.DefaultRegistry(sessionContext);
             registry = created;
             jobTasks = tasks;

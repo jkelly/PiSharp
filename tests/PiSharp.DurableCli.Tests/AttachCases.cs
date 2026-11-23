@@ -116,6 +116,9 @@ internal static partial class Program
                 output.Clear();
                 await attach.HandleAsync("/artifacts", CancellationToken.None);
                 Check(!output.Text.Contains("does not offer", StringComparison.Ordinal), "this device offers artifacts: " + output.Text);
+                output.Clear();
+                await attach.HandleAsync("""/signal 999999 test.wake k1 {"ok":true}""", CancellationToken.None);
+                Check(output.Text.Contains("Task 999999 signal test.wake/k1: not_found.", StringComparison.Ordinal), "/signal output: " + output.Text);
                 Check(!await attach.HandleAsync("/quit", CancellationToken.None), "/quit detaches");
             }
             finally

@@ -130,11 +130,11 @@ public sealed class WorkflowRun<TData> where TData : class
     /// <summary>Sends the signal <paramref name="signal"/> to the run: a WaitForSignal step waiting for that name takes it (in the order
     /// sent), and one sent before the run gets there is kept until it does. A non-null <paramref name="id"/> makes the send idempotent:
     /// a second send with the same id is ignored and returns false.</summary>
-    public Task<bool> SignalAsync<T>(string signal, T value, string? id = null, DurableContext? context = null)
+    public async Task<bool> SignalAsync<T>(string signal, T value, string? id = null, DurableContext? context = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(signal);
         var json = runner.Catalog.Engine(Workflow).Codec.Serialize(value, "signal '" + signal + "'");
-        return runner.Harness.CommitAsync(async tx =>
+        var sent = await runner.Harness.CommitAsync(async tx =>
         {
             var doc = await RunDocs.RunAsync(tx, ConversationId, TaskId).ConfigureAwait(false);
             if (id is not null)
@@ -146,8 +146,16 @@ public sealed class WorkflowRun<TData> where TData : class
                 throw new InvalidOperationException($"Workflow run {TaskId.Value} already holds {RunDocs.SignalLimit} signals nobody has taken.");
             RunDocs.Append(doc, "signals", RunDocs.Object(("name", signal), ("id", RunDocs.Opt(id)), ("value", json),
                 ("at", (double)DateTimeOffset.UtcNow.ToUnixTimeMilliseconds())), RunDocs.SignalLimit);
+            if (doc.Get("waitingSignal") is JsonObjectValue waiting &&
+                waiting.TryGetValue("signal", out var waitingName) && waitingName is JsonStringValue { Value: var name } && name == signal &&
+                waiting.TryGetValue("key", out var waitingKey) && waitingKey is JsonStringValue { Value: var key } && key.Length > 0)
+            {
+                await tx.SignalAsync(TaskId, RunDocs.WorkflowSignal, key, json).ConfigureAwait(false);
+            }
             return true;
-        }, context ?? DurableContext.Background);
+        }, context ?? DurableContext.Background).ConfigureAwait(false);
+        if (sent) runner.Harness.Resume();
+        return sent;
     }
 
     /// <summary>The run's status, current action, recent history and log.</summary>

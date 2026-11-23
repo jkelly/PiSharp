@@ -1,6 +1,7 @@
 using PiSharp.CustomAgents.Workflows;
 using PiSharp.CustomAgents.Workflows.Hosting;
 using PiSharp.Durable;
+using PiSharp.Durable.Chord;
 
 internal sealed class ChildData
 {
@@ -300,6 +301,76 @@ internal static partial class Program
                 Equal("approved by dee", data.Note, "signal after reopen");
                 Equal("parked", data.OrderId, "same run");
             }
+        });
+
+        yield return Case("signal.durable-sleep-and-direct-delivery", async () =>
+        {
+            var workflow = Workflow.For<OrderData>("durable-signal")
+                .WaitForSignal<string>("first", "step", (data, value) => data.Trail.Add(value))
+                .WaitForSignal<string>("second", "step", (data, value) => data.Trail.Add(value))
+                .Build();
+            await using var host = await TestHost.OpenAsync(catalog => catalog.Add(workflow));
+
+            // WaitForSignal sleeps durably on Durable 1.6.0 signals instead of holding a running phase.
+            var run = await host.Runner.StartAsync(workflow, new OrderData());
+            SleepingTaskState? sleeping = null;
+            await WaitUntilAsync(async () =>
+            {
+                var task = await host.Harness.GetTaskAsync(run.TaskId, DurableContext.Background);
+                sleeping = task?.State as SleepingTaskState;
+                return sleeping is not null;
+            }, TimeSpan.FromSeconds(20));
+            Check(sleeping!.Until is null, "no deadline when timeout is omitted");
+            Equal(1, sleeping.Signals?.Length ?? 0, "waits on one signal key");
+            Equal("pisharp.workflow.signal", sleeping.Signals!.Value[0].Signal, "signal token name");
+            var firstKey = sleeping.Signals.Value[0].Key;
+
+            // An unrelated signal name does not wake the sleeping task.
+            Check(await run.SignalAsync("unrelated", "ignored"), "unrelated signal queued");
+            await Task.Delay(100);
+            var stillSleeping = (await host.Harness.GetTaskAsync(run.TaskId, DurableContext.Background))?.State as SleepingTaskState;
+            Check(stillSleeping is not null, "still sleeping after unrelated signal");
+            Equal(firstKey, stillSleeping!.Signals!.Value[0].Key, "same wait key without spurious wake");
+
+            // Two same-name signals delivered back-to-back wake step 1 immediately and queue step 2 in FIFO order.
+            Check(await run.SignalAsync("step", "one", id: "k1"), "first matching signal");
+            Check(await run.SignalAsync("step", "two", id: "k2"), "second matching signal");
+            var completed = (await run.WaitAsync().WaitAsync(TimeSpan.FromSeconds(20))).EnsureCompleted();
+            Equal("one,two", string.Join(",", completed.Trail), "FIFO delivery across sequential WaitForSignal steps");
+
+            // Direct Durable signal delivery (e.g., via IHarness.SignalAsync or HTTP /signals) also wakes and completes the step.
+            var directRun = await host.Runner.StartAsync(workflow, new OrderData());
+            SleepingTaskState? directSleep = null;
+            await WaitUntilAsync(async () =>
+            {
+                var task = await host.Harness.GetTaskAsync(directRun.TaskId, DurableContext.Background);
+                directSleep = task?.State as SleepingTaskState;
+                return directSleep is not null;
+            }, TimeSpan.FromSeconds(20));
+            var firstDirectKey = directSleep!.Signals!.Value[0];
+            var directToken = Signals.DefineSignal(new SignalDefinition
+            {
+                Name = firstDirectKey.Signal,
+                Version = 1,
+                Schema = JsonObjectValue.Empty,
+            });
+            var delivered = await host.Harness.SignalAsync(directRun.TaskId, directToken, firstDirectKey.Key,
+                JsonValue.String("from-harness"), DurableContext.Background);
+            Equal(SignalResult.Delivered, delivered, "direct harness signal delivered");
+
+            // Wait for step 2 to sleep and wake it directly as well.
+            SleepingTaskState? secondSleep = null;
+            await WaitUntilAsync(async () =>
+            {
+                var task = await host.Harness.GetTaskAsync(directRun.TaskId, DurableContext.Background);
+                secondSleep = task?.State as SleepingTaskState;
+                return secondSleep is not null && secondSleep.Signals is { Length: 1 } list && list[0].Key != firstDirectKey.Key;
+            }, TimeSpan.FromSeconds(20));
+            var secondDelivered = await host.Harness.SignalAsync(directRun.TaskId, directToken, secondSleep!.Signals!.Value[0].Key,
+                JsonValue.String("second-direct"), DurableContext.Background);
+            Equal(SignalResult.Delivered, secondDelivered, "second direct signal delivered");
+            var directData = (await directRun.WaitAsync().WaitAsync(TimeSpan.FromSeconds(20))).EnsureCompleted();
+            Equal("from-harness,second-direct", string.Join(",", directData.Trail), "direct signal values applied");
         });
     }
 }

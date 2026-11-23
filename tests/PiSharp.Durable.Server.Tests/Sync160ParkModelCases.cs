@@ -104,5 +104,22 @@ internal static partial class Program
             Equal<double?>(5, old.Until, "time only");
             Check(old.Signals is null, "no signals");
         }),
+
+        Case("sync160.park-model.tool-end-carries-image-unsupported-warning-into-transcript-and-markdown", () =>
+        {
+            var model = new AgentModel();
+            model.Apply(SnapshotFrame(EmptySnapshot));
+            model.Apply(Batch(
+                """{"type":"run_start","inputs":[3]}""",
+                CallEntry("c1", "read"),
+                """{"type":"tool_execution_start","toolCallId":"c1","toolName":"read","taskId":12,"args":{"path":"img.png"}}""",
+                """{"type":"tool_execution_end","toolCallId":"c1","toolName":"read","entry":{"id":6,"conversationId":1,"kind":"pi.tool-result","model":[{"role":"toolResult","toolCallId":"c1","toolName":"read","content":[{"type":"text","text":"Read image"}],"details":{"imageUnsupportedByModel":"faux/text-only"},"isError":false,"timestamp":2}]},"imageUnsupportedByModel":"faux/text-only"}"""));
+            var call = OnlyCall(model);
+            Equal("faux/text-only", call.ImageUnsupportedByModel, "ToolCallView warning");
+            var json = Transcript.ToJson(model.Items);
+            Equal("faux/text-only", json[0]!["blocks"]![0]!["call"]!["imageUnsupportedByModel"]!.GetValue<string>(), "Transcript JSON warning");
+            var md = Transcript.ToMarkdown(model.Items);
+            Check(md.Contains("Image not sent to `faux/text-only`", StringComparison.Ordinal), "Markdown warning: " + md);
+        }),
     ];
 }

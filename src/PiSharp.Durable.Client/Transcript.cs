@@ -47,6 +47,8 @@ public sealed record ToolCallView
     public long? ResultEntryId { get; init; }
     /// <summary>Images of the result.</summary>
     public IReadOnlyList<TranscriptImage> Images { get; init; } = [];
+    /// <summary>Model ID from <c>details.imageUnsupportedByModel</c> when an image result ran under a model without image input (Pi Durable 1.6.0).</summary>
+    public string? ImageUnsupportedByModel { get; init; }
     /// <summary>Calls this call made (code mode), in start order.</summary>
     public IReadOnlyList<ToolCallView> Nested { get; init; } = [];
 }
@@ -95,6 +97,8 @@ public sealed record AssistantItem(long? Id, bool Streaming, IReadOnlyList<Assis
 /// <summary>A tool result whose call is not in view (after a compaction or reset).</summary>
 public sealed record ToolResultItem(long Id, int Index, string Name, string Text, bool IsError) : TranscriptItem
 {
+    /// <summary>Model ID from <c>details.imageUnsupportedByModel</c> when an image result ran under a model without image input (Pi Durable 1.6.0).</summary>
+    public string? ImageUnsupportedByModel { get; init; }
     public override string Key => $"e{Id.ToString(CultureInfo.InvariantCulture)}-{Index.ToString(CultureInfo.InvariantCulture)}";
     public override string Kind => "tool-result";
 }
@@ -193,6 +197,7 @@ public static class Transcript
                     Result = MessageText(result.Message),
                     ResultEntryId = result.EntryId,
                     Images = Images(result.Message),
+                    ImageUnsupportedByModel = UnsupportedImageModel(result.Message),
                     Nested = NestedOf(id, 0),
                 };
             tools.TryGetValue(id, out var running);
@@ -253,7 +258,10 @@ public static class Transcript
                     foreach (var message in Messages(entry).Where(message => Str(message, "role") == "toolResult"))
                     {
                         if (Str(message, "toolCallId") is { } callId && callIds.Contains(callId)) continue;
-                        items.Add(new ToolResultItem(id, index++, Str(message, "toolName") ?? "tool", MessageText(message), Bool(message, "isError")));
+                        items.Add(new ToolResultItem(id, index++, Str(message, "toolName") ?? "tool", MessageText(message), Bool(message, "isError"))
+                        {
+                            ImageUnsupportedByModel = UnsupportedImageModel(message),
+                        });
                     }
                     break;
                 }
@@ -330,7 +338,8 @@ public static class Transcript
                         TextBlockView text => text.Text,
                         ThinkingBlockView thinking => $"> _thinking:_ {Cut(thinking.Text.Replace('\n', ' '), 400)}",
                         ToolBlockView tool => $"- `{tool.Call.Name}` {StatusText(tool.Call.Status)}" +
-                            (tool.Call.Result is { } result ? $"\n\n```\n{Cut(result, 2000)}\n```" : ""),
+                            (tool.Call.Result is { } result ? $"\n\n```\n{Cut(result, 2000)}\n```" : "") +
+                            (tool.Call.ImageUnsupportedByModel is { Length: > 0 } unsupported ? $"\n\n> Image not sent to `{unsupported}` (model does not support image input)." : ""),
                         _ => "",
                     }).ToList();
                     if (assistant.Error is { } error) blocks.Add($"> {error}");
@@ -338,7 +347,8 @@ public static class Transcript
                     break;
                 }
                 case ToolResultItem result:
-                    parts.Add($"- `{result.Name}` {(result.IsError ? "error" : "result")}\n\n```\n{Cut(result.Text, 2000)}\n```");
+                    parts.Add($"- `{result.Name}` {(result.IsError ? "error" : "result")}\n\n```\n{Cut(result.Text, 2000)}\n```" +
+                        (result.ImageUnsupportedByModel is { Length: > 0 } unsupported ? $"\n\n> Image not sent to `{unsupported}` (model does not support image input)." : ""));
                     break;
                 case ToolItem tool:
                     parts.Add($"- `{tool.Call.Name}` {StatusText(tool.Call.Status)}");
@@ -362,7 +372,7 @@ public static class Transcript
             {
                 UserItem user => new() { ["kind"] = "user", ["id"] = user.Id, ["text"] = user.Text },
                 AssistantItem assistant => Assistant(assistant),
-                ToolResultItem result => new() { ["kind"] = "tool-result", ["id"] = result.Id, ["name"] = result.Name, ["text"] = result.Text, ["isError"] = result.IsError },
+                ToolResultItem result => ToolResult(result),
                 ToolItem tool => new() { ["kind"] = "tool", ["id"] = tool.Call.CallId, ["call"] = Call(tool.Call) },
                 EventItem item1 => Event(item1),
                 _ => [],
@@ -370,6 +380,13 @@ public static class Transcript
             array.Add(json);
         }
         return array;
+
+        static JsonObject ToolResult(ToolResultItem result)
+        {
+            var json = new JsonObject { ["kind"] = "tool-result", ["id"] = result.Id, ["name"] = result.Name, ["text"] = result.Text, ["isError"] = result.IsError };
+            if (result.ImageUnsupportedByModel is not null) json["imageUnsupportedByModel"] = result.ImageUnsupportedByModel;
+            return json;
+        }
 
         static JsonObject Assistant(AssistantItem assistant)
         {
@@ -414,6 +431,7 @@ public static class Transcript
         if (call.Output is not null) json["output"] = call.Output;
         if (call.Result is not null) json["result"] = call.Result;
         if (call.ResultEntryId is { } entry) json["resultEntryId"] = entry;
+        if (call.ImageUnsupportedByModel is not null) json["imageUnsupportedByModel"] = call.ImageUnsupportedByModel;
         if (call.Nested.Count > 0) json["nested"] = new JsonArray([.. call.Nested.Select(child => (JsonNode)Call(child))]);
         return json;
     }
@@ -476,6 +494,9 @@ public static class Transcript
     internal static IReadOnlyList<TranscriptImage> Images(JsonObject message) =>
         [.. Blocks(message).Where(block => Str(block, "type") == "image" && Str(block, "data") is not null)
             .Select(block => new TranscriptImage(Str(block, "mimeType") ?? "image/png", Str(block, "data")!))];
+
+    internal static string? UnsupportedImageModel(JsonObject message) =>
+        message["details"] is JsonObject details && Str(details, "imageUnsupportedByModel") is { Length: > 0 } model ? model : null;
 
     internal static string? Str(JsonObject json, string key) =>
         json[key] is JsonValue value && value.TryGetValue<string>(out var text) ? text : null;

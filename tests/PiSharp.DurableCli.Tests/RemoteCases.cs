@@ -102,6 +102,10 @@ internal static partial class Program
             Equal(sessionId, JsonNode.Parse(again.Out)!["id"]!.GetValue<string>(), "the same request finds the same session");
             var executions = await CliAsync(home, env, "executions", "list", "--session", sessionId, "--device", url);
             Equal(0, executions.Exit, "executions: " + executions.Err);
+            var signaled = await CliAsync(home, env, "tasks", "signal", "--session", sessionId, "999999", "test.wake", "k1",
+                "--payload", """{"ok":true}""", "--request", "sig-cli-1", "--json", "--device", url);
+            Equal(0, signaled.Exit, "tasks signal: " + signaled.Err);
+            Equal("not_found", JsonNode.Parse(signaled.Out)!["status"]!.GetValue<string>(), "tasks signal status");
 
             var budgets = JsonNode.Parse((await CliAsync(home, env, "budgets", "show", "--json", "--device", url)).Out)!;
             var revision = budgets["limits"]!["revision"]!.GetValue<long>().ToString(System.Globalization.CultureInfo.InvariantCulture);

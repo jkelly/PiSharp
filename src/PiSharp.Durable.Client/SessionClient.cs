@@ -28,8 +28,19 @@ public sealed partial class DurableDeviceClient
     /// </summary>
     public Task<JsonNode?> SendMessageAsync(string session, long agentId, string content, string requestId, string whenBusy = "followUp",
         CancellationToken cancellationToken = default) =>
-        SendAsync(HttpMethod.Post, AgentPath(session, agentId) + "/messages",
-            new JsonObject { ["content"] = content, ["requestId"] = requestId, ["whenBusy"] = whenBusy }, cancellationToken: cancellationToken);
+        SendMessageAsync(session, agentId, content, requestId, whenBusy, onAbort: null, notifyTaskId: null, notifyKey: null, cancellationToken);
+
+    /// <summary>Sends a message with optional Pi Durable 1.6.0 <paramref name="onAbort"/> (<c>withdraw</c> or <c>keep</c>) and
+    /// <paramref name="notifyTaskId"/>/<paramref name="notifyKey"/> settlement notification.</summary>
+    public Task<JsonNode?> SendMessageAsync(string session, long agentId, string content, string requestId, string whenBusy, string? onAbort,
+        long? notifyTaskId = null, string? notifyKey = null, CancellationToken cancellationToken = default)
+    {
+        var body = new JsonObject { ["content"] = content, ["requestId"] = requestId, ["whenBusy"] = whenBusy };
+        if (onAbort is not null) body["onAbort"] = onAbort;
+        if (notifyTaskId is { } taskId && notifyKey is not null)
+            body["notify"] = new JsonObject { ["taskId"] = taskId, ["key"] = notifyKey };
+        return SendAsync(HttpMethod.Post, AgentPath(session, agentId) + "/messages", body, cancellationToken: cancellationToken);
+    }
 
     /// <summary>Stops an agent's current work (<c>POST .../agents/{a}/abort</c>).</summary>
     public Task<JsonNode?> AbortAgentAsync(string session, long agentId, bool background = false, CancellationToken cancellationToken = default) =>
@@ -38,6 +49,16 @@ public sealed partial class DurableDeviceClient
     /// <summary>Cancels one task, such as an execution (<c>POST /v1/sessions/{s}/tasks/{taskId}/abort</c>): <c>{status: terminal|marked}</c>.</summary>
     public Task<JsonNode?> AbortTaskAsync(string session, long taskId, CancellationToken cancellationToken = default) =>
         SendAsync(HttpMethod.Post, $"{SessionPath(session)}/tasks/{Number(taskId)}/abort", new JsonObject(), cancellationToken: cancellationToken);
+
+    /// <summary>Delivers a signal to a live task (<c>POST /v1/sessions/{s}/tasks/{taskId}/signals</c>):
+    /// <c>{status: delivered|duplicate|invalid|closed|not_found}</c>.</summary>
+    public Task<JsonNode?> SignalTaskAsync(string session, long taskId, string signal, string key, JsonNode? payload = null,
+        string? idempotencyKey = null, CancellationToken cancellationToken = default)
+    {
+        var body = new JsonObject { ["signal"] = signal, ["key"] = key };
+        if (payload is not null) body["payload"] = payload.DeepClone();
+        return SendAsync(HttpMethod.Post, $"{SessionPath(session)}/tasks/{Number(taskId)}/signals", body, idempotencyKey, cancellationToken: cancellationToken);
+    }
 
     /// <summary>An agent's transcript (<c>GET .../agents/{a}/transcript</c>): items, or Markdown with <paramref name="markdown"/>.</summary>
     public Task<JsonNode?> TranscriptAsync(string session, long agentId, bool markdown = false, CancellationToken cancellationToken = default) =>

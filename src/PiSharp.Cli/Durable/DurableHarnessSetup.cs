@@ -167,6 +167,9 @@ internal static class DurableHarnessSetup
     /// <summary>The image processor of <c>pisharp durable</c>'s read tool: one worker thread per process, started on the first image.</summary>
     private static readonly Lazy<IImageProcessor> CodingImages = new(() => ImageProcessors.CreateThreaded(PiSharp.Tools.Skia.SkiaImageCodec.Instance));
 
+    /// <summary>Shared Skia-backed image processor for durable hosts (<c>pisharp durable serve</c>).</summary>
+    internal static IImageProcessor CodingImagesProcessor => CodingImages.Value;
+
     /// <summary>The name of <see cref="ToolSearch.CreateExtension"/>'s extension.</summary>
     internal const string ToolSearchExtensionName = "tool-search";
 

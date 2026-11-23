@@ -71,6 +71,8 @@ internal sealed class AttachView(TextWriter output)
                     break;
                 case ToolResultItem result:
                     Print(result.Key, $"  {(result.IsError ? "✗" : "⎿")} {result.Name}: {Line(result.Text, 200)}");
+                    if (result.ImageUnsupportedByModel is { Length: > 0 } unsupportedModel)
+                        Print(result.Key + ":unsupported-image", $"  ! image not sent to {unsupportedModel} (model does not support image input)");
                     break;
                 case EventItem note:
                     Print(note.Key, $"[{note.EntryKind}] {Line(note.Text, 200)}" + (note.Note is { } extra ? " — " + extra : ""));
@@ -78,6 +80,8 @@ internal sealed class AttachView(TextWriter output)
             }
         }
         quiet = false;
+        if (model.YieldAnswer is { } yieldAnswer)
+            Print("yield:" + yieldAnswer.ToString(CultureInfo.InvariantCulture), $"[reviewing answer #{yieldAnswer}]");
         foreach (var pending in model.Pending) Print("pending:" + pending.TaskId.ToString(CultureInfo.InvariantCulture), Card(pending));
     }
 
@@ -89,6 +93,8 @@ internal sealed class AttachView(TextWriter output)
             Print("parked:" + call.CallId, $"  ⏸ {(call.Status == ToolStatus.Sleeping ? "sleeping" : "waiting")}: {call.Name} holds no process until it is woken");
         if (call.Status is ToolStatus.Done or ToolStatus.Error && call.Result is { } result)
             Print("done:" + call.CallId, $"  {(call.Status == ToolStatus.Error ? "✗" : "⎿")} {Line(result, 200)}" + Images(call.Images.Count));
+        if (call.ImageUnsupportedByModel is { Length: > 0 } unsupported)
+            Print("unsupported-image:" + call.CallId, $"  ! image not sent to {unsupported} (model does not support image input)");
         foreach (var nested in call.Nested) Call(nested);
     }
 
@@ -147,6 +153,7 @@ internal sealed class DurableAttach(DurableDeviceClient client, DeviceInfo devic
           /retry                 send the last unsent message again, with the same request ID
           /abort                 stop the agent's current work
           /cancel <task>         cancel one task, such as an execution
+          /signal <task> <signal> <key> [json]   deliver a signal to a sleeping task
           /answer <task> <a>[; <b>...]   answer a question form: choice numbers (1,2) or your own words, one part per question
           /decline <task>        decline a question form
           /plan <task> approve|reject [feedback]   review a plan
@@ -214,6 +221,9 @@ internal sealed class DurableAttach(DurableDeviceClient client, DeviceInfo devic
                 case "/cancel" when ParseTask(rest) is { } task:
                     var cancelled = await client.AbortTaskAsync(session, task, cancellationToken).ConfigureAwait(false);
                     output.WriteLine($"Task {task}: {cancelled?["status"]}.");
+                    break;
+                case "/signal" when rest.Length > 0:
+                    await SignalAsync(rest, cancellationToken).ConfigureAwait(false);
                     break;
                 case "/answer" when Split(rest) is ({ } task, { Length: > 0 } answers):
                     await AnswerAsync(task, answers, cancellationToken).ConfigureAwait(false);
@@ -351,10 +361,39 @@ internal sealed class DurableAttach(DurableDeviceClient client, DeviceInfo devic
         if (!any) output.WriteLine("Nothing waits for you.");
     }
 
+    private async Task SignalAsync(string rest, CancellationToken cancellationToken)
+    {
+        if (!device.Supports("signals"))
+        {
+            output.WriteLine($"{device.Name} does not offer signals.");
+            return;
+        }
+        var parts = rest.Split(' ', 4, StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length < 3 || ParseTask(parts[0]) is not { } task)
+        {
+            output.WriteLine("Use /signal <task> <signal> <key> [json].");
+            return;
+        }
+        JsonNode? payload = new JsonObject();
+        if (parts.Length == 4)
+        {
+            try { payload = JsonNode.Parse(parts[3]); }
+            catch (System.Text.Json.JsonException error)
+            {
+                output.WriteLine($"Invalid JSON payload: {error.Message}");
+                return;
+            }
+        }
+        var delivered = await client.SignalTaskAsync(session, task, parts[1], parts[2], payload, cancellationToken: cancellationToken).ConfigureAwait(false);
+        output.WriteLine($"Task {task} signal {parts[1]}/{parts[2]}: {delivered?["status"]}.");
+    }
+
     private void Status()
     {
         var agent = View.Model.Agent;
-        output.WriteLine($"Session {session}, agent {agentId}: {(View.Model.Running ? "working" : "idle")}; model {agent["model"]?["provider"]}/{agent["model"]?["modelId"] ?? agent["model"]?["id"]}, " +
+        output.WriteLine($"Session {session}, agent {agentId}: {(View.Model.Running ? "working" : "idle")}" +
+            (View.Model.YieldAnswer is { } yieldId ? $" (reviewing answer #{yieldId})" : "") +
+            $"; model {agent["model"]?["provider"]}/{agent["model"]?["modelId"] ?? agent["model"]?["id"]}, " +
             $"thinking {agent["thinkingLevel"]}; {View.Model.Inbox.Count} queued; about {View.Model.ContextTokens:0} context tokens" +
             (unsent is { } kept ? $"; unsent: \"{AttachView.Line(kept.Text, 40)}\" (/retry)" : ""));
     }
