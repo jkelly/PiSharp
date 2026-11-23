@@ -557,7 +557,7 @@ public sealed partial class JsonlStorage : IStorage
         {
             mainReaderGate.Release();
         }
-        if (readerToClose is not null) await readerToClose.CloseAsync(context).ConfigureAwait(false);
+        if (readerToClose is not null) await readerToClose.CloseAsync(DurableContext.Background).ConfigureAwait(false);
     }
 
     // ---- Batch preparation & encoding ----
@@ -1451,9 +1451,10 @@ public sealed partial class JsonlStorage : IStorage
     {
         var key = (offset, length);
         if (mainLineCache.TryGet(key, out var cached)) return cached;
+        context.ThrowIfCancellationRequested();
         var reader = await GetMainReaderAsync(context).ConfigureAwait(false);
         var read = await reader.ReadAsync(offset, length, context).ConfigureAwait(false);
-        if (!read.IsOk) throw ErrorFromFile($"positional read of {MainFile}", read.Error);
+        if (!read.IsOk) throw ErrorFromFile($"positional read of {MainFile}", read.Error, context);
         if (read.Value.Length < length) throw new JsonlCorruptionException($"Truncated read in {MainFile} at offset {offset}");
         var text = DecodeUtf8Line(read.Value.AsSpan(0, length));
         var marker = (JsonObjectValue)JsonValue.Parse(text);
@@ -1466,13 +1467,15 @@ public sealed partial class JsonlStorage : IStorage
     {
         var existing = Volatile.Read(ref mainReader);
         if (existing is not null) return existing;
+        context.ThrowIfCancellationRequested();
         await mainReaderGate.WaitAsync().ConfigureAwait(false);
         try
         {
             AssertUsable();
+            context.ThrowIfCancellationRequested();
             if (mainReader is not null) return mainReader;
-            var opened = await fs.OpenBinaryReaderAsync(mainPath, null, context).ConfigureAwait(false);
-            if (!opened.IsOk) throw ErrorFromFile($"open of {MainFile}", opened.Error);
+            var opened = await fs.OpenBinaryReaderAsync(mainPath, null, DurableContext.Background).ConfigureAwait(false);
+            if (!opened.IsOk) throw ErrorFromFile($"open of {MainFile}", opened.Error, context);
             mainReader = opened.Value;
             return mainReader;
         }
@@ -1524,18 +1527,18 @@ public sealed partial class JsonlStorage : IStorage
 
             var path = await ResolveFileAsync(file, context).ConfigureAwait(false);
             var opened = await fs.OpenBinaryReaderAsync(path, null, context).ConfigureAwait(false);
-            if (!opened.IsOk) throw ErrorFromFile($"open of {file}", opened.Error);
+            if (!opened.IsOk) throw ErrorFromFile($"open of {file}", opened.Error, context);
             byte[] bytes;
             try
             {
                 var read = await opened.Value.ReadAsync(location.Offset, location.Length, context).ConfigureAwait(false);
-                if (!read.IsOk) throw ErrorFromFile($"positional read of {file}", read.Error);
+                if (!read.IsOk) throw ErrorFromFile($"positional read of {file}", read.Error, context);
                 if (read.Value.Length < location.Length) throw new JsonlCorruptionException($"Truncated read in {file} at offset {location.Offset}");
                 bytes = read.Value;
             }
             finally
             {
-                await opened.Value.CloseAsync(context).ConfigureAwait(false);
+                await opened.Value.CloseAsync(DurableContext.Background).ConfigureAwait(false);
             }
             var record = ParseSidecarTask(bytes.AsSpan(0, location.Length));
             sidecarCache.Set(key, record, location.Length);
@@ -1584,18 +1587,18 @@ public sealed partial class JsonlStorage : IStorage
 
                 var path = await ResolveFileAsync(file, context).ConfigureAwait(false);
                 var opened = await fs.OpenBinaryReaderAsync(path, null, context).ConfigureAwait(false);
-                if (!opened.IsOk) throw ErrorFromFile($"open of {file}", opened.Error);
+                if (!opened.IsOk) throw ErrorFromFile($"open of {file}", opened.Error, context);
                 byte[] bytes;
                 try
                 {
                     var read = await opened.Value.ReadAsync(location.Offset, location.Length, context).ConfigureAwait(false);
-                    if (!read.IsOk) throw ErrorFromFile($"positional read of {file}", read.Error);
+                    if (!read.IsOk) throw ErrorFromFile($"positional read of {file}", read.Error, context);
                     if (read.Value.Length < location.Length) throw new JsonlCorruptionException($"Truncated read in {file} at offset {location.Offset}");
                     bytes = read.Value;
                 }
                 finally
                 {
-                    await opened.Value.CloseAsync(context).ConfigureAwait(false);
+                    await opened.Value.CloseAsync(DurableContext.Background).ConfigureAwait(false);
                 }
                 var record = ParseSidecarTask(bytes.AsSpan(0, location.Length));
                 sidecarCache.Set(key, record, location.Length);
@@ -1701,7 +1704,7 @@ public sealed partial class JsonlStorage : IStorage
             {
                 var path = await ResolveFileAsync(file, context).ConfigureAwait(false);
                 var opened = await fs.OpenBinaryReaderAsync(path, null, context).ConfigureAwait(false);
-                if (!opened.IsOk) throw ErrorFromFile($"open of {file}", opened.Error);
+                if (!opened.IsOk) throw ErrorFromFile($"open of {file}", opened.Error, context);
                 try
                 {
                     // Coalesce contiguous/small spans into one positional read when multiple revisions miss cache.
@@ -1712,7 +1715,7 @@ public sealed partial class JsonlStorage : IStorage
                     if (missing.Count > 1 && totalSpan > 0 && totalSpan <= 4 * 1024 * 1024)
                     {
                         var bulk = await opened.Value.ReadAsync(firstOffset, totalSpan, context).ConfigureAwait(false);
-                        if (!bulk.IsOk) throw ErrorFromFile($"positional read of {file}", bulk.Error);
+                        if (!bulk.IsOk) throw ErrorFromFile($"positional read of {file}", bulk.Error, context);
                         if (bulk.Value.Length < totalSpan)
                             throw new JsonlCorruptionException($"Truncated read in {file} at offset {firstOffset}");
                         foreach (var index in missing)
@@ -1730,7 +1733,7 @@ public sealed partial class JsonlStorage : IStorage
                         {
                             var rev = needed[index];
                             var read = await opened.Value.ReadAsync(rev.Offset, rev.Length, context).ConfigureAwait(false);
-                            if (!read.IsOk) throw ErrorFromFile($"positional read of {file}", read.Error);
+                            if (!read.IsOk) throw ErrorFromFile($"positional read of {file}", read.Error, context);
                             if (read.Value.Length < rev.Length)
                                 throw new JsonlCorruptionException($"Truncated read in {file} at offset {rev.Offset}");
                             var content = ParseSidecarDocument(read.Value.AsSpan(0, rev.Length));
@@ -1741,7 +1744,7 @@ public sealed partial class JsonlStorage : IStorage
                 }
                 finally
                 {
-                    await opened.Value.CloseAsync(context).ConfigureAwait(false);
+                    await opened.Value.CloseAsync(DurableContext.Background).ConfigureAwait(false);
                 }
             }
 
@@ -1940,7 +1943,7 @@ public sealed partial class JsonlStorage : IStorage
     private async Task<string> ResolveFileAsync(string file, DurableContext context)
     {
         var path = await fs.JoinPathAsync([directory, file], context).ConfigureAwait(false);
-        if (!path.IsOk) throw ErrorFromFile("path join", path.Error);
+        if (!path.IsOk) throw ErrorFromFile("path join", path.Error, context);
         return path.Value;
     }
 
@@ -2070,7 +2073,12 @@ public sealed partial class JsonlStorage : IStorage
         return builder.ToImmutable();
     }
 
-    private static IOException ErrorFromFile(string action, FileError error) => new($"JSONL {action} failed: {error.Message}", error);
+    private static Exception ErrorFromFile(string action, FileError error, DurableContext? context = null)
+    {
+        if (error.Code == FileErrorCode.Aborted && context is { IsCancellationRequested: true })
+            context.ThrowIfCancellationRequested();
+        return new IOException($"JSONL {action} failed: {error.Message}", error);
+    }
 
     private static JsonValue ParseJson(string text, string description)
     {
