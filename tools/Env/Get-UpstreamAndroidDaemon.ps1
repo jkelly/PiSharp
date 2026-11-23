@@ -1,15 +1,29 @@
 # Download only the explicitly pinned MIT upstream Android backend. Never execute downloaded files.
-param([Parameter(Mandatory=$true)][string]$OutputDirectory)
+param(
+    [Parameter(Mandatory=$true)][string]$OutputDirectory,
+    [ValidateSet('1.6.0','1.5.2')][string]$Version='1.6.0'
+)
 $ErrorActionPreference='Stop'
+$pins=@{
+    '1.6.0'=@{
+        integrity='UjMM0b75zRDadNXzABfy9gnRO3p8NAWvRBNab5LtnhFYbNJhqnEfOTPASO6LV0Tsrx4HywMEkDchY3bFtICoBw=='
+        manifest='upstream-android-1.6.0.json'
+    }
+    '1.5.2'=@{
+        integrity='yw9dPqPHHP567m7+TDAmuzWC9AU1I3aV3FFdNQlo+UXASYGEIW4QgbYXNTka6Y/Z4+KcifSdgDSiMiTM3ZXBfg=='
+        manifest='upstream-android-1.5.2.json'
+    }
+}
+$pin=$pins[$Version]
 $destination=[IO.Path]::GetFullPath($OutputDirectory)
 New-Item -ItemType Directory -Path $destination -Force | Out-Null
-$archive=Join-Path $destination 'pi-env-1.5.2.tgz'
-$uri='https://registry.npmjs.org/@earendil-works/pi-env/-/pi-env-1.5.2.tgz'
-$integrity='yw9dPqPHHP567m7+TDAmuzWC9AU1I3aV3FFdNQlo+UXASYGEIW4QgbYXNTka6Y/Z4+KcifSdgDSiMiTM3ZXBfg=='
+$archive=Join-Path $destination "pi-env-$Version.tgz"
+$uri="https://registry.npmjs.org/@earendil-works/pi-env/-/pi-env-$Version.tgz"
+$integrity=$pin.integrity
 if(-not (Test-Path -LiteralPath $archive)){Invoke-WebRequest -Uri $uri -OutFile $archive}
 $actual=[Convert]::ToBase64String([Security.Cryptography.SHA512]::HashData([IO.File]::ReadAllBytes($archive)))
 if($actual -ne $integrity){throw 'Upstream package SHA-512 mismatch; refusing extraction.'}
-$manifestPath=Join-Path $PSScriptRoot 'upstream-android-1.5.2.json'
+$manifestPath=Join-Path $PSScriptRoot $pin.manifest
 $artifacts=Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
 $members=@(& tar -tf $archive)
 if($LASTEXITCODE -ne 0){throw 'Could not inspect pinned upstream archive.'}

@@ -12,4 +12,21 @@
     <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
     <NuGetAudit>false</NuGetAudit>
   </PropertyGroup>
+  <PropertyGroup>
+    <!-- Single source of truth for pinned third-party NuGet package versions across src/ and tests/.
+         Projects keep explicit PackageReference Version attributes using these properties so
+         packages.lock.json stays byte-stable under RestorePackagesWithLockFile=true. -->
+    <PiSharpJintVersion>[4.16.3]</PiSharpJintVersion>
+    <PiSharpRoslynVersion>[5.6.0]</PiSharpRoslynVersion>
+    <PiSharpSqlClientVersion>[7.1.1]</PiSharpSqlClientVersion>
+    <PiSharpSqlClientSniVersion>[7.1.0]</PiSharpSqlClientSniVersion>
+    <PiSharpPkcsVersion>[9.0.21]</PiSharpPkcsVersion>
+    <PiSharpSqliteVersion>[10.0.12]</PiSharpSqliteVersion>
+    <PiSharpSqlitePclRawVersion>[2.1.12]</PiSharpSqlitePclRawVersion>
+    <PiSharpYamlDotNetVersion>[16.3.0]</PiSharpYamlDotNetVersion>
+    <PiSharpSkiaSharpVersion>[4.152.1]</PiSharpSkiaSharpVersion>
+    <PiSharpMarkdigVersion>[0.41.3]</PiSharpMarkdigVersion>
+    <PiSharpHtmlSanitizerVersion>[9.1.973]</PiSharpHtmlSanitizerVersion>
+    <PiSharpPlaywrightVersion>[1.63.0]</PiSharpPlaywrightVersion>
+  </PropertyGroup>
 </Project>

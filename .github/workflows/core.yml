@@ -51,7 +51,13 @@ jobs:
         run: |
           $suite = if ('${{ matrix.suite }}' -eq 'Extensions.ContractTests') { 'PiSharp.Extensions.ContractTests' } else { 'PiSharp.${{ matrix.suite }}.Tests' }
           node tools/ci/write-validation-manifest.mjs --output '${{ runner.temp }}/core/manifest.json' --execution '${{ runner.temp }}/core/execution.json' --report "$suite=${{ runner.temp }}/core/$suite.json" --console "$suite=${{ runner.temp }}/core/console.log" --prerequisite "dotnet-sdk=$(dotnet --version)" --prerequisite 'Windows native process and ConPTY support' --prerequisite 'native extension fixtures published for CodingAgent/Extensions.ContractTests by runner' --reject-skips
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $manifestExit = $LASTEXITCODE
+          if (Test-Path -LiteralPath '${{ runner.temp }}/core/manifest.json') {
+            $summaryArgs = @('--manifest', '${{ runner.temp }}/core/manifest.json', '--trx', "${{ runner.temp }}/core/$suite.trx", '--title', "Core console ($suite)")
+            if ($env:GITHUB_STEP_SUMMARY) { $summaryArgs += @('--summary', $env:GITHUB_STEP_SUMMARY, '--append') }
+            node tools/ci/manifest-to-trx.mjs @summaryArgs
+          }
+          if ($manifestExit -ne 0) { exit $manifestExit }
       - uses: actions/upload-artifact@v7
         if: always()
         with:
@@ -73,6 +79,7 @@ jobs:
         run: |
           node --test tools/CompatibilityReport/sync-applicability.test.mjs tools/CompatibilityReport/sync-1.5.2-applicability.test.mjs tools/CompatibilityReport/accept-sync-1.5.2.test.mjs tools/CompatibilityReport/sync-1.6.0-applicability.test.mjs tools/ci/validation-manifest.test.mjs tools/release/publish-github-release.test.mjs tools/release/generate-package-manifests.test.mjs
           node --test tools/ci/historical-ai-archive.test.mjs
+          node tools/TuiData/pack-word-data.mjs
           node tools/DurablePortMap/check-worklist.mjs --offline
       - name: Fetch immutable upstream objects
         shell: bash

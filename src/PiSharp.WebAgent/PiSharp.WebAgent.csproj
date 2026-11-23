@@ -22,10 +22,10 @@
   </ItemGroup>
   <ItemGroup>
     <!-- webagent.db, with PiSharp.Durable.Web's (and PiSharp.Durable.Sqlite's) exact pins (decision 0005). -->
-    <PackageReference Include="Microsoft.Data.Sqlite" Version="[10.0.12]" />
-    <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="[2.1.12]" />
-    <PackageReference Include="SQLitePCLRaw.core" Version="[2.1.12]" />
-    <PackageReference Include="SQLitePCLRaw.lib.e_sqlite3" Version="[2.1.12]" />
-    <PackageReference Include="SQLitePCLRaw.provider.e_sqlite3" Version="[2.1.12]" />
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="$(PiSharpSqliteVersion)" />
+    <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="$(PiSharpSqlitePclRawVersion)" />
+    <PackageReference Include="SQLitePCLRaw.core" Version="$(PiSharpSqlitePclRawVersion)" />
+    <PackageReference Include="SQLitePCLRaw.lib.e_sqlite3" Version="$(PiSharpSqlitePclRawVersion)" />
+    <PackageReference Include="SQLitePCLRaw.provider.e_sqlite3" Version="$(PiSharpSqlitePclRawVersion)" />
   </ItemGroup>
 </Project>

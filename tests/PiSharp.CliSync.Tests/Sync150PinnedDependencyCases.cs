@@ -66,6 +66,11 @@ internal static partial class Program
                     Equal("[" + version + "]", range, $"{library} -> {id}");
             var jint = XDocument.Load(Path.Combine(repo, "src", "PiSharp.Codemode", "PiSharp.Codemode.csproj")).Descendants("PackageReference")
                 .Single(reference => (string?)reference.Attribute("Include") == "Jint").Attribute("Version")!.Value;
+            if (jint.StartsWith("$(", StringComparison.Ordinal) && jint.EndsWith(')'))
+            {
+                var propertyName = jint[2..^1];
+                jint = XDocument.Load(Path.Combine(repo, "Directory.Build.props")).Descendants(propertyName).Single().Value.Trim();
+            }
             Check(jint.StartsWith('[') && jint.EndsWith(']'), "Jint's PackageReference is an exact pin: " + jint);
             Equal(jint, codemode["Jint"], "PiSharp.Codemode -> Jint (third-party pin unchanged)");
         }

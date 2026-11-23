@@ -19,12 +19,12 @@
     <ProjectReference Include="../PiSharp.Web.Common/PiSharp.Web.Common.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="YamlDotNet" Version="[16.3.0]" />
+    <PackageReference Include="YamlDotNet" Version="$(PiSharpYamlDotNetVersion)" />
     <!-- The registry's SQLite, with PiSharp.Durable.Sqlite's exact pins (decision 0005). -->
-    <PackageReference Include="Microsoft.Data.Sqlite" Version="[10.0.12]" />
-    <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="[2.1.12]" />
-    <PackageReference Include="SQLitePCLRaw.core" Version="[2.1.12]" />
-    <PackageReference Include="SQLitePCLRaw.lib.e_sqlite3" Version="[2.1.12]" />
-    <PackageReference Include="SQLitePCLRaw.provider.e_sqlite3" Version="[2.1.12]" />
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="$(PiSharpSqliteVersion)" />
+    <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="$(PiSharpSqlitePclRawVersion)" />
+    <PackageReference Include="SQLitePCLRaw.core" Version="$(PiSharpSqlitePclRawVersion)" />
+    <PackageReference Include="SQLitePCLRaw.lib.e_sqlite3" Version="$(PiSharpSqlitePclRawVersion)" />
+    <PackageReference Include="SQLitePCLRaw.provider.e_sqlite3" Version="$(PiSharpSqlitePclRawVersion)" />
   </ItemGroup>
 </Project>

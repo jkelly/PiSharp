@@ -257,7 +257,11 @@ internal static class NativeExtensionExecHostTests
         finally
         {
             release.TrySetResult();
-            if (cancel is not null) await ExpectedJoin(cancel, ControlOriginals, "control-external-signal-cancellation", failures, [marker]);
+            if (cancel is not null)
+            {
+                Exception? cancelDirect = null; try { await cancel; } catch (Exception error) { cancelDirect = error; }
+                if (ControlOriginals.Record("control-external-signal-cancellation", cancel, cancelDirect) is { } cancelFault && !Allowed(cancelFault, [marker])) failures.Add(cancelFault);
+            }
             close ??= registry.DisposeAsync().AsTask();
             Exception? direct = null; try { await close; } catch (Exception error) { direct = error; }
             var expected = CanceledProcesses(install).Append(marker).ToArray();

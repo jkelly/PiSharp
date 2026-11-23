@@ -144,6 +144,8 @@ var tests = PersistentAgentSessionTests.Cases().Concat(OfflineDemoTests.Cases())
     .Concat(ProfileCloseAndEmptyReloadTests.Cases())
     .Concat(McpProfileResourceAdmissionTests.Cases())
     .Concat(NativeHostReloadTests.Cases())
+    .Concat(NativeExtensionExecHostTests.Cases())
+    .Concat(NativeExtensionExecContextBridgeTests.Cases())
     .Concat(InteractiveCommandCompletionTests.Cases()).ToArray();
 if (commandTerminalPackage)
     tests = NativeCommandTerminalSessionTests.Cases(dotnetHost, typeof(InteractiveCommandCompletionTests).Assembly.Location, cliDll,
@@ -268,6 +270,7 @@ foreach (var test in tests)
             test.Name.StartsWith("node-command-terminal.", StringComparison.Ordinal) ||
             test.Name.StartsWith("native stateful Todo ", StringComparison.Ordinal) ||
             test.Name.StartsWith("native session checkpoint ", StringComparison.Ordinal) ||
+            test.Name.StartsWith("exec.", StringComparison.Ordinal) ||
             test.Name is "RPC direct host write/flush faults poison gated response authority and await durable close" or
                 "RPC shared output failures retain RpcHostFailed with zero new cleanup failures for every API" or
                 "RPC retained output fault preserves original phase and genuine late cleanup cause order" or
