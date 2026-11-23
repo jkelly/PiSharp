@@ -34,23 +34,30 @@ public sealed class GoogleGenerativeAIHttpTransport : IChatTransport
         var mapper = new GoogleEventMapper(request, _options);
         HttpRequestMessage? ownedRequest = null; HttpResponseMessage? response = null; Stream? body = null;
         IAsyncEnumerator<JsonData>? chunks = null; Exception? failure = null; Exception? cleanup = null;
-        StreamTerminalEvent? terminal = null; var loopExited = false;
+        StreamTerminalEvent? terminal = null; var loopExited = false; var allowTransportRetry = true;
         try
         {
             try
             {
-                ownedRequest = await _factory.CreateAsync(request, token).ConfigureAwait(false);
+                try { ownedRequest = await _factory.CreateAsync(request, token).ConfigureAwait(false); }
+                catch { allowTransportRetry = false; throw; }
                 var replay = _options.MaxRetries > 0 ? await GoogleRetryRequest.CaptureAsync(ownedRequest, _options, token).ConfigureAwait(false) : null;
                 var retryIndex = 0;
                 while (true)
                 {
+                    allowTransportRetry = true;
                     token.ThrowIfCancellationRequested();
                     var currentRequest = ownedRequest ?? throw GoogleData.Fail(GoogleFailure.SourceFailed);
                     // Original admitted operations remain owned even if injected work ignores cancellation.
                     response = await _client.SendAsync(currentRequest, HttpCompletionOption.ResponseHeadersRead, token).ConfigureAwait(false);
+                    var permanentHttpStatus = !response.IsSuccessStatusCode && !GoogleRetryPolicy.Retryable(response, _options);
                     if (_options.Hooks.OnNativeResponse is { } observe)
-                        await observe(Response(response), new(_model, _options.ModelMetadata), token).ConfigureAwait(false);
+                    {
+                        try { await observe(Response(response), new(_model, _options.ModelMetadata), token).ConfigureAwait(false); }
+                        catch { allowTransportRetry = false; throw; }
+                    }
                     token.ThrowIfCancellationRequested();
+                    if (permanentHttpStatus) allowTransportRetry = false;
                     body = _options.BodyReaderFactory is { } acquire ? await acquire(response, token).ConfigureAwait(false) :
                         await response.Content.ReadAsStreamAsync(token).ConfigureAwait(false);
                     if (body is null) throw GoogleData.Fail(GoogleFailure.SourceFailed);
@@ -76,7 +83,8 @@ public sealed class GoogleGenerativeAIHttpTransport : IChatTransport
                     if (planningFailure is not null) throw planningFailure;
                     if (cleanup is not null) throw statusError; // Original provider failure remains primary.
                     token.ThrowIfCancellationRequested();
-                    _options.Hooks.OnRetry?.Invoke(new(retryIndex, status, delay));
+                    try { _options.Hooks.OnRetry?.Invoke(new(retryIndex, status, delay)); }
+                    catch { allowTransportRetry = false; throw; }
                     token.ThrowIfCancellationRequested();
                     await Task.Delay(delay, _options.RetryTimeProvider, token).ConfigureAwait(false);
                     token.ThrowIfCancellationRequested();
@@ -88,7 +96,7 @@ public sealed class GoogleGenerativeAIHttpTransport : IChatTransport
             {
                 StreamEvent? start = null;
                 try { start = mapper.Start(); _options.Hooks.OnEventPublished?.Invoke(start); }
-                catch (Exception error) { failure = error; }
+                catch (Exception error) { allowTransportRetry = false; failure = error; }
                 if (start is not null && failure is null) yield return start;
             }
             while (failure is null)
@@ -101,7 +109,10 @@ public sealed class GoogleGenerativeAIHttpTransport : IChatTransport
                     {
                         var chunk = chunks.Current;
                         if (_options.Hooks.OnProviderStreamEvent is { } hook)
-                            await hook(chunk, new(_model, _options.ModelMetadata), token).ConfigureAwait(false);
+                        {
+                            try { await hook(chunk, new(_model, _options.ModelMetadata), token).ConfigureAwait(false); }
+                            catch { allowTransportRetry = false; throw; }
+                        }
                         token.ThrowIfCancellationRequested(); frames = mapper.Convert(chunk);
                     }
                     else frames = mapper.EndContent();
@@ -111,7 +122,7 @@ public sealed class GoogleGenerativeAIHttpTransport : IChatTransport
                 foreach (var frame in frames!)
                 {
                     try { token.ThrowIfCancellationRequested(); _options.Hooks.OnEventPublished?.Invoke(frame); }
-                    catch (Exception error) { failure = error; }
+                    catch (Exception error) { allowTransportRetry = false; failure = error; }
                     if (failure is not null) break;
                     yield return frame;
                 }
@@ -131,17 +142,17 @@ public sealed class GoogleGenerativeAIHttpTransport : IChatTransport
         var cleanupOnly = failure is null && terminal is not StreamError && cleanup is not null;
         if (cleanupOnly) failure = GoogleData.Fail(GoogleFailure.CleanupFailed);
         if (token.IsCancellationRequested) terminal = mapper.Error(failure ?? cleanup ?? new OperationCanceledException(), true);
-        else if (failure is not null) terminal = mapper.Error(failure, false);
+        else if (failure is not null) terminal = mapper.Error(failure, false, allowTransportRetry);
         // A mapped provider error survives a secondary cleanup failure with its original partial.
         var primary = mapper.FailureKind;
         try { _options.Hooks.OnNativeSettlement?.Invoke(new(primary, cleanup is not null, token.IsCancellationRequested)); }
-        catch (Exception error) { terminal = mapper.Error(error, token.IsCancellationRequested); }
+        catch (Exception error) { terminal = mapper.Error(error, token.IsCancellationRequested, allowTransportRetry: false); }
         if (token.IsCancellationRequested && terminal!.Reason != StopReason.Aborted)
             terminal = mapper.Error(new OperationCanceledException(), true);
         if (cleanup is not null)
             terminal = terminal! with { NativeCleanupDiagnostic = GoogleNativeDiagnostics.FromCode(NativeChatFailureCode.CleanupFailed) };
         try { _options.Hooks.OnEventPublished?.Invoke(terminal!); }
-        catch (Exception error) { terminal = mapper.Error(error, token.IsCancellationRequested); }
+        catch (Exception error) { terminal = mapper.Error(error, token.IsCancellationRequested, allowTransportRetry: false); }
         if (token.IsCancellationRequested && terminal!.Reason != StopReason.Aborted)
             terminal = mapper.Error(new OperationCanceledException(), true);
         // A publication callback may replace the terminal; physical cleanup remains a

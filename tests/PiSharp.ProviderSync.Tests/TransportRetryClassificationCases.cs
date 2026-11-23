@@ -110,24 +110,100 @@ internal static partial class Program
             Check(!result.IsRetryableTransportFailure, "Mistral 401 with mid-error-body IOException must NOT be marked retryable.");
         }
 
-        // 7. Completions observer callback throwing TimeoutException -> NOT retryable.
+        // 7. Completions observer callbacks (OnSourcePublished, OnResponse, OnProviderStreamEvent) throwing TimeoutException -> NOT retryable.
         {
             var completionsModel = new ModelDescriptor("gpt-4o", "openai-completions", "openai");
-            using var client = new HttpClient(new Handler(_ => Task.FromResult(Sse(null,
+            static HttpResponseMessage CompletionsOk() => Sse(null,
                 """data: {"id":"cmpl-1","choices":[{"index":0,"delta":{"role":"assistant","content":"hi"},"finish_reason":"stop"}]}""" + "\n\n" +
-                "data: [DONE]\n\n"))));
-            var transport = new CompletionsHttpSseTransport(client,
-                (_, _) => new HttpRequestMessage(HttpMethod.Post, "https://openai.invalid/v1/chat/completions"),
-                options: new CompletionsHttpSseOptions
-                {
-                    Hooks = new CompletionsLifecycleHooks
-                    {
-                        OnSourcePublished = _ => throw new TimeoutException("observer callback timeout")
-                    }
-                });
-            var result = await new ChatClient(transport).CompleteAsync(new(completionsModel, [Ask], 1)).WaitAsync(Deadline);
-            Equal(StopReason.Error, result.Message.StopReason);
-            Check(!result.IsRetryableTransportFailure, "Completions OnSourcePublished TimeoutException must NOT be marked retryable.");
+                "data: [DONE]\n\n");
+            foreach (var (label, hooks) in new (string, CompletionsLifecycleHooks)[]
+            {
+                ("OnSourcePublished", new() { OnSourcePublished = _ => throw new TimeoutException("observer timeout") }),
+                ("OnResponse", new() { OnResponse = (_, _, _) => ValueTask.FromException(new TimeoutException("response hook timeout")) }),
+                ("OnResponse-OCE", new() { OnResponse = (_, _, _) => ValueTask.FromException(new OperationCanceledException("hook timeout")) }),
+                ("OnProviderStreamEvent", new() { OnProviderStreamEvent = (_, _, _) => ValueTask.FromException(new TimeoutException("stream hook timeout")) }),
+            })
+            {
+                using var client = new HttpClient(new Handler(_ => Task.FromResult(CompletionsOk())));
+                var transport = new CompletionsHttpSseTransport(client,
+                    (_, _) => new HttpRequestMessage(HttpMethod.Post, "https://openai.invalid/v1/chat/completions"),
+                    options: new CompletionsHttpSseOptions { Hooks = hooks });
+                var result = await new ChatClient(transport).CompleteAsync(new(completionsModel, [Ask], 1)).WaitAsync(Deadline);
+                Equal(StopReason.Error, result.Message.StopReason);
+                Check(!result.IsRetryableTransportFailure, $"Completions {label} must NOT be marked retryable.");
+            }
+        }
+
+        // 8. Anthropic hooks (OnPayload, OnResponse, OnProviderStreamEvent) throwing TimeoutException or unrequested OCE -> NOT retryable.
+        {
+            var anthropicModel = new ModelDescriptor("claude-3-5-haiku-latest", "anthropic-messages", "anthropic");
+            foreach (var (label, hooks) in new (string, AnthropicMessagesHooks)[]
+            {
+                ("OnResponse-Timeout", new() { OnResponse = (_, _, _) => Task.FromException(new TimeoutException("response hook timeout")) }),
+                ("OnResponse-OCE", new() { OnResponse = (_, _, _) => Task.FromException(new OperationCanceledException("hook canceled")) }),
+                ("OnProviderStreamEvent-Timeout", new() { OnProviderStreamEvent = (_, _, _) => Task.FromException(new TimeoutException("event hook timeout")) }),
+                ("OnProviderStreamEvent-OCE", new() { OnProviderStreamEvent = (_, _, _) => Task.FromException(new OperationCanceledException("event hook canceled")) }),
+            })
+            {
+                using var client = new HttpClient(new Handler(_ => Task.FromResult(AnthropicSuccessSse())));
+                var transport = new AnthropicMessagesHttpSseTransport(client,
+                    (_, _) => new HttpRequestMessage(HttpMethod.Post, "https://anthropic.invalid/v1/messages"),
+                    hooks: hooks);
+                var result = await new ChatClient(transport).CompleteAsync(new(anthropicModel, [Ask], 1)).WaitAsync(Deadline);
+                Equal(StopReason.Error, result.Message.StopReason);
+                Check(!result.IsRetryableTransportFailure, $"Anthropic {label} must NOT be marked retryable.");
+            }
+            using (var client = new HttpClient(new Handler(_ => Task.FromResult(AnthropicSuccessSse()))))
+            {
+                var factory = new AnthropicMessagesKeyAuthRequestFactory(new("https://anthropic.invalid"), anthropicModel, new(100));
+                var transport = AnthropicMessagesHttpSseTransport.FromPrepared(client,
+                    (req, tok) => factory.Prepare(req, Key, tok),
+                    hooks: new AnthropicMessagesHooks { OnPayload = (_, _, _) => Task.FromException<JsonData?>(new TimeoutException("payload hook timeout")) });
+                var result = await new ChatClient(transport).CompleteAsync(new(anthropicModel, [Ask], 1)).WaitAsync(Deadline);
+                Equal(StopReason.Error, result.Message.StopReason);
+                Check(!result.IsRetryableTransportFailure, "Anthropic OnPayload TimeoutException must NOT be marked retryable.");
+            }
+        }
+
+        // 9. Mistral hooks (OnPayload, OnResponse, OnProviderStreamEvent) throwing unrequested OCE -> NOT retryable.
+        {
+            var mistralModel = new ModelDescriptor("mistral-large-latest", "mistral-conversations", "mistral");
+            static HttpResponseMessage MistralOk() => Sse(null,
+                """data: {"id":"m1","choices":[{"index":0,"delta":{"role":"assistant","content":"hi"},"finish_reason":"stop"}],"usage":{"prompt_tokens":1,"completion_tokens":1,"total_tokens":2}}""" + "\n\n" +
+                "data: [DONE]\n\n");
+            var baseOpts = new MistralTextOptions(new("https://api.mistral.ai/"), true, new(0, 0, 0, 0), "offline-fixture") { ApiKey = Key };
+            foreach (var (label, opts) in new (string, MistralTextOptions)[]
+            {
+                ("OnPayload-OCE", baseOpts with { OnPayload = (_, _, _) => ValueTask.FromException<JsonData?>(new OperationCanceledException("hook timeout")) }),
+                ("OnResponse-OCE", baseOpts with { OnResponse = (_, _, _) => ValueTask.FromException(new OperationCanceledException("hook timeout")) }),
+                ("OnProviderStreamEvent-OCE", baseOpts with { OnProviderStreamEvent = (_, _, _) => ValueTask.FromException(new OperationCanceledException("hook timeout")) }),
+            })
+            {
+                using var client = new HttpClient(new Handler(_ => Task.FromResult(MistralOk())));
+                var transport = new MistralTextHttpSseTransport(client, mistralModel, opts);
+                var result = await new ChatClient(transport).CompleteAsync(new(mistralModel, [Ask], 1)).WaitAsync(Deadline);
+                Equal(StopReason.Error, result.Message.StopReason);
+                Check(!result.IsRetryableTransportFailure, $"Mistral {label} must NOT be marked retryable.");
+            }
+        }
+
+        // 10. Google hooks (OnPayload, OnProviderStreamEvent) throwing TimeoutException or unrequested OCE -> NOT retryable.
+        {
+            static HttpResponseMessage GoogleOk() => Sse(null,
+                """data: {"candidates":[{"content":{"role":"model","parts":[{"text":"hi"}]},"finishReason":"STOP"}]}""" + "\n\n");
+            foreach (var (label, hooks) in new (string, GoogleGenerativeAIHooks)[]
+            {
+                ("OnPayload-Timeout", new() { OnPayload = (_, _, _) => ValueTask.FromException<JsonData?>(new TimeoutException("payload timeout")) }),
+                ("OnProviderStreamEvent-OCE", new() { OnProviderStreamEvent = (_, _, _) => ValueTask.FromException(new OperationCanceledException("event timeout")) }),
+            })
+            {
+                using var client = new HttpClient(new Handler(_ => Task.FromResult(GoogleOk())));
+                var transport = new GoogleGenerativeAIHttpTransport(client, Sync160Google,
+                    new GoogleGenerativeAIOptions(Sync160GoogleRow("google-generative-ai"), Key) { Hooks = hooks });
+                var result = await new ChatClient(transport).CompleteAsync(new(Sync160Google, [Ask], 1)).WaitAsync(Deadline);
+                Equal(StopReason.Error, result.Message.StopReason);
+                Check(!result.IsRetryableTransportFailure, $"Google {label} must NOT be marked retryable.");
+            }
         }
     }
 

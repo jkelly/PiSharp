@@ -121,6 +121,8 @@ public sealed class AnthropicMessagesHttpSseTransport : IChatTransport
         terminal ??= session.Failure(null, AnthropicMessagesFailure.SourceFailed);
         if (cancellationToken.IsCancellationRequested) terminal = session.Failure(terminal.Message, AnthropicMessagesFailure.Cancelled);
         else if (session.CleanupErrors.Count != 0) terminal = session.Failure(terminal.Message, AnthropicMessagesFailure.CleanupFailed);
+        if (session.PrimaryIsHookFailure && terminal is StreamError { IsRetryableTransportFailure: true } hookError)
+            terminal = hookError with { IsRetryableTransportFailure = false };
         if (terminal is StreamDone && session.Diagnostics.Thread is { } thread)
             thread.Context.Store.Complete(thread, terminal.Message, cancellationToken);
         yield return terminal with
@@ -142,6 +144,7 @@ public sealed class AnthropicMessagesHttpSseTransport : IChatTransport
         private Stream? _body;
         internal Task? PrimaryTask;
         internal Exception? PrimaryError;
+        internal bool PrimaryIsHookFailure;
         internal List<Task> CleanupTasks = [];
         internal List<Exception> CleanupErrors = [];
         internal readonly AnthropicRequestDiagnostics Diagnostics = new();
@@ -162,7 +165,7 @@ public sealed class AnthropicMessagesHttpSseTransport : IChatTransport
             catch (Exception error) { row.Direct = error; row.Aggregate = actual.Exception; throw; }
             finally { row.Settled = true; }
         }
-        private void Primary(Exception error,Task? actual = null) { PrimaryError ??= error; PrimaryTask ??= actual; }
+        private void Primary(Exception error,Task? actual = null,bool isHookFailure = false) { if (PrimaryError is null) { PrimaryError = error; PrimaryTask = actual; PrimaryIsHookFailure = isHookFailure; } }
         private static Task Invoke<T>(Func<T,ModelDescriptor,CancellationToken,Task> hook,T value,ModelDescriptor model,CancellationToken cancellation,string name)
         {
             // Only invocation is guarded here; returned Task faults/cancellation stay genuine.
@@ -193,7 +196,7 @@ public sealed class AnthropicMessagesHttpSseTransport : IChatTransport
                             catch (OperationCanceledException cause) { throw new AnthropicMessagesHookInvocationException("onPayload", cause); }
                             replacement = await Await(callback).ConfigureAwait(false);
                         }
-                        catch (Exception error) { Primary(error, callback); throw; }
+                        catch (Exception error) { Primary(error, callback, isHookFailure: true); throw; }
                         token.ThrowIfCancellationRequested();
                         _request = prepared.CompleteClaimed(replacement, token);
                     }
@@ -221,7 +224,7 @@ public sealed class AnthropicMessagesHttpSseTransport : IChatTransport
                             .ToImmutableDictionary(group=>group.Key.ToLowerInvariant(),group=>string.Join(", ",group.SelectMany(h=>h.Value)),StringComparer.Ordinal);
                         Task? callback = null;
                         try { callback = Invoke(hook,new AnthropicMessagesResponseInfo((int)physical.StatusCode,headers),request.Model,cancellation,"onResponse");await Await(callback).ConfigureAwait(false); }
-                        catch (Exception error) { Primary(error,callback); throw; }
+                        catch (Exception error) { Primary(error,callback,isHookFailure:true); throw; }
                     },token).AsTask();
                     await Await(actual).ConfigureAwait(false);
                 }
@@ -264,7 +267,7 @@ public sealed class AnthropicMessagesHttpSseTransport : IChatTransport
                     {
                         Task? callback = null;
                         try { callback = Invoke(hook,dto,request.Model,cancellation,"onProviderStreamEvent");await Await(callback).ConfigureAwait(false); }
-                        catch (Exception error) { Primary(error,callback); throw; }
+                        catch (Exception error) { Primary(error,callback,isHookFailure:true); throw; }
                     }
                     cancellation.ThrowIfCancellationRequested();
                     yield return dto; // Hook completed before the mapper can mutate its state.
@@ -305,7 +308,7 @@ public sealed class AnthropicMessagesHttpSseTransport : IChatTransport
                     PrimaryError is ProviderDisplayException shown ? shown.Message : "Anthropic stream did not complete."))
                 .Set("anthropicFailure",JsonData.Parse(JsonSerializer.Serialize(failure.ToString())));
             var message = partial ?? new(request.Model.Api,request.Model.Provider,request.Model.Id,request.Timestamp,[],TokenUsage.Zero,reason);
-            var retryable = reason == StopReason.Error &&
+            var retryable = reason == StopReason.Error && !PrimaryIsHookFailure &&
                 (failure == AnthropicMessagesFailure.UnexpectedEof || TransportRetryClassifier.IsTransientConnectionFailure(PrimaryError));
             return new StreamError(reason,message with {StopReason=reason,ExtraProperties=properties}) { IsRetryableTransportFailure = retryable };
         }

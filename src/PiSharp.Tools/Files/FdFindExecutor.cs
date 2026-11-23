@@ -110,7 +110,8 @@ public sealed class FdFindExecutor : IFindExecutor
                 throw new IOException("Failed to run fd: admitted process did not complete normally.");
             if ((result.Process.Status == ProcessRunStatus.Exited) != (result.Process.ExitCode == 0))
                 throw new IOException("Fd process status/exit receipt is inconsistent.");
-            paths = ParseOutput(result.StandardOutput.Content, result.StandardError.Content, result.Process.ExitCode.Value, request);
+            paths = ParseOutput(result.StandardOutput.Content, result.StandardError.Content, result.Process.ExitCode.Value, request,
+                OperatingSystem.IsWindows(), result.StandardOutputFilteredNonEmpty);
         }
         catch (Exception original) { failure = original; }
         try { await lease.DisposeAsync().ConfigureAwait(false); }
@@ -152,16 +153,16 @@ public sealed class FdFindExecutor : IFindExecutor
     }
 
     internal static ImmutableArray<string> ParseOutput(string stdout, string stderr, int exitCode, FindExecutionRequest request) =>
-        ParseOutput(stdout, stderr, exitCode, request, OperatingSystem.IsWindows());
+        ParseOutput(stdout, stderr, exitCode, request, OperatingSystem.IsWindows(), stdoutHadFilteredPaths: false);
 
-    internal static ImmutableArray<string> ParseOutput(string stdout, string stderr, int exitCode, FindExecutionRequest request, bool windows)
+    internal static ImmutableArray<string> ParseOutput(string stdout, string stderr, int exitCode, FindExecutionRequest request, bool windows, bool stdoutHadFilteredPaths = false)
     {
         if (stdout.Length > 2 * 1024 * 1024 || stderr.Length > 2 * 1024 * 1024 || stdout.Contains('\0') || stderr.Contains('\0'))
             throw new IOException("Fd stream receipt exceeds the supported text profile.");
         var lines = stdout.Replace("\r\n", "\n", StringComparison.Ordinal).Replace('\r', '\n').Split('\n').ToList();
         if (lines.Count > 0 && lines[^1] == "") lines.RemoveAt(lines.Count - 1);
         var raw = string.Join('\n', lines);
-        if (exitCode != 0 && raw.Length == 0) throw new IOException(stderr.Trim() is { Length: > 0 } error ? error : $"fd exited with code {exitCode}");
+        if (exitCode != 0 && raw.Length == 0 && !stdoutHadFilteredPaths) throw new IOException(stderr.Trim() is { Length: > 0 } error ? error : $"fd exited with code {exitCode}");
         if (raw.Length == 0) return [];
         var paths = lines.Select(line => line.Trim()).Where(line => line.Length != 0).ToImmutableArray();
         if (paths.IsEmpty) throw new IOException("Whitespace-only fd path output is outside the supported domain.");

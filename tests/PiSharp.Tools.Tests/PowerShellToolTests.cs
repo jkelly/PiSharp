@@ -96,6 +96,18 @@ internal static class PowerShellToolTests
         var tampered = prepared with { CommandArguments = prepared.CommandArguments.SetItem(prepared.CommandArguments.Length - 1, "evil") };
         Check(!await tool.ValidateAsync(tampered, CancellationToken.None), "Tampered PowerShell action should fail ValidateAsync.");
 
+        // Tight MaximumCommandCharacters still admits commands whose scriptblock wrapper and quote escaping exceed MaximumCommandCharacters
+        var tightOptions = BashToolOptions.FromShell(shell, temp.Root, ImmutableDictionary<string, string>.Empty, temp.Spill) with
+        {
+            MaximumCommandCharacters = 32,
+            MaximumArgumentCharacters = 4096
+        };
+        var tightTool = new PowerShellTool(runner, tightOptions);
+        var quotedCall = new ToolCallContent("ps-tight", "powershell", JsonData.Parse("""{"command":"Write-Output 'hi'"}"""));
+        var quotedAssistant = new AssistantMessage("openai-responses", "openai", "m", 1, [quotedCall], TokenUsage.Zero, StopReason.ToolUse);
+        var tightPrepared = await tightTool.PrepareAsync(new ToolInvocation(quotedAssistant, quotedCall, 0), CancellationToken.None);
+        Check(await tightTool.ValidateAsync(tightPrepared, CancellationToken.None), "Tight MaximumCommandCharacters rejected valid user command due to wrapper overhead.");
+
         // UnavailableShellError fails without launching process
         var unavailable = new PowerShellTool(runner, BashToolOptions.Unavailable("No PowerShell installed.", "powershell.exe", temp.Root, ImmutableDictionary<string, string>.Empty, temp.Spill));
         var unavailInvoker = unavailable.CreateInvoker(new FixedPolicy(allow: true));

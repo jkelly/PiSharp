@@ -10,6 +10,8 @@ public sealed record SeparatedProcessRunResult(ProcessRunResult Process,
     /// <summary>The request's <see cref="ProcessRequest.CaptureLimitBytes"/> was exceeded: the runner stopped the process, and each
     /// pipe keeps only its complete UTF-8 characters within the limit.</summary>
     [Experimental("PISHARP_EXEC001")] public bool CaptureLimitReached { get; init; }
+    /// <summary>True when a streaming stdout line filter discarded at least one non-whitespace line.</summary>
+    internal bool StandardOutputFilteredNonEmpty { get; init; }
 }
 
 public interface ISeparatedProcessRunner : IProcessRunner
@@ -32,7 +34,7 @@ public sealed class SeparatedProcessCapture : IDisposable
     private readonly MemoryStream _stdout = new();
     private readonly MemoryStream _stderr = new();
     private readonly MemoryStream? _pendingStdoutLine;
-    private bool _stdoutTruncated, _stderrTruncated, _stdoutMatchLimitReached, _stdoutFlushed;
+    private bool _stdoutTruncated, _stderrTruncated, _stdoutMatchLimitReached, _stdoutFlushed, _stdoutFilteredNonEmpty;
     private int _stdoutMatchedLines;
     public SeparatedProcessCapture(int maximumBytes)
     {
@@ -129,7 +131,11 @@ public sealed class SeparatedProcessCapture : IDisposable
             return;
         }
         var line = Encoding.UTF8.GetString(span);
-        if (!_stdoutLineFilter!(line)) return;
+        if (!_stdoutLineFilter!(line))
+        {
+            if (!string.IsNullOrWhiteSpace(line)) _stdoutFilteredNonEmpty = true;
+            return;
+        }
         var needed = span.Length + 1;
         if (_stdout.Length + needed > _maximumBytes)
         {
@@ -158,7 +164,7 @@ public sealed class SeparatedProcessCapture : IDisposable
         }
         return new(original,
             new(Decode(_stdout), _stdoutTruncated || LimitReached), new(Decode(_stderr), _stderrTruncated || LimitReached))
-        { CaptureLimitReached = LimitReached };
+        { CaptureLimitReached = LimitReached, StandardOutputFilteredNonEmpty = _stdoutFilteredNonEmpty };
     }
     // A stopped capture drops an incomplete UTF-8 suffix rather than decoding it as a replacement character (source execCommand).
     private string Decode(MemoryStream buffer)

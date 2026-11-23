@@ -76,14 +76,15 @@ public sealed class PowerShellTool : IToolArgumentSchemaAdapter
         if (!SpillPath(outputPath)) throw Invalid();
         var environment = BashSessionEnvironment.Apply(_options.Environment,
             _options.ExposeSessionEnvironment ? _options.SessionEnvironment?.Invoke() : null);
-        var context = new BashSpawnContext(Resolve(input.Command), _options.WorkingDirectory, environment);
+        var resolved = Resolve(input.Command);
+        var context = new BashSpawnContext(resolved, _options.WorkingDirectory, environment);
         if (_options.SpawnHook is { } hook) context = hook(context) ?? throw Invalid();
         var commandArgs = Shell.CommandArguments(context.Command);
         if (NodeArgumentErrors.SpawnNullBytes(_options.Executable, commandArgs, context.WorkingDirectory,
             context.Environment) is { } spawnError)
             throw new ToolSourceErrorException(_options.UnavailableShellError is { } shellError ? TimeoutError(input.Timeout) ?? shellError : spawnError);
-        var overhead = PowerShellDiscovery.Utf8OutputPreamble.Length + 1 + (_options.CommandPrefix is { Length: > 0 } p ? p.Length + 1 : 0);
-        if (!Text(context.Command) || context.Command.Length > _options.MaximumCommandCharacters + overhead &&
+        var overhead = resolved.Length - input.Command.Length;
+        if (!Text(context.Command) || (long)context.Command.Length > (long)_options.MaximumCommandCharacters + overhead &&
             _options.SpawnHook is null || !Absolute(context.WorkingDirectory) || !EnvironmentValid(context.Environment))
             throw Invalid();
         var arguments = new Dictionary<string, object?> { ["command"] = input.Command, ["outputPath"] = outputPath };

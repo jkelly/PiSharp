@@ -27,4 +27,5 @@ internal interface IPreparedCompletionsEnumerator
 {
     void BindStartup(CompletionsStartupHandoff? startup);
     ValueTask PrepareAsync(CancellationToken cancellationToken);
+    bool LastFailureNonTransport => false;
 }

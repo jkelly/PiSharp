@@ -114,6 +114,8 @@ public sealed class CompletionsHttpSseTransport : IChatTransport
         private Exception? _preparationCleanupFailure;
         private bool _prepared;
         public CompletionsPublicFailure? PublicFailure { get; private set; }
+        public bool LastFailureNonTransport { get; private set; }
+        internal void MarkNonTransportFailure() => LastFailureNonTransport = true;
         private bool _receivedDone;
         private ReaderCleanupFault _readerCleanupFault;
         private CompletionsStartupHandoff? _startup;
@@ -138,7 +140,8 @@ public sealed class CompletionsHttpSseTransport : IChatTransport
             if (_prepared) throw new InvalidOperationException("Completions HTTP preparation runs once.");
             _prepared = true;
             _token.ThrowIfCancellationRequested(); cancellationToken.ThrowIfCancellationRequested();
-            _request = await owner._requestFactory(request, _token).ConfigureAwait(false) ?? throw Protocol();
+            try { _request = await owner._requestFactory(request, _token).ConfigureAwait(false) ?? throw Protocol(); }
+            catch { LastFailureNonTransport = true; throw; }
             _token.ThrowIfCancellationRequested();
             var accepted = await SendPreparedAsync().ConfigureAwait(false);
             if (_startup is not null)
@@ -147,8 +150,12 @@ public sealed class CompletionsHttpSseTransport : IChatTransport
                 _input = new(await _response.AcquireBodyAsync(_token).ConfigureAwait(false), owner._framing.ReadBufferBytes,
                     owner._options.OnInputPublished, _token, _startup.AwaitDeliveryAsync);
                 if (owner._options.Hooks?.OnResponse is not null)
-                    await _response.InspectAsync((response, token) => owner.ObserveResponseAsync(response, request.Model, token), _token)
-                        .ConfigureAwait(false);
+                    try
+                    {
+                        await _response.InspectAsync((response, token) => owner.ObserveResponseAsync(response, request.Model, token), _token)
+                            .ConfigureAwait(false);
+                    }
+                    catch { LastFailureNonTransport = true; throw; }
                 _token.ThrowIfCancellationRequested();
             }
             else
@@ -156,7 +163,8 @@ public sealed class CompletionsHttpSseTransport : IChatTransport
                 try
                 {
                     if (owner._options.Hooks?.OnResponse is not null)
-                        await owner.ObserveResponseAsync(accepted, request.Model, _token).ConfigureAwait(false);
+                        try { await owner.ObserveResponseAsync(accepted, request.Model, _token).ConfigureAwait(false); }
+                        catch { LastFailureNonTransport = true; throw; }
                     _token.ThrowIfCancellationRequested(); _response = new(accepted, owner._framing);
                 }
                 catch { DisposeRejected(accepted); throw; }
@@ -194,6 +202,7 @@ public sealed class CompletionsHttpSseTransport : IChatTransport
                     if (options is null || retryIndex >= options.MaxRetries || !CompletionsRetryPolicy.Retryable(options, status,
                         response is null ? null : CompletionsRetryPolicy.Header(response, "x-should-retry", owner._options.MaximumResponseHeaderCharacters)))
                     {
+                        if (status is >= 400 and < 500 and not 408 and not 429) LastFailureNonTransport = true;
                         if (response is not null) failure = await owner.StatusFailureAsync(response, failure, _token).ConfigureAwait(false);
                         throw failure;
                     }
@@ -430,14 +439,16 @@ public sealed class CompletionsHttpSseTransport : IChatTransport
                     ?? new CompletionsPublicFailureException(new("(no status code or body)"));
             }
             if (_options.Hooks?.OnProviderStreamEvent is { } observe)
-                await observe(chunk, model, cancellationToken).ConfigureAwait(false);
+                try { await observe(chunk, model, cancellationToken).ConfigureAwait(false); }
+                catch { invocation.MarkNonTransportFailure(); throw; }
             cancellationToken.ThrowIfCancellationRequested();
             if (_options.Hooks?.OnProviderStreamEventSnapshot is { } observeSnapshot)
             {
                 var snapshot = new CompletionsSourceSnapshot(JsonData.Parse("{\"value\":" + chunk.ToString() + ",\"ownUndefinedPaths\":[]}"),
                     _options.MaximumSourceValueCharacters, _options.MaximumSourceValueBytes);
                 cancellationToken.ThrowIfCancellationRequested();
-                await observeSnapshot(snapshot, model, cancellationToken).ConfigureAwait(false);
+                try { await observeSnapshot(snapshot, model, cancellationToken).ConfigureAwait(false); }
+                catch { invocation.MarkNonTransportFailure(); throw; }
                 cancellationToken.ThrowIfCancellationRequested();
             }
             yield return chunk;

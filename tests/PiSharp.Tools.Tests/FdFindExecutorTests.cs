@@ -132,6 +132,30 @@ internal static class FdFindExecutorTests
             Check(!captured.StandardOutput.Truncated && captured.StandardOutput.Content == aTs + "\n",
                 "Trailing match without newline was dropped: " + captured.StandardOutput.Content);
         }
+        // Nonzero exit with only non-matching stdout preserves partial-output empty result, while genuinely empty stdout still fails
+        using (var nonMatching = new SeparatedProcessCapture(1024, streamingFilter, matchLimit: 5))
+        {
+            nonMatching.AppendAdmitted(false, Encoding.UTF8.GetBytes(dTs + "\n" + bTs + "\n"));
+            var captured = nonMatching.Result(Receipt("", "partial warning", 1).Process);
+            Check(captured.StandardOutput.Content.Length == 0 && captured.StandardOutputFilteredNonEmpty,
+                "Filtered non-matching stdout did not record raw non-empty provenance.");
+            var parsed = FdFindExecutor.ParseOutput(captured.StandardOutput.Content, captured.StandardError.Content, 1,
+                new FindExecutionRequest("src/*.ts", project, 5, [], FindTool.MaximumResults, FindTool.MaximumResultPathCharacters),
+                windows: true, stdoutHadFilteredPaths: captured.StandardOutputFilteredNonEmpty);
+            Names([], parsed);
+        }
+        using (var trulyEmpty = new SeparatedProcessCapture(1024, streamingFilter, matchLimit: 5))
+        {
+            var captured = trulyEmpty.Result(Receipt("", "permission denied", 1).Process);
+            Check(!captured.StandardOutputFilteredNonEmpty, "Empty stdout falsely set filtered provenance.");
+            await Throws<IOException>(() =>
+            {
+                FdFindExecutor.ParseOutput(captured.StandardOutput.Content, captured.StandardError.Content, 1,
+                    new FindExecutionRequest("src/*.ts", project, 5, [], FindTool.MaximumResults, FindTool.MaximumResultPathCharacters),
+                    windows: true, stdoutHadFilteredPaths: captured.StandardOutputFilteredNonEmpty);
+                return Task.CompletedTask;
+            });
+        }
 
         // FindTool declaration matches Pi 1.6.0's relative-pattern wording
         var findTool = new FindTool(fixture.Root, fixture.Root, fixture.Executor());

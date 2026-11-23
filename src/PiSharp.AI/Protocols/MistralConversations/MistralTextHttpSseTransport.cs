@@ -44,7 +44,17 @@ public sealed partial class MistralTextHttpSseTransport : IChatTransport, IModel
         var options = request.SessionId is { } session && this.options.SessionId is null ? this.options with { SessionId = session } : this.options;
         var token = caller; var state = new TextState(request, options);
         HttpRequestMessage? send = null; HttpResponseMessage? response = null; Stream? body = null; IAsyncEnumerator<JsonData>? reader = null;
-        Exception? failure = null, cleanup = null; var completed = false; var permanentHttpStatus = false;
+        Exception? failure = null, cleanup = null; var completed = false; var permanentHttpStatus = false; var nonTransportFailure = false;
+        async ValueTask<T> AwaitHook<T>(Func<ValueTask<T>> action)
+        {
+            try { return await AwaitSource(action, classifyTransport: false).ConfigureAwait(false); }
+            catch { nonTransportFailure = true; throw; }
+        }
+        async ValueTask AwaitHookAction(Func<ValueTask> action)
+        {
+            try { await AwaitSource(action, classifyTransport: false).ConfigureAwait(false); }
+            catch { nonTransportFailure = true; throw; }
+        }
         try
         {
             try
@@ -53,7 +63,7 @@ public sealed partial class MistralTextHttpSseTransport : IChatTransport, IModel
                 if (string.IsNullOrEmpty(options.ApiKey)) throw Fail(NativeChatFailureCode.UnsupportedFeature, "No API key for provider: mistral");
                 if (options.OnPayload is { } hook)
                 {
-                    var replacement = await AwaitSource(() => hook(payload, model, token)).ConfigureAwait(false);
+                    var replacement = await AwaitHook(() => hook(payload, model, token)).ConfigureAwait(false);
                     token.ThrowIfCancellationRequested();
                     if (replacement is not null) { Admit(() => { AdmitPayload(replacement.Value, camel: true); return true; }); payload = replacement; }
                 }
@@ -90,7 +100,7 @@ public sealed partial class MistralTextHttpSseTransport : IChatTransport, IModel
                 if (!response.IsSuccessStatusCode && !IsRetryableHttpStatus(response.StatusCode))
                     permanentHttpStatus = true;
                 var observed = ObserveHeaders(response.Headers.Concat(response.Content.Headers));
-                if (options.OnResponse is { } responseHook) await AwaitSource(() => responseHook(JsonData.Parse(new JsonObject { ["status"] = (int)response.StatusCode, ["headers"] = observed }.ToJsonString()), model, token)).ConfigureAwait(false);
+                if (options.OnResponse is { } responseHook) await AwaitHookAction(() => responseHook(JsonData.Parse(new JsonObject { ["status"] = (int)response.StatusCode, ["headers"] = observed }.ToJsonString()), model, token)).ConfigureAwait(false);
                 token.ThrowIfCancellationRequested(); body = await AwaitSource(() => new ValueTask<Stream>(response.Content.ReadAsStreamAsync(token)), classifyTransport: !permanentHttpStatus).ConfigureAwait(false);
                 if (!response.IsSuccessStatusCode) throw await HttpError(response, body, token, classifyTransport: !permanentHttpStatus).ConfigureAwait(false);
                 if (body is null) throw Fail(NativeChatFailureCode.SourceFailed, "Mistral response has no body");
@@ -107,7 +117,7 @@ public sealed partial class MistralTextHttpSseTransport : IChatTransport, IModel
                     if (moved)
                     {
                         var chunk = reader.Current;
-                        if (options.OnProviderStreamEvent is { } hook) await AwaitSource(() => hook(chunk, model, token)).ConfigureAwait(false);
+                        if (options.OnProviderStreamEvent is { } hook) await AwaitHookAction(() => hook(chunk, model, token)).ConfigureAwait(false);
                         token.ThrowIfCancellationRequested(); frames = state.Convert(chunk);
                     }
                 }
@@ -133,7 +143,7 @@ public sealed partial class MistralTextHttpSseTransport : IChatTransport, IModel
         else if (reason == StopReason.Pending) { reason = StopReason.Error; code = NativeChatFailureCode.UnexpectedEof; text = "Mistral stream ended without a finish reason"; }
         else if (reason == StopReason.Error) { code = NativeChatFailureCode.ProviderError; text = state.ProviderError; }
         if (cleanup is not null && text is null) { reason = StopReason.Error; code = NativeChatFailureCode.CleanupFailed; text = "Mistral invocation cleanup failed."; }
-        var retryable = reason == StopReason.Error && !permanentHttpStatus && (code == NativeChatFailureCode.UnexpectedEof ||
+        var retryable = reason == StopReason.Error && !permanentHttpStatus && !nonTransportFailure && (code == NativeChatFailureCode.UnexpectedEof ||
             failure is MistralTextException { IsRetryableTransportFailure: true } ||
             (failure is not MistralTextException && PiSharp.AI.Protocols.ProviderShared.TransportRetryClassifier.IsTransientConnectionFailure(failure, caller.IsCancellationRequested)));
         StreamTerminalEvent terminal = text is null ? new StreamDone(reason, state.Message(reason)) : new StreamError(reason, state.Message(reason, text)) { NativeDiagnostic = MistralNativeDiagnostics.FromCode(code), IsRetryableTransportFailure = retryable };

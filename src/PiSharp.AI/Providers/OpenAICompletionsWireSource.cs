@@ -103,7 +103,8 @@ public sealed class OpenAICompletionsWireSource : IChatTransport
                     owner?.Admit(error);
                     failure = cancellationToken.IsCancellationRequested
                         ? OpenAICompletionsWireFailure.Cancelled : OpenAICompletionsWireFailure.SourceFailed;
-                    if (failure == OpenAICompletionsWireFailure.SourceFailed && TransportRetryClassifier.IsTransientConnectionFailure(error))
+                    if (failure == OpenAICompletionsWireFailure.SourceFailed && !prepared.LastFailureNonTransport &&
+                        TransportRetryClassifier.IsTransientConnectionFailure(error))
                         state.RetryableTransportFailure = true;
                 }
             if (failure is null && !cancellationToken.IsCancellationRequested && start is not null) yield return start;
@@ -117,7 +118,9 @@ public sealed class OpenAICompletionsWireSource : IChatTransport
                     owner?.Admit(error);
                     failure = cancellationToken.IsCancellationRequested
                         ? OpenAICompletionsWireFailure.Cancelled : OpenAICompletionsWireFailure.SourceFailed;
-                    if (failure == OpenAICompletionsWireFailure.SourceFailed && TransportRetryClassifier.IsTransientConnectionFailure(error))
+                    if (failure == OpenAICompletionsWireFailure.SourceFailed &&
+                        enumerator is not IPreparedCompletionsEnumerator { LastFailureNonTransport: true } &&
+                        TransportRetryClassifier.IsTransientConnectionFailure(error))
                         state.RetryableTransportFailure = true;
                 }
                 if (failure is not null || !moved) break;
@@ -129,7 +132,9 @@ public sealed class OpenAICompletionsWireSource : IChatTransport
                     owner?.Admit(error);
                     failure = cancellationToken.IsCancellationRequested
                         ? OpenAICompletionsWireFailure.Cancelled : OpenAICompletionsWireFailure.SourceFailed;
-                    if (failure == OpenAICompletionsWireFailure.SourceFailed && TransportRetryClassifier.IsTransientConnectionFailure(error))
+                    if (failure == OpenAICompletionsWireFailure.SourceFailed &&
+                        enumerator is not IPreparedCompletionsEnumerator { LastFailureNonTransport: true } &&
+                        TransportRetryClassifier.IsTransientConnectionFailure(error))
                         state.RetryableTransportFailure = true;
                 }
                 if (failure is not null) break;

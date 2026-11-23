@@ -130,10 +130,12 @@ internal sealed partial class PiPackageManager
         var patterns = entries.Where(IsPattern).ToList();
         if (resourceType == "extensions")
         {
+            var builtinPatterns = patterns.Where(IsBuiltinPattern).ToList();
+            patterns = patterns.Where(pattern => !IsBuiltinPattern(pattern)).ToList();
             var builtins = plain.Where(entry => entry.StartsWith(BuiltinPathPrefix, StringComparison.Ordinal)).ToList();
             if (builtins.Count > 0)
             {
-                var enabledBuiltins = ApplyBuiltinPatterns(builtins, patterns);
+                var enabledBuiltins = ApplyBuiltinPatterns(builtins, builtinPatterns);
                 var projectOverrides = metadata.Scope == "user" ? OverridePatterns(StringsOf(settings.Project, "extensions")) : null;
                 foreach (var builtin in builtins)
                 {
@@ -539,6 +541,12 @@ internal sealed partial class PiPackageManager
                 if (exact ? MatchesAnyExactPattern(path, [target], baseDir) : MatchesAnyPattern(path, [target], baseDir)) result[path] = enabled;
         }
         return result;
+    }
+
+    private static bool IsBuiltinPattern(string pattern)
+    {
+        var target = pattern.Length > 0 && pattern[0] is '+' or '-' or '!' ? pattern[1..] : pattern;
+        return target.StartsWith(BuiltinPathPrefix, StringComparison.Ordinal);
     }
 
     private static HashSet<string> ApplyBuiltinPatterns(List<string> builtins, List<string> patterns)
