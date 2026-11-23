@@ -9,7 +9,7 @@ You build PiSharp from source to work on it, to run its tests, or to use a featu
 
 | Tool | Version | Needed for |
 | --- | --- | --- |
-| .NET SDK | 10.0.401 exactly | Everything. [`global.json`](https://github.com/jkelly/PiSharp/blob/main/global.json) pins it with `"rollForward": "disable"`, so no other SDK version builds it. |
+| .NET SDK | 10.0.401 exactly | Everything. [`global.json`](https://github.com/jkelly/PiSharp/blob/main/global.json) pins it with `"rollForward": "disable"` to match the deterministic offline contract. Run `./tools/bootstrap-sdk.ps1` (Windows/PowerShell) or `./tools/bootstrap-sdk.sh` (macOS/Linux) to install the exact pinned SDK locally under `.dotnet/` without touching your system SDKs. |
 | Git | Any recent | Cloning, and the test cases that run `git`. |
 | Node.js | 22.13 or later, with npm | The [Node bridge](/docs/extensions/node-bridge/) for Pi's TypeScript extensions, the `ExtensionParity` suite, and the Node tools under `tools/`. |
 | Node.js | 22 or later | The [website](/docs/contribute/website/). |
@@ -115,10 +115,10 @@ Once the packages are in your cache, you can leave out `-p:RestoreSources`. The 
 To run your build as `pisharp`, pack it the way a release does and install it from the output folder. The macOS CI job does exactly this.
 
 ```powershell
-pwsh ./tools/release/build-release-packages.ps1 -Version 1.5.0 -SourceCommit (git rev-parse HEAD)
+pwsh ./tools/release/build-release-packages.ps1 -Version {{PISHARP_VERSION}} -SourceCommit (git rev-parse HEAD)
 ```
 
-The script packs every library and the CLI into `artifacts/packages/`, and checks each package. It expects exactly 24 packages there when it ends, so empty the folder before you run it again. The version's first three numbers must match the Pi baseline in `compatibility/target.lock.json` (1.5.0 today), and `-SourceCommit` must be a full 40-character commit id. See [Releasing](/docs/contribute/releasing/#build-the-packages) for what it checks.
+The script packs every library and the CLI into `artifacts/packages/`, and checks each package. It expects 29 packages there when it ends, so empty the folder before you run it again. The version's first three numbers must match the Pi baseline in `compatibility/target.lock.json` (`1.6.0` today), and `-SourceCommit` must be a full 40-character commit id. See [Releasing](/docs/contribute/releasing/#build-the-packages) for what it checks.
 
 Then install the tool from a folder outside the repository, because the repository's `NuGet.Config` would hide nuget.org, where the tool's dependencies come from:
 

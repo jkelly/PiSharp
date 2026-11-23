@@ -2,4 +2,12 @@
   <PropertyGroup>
     <NoWarn>$(NoWarn);PISHARP_TUI001</NoWarn>
   </PropertyGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Input/Assets/WordData/cjk.gz" LogicalName="PiSharp.Tui.Input.Assets.WordData.cjk.gz" WithCulture="false" />
+    <EmbeddedResource Include="Input/Assets/WordData/thai.gz" LogicalName="PiSharp.Tui.Input.Assets.WordData.thai.gz" WithCulture="false" />
+    <EmbeddedResource Include="Input/Assets/WordData/normalization.gz" LogicalName="PiSharp.Tui.Input.Assets.WordData.normalization.gz" WithCulture="false" />
+    <EmbeddedResource Include="Input/Assets/WordData/lao.gz" LogicalName="PiSharp.Tui.Input.Assets.WordData.lao.gz" WithCulture="false" />
+    <EmbeddedResource Include="Input/Assets/WordData/khmer.gz" LogicalName="PiSharp.Tui.Input.Assets.WordData.khmer.gz" WithCulture="false" />
+    <EmbeddedResource Include="Input/Assets/WordData/burmese.gz" LogicalName="PiSharp.Tui.Input.Assets.WordData.burmese.gz" WithCulture="false" />
+  </ItemGroup>
 </Project>

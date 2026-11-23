@@ -2,10 +2,10 @@
   <!-- The read tool's image codec (Pi uses Photon). PiSharp.Tools itself stays free of native dependencies. -->
   <ItemGroup>
     <ProjectReference Include="../PiSharp.Tools/PiSharp.Tools.csproj" />
-    <PackageReference Include="SkiaSharp" Version="[4.152.1]" />
-    <PackageReference Include="SkiaSharp.NativeAssets.Win32" Version="[4.152.1]" />
-    <PackageReference Include="SkiaSharp.NativeAssets.macOS" Version="[4.152.1]" />
-    <PackageReference Include="SkiaSharp.NativeAssets.Linux.NoDependencies" Version="[4.152.1]" />
+    <PackageReference Include="SkiaSharp" Version="$(PiSharpSkiaSharpVersion)" />
+    <PackageReference Include="SkiaSharp.NativeAssets.Win32" Version="$(PiSharpSkiaSharpVersion)" />
+    <PackageReference Include="SkiaSharp.NativeAssets.macOS" Version="$(PiSharpSkiaSharpVersion)" />
+    <PackageReference Include="SkiaSharp.NativeAssets.Linux.NoDependencies" Version="$(PiSharpSkiaSharpVersion)" />
   </ItemGroup>
   <ItemGroup>
     <None Include="../../third-party/SkiaSharp.LICENSE.txt" Pack="true" PackagePath="licenses/" />

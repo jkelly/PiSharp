@@ -27,3 +27,9 @@ Signed NuGet archives have a canonical package content hash distinct from the SH
 `evidence/` contains publish/test output, environment prerequisites, per-case smoke results, executable and distribution-manifest SHA-256, exact checkout identity, and the overall result. The workflow uploads the executable with its complete license/notices bundle only after all gates pass, and uploads evidence on failure too. GitHub artifact downloads may require restoring the executable bit on Unix; SSH deployment already sets permissions before use. Retain the accompanying notices when redistributing the binary.
 
 Native publication is not established by the existence of this workflow. A platform is qualified only when its actual job passes at the intended source revision. See [NativeAOT interop](https://learn.microsoft.com/en-us/dotnet/core/deploying/native-aot/interop) for the static-library/direct-P/Invoke mechanism used by the Unix shim. System JSON reflection restrictions are covered by [the serialization documentation](https://learn.microsoft.com/en-us/dotnet/standard/serialization/system-text-json/source-generation#disable-reflection-defaults).
+
+## Managed Env regression coverage & upstream Android manifests
+
+All seven managed Env suites (`PiSharp.Env.Adapter.Tests`, `PiSharp.Env.Connection.Tests`, `PiSharp.Env.Daemon.Tests`, `PiSharp.Env.Process.Tests`, `PiSharp.Env.Ssh.Tests`, `PiSharp.Env.Terminal.Tests`, `PiSharp.Env.Watch.Tests`) are registered in `tools/ci/gap-suites.json` and executed on Windows, Ubuntu, and macOS in `.github/workflows/gap-regressions.yml`.
+
+For Android (`arm64` and `x64`), `tools/Env/Get-UpstreamAndroidDaemon.ps1` downloads and verifies only the pinned MIT upstream `@earendil-works/pi-env` tarball (`1.6.0` by default via `upstream-android-1.6.0.json`, with `upstream-android-1.5.2.json` and `upstream-android-1.5.0.json` preserved for historical baselines) without executing downloaded binaries.
