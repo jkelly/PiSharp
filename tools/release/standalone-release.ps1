@@ -52,7 +52,9 @@ function Write-PiSharpStandaloneArchive {
             try { $files[$name].stream.CopyTo($writer) } finally { $writer.Dispose() }
         }
         $zip.Dispose(); $zip = $null; $output.Dispose(); $output = $null
-        $inventory = Get-PiSharpArchiveInventory -Path $destination
+        # Align with Assert-PiSharpDistribution (decisions 0004 items 8-10): PiSharp.Compatibility.Node.* ships with the CLI;
+        # Node/npm executables and node_modules remain forbidden.
+        $inventory = Get-PiSharpArchiveInventory -Path $destination -AllowNodeBridge
         if ($inventory.Count -ne $files.Count) { throw 'Produced archive file inventory differs.' }
         foreach ($name in $files.Keys) {
             if (-not $inventory.ContainsKey($name) -or $inventory[$name].bytes -ne $files[$name].bytes -or $inventory[$name].sha256 -cne $files[$name].sha256) { throw 'Produced archive bytes differ from leased payload.' }
@@ -142,7 +144,7 @@ function Resolve-PiSharpStandaloneRelease {
         if ($artifact.Length -ne $record.artifact.bytes -or $hash -cne $record.artifact.sha256) { throw 'Artifact bytes differ from retained manifest.' }
         $validation=Assert-PiSharpDistribution -Path $archive -Repo $Repo -Kind standalone -Version $Version -SourceCommit $SourceCommit -Rid $Rid -EnablePromptTemplateYaml $record.enablePromptTemplateYaml
         if ($record.sdk -cne $validation.sdk -or $record.baselineTag -cne $validation.baselineTag -or $record.baselineCommit -cne $validation.baselineCommit) { throw 'Release provenance differs from inspected artifact.' }
-        $actual=Get-PiSharpArchiveInventory -Path $archive
+        $actual=Get-PiSharpArchiveInventory -Path $archive -AllowNodeBridge
         if ($record.files.Count -ne $actual.Count) { throw 'Release file inventory count differs.' }
         $seen=[Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
         foreach ($file in $record.files) {
