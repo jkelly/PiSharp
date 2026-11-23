@@ -1,10 +1,14 @@
 // PiSharp-only (decision 0008): the device side of durable-pi's dpi-backend (apps/dpi-backend/src/store.ts), without HTTP. One process hosts
 // every session of a data directory: one Harness on one SQLite file per session, a catalog beside them, and change notifications for the
 // device server's streams.
+using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Threading.Channels;
+using PiSharp.Durable.Chord;
 using PiSharp.Durable.Tools;
+using PiSharp.Durable.Tools.Images;
+using PiSharp.Tools.Images;
 
 namespace PiSharp.Durable.Hosting;
 
@@ -19,6 +23,8 @@ public sealed partial class DurableDeviceHost : IAsyncDisposable
     private readonly SemaphoreSlim mutations = new(1, 1);
     private readonly List<HostedSession> sessions = [];
     private readonly List<Action<DeviceChange>> listeners = [];
+    private readonly IReadOnlyDictionary<string, SignalToken> registeredSignals;
+    private readonly ConcurrentDictionary<string, SignalToken> dynamicSignals = new(StringComparer.Ordinal);
     private readonly FileLock deviceLock;
     private int disposed;
     private Task? disposal;
@@ -29,6 +35,12 @@ public sealed partial class DurableDeviceHost : IAsyncDisposable
         this.deviceLock = deviceLock;
         Catalog = catalog;
         Info = info;
+        var signals = new Dictionary<string, SignalToken>(StringComparer.Ordinal)
+        {
+            [Signals.SubmissionSettled.Name] = Signals.SubmissionSettled,
+        };
+        foreach (var token in options.Signals) signals[token.Name] = token;
+        registeredSignals = signals;
         AppState = new DeviceAppState(this);
         Blobs = new BlobStore(Path.Join(info.DataDirectory, "blobs"), catalog, options.TimeProvider);
         Budgets = new BudgetLedger(catalog, options.TimeProvider);
@@ -80,6 +92,9 @@ public sealed partial class DurableDeviceHost : IAsyncDisposable
 
     /// <summary>Where the <c>system-prompts</c> extension finds its prompt files.</summary>
     public string PromptsDirectory => Options.PromptsDirectory ?? Path.Join(Info.DataDirectory, "prompts");
+
+    /// <summary>Whether this host enables the <c>fit-images</c> extension by default.</summary>
+    public bool FitImagesEnabled => Options.FitImages;
 
     internal DurableDeviceOptions Options { get; }
     internal SessionCatalog Catalog { get; }
@@ -138,6 +153,10 @@ public sealed partial class DurableDeviceHost : IAsyncDisposable
                 throw new ArgumentException($"Job {job.Id} has an invalid input schema: " + string.Join("; ", problems.Take(3).Select(problem => problem.Path + " " + problem.Message)) +
                     (job.MaxInputBytes is < 2 or > 256 * 1024 ? " MaxInputBytes must be 2 to 262144." : ""), nameof(options));
         }
+
+        if (options.Signals.Any(token => token is null) ||
+            options.Signals.Select(token => token.Name).Distinct(StringComparer.Ordinal).Count() != options.Signals.Count)
+            throw new ArgumentException("Signals must be non-null with unique names.", nameof(options));
 
         var data = Path.GetFullPath(ExpandHome(options.DataDirectory));
         Directory.CreateDirectory(data);
@@ -520,15 +539,45 @@ public sealed partial class DurableDeviceHost : IAsyncDisposable
         return Directory.Exists(full) ? full : throw new HostInvalidException($"The working directory {full} does not exist on {Info.Name}.");
     }
 
+    /// <summary>Delivers a signal to a task in the session resolved by <paramref name="sessionAddress"/> (UUID or unique name), returning
+    /// the exact Durable delivery status (<c>delivered</c>, <c>duplicate</c>, <c>invalid</c>, <c>closed</c> or <c>not_found</c>).</summary>
+    public Task<SignalDelivery> DeliverSignalAsync(string sessionAddress, long taskId, string signalName, string key, JsonValue? payload = null,
+        string? idempotencyKey = null, CancellationToken cancellationToken = default) =>
+        ResolveSession(sessionAddress).DeliverSignalAsync(taskId, signalName, key, payload, idempotencyKey, cancellationToken);
+
+    /// <summary>Delivers a typed signal to a task in the session resolved by <paramref name="sessionAddress"/>.</summary>
+    public Task<SignalDelivery> DeliverSignalAsync(string sessionAddress, long taskId, SignalToken token, string key, JsonValue? payload = null,
+        string? idempotencyKey = null, CancellationToken cancellationToken = default) =>
+        ResolveSession(sessionAddress).DeliverSignalAsync(taskId, token, key, payload, idempotencyKey, cancellationToken);
+
+    internal SignalToken ResolveSignalToken(string signalName)
+    {
+        if (string.IsNullOrEmpty(signalName) || signalName.Length > 128 || signalName.Contains('/', StringComparison.Ordinal))
+            throw new HostInvalidException("A signal name must have 1 to 128 characters and contain no '/'.");
+        if (registeredSignals.TryGetValue(signalName, out var registered)) return registered;
+        return dynamicSignals.GetOrAdd(signalName, static name => Signals.DefineSignal(new SignalDefinition
+        {
+            Name = name,
+            Version = 1,
+            Schema = JsonObjectValue.Empty,
+        }));
+    }
+
     /// <summary>The registry of a session when the host passes none: the durable coding tools, <c>user-interaction</c>, <c>plan-mode</c>
-    /// (installed, selected only while an agent plans) and the device's extensions (<see cref="HostedSessionContext.Apps"/>).</summary>
+    /// (installed, selected only while an agent plans), <c>fit-images</c> (when <see cref="HostedSessionContext.FitImages"/> is true), and the
+    /// device's extensions (<see cref="HostedSessionContext.Apps"/>).</summary>
     public static IRegistry DefaultRegistry(HostedSessionContext context)
     {
         ArgumentNullException.ThrowIfNull(context);
         var registry = Registry.Create();
-        registry.Install(CodingTools.CreateCodingTools());
+        registry.Install(CodingTools.CreateCodingTools(context.ImageProcessor is { } images ? new ReadToolOptions { Images = images } : null));
         registry.Install(UserInteraction.CreateExtension());
         registry.Install(PlanMode.CreateExtension());
+        if (context.FitImages)
+        {
+            var processor = context.ImageProcessor ?? ImageProcessors.Create(BuiltinImageCodec.Instance);
+            registry.Install(Tools.Images.FitImages.CreateExtension(processor));
+        }
         foreach (var extension in context.Apps) registry.Install(extension);
         return registry;
     }

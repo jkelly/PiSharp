@@ -428,6 +428,8 @@ internal sealed class DurableTuiView
         else if (runningTool is not null) text = $"Running {Str(runningTool, "name") ?? "undefined"}... (esc to abort)";
         else if (parkedTool is not null)
             text = $"{Str(parkedTool, "name") ?? "undefined"} is {Str(parkedTool, "status")}... (esc to abort)";
+        else if (Obj(Obj(live, "run"), "yield") is not null)
+            text = "Reviewing answer... (esc to abort)";
         else if (live["run"] is not null) text = "Working... (esc to abort)";
         if (text == statusText) return;
         statusText = text;

@@ -1,8 +1,8 @@
 // Decision 0012: composite steps. Run, Parallel and ForEach start child workflow tasks owned by the run's task and wait for them in the
 // commit that creates them (one durable Waiting state); their "<step>#join" phase reads the outcomes and merges them into the Data.
-// Aborting the run cascades to the children. WaitForSignal waits on the run document's signal queue, so a signal sent before the run gets
-// there is kept, and consumes one signal in the commit that records it. Pi v1.5.0 sync (area sleep): its deadline waits on runtime.SetTimer
-// timers that recheck the Harness clock, as ITaskRuntime.SleepAsync is gone.
+// Aborting the run cascades to the children. WaitForSignal waits on the run document's signal queue and sleeps durably via Durable 1.6.0
+// Signals (NextTaskState.Sleeping with RunDocs.WorkflowSignal + optional deadline), so early signals are preserved in FIFO order, late
+// signals wake the sleeping task immediately on delivery, and idle waiters consume no active task slot or polling loop.
 using PiSharp.CustomAgents.Workflows.Hosting;
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
@@ -252,101 +252,61 @@ internal sealed class SignalStep<TData, TSignal>(string name, string signal, Act
             await engine.TransitionAsync(task, runtime, checkpoint, Name, "signal", data, engine.NextOf(this), null, context).ConfigureAwait(false);
             return;
         }
-        double? deadline = state.TryGetValue("deadline", out var at) && at is JsonNumberValue when ? when.Value : null;
-        if (timeout is { } limit && deadline is null)
+        double? deadline = state.TryGetValue("deadline", out var at) && at is JsonNumberValue when
+            ? when.Value
+            : timeout is { } limit
+                ? runtime.Now() + limit.TotalMilliseconds
+                : null;
+        var previousWaitKey = state.TryGetValue("waitKey", out var waitKeyValue) && waitKeyValue is JsonStringValue waitKeyText
+            ? waitKeyText.Value
+            : null;
+        var direct = previousWaitKey is not null
+            ? await runtime.ReadSignalAsync(RunDocs.WorkflowSignal, previousWaitKey, context).ConfigureAwait(false)
+            : null;
+        var timedOut = false;
+        await runtime.CommitAsync(async (tx, _) =>
         {
-            // Persist the deadline first, so a restart keeps the original one.
-            var withDeadline = checkpoint with { Seq = checkpoint.Seq + 1, State = state.SetItem("deadline", runtime.Now() + limit.TotalMilliseconds) };
-            await runtime.CommitAsync((_, _) => (TaskState?)NextTaskState.Running(withDeadline.ToJson()), context).ConfigureAwait(false);
-            return;
-        }
-        var key = RunDocs.Key(task.Id);
-        while (true)
+            var draft = await RunDocs.RunAsync(tx, task.ConversationId, task.Id).ConfigureAwait(false);
+            if (draft.Get("signals") is JsonArrayValue queue && First(queue) is { } index)
+            {
+                var value = ((JsonObjectValue)queue[index])["value"];
+                draft.GetArray("signals").RemoveAt(index);
+                draft.Delete("waitingSignal");
+                var nextState = state.Remove("waitKey").SetItem("received", value);
+                return (TaskState?)NextTaskState.Running((checkpoint with { Seq = checkpoint.Seq + 1, WakeAt = null, State = nextState }).ToJson());
+            }
+            if (direct is { Expired: false, Value: { } directValue })
+            {
+                draft.Delete("waitingSignal");
+                var nextState = state.Remove("waitKey").SetItem("received", directValue);
+                return (TaskState?)NextTaskState.Running((checkpoint with { Seq = checkpoint.Seq + 1, WakeAt = null, State = nextState }).ToJson());
+            }
+            if ((deadline is { } due && runtime.Now() >= due) || task.Wake?.Reason == WakeReasonKind.Expired)
+            {
+                draft.Delete("waitingSignal");
+                timedOut = true;
+                return null;
+            }
+            var nextSeq = checkpoint.Seq + 1;
+            var waitKey = $"w{nextSeq}:{signal}";
+            draft.Set("waitingSignal", RunDocs.Object(("signal", signal), ("key", waitKey)));
+            draft.Set("status", "sleeping");
+            draft.Set("current", RunDocs.Object(("action", Name), ("step", checkpoint.Visit), ("signal", signal),
+                ("wakeAt", deadline is { } wakeAt ? wakeAt : null)));
+            var sleepState = (deadline is { } persisted ? state.SetItem("deadline", persisted) : state).SetItem("waitKey", waitKey);
+            var next = checkpoint with { Seq = nextSeq, WakeAt = null, State = sleepState };
+            return (TaskState?)NextTaskState.Sleeping(next.ToJson(), deadline, [RunDocs.WorkflowSignal.Key(waitKey)]);
+        }, context).ConfigureAwait(false);
+        if (!timedOut) return;
+        if (onTimeout is not null)
         {
-            var doc = await runtime.SnapshotAsync(RunDocs.Run, task.ConversationId, key, context).ConfigureAwait(false);
-            if (First(doc) is not null)
-            {
-                await runtime.CommitAsync(async (tx, _) =>
-                {
-                    var draft = await RunDocs.RunAsync(tx, task.ConversationId, task.Id).ConfigureAwait(false);
-                    // Only this run consumes its signals; should the queue have changed, loop again (with progress).
-                    if (draft.Get("signals") is not JsonArrayValue queue || First(queue) is not { } index)
-                        return (TaskState?)NextTaskState.Running((checkpoint with { Seq = checkpoint.Seq + 1 }).ToJson());
-                    var value = ((JsonObjectValue)queue[index])["value"];
-                    draft.GetArray("signals").RemoveAt(index);
-                    return (TaskState?)NextTaskState.Running((checkpoint with { Seq = checkpoint.Seq + 1, State = state.SetItem("received", value) }).ToJson());
-                }, context).ConfigureAwait(false);
-                return;
-            }
-            if (deadline is { } due && runtime.Now() >= due)
-            {
-                if (onTimeout is not null)
-                {
-                    var data = engine.Codec.Deserialize<TData>(checkpoint.Data);
-                    await engine.TransitionAsync(task, runtime, checkpoint, Name, "timeout", data, onTimeout, null, context).ConfigureAwait(false);
-                }
-                else
-                    await engine.FailAsync(task, runtime, checkpoint, Name, $"No signal '{signal}' arrived within {timeout}.", "timeout", checkpoint.Data,
-                        context).ConfigureAwait(false);
-                return;
-            }
-            await WaitForChangeAsync(runtime, task, key, deadline, context).ConfigureAwait(false);
+            var data = engine.Codec.Deserialize<TData>(checkpoint.Data);
+            await engine.TransitionAsync(task, runtime, checkpoint, Name, "timeout", data, onTimeout, null, context).ConfigureAwait(false);
         }
+        else
+            await engine.FailAsync(task, runtime, checkpoint, Name, $"No signal '{signal}' arrived within {timeout}.", "timeout", checkpoint.Data,
+                context).ConfigureAwait(false);
     }
-
-    /// <summary>Waits until the run document holds a matching signal or <paramref name="deadline"/> passes. The run document is a
-    /// conversation family member, which outlives the task (pi-durable 1.5.0's watch follows its address: a retirement is a call, and a run
-    /// document created again at the key arrives on the same watch); the watch is stopped once the wait ends, so it never outlives it.</summary>
-    private async Task WaitForChangeAsync(ITaskRuntime runtime, RunningTask task, string key, double? deadline, DurableContext context)
-    {
-        var arrived = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var watch = await runtime.WatchDocAsync(RunDocs.Run, task.ConversationId, key, context).ConfigureAwait(false);
-        var sleeping = context.WithCancel();
-        try
-        {
-            if (watch is not null)
-            {
-                watch.Start((call, _) =>
-                {
-                    if (call is WatchValueCall<JsonObjectValue> change && First(change.Value) is not null) arrived.TrySetResult();
-                    return Task.CompletedTask;
-                });
-                if (First(watch.Value) is not null) arrived.TrySetResult();
-            }
-            var sleep = deadline is { } due ? DelayUntilAsync(runtime, due, sleeping.Context) : Task.Delay(Timeout.Infinite, sleeping.Context.CancellationToken);
-            await Task.WhenAny(arrived.Task, sleep).ConfigureAwait(false);
-            context.ThrowIfCancellationRequested();
-        }
-        finally
-        {
-            sleeping.Cancel();
-            if (watch is not null) await watch.StopAsync().ConfigureAwait(false);
-        }
-    }
-
-    /// <summary>Waits inside a phase until the Harness clock reaches <paramref name="until"/>, on <see cref="ITaskRuntime.SetTimer"/> timers
-    /// that recheck the clock when they fire; rejects when <paramref name="context"/> or the invocation is cancelled.</summary>
-    private static async Task DelayUntilAsync(ITaskRuntime runtime, double until, DurableContext context)
-    {
-        while (true)
-        {
-            context.ThrowIfCancellationRequested();
-            var remaining = until - runtime.Now();
-            if (remaining <= 0) return;
-            var fired = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-            var disarm = runtime.SetTimer(() => fired.TrySetResult(), remaining);
-            try
-            {
-                await context.WaitAsync(fired.Task).ConfigureAwait(false);
-            }
-            finally
-            {
-                disarm();
-            }
-        }
-    }
-
-    private int? First(JsonObjectValue? doc) => doc is not null && doc.TryGetValue("signals", out var queue) && queue is JsonArrayValue list ? First(list) : null;
 
     private int? First(JsonArrayValue queue)
     {

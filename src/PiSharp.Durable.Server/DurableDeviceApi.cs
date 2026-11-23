@@ -137,6 +137,20 @@ public static partial class DurableDeviceApi
             var result = await session.AbortTaskAsync(id, http.RequestAborted).ConfigureAwait(false);
             return Json(new JsonObject { ["status"] = result == TaskAbortResult.Terminal ? "terminal" : "marked" });
         });
+        v1.MapPost("/sessions/{s}/tasks/{taskId}/signals", async (HttpContext http, string s, string taskId) =>
+        {
+            var body = await BodyAsync(http, options).ConfigureAwait(false);
+            var session = host.ResolveSession(s);
+            var id = Id(taskId, "taskId");
+            var signal = String(body, "signal");
+            if (string.IsNullOrEmpty(signal)) throw new HostInvalidException("signal is required.");
+            var key = String(body, "key");
+            if (string.IsNullOrEmpty(key)) throw new HostInvalidException("key is required.");
+            var payload = body.ContainsKey("payload") ? DeviceService.ToChord(body["payload"]) : Chord.JsonObjectValue.Empty;
+            var delivery = await session.DeliverSignalAsync(id, signal, key, payload, IdempotencyKey(http), http.RequestAborted).ConfigureAwait(false);
+            if (delivery.Replayed) http.Response.Headers["Idempotent-Replay"] = "true";
+            return Json(new JsonObject { ["status"] = delivery.Status });
+        });
         v1.MapGet("/sessions/{s}/inspect", async (HttpContext http, string s) =>
             Json(await DeviceService.InspectAsync(host.ResolveSession(s), http.RequestAborted).ConfigureAwait(false)));
         v1.MapGet("/sessions/{s}/submissions/{id}", async (HttpContext http, string s, string id) =>
@@ -208,8 +222,26 @@ public static partial class DurableDeviceApi
             var requestId = String(body, "requestId");
             if (string.IsNullOrEmpty(requestId) || requestId.Length > 128)
                 throw new HostInvalidException("requestId is required (at most 128 characters) so a retry never submits twice.");
+            var onAbort = String(body, "onAbort") switch
+            {
+                null => (InputOnAbort?)null,
+                "withdraw" => InputOnAbort.Withdraw,
+                "keep" => InputOnAbort.Keep,
+                _ => throw new HostInvalidException("onAbort must be withdraw or keep."),
+            };
+            SubmissionNotify? notify = null;
+            if (body["notify"] is JsonNode notifyNode)
+            {
+                if (notifyNode is not JsonObject notifyObj ||
+                    notifyObj["taskId"] is not JsonValue taskIdVal || !taskIdVal.TryGetValue<double>(out var notifyTaskNum) ||
+                    notifyTaskNum < 1 || notifyTaskNum != Math.Floor(notifyTaskNum) ||
+                    String(notifyObj, "key") is not { Length: > 0 } notifyKey)
+                    throw new HostInvalidException("notify must be {taskId, key}.");
+                notify = new SubmissionNotify(new TaskId((long)notifyTaskNum), notifyKey);
+            }
             var wait = body["waitMs"] is JsonNode waitMs ? WaitOf(Transcript.Describe(waitMs), options) : null;
-            var result = await session.SendAsync(resolved.Id, new SendRequest(content, requestId) { WhenBusy = whenBusy, Wait = wait },
+            var result = await session.SendAsync(resolved.Id, new SendRequest(content, requestId)
+                { WhenBusy = whenBusy, Wait = wait, OnAbort = onAbort, Notify = notify },
                 http.RequestAborted).ConfigureAwait(false);
             var json = DeviceService.Result(result);
             if (wait is null) json = new JsonObject { ["submissionId"] = result.SubmissionId.Value, ["status"] = "queued" };

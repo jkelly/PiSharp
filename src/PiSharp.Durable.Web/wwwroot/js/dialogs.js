@@ -185,7 +185,7 @@ export class Dialogs {
   }
 
   /** Opens the prompt dialog. Without `label` it is a confirmation. */
-  prompt({ title, text, label, value = '', placeholder = '', hint = '', submit, danger = false, onSubmit }) {
+  prompt({ title, text, label, value = '', placeholder = '', hint = '', maxLength = 100, submit, danger = false, onSubmit }) {
     $('[data-pr-title]').textContent = title;
     const p = $('[data-pr-text]');
     p.hidden = !text;
@@ -193,6 +193,7 @@ export class Dialogs {
     $('[data-pr-field]').hidden = !label;
     $('[data-pr-label]').textContent = label || '';
     const input = $('#pr-input');
+    input.maxLength = maxLength;
     input.value = value;
     input.placeholder = placeholder;
     $('[data-pr-hint]').textContent = hint;

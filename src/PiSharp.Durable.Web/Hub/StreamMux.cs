@@ -363,6 +363,7 @@ public sealed partial class StreamMux(DeviceRegistry registry, DeviceMonitor mon
                     JobRuns = agent.Docs.TryGetValue("pisharp.job-runs", out var runs) ? runs as JsonObject : null,
                     Jobs = jobs,
                     Agents = session.Agents.ToDictionary(item => item.Id),
+                    YieldAnswer = agent.YieldAnswer,
                 };
                 if (reset) items.Clear();
                 var upsert = new JsonArray();
@@ -407,6 +408,7 @@ public sealed partial class StreamMux(DeviceRegistry registry, DeviceMonitor mon
                         ["running"] = agent.Running,
                         ["busy"] = busy,
                         ["generating"] = agent.Generating,
+                        ["yieldAnswer"] = agent.YieldAnswer,
                         ["waiting"] = agent.Pending.Count + waiting.Count,
                         ["queued"] = agent.Inbox.Count,
                         ["tasks"] = rows.Count,
@@ -447,8 +449,12 @@ public sealed partial class StreamMux(DeviceRegistry registry, DeviceMonitor mon
             var json = Transcript.ToJson([item]).ToJsonString();
             if (item is EventItem { EntryKind: "pisharp.job" } job && job.Data is JsonObject data && Display.Long(data, "taskId") is { } task)
                 json += context.Run(task)?.ToJsonString();
-            if (item is AssistantItem assistant && assistant.Blocks.OfType<ToolBlockView>().Any(block => block.Call.Name == "subagent"))
-                json += string.Join(",", context.Agents.Values.Select(agent => agent.Id + agent.Name));
+            if (item is AssistantItem assistant)
+            {
+                if (assistant.Blocks.OfType<ToolBlockView>().Any(block => block.Call.Name == "subagent"))
+                    json += string.Join(",", context.Agents.Values.Select(agent => agent.Id + agent.Name));
+                if (assistant.Id is { } id && context.YieldAnswer == id) json += "|yield:reviewing";
+            }
             return json;
         }
 

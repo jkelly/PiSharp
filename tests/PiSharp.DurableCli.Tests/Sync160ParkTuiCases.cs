@@ -58,5 +58,13 @@ internal static partial class Program
                 Equal("running", DurableTuiState.NestedRow(new DurableNestedCall(slot))["status"]!.GetValue<string>(), status);
             }
         }),
+
+        Case("sync160.tui.yield-answer-shows-reviewing-answer-status-line", async () =>
+        {
+            const string live = """{"run":{"taskId":7,"inputs":[1],"yield":{"answer":5}},"tools":[]}""";
+            var entries = new[] { UserEntry(1, "review me") };
+            await using var run = await TuiRun.Start(View(entries, live: live));
+            await run.WaitFor("Reviewing answer... (esc to abort)");
+        }),
     ];
 }

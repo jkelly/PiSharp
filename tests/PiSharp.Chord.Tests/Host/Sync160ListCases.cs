@@ -23,8 +23,7 @@ using static PiSharp.Chord.Store.Expressions;
 //   for, that a load sends only the new rows, is asserted on the frames the list itself publishes: one insert behind the loaded rows.
 // - Frames are read at the list (the member's source in its attempt) where a case compares them one by one: a watch may fold frames, and
 //   a reference's member relays values and diffs them again (Host/Reference.cs).
-// - "commit groups": the native store writes each commit in a transaction of its own (group commit is not ported, see the chord-store
-//   report); the commits a step queues together run one after another.
+// - "commit groups": commits queued together coalesce into one backend transaction via ChordStore group commit (S18).
 // - A reload's report returns before a restarted object's successor is live (the native activation parks on its dependencies before it
 //   prepares its tables); the cases wait for the reload's work.
 internal static partial class Program

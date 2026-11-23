@@ -16,11 +16,11 @@ using static PiSharp.Chord.Store.Expressions;
 // computed before any is adopted: a run of a page an earlier adoption cut or merged applies to the pages that cover its interval, which
 // then know its keys and whether it was cut. After every adoption of randomized runs the value is a gapless prefix of the true order,
 // compared row by row. Differences from upstream:
-// - Commit groups. Upstream's store writes the commits queued behind a running one as one backend transaction, so the runs of two owners'
-//   commits are all computed before either is adopted. The native store writes each commit in a transaction of its own (group commit is
-//   not ported; see the chord-store report): the cases queue the same commits together, they run one after another, and the assertions on
-//   the number of groups are left out. The path a group exercises (a run patched into pages an earlier adoption cut or merged) is still
-//   reached by the cases of one commit and several pages, and by the two cases below that hand a page's run to the list themselves.
+// - Commit groups. ChordStore coalesces commits queued behind a running one into one backend transaction (group commit, S18), so the
+//   16 randomized cases (`Task.WhenAll(fill, a, b)`) and `a-commit-refused-in-its-step` exercise real multi-owner commit groups.
+//   The deterministic `hosted.Group` cases run on separate actor lines whose threads are not deterministically ordered against each other,
+//   so `hosted.Group` awaits `first` then `second` to preserve exact deterministic ordering, while `Sync160StoreCases` asserts the
+//   store-level group-commit coalescing, transaction count, and refusal isolation directly.
 // - What a commit wrote. Upstream takes it from a queue when the commit is queued (the commits are queued in the order of the calls).
 //   Here a transaction runs on whatever thread its object's line resumed it on, so two owners' commits are queued in no fixed order: a
 //   method takes what its call wrote when it is called (on the host's dispatcher, in the order of the calls) and hands it to its own

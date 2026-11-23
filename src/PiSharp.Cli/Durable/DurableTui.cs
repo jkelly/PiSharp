@@ -127,6 +127,27 @@ internal static class DurableTui
                                 Fire(() => controller.CompactAsync(instructions.Length > 0 ? instructions : null));
                                 return;
                             }
+                            if (trimmed == "/signal" || trimmed.StartsWith("/signal ", StringComparison.Ordinal))
+                            {
+                                var parts = TextUtils.JsTrim(trimmed["/signal".Length..]).Split(' ', 4, StringSplitOptions.RemoveEmptyEntries);
+                                if (parts.Length < 3 || !long.TryParse(parts[0], System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out var signalTaskId))
+                                {
+                                    controller.ShowNotice(DurableNoticeLevel.Warning, "Usage: /signal <taskId> <signal> <key> [json]");
+                                    return;
+                                }
+                                PiSharp.Durable.Chord.JsonValue payload = PiSharp.Durable.Chord.JsonObjectValue.Empty;
+                                if (parts.Length == 4)
+                                {
+                                    try { payload = PiSharp.Durable.Chord.JsonValue.Parse(parts[3]); }
+                                    catch (Exception error) when (error is FormatException or ArgumentException)
+                                    {
+                                        controller.ShowNotice(DurableNoticeLevel.Error, $"Invalid JSON payload: {error.Message}");
+                                        return;
+                                    }
+                                }
+                                Fire(() => controller.SignalTaskAsync(new TaskId(signalTaskId), parts[1], parts[2], payload));
+                                return;
+                            }
                             Fire(() => controller.SubmitAsync(trimmed, WhenBusy.Steer));
                         },
                         FollowUp: text =>

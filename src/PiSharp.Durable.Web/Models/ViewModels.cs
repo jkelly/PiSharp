@@ -34,6 +34,8 @@ public sealed class AgentRenderContext
     public IReadOnlyDictionary<string, JsonObject> Jobs { get; init; } = new Dictionary<string, JsonObject>();
     /// <summary>The session's agents, by id (subagent links).</summary>
     public IReadOnlyDictionary<long, AgentSummary> Agents { get; init; } = new Dictionary<long, AgentSummary>();
+    /// <summary>The entry ID of the answer currently under <c>onYield</c> review (Pi Durable 1.6.0), or null.</summary>
+    public long? YieldAnswer { get; init; }
 
     /// <summary>The run record of a job task.</summary>
     public JsonObject? Run(long taskId) => (JobRuns?["items"] as JsonArray)?.OfType<JsonObject>().FirstOrDefault(run => Display.Long(run, "id") == taskId);

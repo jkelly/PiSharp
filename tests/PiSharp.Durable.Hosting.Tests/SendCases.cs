@@ -75,5 +75,134 @@ internal static partial class Program
             var task = await session.CompactAsync(1);
             await harness.WaitForTaskAsync(task, DurableContext.Background).WaitAsync(Answer);
         }),
+
+        Case("send.signals-onabort-notify-and-fit-images-end-to-end", async () =>
+        {
+            var approval = Signals.DefineSignal(new SignalDefinition
+            {
+                Name = "test.approval",
+                Version = 1,
+                Schema = JsonValue.Object([
+                    KeyValuePair.Create("type", (JsonValue)"object"),
+                    KeyValuePair.Create("properties", (JsonValue)JsonValue.Object([
+                        KeyValuePair.Create("approved", (JsonValue)JsonValue.Object([KeyValuePair.Create("type", (JsonValue)"boolean")])),
+                    ])),
+                    KeyValuePair.Create("required", (JsonValue)JsonValue.Array("approved")),
+                    KeyValuePair.Create("additionalProperties", (JsonValue)false),
+                ]),
+            });
+            var waiterTask = Tasks.DefineTask(new TaskDefinition
+            {
+                Name = "test.signal-waiter",
+                Version = 1,
+                Initial = _ => JsonValue.Object([KeyValuePair.Create("phase", (JsonValue)"wait")]),
+                Phases = new Dictionary<string, TaskPhaseHandler>
+                {
+                    ["wait"] = async (task, runtime, context) =>
+                    {
+                        var key = ((JsonStringValue)((JsonObjectValue)task.Input)["key"]).Value;
+                        var signalName = ((JsonStringValue)((JsonObjectValue)task.Input)["signal"]).Value;
+                        var token = signalName == Signals.SubmissionSettled.Name ? Signals.SubmissionSettled : approval;
+                        var read = await runtime.ReadSignalAsync(token, key, context);
+                        if (read is { Expired: false, Value: { } value })
+                        {
+                            await runtime.CommitAsync((_, _) => (TaskState?)NextTaskState.Terminal(new CompletedTaskOutcome(value)), context);
+                            return;
+                        }
+                        await runtime.CommitAsync((_, _) => (TaskState?)NextTaskState.Sleeping(
+                            JsonValue.Object([KeyValuePair.Create("phase", (JsonValue)"wait")]),
+                            until: null,
+                            signals: [token.Key(key)]), context);
+                    },
+                },
+            });
+
+            await using var device = await TestDevice.OpenAsync("send-signals", new DeviceSetup
+            {
+                Registry = context =>
+                {
+                    var registry = DurableDeviceHost.DefaultRegistry(context);
+                    registry.Install(Define.Extension(new Extension { Name = "test-waiters", Tasks = [waiterTask] }));
+                    return registry;
+                },
+                Configure = options => options with { Signals = [approval] },
+            });
+            Check(device.Host.FitImagesEnabled, "FitImages enabled by default");
+            var session = await device.CreateAsync("signals");
+            var harness = session.GetHarness();
+
+            // 1. Typed signal validation, delivery, idempotency replay/conflict, closed and not_found.
+            var waiterId = await harness.CommitAsync(tx => tx.CreateTaskAsync(waiterTask,
+                JsonValue.Object([KeyValuePair.Create("signal", (JsonValue)approval.Name), KeyValuePair.Create("key", (JsonValue)"k1")]),
+                new TaskOptions(TaskOwnership.Conversation) { ConversationId = ConversationId.Root }), DurableContext.Background);
+            harness.Resume();
+            await WaitUntilAsync(async () => (await harness.GetTaskAsync(waiterId, DurableContext.Background))?.State is SleepingTaskState, "waiter sleeping");
+
+            var invalid = await session.DeliverSignalAsync(waiterId.Value, approval.Name, "k1",
+                JsonValue.Object([KeyValuePair.Create("approved", (JsonValue)"wrong")]));
+            Equal(SignalResult.Invalid, invalid.Result, "schema rejects wrong type");
+            Equal("invalid", invalid.Status, "invalid wire status");
+
+            var validPayload = JsonValue.Object([KeyValuePair.Create("approved", (JsonValue)true)]);
+            var delivered = await session.DeliverSignalAsync(waiterId.Value, approval.Name, "k1", validPayload, idempotencyKey: "sig-op-1");
+            Equal(SignalResult.Delivered, delivered.Result, "delivered");
+            Check(!delivered.Replayed, "first delivery is not replayed");
+
+            var replayed = await session.DeliverSignalAsync(waiterId.Value, approval.Name, "k1", validPayload, idempotencyKey: "sig-op-1");
+            Equal(SignalResult.Delivered, replayed.Result, "replayed result");
+            Check(replayed.Replayed, "same idempotency key replays");
+
+            await ThrowsAsync<HostConflictException>(() => session.DeliverSignalAsync(waiterId.Value, approval.Name, "k1",
+                JsonValue.Object([KeyValuePair.Create("approved", (JsonValue)false)]), idempotencyKey: "sig-op-1"), "conflicting idempotency key");
+
+            // Cross-operation Idempotency-Key collision (e.g., an existing StartExecutionAsync receipt) must conflict without overwriting.
+            await harness.CommitAsync(async tx =>
+            {
+                var existing = await tx.DocAsync(SessionRecords.OperationDoc, "job-op-1", JsonValue.Null);
+                existing.Set("kind", "job:daily");
+                existing.Set("requestHash", "hash-job-1");
+                existing.Set("taskId", 123);
+                existing.Set("agentId", 1);
+            }, DurableContext.Background);
+            await ThrowsAsync<HostConflictException>(() => session.DeliverSignalAsync(waiterId.Value, approval.Name, "k1",
+                validPayload, idempotencyKey: "job-op-1"), "signal reuses job idempotency key");
+            var preserved = await harness.SnapshotAsync(SessionRecords.OperationDoc, "job-op-1", DurableContext.Background);
+            Equal("job:daily", ((JsonStringValue)preserved!["kind"]).Value, "job receipt kind untouched");
+            Check(!preserved.ContainsKey("status"), "job receipt not overwritten with signal fields");
+
+            var settled = await harness.WaitForTaskAsync(waiterId, DurableContext.Background).WaitAsync(Answer);
+            Equal(DurableTaskStatus.Terminal, settled.State.Status, "waiter completed");
+
+            var closed = await session.DeliverSignalAsync(waiterId.Value, approval.Name, "k1", validPayload);
+            Equal(SignalResult.Closed, closed.Result, "terminal task returns closed");
+
+            var missing = await session.DeliverSignalAsync(999_999, approval.Name, "k1", validPayload);
+            Equal(SignalResult.NotFound, missing.Result, "missing task returns not_found");
+            Equal("not_found", missing.Status, "not_found snake_case wire status");
+
+            // 2. Submission notify + onAbort forwarding wakes a task waiting on Signals.SubmissionSettled.
+            var notifyWatcherId = await harness.CommitAsync(tx => tx.CreateTaskAsync(waiterTask,
+                JsonValue.Object([KeyValuePair.Create("signal", (JsonValue)Signals.SubmissionSettled.Name), KeyValuePair.Create("key", (JsonValue)"sub-done")]),
+                new TaskOptions(TaskOwnership.Conversation) { ConversationId = ConversationId.Root }), DurableContext.Background);
+            await WaitUntilAsync(async () => (await harness.GetTaskAsync(notifyWatcherId, DurableContext.Background))?.State is SleepingTaskState, "notify watcher sleeping");
+
+            var reply = await session.SendAsync(1, new SendRequest("notify me", "notify-1")
+            {
+                Wait = Answer,
+                OnAbort = InputOnAbort.Keep,
+                Notify = new SubmissionNotify(notifyWatcherId, "sub-done"),
+            });
+            Equal(SendStatus.Done, reply.Status, "notified submission settled");
+            var notified = await harness.WaitForTaskAsync(notifyWatcherId, DurableContext.Background).WaitAsync(Answer);
+            Check(notified.State is TerminalTaskState { Outcome: CompletedTaskOutcome { Result: JsonObjectValue resultObj } } &&
+                resultObj.TryGetValue("status", out var statusVal) && statusVal is JsonStringValue { Value: "done" },
+                "submission-settled signal woke watcher with settled record");
+
+            // 3. ToolExecutionEndEvent preserves ImageUnsupportedByModel only when set.
+            var endWithWarning = new ToolExecutionEndEvent("c1", "read") { ImageUnsupportedByModel = "faux/echo" };
+            Equal("faux/echo", ((JsonStringValue)endWithWarning.ToJson()["imageUnsupportedByModel"]).Value, "warning serialized");
+            var endWithoutWarning = new ToolExecutionEndEvent("c2", "read");
+            Check(!endWithoutWarning.ToJson().ContainsKey("imageUnsupportedByModel"), "null warning omitted");
+        }),
     ];
 }

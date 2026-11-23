@@ -37,6 +37,8 @@ internal static partial class Program
             Equal("echo", info.Models[0].Id, "models");
             Equal("echo", info.DefaultModel, "default model");
             Check(info.Capabilities.Contains("interactions"), "PiSharp capabilities");
+            Check(info.Capabilities.Contains("signals"), "signals capability");
+            Check(info.Capabilities.Contains("fitImages"), "fitImages capability");
             Equal("workspace-snapshot,release-check,change-watch", string.Join(",", info.Jobs!.Select(job => job!["id"]!.GetValue<string>())), "jobs");
             var missing = await server.RawAsync(HttpMethod.Get, "/v1/nope");
             Equal(404, missing.Status, "unknown route");
@@ -223,6 +225,48 @@ internal static partial class Program
             var planning = DurableWire.Read<AgentDetail>(await server.Get(main))!;
             Check(planning.Extensions.Contains("plan-mode"), "plan-mode selected");
             Equal(false, (await server.Patch(main + "/plan-mode", new JsonObject { ["enabled"] = false }))!["enabled"]!.GetValue<bool>(), "plan mode off");
+        }),
+
+        Case("api.signals-and-submission-notify-round-trip", async () =>
+        {
+            await using var server = await TestServer.StartAsync("api-signals");
+            var id = await server.CreateSessionAsync("Signals");
+
+            // Missing task returns 200 with status "not_found".
+            var missing = await server.Client.SignalTaskAsync(id, 999_999, "example.wake", "k1", new JsonObject { ["ok"] = true }, idempotencyKey: "sig-missing-1");
+            Equal("not_found", missing!["status"]!.GetValue<string>(), "missing task status");
+            // Same Idempotency-Key replays with Idempotent-Replay header.
+            using (var req = new HttpRequestMessage(HttpMethod.Post, new Uri(server.Base, $"/v1/sessions/{id}/tasks/999999/signals")))
+            {
+                req.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", server.Token);
+                req.Headers.Add("Idempotency-Key", "sig-missing-1");
+                req.Content = new StringContent("""{"signal":"example.wake","key":"k1","payload":{"ok":true}}""", System.Text.Encoding.UTF8, "application/json");
+                using var resp = await server.Raw.SendAsync(req);
+                Equal(200, (int)resp.StatusCode, "replayed signal status code");
+                Check(resp.Headers.TryGetValues("Idempotent-Replay", out var values) && values.Contains("true"), "Idempotent-Replay header");
+            }
+            // Conflicting payload under the same Idempotency-Key fails conflict (409).
+            await FailsAsync(() => server.Client.SignalTaskAsync(id, 999_999, "example.wake", "k1", new JsonObject { ["ok"] = false }, idempotencyKey: "sig-missing-1"),
+                "conflict", "conflicting signal idempotency key");
+            // Explicit JSON null payload is serialized as "payload": null (distinct from omitted {} payload).
+            var nullSignal = await server.Client.SignalTaskAsync(id, 999_999, "example.wake", "k1", (JsonNode?)null, idempotencyKey: "sig-null-1");
+            Equal("not_found", nullSignal!["status"]!.GetValue<string>(), "explicit null payload succeeds");
+            await FailsAsync(() => server.Client.SignalTaskAsync(id, 999_999, "example.wake", "k1", idempotencyKey: "sig-null-1"),
+                "conflict", "omitted payload ({}) conflicts with explicit null payload");
+
+            // Validation rejects empty signal/key and bad onAbort/notify shapes.
+            await FailsAsync(() => server.Post($"/v1/sessions/{id}/tasks/999999/signals", new JsonObject { ["signal"] = "", ["key"] = "k1", ["payload"] = true }),
+                "invalid", "empty signal name");
+            await FailsAsync(() => server.Post($"/v1/sessions/{id}/agents/main/messages",
+                new JsonObject { ["content"] = "hi", ["requestId"] = "bad-abort", ["onAbort"] = "nope" }), "invalid", "invalid onAbort");
+
+            // SendMessageAsync forwards onAbort and notify cleanly.
+            var queued = (await server.Client.SendMessageAsync(id, 1, "hello notify", "req-notify-1", "followUp",
+                onAbort: "keep", notifyTaskId: 999_999, notifyKey: "sub-key"))!;
+            var submission = queued["submissionId"]!.GetValue<long>();
+            var answered = await server.Get($"/v1/sessions/{id}/submissions/{submission}?waitMs=15000");
+            Equal("done", answered!["status"]!.GetValue<string>(), "send with onAbort and notify settles");
+            Equal("Echo: hello notify", AnswerText(answered), "answer text");
         }),
     ];
 }

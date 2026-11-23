@@ -4,6 +4,7 @@
 // Pi v1.5.0 sync (area model-requests): Identity, each session Harness's HarnessOptions.Identity.
 using PiSharp.AI;
 using PiSharp.Durable.Chord;
+using PiSharp.Durable.Tools;
 
 namespace PiSharp.Durable.Hosting;
 
@@ -102,6 +103,18 @@ public sealed record DurableDeviceOptions
 
     /// <summary>How long the catalog keeps settled application records (see <see cref="DeviceRetention"/>).</summary>
     public RetentionPolicy Retention { get; init; } = new();
+
+    /// <summary>Image processor used by <c>read</c> and the <c>fit-images</c> extension (Pi Durable 1.6.0). Null uses
+    /// <see cref="PiSharp.Tools.Images.BuiltinImageCodec"/> for <c>fit-images</c> when <see cref="FitImages"/> is enabled.</summary>
+    public IImageProcessor? ImageProcessor { get; init; }
+
+    /// <summary>Whether <see cref="DurableDeviceHost.DefaultRegistry"/> installs the <c>fit-images</c> extension (Pi Durable 1.6.0) to fit
+    /// tool-result images to the conversation model's limits before they are committed. Defaults to true.</summary>
+    public bool FitImages { get; init; } = true;
+
+    /// <summary>Typed signal definitions whose schemas <see cref="HostedSession.DeliverSignalAsync(long, string, string, JsonValue?, string?, CancellationToken)"/>
+    /// validates by name. Built-in <see cref="PiSharp.Durable.Signals.SubmissionSettled"/> is always registered.</summary>
+    public IReadOnlyList<SignalToken> Signals { get; init; } = [];
 }
 
 /// <summary>The session a registry is made for.</summary>
@@ -114,4 +127,10 @@ public sealed record HostedSessionContext(string SessionId, string Cwd, string D
     /// and the job tasks), then the optional <c>system-prompts</c> and <c>command-guard</c>. A custom registry installs them to offer
     /// them.</summary>
     public IReadOnlyList<Extension> Apps { get; init; } = [];
+
+    /// <summary>Image processor configured on the device host, if any.</summary>
+    public IImageProcessor? ImageProcessor { get; init; }
+
+    /// <summary>Whether <see cref="DurableDeviceHost.DefaultRegistry"/> installs the <c>fit-images</c> extension.</summary>
+    public bool FitImages { get; init; } = true;
 }

@@ -241,6 +241,19 @@
       "unsupported": {
         "web": "Retention is an operator task run from the CLI (pisharp durable retention); the hub does not offer it."
       }
+    },
+    {
+      "id": "signals",
+      "version": 1,
+      "title": "Deliver typed signals to live tasks",
+      "routes": ["POST /v1/sessions/{s}/tasks/{taskId}/signals"],
+      "scopes": ["device-admin"],
+      "client": ["SignalTaskAsync"],
+      "cli": ["pisharp durable tasks signal"],
+      "web": [],
+      "unsupported": {
+        "web": "Signals are delivered from the live task panel on the Network page; there is no separate automation page."
+      }
     }
   ]
 }

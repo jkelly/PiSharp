@@ -591,6 +591,198 @@ internal static partial class Program
             Check(!PathExists(Path.Combine(directory, "task-2.jsonl")), "the terminal task's sidecar is removed");
             Equal("main.jsonl,doc-5.jsonl,doc-7.jsonl", string.Join(",", Directory.GetFiles(directory).Select(Path.GetFileName).OrderBy(name => name!.StartsWith("main") ? 0 : 1).ThenBy(name => name, StringComparer.Ordinal)), "files");
         });
+
+        yield return JsonlCase("bounds-retained-heap-under-large-payloads-and-reloads-lazily", async fixture =>
+        {
+            static string MakeLargePayload(int index) =>
+                string.Create(64 * 1024, index, static (span, idx) =>
+                {
+                    var fill = (char)('A' + (idx % 26));
+                    span.Fill(fill);
+                    var header = $"payload-{idx:D4}:";
+                    header.AsSpan().CopyTo(span);
+                });
+
+            static long ForceManagedHeap()
+            {
+                for (var round = 0; round < 3; round++)
+                {
+                    GC.Collect(GC.MaxGeneration, GCCollectionMode.Forced, blocking: true, compacting: true);
+                    GC.WaitForPendingFinalizers();
+                }
+                return GC.GetTotalMemory(forceFullCollection: true);
+            }
+
+            static async Task<(List<EntryId> Ids, DocumentId DocId)> SeedLargePayloadsAsync(JsonlStorage target)
+            {
+                var seeded = new List<EntryId>(80);
+                for (var index = 0; index < 80; index++)
+                {
+                    var id = await target.MintIdAsync<EntryId>();
+                    seeded.Add(id);
+                    var blob = MakeLargePayload(index);
+                    await Commit(target, new EntryWrite(new()
+                    {
+                        Id = id, ConversationId = ConversationId.Root, Kind = "large",
+                        Data = JsonValue.Object([KeyValuePair.Create("index", (JsonValue)index), KeyValuePair.Create("blob", (JsonValue)blob)]),
+                    }));
+                }
+                var seededDocId = await target.MintIdAsync<DocumentId>();
+                await Commit(target, new DocumentCreateWrite(SessionDocument(seededDocId), DocumentContent.Base(1,
+                    JsonValue.Object([KeyValuePair.Create("blob", (JsonValue)MakeLargePayload(100))]))));
+                await Commit(target, new DocumentChangeWrite(seededDocId, DocumentContent.Base(1,
+                    JsonValue.Object([KeyValuePair.Create("blob", (JsonValue)("v2:" + MakeLargePayload(101)))]))));
+                return (seeded, seededDocId);
+            }
+
+            var directory = fixture.NewDirectory();
+            var storage = await fixture.Open(directory);
+            await CreateRoot(storage);
+            var baselineHeap = ForceManagedHeap();
+
+            var (ids, docId) = await SeedLargePayloadsAsync(storage);
+
+            var retainedAfterWrites = ForceManagedHeap();
+            var heapDelta = Math.Max(0, retainedAfterWrites - baselineHeap);
+            var mainBytes = new FileInfo(Path.Combine(directory, "main.jsonl")).Length;
+            // 80 distinct 64 KiB payloads (~5.1 MiB) were written; retained heap delta must stay well below half of main.jsonl.
+            Check(heapDelta < mainBytes / 2,
+                $"retained heap delta should stay well below raw main.jsonl payload size (delta {heapDelta}, baseline {baselineHeap}, after {retainedAfterWrites}, main {mainBytes})");
+
+            var first = await storage.GetEntryAsync(ids[0], JsonlContext);
+            var last = await storage.GetEntryAsync(ids[^1], JsonlContext);
+            Equal(MakeLargePayload(0), ((JsonStringValue)((JsonObjectValue)first!.Entry.Data!)["blob"]).Value, "first lazy entry");
+            Equal(MakeLargePayload(79), ((JsonStringValue)((JsonObjectValue)last!.Entry.Data!)["blob"]).Value, "last lazy entry");
+            var page = await storage.ScanEntriesAsync(new EntryQuery(ConversationId.Root), 10, null, JsonlContext);
+            Equal(10, page.Items.Length, "paged lazy scan");
+            var doc = await storage.GetDocumentAsync(docId, DocumentPoint.Current, JsonlContext);
+            Equal("v2:" + MakeLargePayload(101), ((JsonStringValue)doc!.Value["blob"]).Value, "reclaimed current-only document");
+
+            var reopened = await fixture.Open(directory);
+            var reloaded = await reopened.GetEntryAsync(ids[40], JsonlContext);
+            Equal(MakeLargePayload(40), ((JsonStringValue)((JsonObjectValue)reloaded!.Entry.Data!)["blob"]).Value, "entry after reopen");
+            Equal("v2:" + MakeLargePayload(101), ((JsonStringValue)(await reopened.GetDocumentAsync(docId, DocumentPoint.Current, JsonlContext))!.Value["blob"]).Value,
+                "document after reopen");
+        });
+
+        yield return JsonlCase("protects-cold-sidecar-reads-from-concurrent-terminal-task-and-document-reclamation", async fixture =>
+        {
+            var directory = fixture.NewDirectory();
+            var taskPaused = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var taskRelease = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var docPaused = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var docRelease = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var fs = new PausingJoinFileSystem(directory);
+            var storage = await fixture.Open(directory, fs);
+            await CreateRoot(storage);
+            var taskId = await storage.MintIdAsync<TaskId>();
+            var docId = await storage.MintIdAsync<DocumentId>();
+            var pendingTask = PendingTask(taskId, "live");
+            await Commit(storage, new TaskWrite(pendingTask),
+                new DocumentCreateWrite(SessionDocument(docId), DocumentContent.Base(1, JO("{\"v\":1}"))));
+
+            // Pause the cold GetTaskAsync inside sidecar path resolution while a concurrent commit makes the task terminal and reclaims its sidecar.
+            fs.PauseOnce($"task-{taskId}.jsonl", taskPaused, taskRelease.Task);
+            var taskRead = storage.GetTaskAsync(taskId, JsonlContext);
+            try
+            {
+                await Task.WhenAny(taskPaused.Task, taskRead).WaitAsync(TimeSpan.FromSeconds(5));
+                Check(taskPaused.Task.IsCompleted, "cold task read reached sidecar path resolution");
+                var reclaimEntered = fs.NotifyJoinOnce($"task-{taskId}.jsonl");
+                var terminalCommit = storage.CommitAsync([[new TaskWrite(TerminalTask(taskId))]], (_, _) => { }, JsonlContext);
+                await reclaimEntered.WaitAsync(TimeSpan.FromSeconds(5));
+                // Give reclamation a brief window to prove it blocks on the reader gate rather than deleting the sidecar.
+                await Task.WhenAny(terminalCommit, Task.Delay(50));
+                Check(!terminalCommit.IsCompleted, "task sidecar reclamation waits for the in-flight cold reader");
+                Check(File.Exists(Path.Combine(directory, $"task-{taskId}.jsonl")), "sidecar stays until in-flight cold task read finishes");
+                taskRelease.TrySetResult();
+                var readTask = await taskRead.WaitAsync(TimeSpan.FromSeconds(5));
+                Equal<TaskRecord?>(pendingTask, readTask, "in-flight cold task read returns the pending record selected before reclamation");
+                await terminalCommit.WaitAsync(TimeSpan.FromSeconds(5));
+            }
+            finally
+            {
+                taskRelease.TrySetResult();
+            }
+            Check(!File.Exists(Path.Combine(directory, $"task-{taskId}.jsonl")), "sidecar is reclaimed after reader finishes");
+            Equal<TaskRecord?>(TerminalTask(taskId), await storage.GetTaskAsync(taskId, JsonlContext), "subsequent read sees terminal task from main");
+
+            // Pause a cold GetDocumentAsync while a concurrent commit rewrites the current-only document base and reclaims its sidecar.
+            fs.PauseOnce($"doc-{docId}.jsonl", docPaused, docRelease.Task);
+            var docRead = storage.GetDocumentAsync(docId, DocumentPoint.Current, JsonlContext);
+            try
+            {
+                await Task.WhenAny(docPaused.Task, docRead).WaitAsync(TimeSpan.FromSeconds(5));
+                Check(docPaused.Task.IsCompleted, "cold document read reached sidecar path resolution");
+                var reclaimWritten = fs.NotifyWriteOnce($"doc-{docId}.jsonl.reclaim");
+                var baseCommit = storage.CommitAsync([[new DocumentChangeWrite(docId, DocumentContent.Base(1, JO("{\"v\":2}")))]], (_, _) => { }, JsonlContext);
+                await reclaimWritten.WaitAsync(TimeSpan.FromSeconds(5));
+                await Task.WhenAny(baseCommit, Task.Delay(50));
+                Check(!baseCommit.IsCompleted, "document sidecar reclamation waits for the in-flight cold reader");
+                docRelease.TrySetResult();
+                var readDoc = await docRead.WaitAsync(TimeSpan.FromSeconds(5));
+                Check(readDoc is not null, "in-flight cold document read succeeds across concurrent base reclamation");
+                Same("{\"v\":1}", readDoc!.Value, "in-flight cold document read returns the original base selected before reclamation");
+                await baseCommit.WaitAsync(TimeSpan.FromSeconds(5));
+            }
+            finally
+            {
+                docRelease.TrySetResult();
+            }
+            Same("{\"v\":2}", (await storage.GetDocumentAsync(docId, DocumentPoint.Current, JsonlContext))!.Value, "subsequent read sees reclaimed base");
+        });
+
+        yield return JsonlCase("retries-filtered-task-scan-when-cold-task-status-changes-mid-page", async fixture =>
+        {
+            var directory = fixture.NewDirectory();
+            var taskPaused = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var taskRelease = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var fs = new PausingJoinFileSystem(directory);
+            var storage = await fixture.Open(directory, fs);
+            await CreateRoot(storage);
+            var taskA = await storage.MintIdAsync<TaskId>();
+            var taskB = await storage.MintIdAsync<TaskId>();
+            await Commit(storage, new TaskWrite(PendingTask(taskA, "a")), new TaskWrite(PendingTask(taskB, "b")));
+
+            // Pause the pending-only scan while loading taskA; concurrently make taskB terminal before taskB is loaded.
+            fs.PauseOnce($"task-{taskA}.jsonl", taskPaused, taskRelease.Task);
+            var scan = storage.ScanTasksAsync(new TaskQuery { Status = DurableTaskStatus.Pending }, 10, null, JsonlContext);
+            try
+            {
+                await Task.WhenAny(taskPaused.Task, scan).WaitAsync(TimeSpan.FromSeconds(5));
+                Check(taskPaused.Task.IsCompleted, "filtered scan paused on taskA");
+                await Commit(storage, new TaskWrite(TerminalTask(taskB))).WaitAsync(TimeSpan.FromSeconds(5));
+                taskRelease.TrySetResult();
+                var page = await scan.WaitAsync(TimeSpan.FromSeconds(5));
+                Equal(1, page.Items.Length, "retried pending scan excludes taskB after it became terminal");
+                Equal(taskA, page.Items[0].Id, "only pending taskA remains");
+                Equal(DurableTaskStatus.Pending, page.Items[0].State.Status, "returned task matches pending filter");
+            }
+            finally
+            {
+                taskRelease.TrySetResult();
+            }
+        });
+
+        yield return JsonlCase("cancels-sidecar-deletion-when-later-batch-in-same-commit-writes-live-task", async fixture =>
+        {
+            var directory = fixture.NewDirectory();
+            var storage = await fixture.Open(directory);
+            await CreateRoot(storage);
+            var taskId = await storage.MintIdAsync<TaskId>();
+            await Commit(storage, new TaskWrite(PendingTask(taskId, "initial")));
+
+            // Batch 1 makes taskId terminal (scheduling sidecar deletion); batch 2 replaces it with a live task in the same CommitAsync.
+            var liveAgain = PendingTask(taskId, "reborn");
+            var result = await storage.CommitAsync([[new TaskWrite(TerminalTask(taskId))], [new TaskWrite(liveAgain)]], (_, _) => { }, JsonlContext);
+            Equal(new CommitResult(2), result, "both batches committed");
+            Check(File.Exists(Path.Combine(directory, $"task-{taskId}.jsonl")), "live replacement cancels pending sidecar deletion");
+            Equal<TaskRecord?>(liveAgain, await storage.GetTaskAsync(taskId, JsonlContext), "live task readable from sidecar");
+            await storage.CloseAsync(JsonlContext);
+
+            var reopened = await fixture.Open(directory);
+            Equal<TaskRecord?>(liveAgain, await reopened.GetTaskAsync(taskId, JsonlContext), "directory reopens cleanly with live task");
+        });
     }
 
     private static IEnumerable<(string, Func<Task>)> StorageJsonlBatchesCases()
@@ -646,6 +838,64 @@ internal static partial class Program
             if (!Fail) return await base.JoinPathAsync(parts, context);
             await gate;
             return new FileError(FileErrorCode.Unknown, "injected path resolution failure");
+        }
+    }
+
+    private sealed class PausingJoinFileSystem(string directory) : LocalFileSystem(directory)
+    {
+        private readonly Lock gate = new();
+        private readonly Dictionary<string, (TaskCompletionSource Paused, Task Release)> pauses = new(StringComparer.Ordinal);
+        private readonly Dictionary<string, TaskCompletionSource> joinNotices = new(StringComparer.Ordinal);
+        private readonly Dictionary<string, TaskCompletionSource> writeNotices = new(StringComparer.Ordinal);
+
+        public void PauseOnce(string fileName, TaskCompletionSource paused, Task release)
+        {
+            lock (gate) pauses[fileName] = (paused, release);
+        }
+
+        public Task NotifyJoinOnce(string fileName)
+        {
+            var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            lock (gate) joinNotices[fileName] = tcs;
+            return tcs.Task;
+        }
+
+        public Task NotifyWriteOnce(string fileName)
+        {
+            var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            lock (gate) writeNotices[fileName] = tcs;
+            return tcs.Task;
+        }
+
+        public override async Task<Result<string, FileError>> JoinPathAsync(IReadOnlyList<string> parts, DurableContext context)
+        {
+            (TaskCompletionSource Paused, Task Release)? match = null;
+            TaskCompletionSource? notice = null;
+            if (parts.Count > 0)
+            {
+                lock (gate)
+                {
+                    if (pauses.Remove(parts[^1], out var found)) match = found;
+                    else joinNotices.Remove(parts[^1], out notice);
+                }
+            }
+            if (match is { } foundMatch)
+            {
+                foundMatch.Paused.TrySetResult();
+                await foundMatch.Release;
+            }
+            notice?.TrySetResult();
+            return await base.JoinPathAsync(parts, context);
+        }
+
+        public override async Task<Result<Unit, FileError>> WriteFileAsync(string path, ReadOnlyMemory<byte> content, DurableContext context)
+        {
+            var result = await base.WriteFileAsync(path, content, context);
+            var name = Path.GetFileName(path);
+            TaskCompletionSource? notice = null;
+            lock (gate) writeNotices.Remove(name, out notice);
+            notice?.TrySetResult();
+            return result;
         }
     }
 

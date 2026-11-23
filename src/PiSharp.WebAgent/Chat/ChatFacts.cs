@@ -107,6 +107,9 @@ public sealed record ChatRunState(bool Running, bool Generating, bool WaitingApp
 {
     /// <summary>Nothing runs.</summary>
     public static ChatRunState Idle { get; } = new(false, false, false, false);
+
+    /// <summary>The entry ID of the answer currently waiting for <c>onYield</c> review tasks (Pi Durable 1.6.0), or null.</summary>
+    public long? YieldAnswer { get; init; }
 }
 
 /// <summary>The facts of one transcript item.</summary>
@@ -146,8 +149,11 @@ public sealed record ChatItemFacts
     /// <summary>The running turn's last item.</summary>
     public bool Tail { get; init; }
 
-    /// <summary>For the tail: <c>streaming</c>, <c>working</c>, <c>waiting for approval</c> or <c>waiting for you</c>.</summary>
+    /// <summary>For the tail: <c>streaming</c>, <c>working</c>, <c>reviewing answer</c>, <c>waiting for approval</c> or <c>waiting for you</c>.</summary>
     public string? LiveStatus { get; init; }
+
+    /// <summary>Whether this answer is currently under <c>onYield</c> review (Pi Durable 1.6.0).</summary>
+    public bool YieldReview { get; init; }
 
     /// <summary>For the tail: when the run's message was sent, in Unix milliseconds.</summary>
     public double? RunStarted { get; init; }
@@ -205,6 +211,12 @@ public static class ChatFacts
             };
             previousAborted = failure == ChatFailureKind.Aborted;
         }
+        if (run.YieldAnswer is { } yieldId)
+        {
+            var yieldKey = "e" + yieldId.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            var existing = facts.GetValueOrDefault(yieldKey) ?? ChatItemFacts.Empty;
+            facts[yieldKey] = existing with { YieldReview = true };
+        }
         if (run.Running && items.LastOrDefault(item => item is AssistantItem) is AssistantItem tail)
         {
             var known = facts.GetValueOrDefault(tail.Key) ?? ChatItemFacts.Empty;
@@ -213,7 +225,8 @@ public static class ChatFacts
                 Tail = true,
                 Turn = tail.Id is null ? turn + 1 : known.Turn,
                 RunStarted = runStarted,
-                LiveStatus = run.WaitingApproval ? "waiting for approval" : run.WaitingForYou ? "waiting for you" : run.Generating ? "streaming" : "working",
+                LiveStatus = run.WaitingApproval ? "waiting for approval" : run.WaitingForYou ? "waiting for you"
+                    : run.Generating ? "streaming" : run.YieldAnswer is not null ? "reviewing answer" : "working",
             };
         }
         return facts;

@@ -161,6 +161,7 @@ internal static class DurableServe
                 Models = models,
                 DefaultModel = defaultModel,
                 DefaultThinkingLevel = thinking,
+                ImageProcessor = DurableHarnessSetup.CodingImagesProcessor,
                 OnReport = (session, failure) => host.Stderr.WriteLine($"[device{(session is null ? "" : " " + session)}] {failure.Message}"),
             }, cancellationToken).ConfigureAwait(false);
             app = DurableDeviceServer.Build(device, new DurableDeviceServerOptions

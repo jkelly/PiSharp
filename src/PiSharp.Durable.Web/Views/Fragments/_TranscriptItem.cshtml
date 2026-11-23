@@ -25,6 +25,10 @@
             {
               <div class="msg-role"><span class="status-dot live"></span>Working</div>
             }
+            else if (assistant.Id is { } yieldId && context.YieldAnswer == yieldId)
+            {
+              <div class="msg-role"><span class="ps-chip" data-tone="warn" data-yield-review title="Waiting for onYield review tasks before ending the run"><i class="bi bi-hourglass-split me-1"></i>Reviewing answer</span></div>
+            }
             @foreach (var block in assistant.Blocks)
             {
               switch (block)
@@ -69,7 +73,12 @@
           <div class="msg-body">
             <details class="tool-card @(result.IsError ? "is-error" : "")" data-detail="@result.Key">
               <summary><span class="tool-icon"><i class="bi @(result.IsError ? "bi-exclamation-circle" : "bi-check2")"></i></span><span class="tool-name">@result.Name</span><span class="tool-args-summary">Result of a call before this context</span><span class="tool-status">@(result.IsError ? "Error" : "Done")</span></summary>
-              <div class="tool-body"><div class="ps-term"><pre class="wrap">@result.Text</pre></div></div>
+              <div class="tool-body"><div class="ps-term"><pre class="wrap">@result.Text</pre></div>
+                @if (result.ImageUnsupportedByModel is { Length: > 0 } unsupported)
+                {
+                  <div class="fs-8 text-ps-warn mt-2" data-image-unsupported="@unsupported"><i class="bi bi-image me-1"></i>Image not sent to <code>@unsupported</code> (model does not support image input).</div>
+                }
+              </div>
             </details>
             <div class="msg-footer"><span class="msg-actions"><span class="entry-id">#@result.Id</span><button class="btn btn-icon" type="button" title="Fork from this entry" aria-label="Fork at entry @result.Id" data-action="fork" data-entry="@result.Id"><i class="bi bi-signpost-split"></i></button></span></div>
           </div>

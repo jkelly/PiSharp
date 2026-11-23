@@ -339,18 +339,23 @@ public sealed record ToolOutputSet(string Set) : ToolOutputChange
     public override JsonObjectValue ToJson() => new RecordJson.Writer().Add("set", Set).Build();
 }
 
-/// <summary><c>{type: "tool_execution_end", ...call, entry?, result?}</c>: the slot is done. A model-issued call ends with its
-/// <c>pi.tool-result</c> entry, a nested call with its <see cref="Result"/>. Both are absent when the tool task faulted or was orphaned, or
-/// when the call's slot left <c>pi.live</c> unfinished: its run ended, or its parent settled first.</summary>
+/// <summary><c>{type: "tool_execution_end", ...call, entry?, result?, imageUnsupportedByModel?}</c>: the slot is done. A model-issued call
+/// ends with its <c>pi.tool-result</c> entry, a nested call with its <see cref="Result"/>. Both are absent when the tool task faulted or was
+/// orphaned, or when the call's slot left <c>pi.live</c> unfinished: its run ended, or its parent settled first.</summary>
 public sealed record ToolExecutionEndEvent(ToolEventCall Call, EntryRecord? Entry = null, NestedToolExecutionResult? Result = null) : ToolEvent(Call)
 {
     /// <summary>A model-issued call's end without a task ID.</summary>
     public ToolExecutionEndEvent(string toolCallId, string toolName, EntryRecord? entry = null) : this(new ToolEventCall(toolCallId, toolName), entry) { }
 
+    /// <summary>Model ID from <c>details.imageUnsupportedByModel</c> when an image tool result ran under a model without image input (Pi
+    /// Durable 1.6.0); null otherwise.</summary>
+    public string? ImageUnsupportedByModel { get; init; }
+
     /// <inheritdoc/>
     public override string Type => "tool_execution_end";
     /// <inheritdoc/>
-    public override JsonObjectValue ToJson() => CallWriter().Add("entry", Entry?.ToJson()).Add("result", Result?.ToJson()).Build();
+    public override JsonObjectValue ToJson() => CallWriter().Add("entry", Entry?.ToJson()).Add("result", Result?.ToJson())
+        .Add("imageUnsupportedByModel", ImageUnsupportedByModel).Build();
 }
 
 /// <summary><c>{type: "inbox_update", items}</c>: <c>pi.inbox</c> changed.</summary>
@@ -816,7 +821,9 @@ public static class AgentEvents
         void EndTool(JsonObjectValue slot, long? entryId)
         {
             var entry = entryId is { } id ? entries.Find(candidate => candidate.Id.Value == id) : null;
-            toolEnds.Add(new ToolExecutionEndEvent(CallOf(slot), entry));
+            var unsupported = entry is not null && FirstMessage(entry) is { } message &&
+                Field(Field(message, "details"), "imageUnsupportedByModel") is JsonStringValue { Value: { Length: > 0 } modelId } ? modelId : null;
+            toolEnds.Add(new ToolExecutionEndEvent(CallOf(slot), entry) { ImageUnsupportedByModel = unsupported });
         }
         foreach (var callId in callOrder)
         {
