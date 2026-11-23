@@ -22,6 +22,29 @@
     <None Include="$(MSBuildThisFileDirectory)../../README.md" Pack="true" PackagePath="/" CopyToPublishDirectory="PreserveNewest" Link="README.md" />
     <None Include="$(PiSharpProvenanceFile)" Condition="'$(PiSharpProvenanceFile)' != ''" Pack="true" PackagePath="/provenance.json" CopyToPublishDirectory="PreserveNewest" Link="provenance.json" />
   </ItemGroup>
+  <Target Name="PrunePiSharpCliNativeAssets"
+          AfterTargets="ComputeFilesToPublish"
+          BeforeTargets="CopyFilesToPublishDirectory"
+          Condition="'$(MSBuildProjectName)' == 'PiSharp.Cli'">
+    <!-- Drop third-party native debug symbols (e.g. ~280 MiB of libSkiaSharp.pdb) and unsupported mobile/exotic RIDs
+         from the packed CLI tool and standalone payloads while keeping all supported desktop/server RIDs intact. -->
+    <ItemGroup>
+      <_PiSharpCliPrunedNative Include="@(ResolvedFileToPublish)"
+          Condition="($([System.String]::Copy('%(ResolvedFileToPublish.RelativePath)').Replace('\', '/').StartsWith('runtimes/', System.StringComparison.OrdinalIgnoreCase))
+                      And $([System.String]::Copy('%(ResolvedFileToPublish.RelativePath)').EndsWith('.pdb', System.StringComparison.OrdinalIgnoreCase)))
+                  Or ($([System.String]::Copy('%(ResolvedFileToPublish.RelativePath)').Replace('\', '/').StartsWith('runtimes/', System.StringComparison.OrdinalIgnoreCase))
+                      And !$([System.String]::Copy('%(ResolvedFileToPublish.RelativePath)').Replace('\', '/').StartsWith('runtimes/win-x64/', System.StringComparison.OrdinalIgnoreCase))
+                      And !$([System.String]::Copy('%(ResolvedFileToPublish.RelativePath)').Replace('\', '/').StartsWith('runtimes/win-arm64/', System.StringComparison.OrdinalIgnoreCase))
+                      And !$([System.String]::Copy('%(ResolvedFileToPublish.RelativePath)').Replace('\', '/').StartsWith('runtimes/linux-x64/', System.StringComparison.OrdinalIgnoreCase))
+                      And !$([System.String]::Copy('%(ResolvedFileToPublish.RelativePath)').Replace('\', '/').StartsWith('runtimes/linux-arm64/', System.StringComparison.OrdinalIgnoreCase))
+                      And !$([System.String]::Copy('%(ResolvedFileToPublish.RelativePath)').Replace('\', '/').StartsWith('runtimes/linux-musl-x64/', System.StringComparison.OrdinalIgnoreCase))
+                      And !$([System.String]::Copy('%(ResolvedFileToPublish.RelativePath)').Replace('\', '/').StartsWith('runtimes/linux-musl-arm64/', System.StringComparison.OrdinalIgnoreCase))
+                      And !$([System.String]::Copy('%(ResolvedFileToPublish.RelativePath)').Replace('\', '/').StartsWith('runtimes/osx/', System.StringComparison.OrdinalIgnoreCase))
+                      And !$([System.String]::Copy('%(ResolvedFileToPublish.RelativePath)').Replace('\', '/').StartsWith('runtimes/osx-x64/', System.StringComparison.OrdinalIgnoreCase))
+                      And !$([System.String]::Copy('%(ResolvedFileToPublish.RelativePath)').Replace('\', '/').StartsWith('runtimes/osx-arm64/', System.StringComparison.OrdinalIgnoreCase)))" />
+      <ResolvedFileToPublish Remove="@(_PiSharpCliPrunedNative)" />
+    </ItemGroup>
+  </Target>
   <Target Name="ValidatePiSharpDistributionInputs" BeforeTargets="Pack;Publish" Condition="'$(MSBuildProjectName)' == 'PiSharp.Cli'">
     <Error Condition="'$(PiSharpReleaseVersion)' == ''" Text="An explicit independently versioned PiSharpReleaseVersion is required." />
     <Error Condition="'$(PiSharpProvenanceFile)' == '' Or !Exists('$(PiSharpProvenanceFile)')" Text="An admitted PiSharpProvenanceFile is required." />

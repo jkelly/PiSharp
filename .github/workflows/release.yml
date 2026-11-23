@@ -16,6 +16,10 @@ on:
         description: Skip the 22 release-list suites (dry runs only; core/Durable validation still runs)
         type: boolean
         default: false
+      include_standalone:
+        description: Also build self-contained standalone archives and Homebrew/Scoop/Winget manifests (dry runs only)
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -145,6 +149,14 @@ jobs:
             unzip -p "$tool" "$prefix/runtimes/$asset" | cmp - "$HOME/.nuget/packages/sqlitepclraw.lib.e_sqlite3/$version/runtimes/$asset"
             echo "$asset: SQLitePCLRaw.lib.e_sqlite3 $version"
           done
+          if grep -iE '/runtimes/[^/]+/native/.*\.pdb$' <<< "$members"; then
+            echo "::error::Native debug symbols (.pdb) found in $tool"; exit 1
+          fi
+          tool_bytes=$(stat -c%s "$tool")
+          echo "PiSharp.Cli.$VERSION.nupkg size: $tool_bytes bytes"
+          if [ "$tool_bytes" -gt 83886080 ]; then
+            echo "::error::$tool exceeds 80 MiB budget ($tool_bytes bytes)"; exit 1
+          fi
 
       - uses: actions/upload-artifact@v7
         with:
@@ -210,3 +222,44 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ needs.build.outputs.version }}
         run: node tools/release/publish-github-release.mjs
+
+  standalone:
+    name: Build standalone archives and package manifests
+    needs: [build]
+    if: github.event_name == 'workflow_dispatch' && inputs.include_standalone
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+
+      - name: Build and validate self-contained archives
+        shell: pwsh
+        run: >
+          ./tools/release/build-standalone-archives.ps1
+          -Version '${{ needs.build.outputs.version }}'
+          -SourceCommit '${{ github.sha }}'
+
+      - name: Generate Homebrew, Scoop and Winget manifests
+        run: >
+          node tools/release/generate-package-manifests.mjs
+          --version '${{ needs.build.outputs.version }}'
+          --checksums artifacts/standalone/checksums.sha256
+          --out artifacts/standalone/manifests
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: standalone-archives
+          path: |
+            artifacts/standalone/*.zip
+            artifacts/standalone/*.manifest.json
+            artifacts/standalone/checksums.sha256
+            artifacts/standalone/manifests/**
+          if-no-files-found: error
