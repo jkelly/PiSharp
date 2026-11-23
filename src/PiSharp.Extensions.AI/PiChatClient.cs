@@ -127,12 +127,21 @@ public sealed class PiChatClient : IChatClient
                     break;
 
                 case TextEnded ended:
-                    if (!streamedBlocks.Contains(ended.ContentIndex) && !string.IsNullOrEmpty(ended.Content))
+                {
+                    var textSignature = ExtractString(ended.Properties, "textSignature");
+                    if (!streamedBlocks.Contains(ended.ContentIndex) && (!string.IsNullOrEmpty(ended.Content) || textSignature is not null))
                     {
                         streamedBlocks.Add(ended.ContentIndex);
-                        yield return CreateUpdate(responseId, request.SessionId, modelId, createdAt, new AiTextContent(ended.Content), ended);
+                        yield return CreateUpdate(responseId, request.SessionId, modelId, createdAt,
+                            CreateTextContent(ended.Content, ended.Properties), ended);
+                    }
+                    else if (textSignature is not null)
+                    {
+                        yield return CreateUpdate(responseId, request.SessionId, modelId, createdAt,
+                            CreateTextContent(string.Empty, ended.Properties), ended);
                     }
                     break;
+                }
 
                 case ThinkingStarted started when !string.IsNullOrEmpty(started.Content.Thinking):
                     streamedBlocks.Add(started.ContentIndex);
@@ -149,16 +158,17 @@ public sealed class PiChatClient : IChatClient
                 case ThinkingEnded ended:
                 {
                     var signature = ExtractString(ended.Properties, "thinkingSignature");
-                    if (!streamedBlocks.Contains(ended.ContentIndex) && (!string.IsNullOrEmpty(ended.Content) || signature is not null))
+                    var redacted = ExtractBool(ended.Properties, "redacted");
+                    if (!streamedBlocks.Contains(ended.ContentIndex) && (!string.IsNullOrEmpty(ended.Content) || signature is not null || redacted))
                     {
                         streamedBlocks.Add(ended.ContentIndex);
                         yield return CreateUpdate(responseId, request.SessionId, modelId, createdAt,
-                            new TextReasoningContent(ended.Content) { ProtectedData = signature }, ended);
+                            CreateReasoningContent(ended.Content, ended.Properties), ended);
                     }
-                    else if (signature is not null)
+                    else if (signature is not null || redacted)
                     {
                         yield return CreateUpdate(responseId, request.SessionId, modelId, createdAt,
-                            new TextReasoningContent(string.Empty) { ProtectedData = signature }, ended);
+                            CreateReasoningContent(string.Empty, ended.Properties), ended);
                     }
                     break;
                 }
@@ -338,13 +348,23 @@ public sealed class PiChatClient : IChatClient
                 switch (item)
                 {
                     case AiTextContent text:
-                        contentBlocks.Add(new JsonObject { ["type"] = "text", ["text"] = text.Text ?? string.Empty });
+                    {
+                        var block = new JsonObject { ["type"] = "text", ["text"] = text.Text ?? string.Empty };
+                        var textSig = ExtractAdditionalString(text.AdditionalProperties, PiChatAdditionalProperties.TextSignature, "textSignature")
+                            ?? (text.RawRepresentation is PiTextContent rawText ? ExtractString(rawText.ExtraProperties, "textSignature") : null);
+                        if (!string.IsNullOrEmpty(textSig))
+                            block["textSignature"] = textSig;
+                        contentBlocks.Add(block);
                         break;
+                    }
                     case TextReasoningContent reasoning:
                     {
                         var block = new JsonObject { ["type"] = "thinking", ["thinking"] = reasoning.Text ?? string.Empty };
                         if (!string.IsNullOrEmpty(reasoning.ProtectedData))
                             block["thinkingSignature"] = reasoning.ProtectedData;
+                        if (ExtractAdditionalBool(reasoning.AdditionalProperties, PiChatAdditionalProperties.ThinkingRedacted, "redacted")
+                            || (reasoning.RawRepresentation is ThinkingContent rawThinking && ExtractBool(rawThinking.ExtraProperties, "redacted")))
+                            block["redacted"] = true;
                         contentBlocks.Add(block);
                         break;
                     }
@@ -354,13 +374,18 @@ public sealed class PiChatClient : IChatClient
                         var callId = call.CallId ?? string.Empty;
                         if (callId.Length > 0 && !string.IsNullOrEmpty(call.Name))
                             toolNamesByCallId[callId] = call.Name;
-                        contentBlocks.Add(new JsonObject
+                        var block = new JsonObject
                         {
                             ["type"] = "toolCall",
                             ["id"] = callId,
                             ["name"] = call.Name ?? string.Empty,
                             ["arguments"] = SerializeArgumentsToNode(call.Arguments)
-                        });
+                        };
+                        var thoughtSig = ExtractAdditionalString(call.AdditionalProperties, PiChatAdditionalProperties.ThoughtSignature, "thoughtSignature")
+                            ?? (call.RawRepresentation is PiToolCallContent rawTool ? ExtractString(rawTool.ExtraProperties, "thoughtSignature") : null);
+                        if (!string.IsNullOrEmpty(thoughtSig))
+                            block["thoughtSignature"] = thoughtSig;
+                        contentBlocks.Add(block);
                         break;
                     }
                 }
@@ -585,17 +610,42 @@ public sealed class PiChatClient : IChatClient
 
     private static AIContent? MapAssistantContent(AssistantContent content) => content switch
     {
-        PiTextContent text => new AiTextContent(text.Text),
-        ThinkingContent thinking => CreateReasoningContent(thinking.Thinking, thinking.ExtraProperties),
+        PiTextContent text => CreateTextContent(text.Text, text.ExtraProperties, text),
+        ThinkingContent thinking => CreateReasoningContent(thinking.Thinking, thinking.ExtraProperties, thinking),
         PiToolCallContent toolCall => MapToolCall(toolCall),
         _ => null
     };
 
-    private static TextReasoningContent CreateReasoningContent(string text, JsonFields? properties) =>
-        new(text) { ProtectedData = ExtractString(properties, "thinkingSignature") };
+    private static AiTextContent CreateTextContent(string text, JsonFields? properties, object? raw = null)
+    {
+        var content = new AiTextContent(text) { RawRepresentation = raw };
+        if (ExtractString(properties, "textSignature") is { Length: > 0 } sig)
+            content.AdditionalProperties = new AdditionalPropertiesDictionary { [PiChatAdditionalProperties.TextSignature] = sig };
+        return content;
+    }
 
-    private static FunctionCallContent MapToolCall(PiToolCallContent toolCall) =>
-        new(toolCall.Id, toolCall.Name, ParseArgumentsDictionary(toolCall.Arguments));
+    private static TextReasoningContent CreateReasoningContent(string text, JsonFields? properties, object? raw = null)
+    {
+        var content = new TextReasoningContent(text)
+        {
+            ProtectedData = ExtractString(properties, "thinkingSignature"),
+            RawRepresentation = raw
+        };
+        if (ExtractBool(properties, "redacted"))
+            content.AdditionalProperties = new AdditionalPropertiesDictionary { [PiChatAdditionalProperties.ThinkingRedacted] = true };
+        return content;
+    }
+
+    private static FunctionCallContent MapToolCall(PiToolCallContent toolCall)
+    {
+        var call = new FunctionCallContent(toolCall.Id, toolCall.Name, ParseArgumentsDictionary(toolCall.Arguments))
+        {
+            RawRepresentation = toolCall
+        };
+        if (ExtractString(toolCall.ExtraProperties, "thoughtSignature") is { Length: > 0 } sig)
+            call.AdditionalProperties = new AdditionalPropertiesDictionary { [PiChatAdditionalProperties.ThoughtSignature] = sig };
+        return call;
+    }
 
     internal static IDictionary<string, object?> ParseArgumentsDictionary(JsonData arguments)
     {
@@ -630,11 +680,14 @@ public sealed class PiChatClient : IChatClient
         if (usage.Input == 0 && usage.Output == 0 && usage.CacheRead == 0 && usage.CacheWrite == 0 && usage.TotalTokens == 0 && reasoning is null)
             return null;
 
+        // PiSharp TokenUsage.Input excludes CacheRead and CacheWrite, whereas Microsoft.Extensions.AI
+        // UsageDetails.InputTokenCount is inclusive of cached input tokens.
+        var inclusiveInput = usage.Input + usage.CacheRead + usage.CacheWrite;
         var details = new UsageDetails
         {
-            InputTokenCount = ToLong(usage.Input),
+            InputTokenCount = ToLong(inclusiveInput),
             OutputTokenCount = ToLong(usage.Output),
-            TotalTokenCount = ToLong(usage.TotalTokens > 0 ? usage.TotalTokens : usage.Input + usage.Output + usage.CacheRead + usage.CacheWrite),
+            TotalTokenCount = ToLong(usage.TotalTokens > 0 ? usage.TotalTokens : inclusiveInput + usage.Output),
             CachedInputTokenCount = usage.CacheRead > 0 ? ToLong(usage.CacheRead) : null,
             ReasoningTokenCount = reasoning is > 0 ? ToLong(reasoning.Value) : null
         };
@@ -670,9 +723,28 @@ public sealed class PiChatClient : IChatClient
         return null;
     }
 
-    private static string? ExtractString(JsonFields? fields, string name) =>
+    internal static string? ExtractString(JsonFields? fields, string name) =>
         fields is not null && fields.TryGet(name, out var value) && value is not null && value.Value.ValueKind == JsonValueKind.String
             ? value.Value.GetString() : null;
+
+    internal static bool ExtractBool(JsonFields? fields, string name) =>
+        fields is not null && fields.TryGet(name, out var value) && value is not null && value.Value.ValueKind == JsonValueKind.True;
+
+    internal static string? ExtractAdditionalString(AdditionalPropertiesDictionary? props, string primaryKey, string fallbackKey)
+    {
+        if (props is null) return null;
+        if (props.TryGetValue(primaryKey, out var raw) && raw is string s && s.Length > 0) return s;
+        if (props.TryGetValue(fallbackKey, out var fb) && fb is string fs && fs.Length > 0) return fs;
+        return null;
+    }
+
+    internal static bool ExtractAdditionalBool(AdditionalPropertiesDictionary? props, string primaryKey, string fallbackKey)
+    {
+        if (props is null) return false;
+        if (props.TryGetValue(primaryKey, out var raw) && raw is bool b) return b;
+        if (props.TryGetValue(fallbackKey, out var fb) && fb is bool f) return f;
+        return false;
+    }
 
     private static double? ExtractNumber(JsonFields? fields, string name) =>
         fields is not null && fields.TryGet(name, out var value) && value is not null && value.Value.ValueKind == JsonValueKind.Number && value.Value.TryGetDouble(out var number)

@@ -30,6 +30,15 @@ public static class PiChatAdditionalProperties
 
     /// <summary>Provider-specific raw JSON object (<see cref="PiSharp.Contracts.JsonData"/> or <see cref="JsonElement"/>) merged into embedding requests.</summary>
     public const string EmbeddingOptions = "pisharp.embeddingOptions";
+
+    /// <summary>Opaque provider signature attached to a tool call (e.g. Gemini <c>thoughtSignature</c>), preserved across multi-turn round trips.</summary>
+    public const string ThoughtSignature = "pisharp.thoughtSignature";
+
+    /// <summary>Opaque provider signature attached to an assistant text block (e.g. OpenAI Responses / Gemini <c>textSignature</c>).</summary>
+    public const string TextSignature = "pisharp.textSignature";
+
+    /// <summary>Boolean flag marking a redacted thinking block (<c>redacted: true</c>).</summary>
+    public const string ThinkingRedacted = "pisharp.thinkingRedacted";
 }
 
 /// <summary>Default request configuration and lifecycle options for <see cref="PiChatClient"/>.</summary>

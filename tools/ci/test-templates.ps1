@@ -18,7 +18,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 $repo = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
-$dotnetCmd = (Get-Command $Dotnet -CommandType Application -ErrorAction Stop).Source
+$dotnetCmd = (Get-Command $Dotnet -CommandType Application -TotalCount 1 -ErrorAction Stop).Source
 
 function Invoke-Checked {
     param([string[]]$Arguments, [string]$WorkingDirectory = $repo)

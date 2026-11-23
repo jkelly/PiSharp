@@ -50,9 +50,11 @@ public sealed class ChatClientTransportAdapter : IChatTransport, IDisposable
         var nextIndex = 0;
         int? openTextIndex = null;
         var textBuffer = new StringBuilder();
+        string? textSignature = null;
         int? openThinkingIndex = null;
         var thinkingBuffer = new StringBuilder();
         string? thinkingSignature = null;
+        var thinkingRedacted = false;
         ChatFinishReason? finishReason = null;
         long inputTokens = 0;
         long outputTokens = 0;
@@ -66,10 +68,22 @@ public sealed class ChatClientTransportAdapter : IChatTransport, IDisposable
         IAsyncEnumerator<ChatResponseUpdate>? enumerator = null;
         try
         {
-            enumerator = _chatClient.GetStreamingResponseAsync(messages, chatOptions, cancellationToken)
-                .GetAsyncEnumerator(cancellationToken);
+            try
+            {
+                enumerator = _chatClient.GetStreamingResponseAsync(messages, chatOptions, cancellationToken)
+                    .GetAsyncEnumerator(cancellationToken);
+            }
+            catch (OperationCanceledException ex)
+            {
+                aborted = true;
+                streamErrorMessage = ex.Message;
+            }
+            catch (Exception ex)
+            {
+                streamErrorMessage = ex.Message;
+            }
 
-            while (true)
+            while (enumerator is not null && !aborted && streamErrorMessage is null)
             {
                 bool hasNext;
                 try
@@ -99,34 +113,48 @@ public sealed class ChatClientTransportAdapter : IChatTransport, IDisposable
                 {
                     switch (content)
                     {
-                        case AiTextContent text when !string.IsNullOrEmpty(text.Text):
+                        case AiTextContent text:
                         {
+                            var sig = PiChatClient.ExtractAdditionalString(text.AdditionalProperties, PiChatAdditionalProperties.TextSignature, "textSignature")
+                                ?? (text.RawRepresentation is PiTextContent rawText ? PiChatClient.ExtractString(rawText.ExtraProperties, "textSignature") : null);
+                            if (string.IsNullOrEmpty(text.Text) && string.IsNullOrEmpty(sig))
+                                break;
                             if (openThinkingIndex is { } tIdx)
                             {
-                                var endedThinking = CloseThinking(tIdx, thinkingBuffer, thinkingSignature, blocks);
+                                var endedThinking = CloseThinking(tIdx, thinkingBuffer, thinkingSignature, thinkingRedacted, blocks);
                                 openThinkingIndex = null;
                                 thinkingSignature = null;
+                                thinkingRedacted = false;
                                 yield return endedThinking;
                             }
                             if (openTextIndex is null)
                             {
                                 openTextIndex = nextIndex++;
                                 textBuffer.Clear();
+                                textSignature = null;
                                 yield return new TextStarted(openTextIndex.Value, new PiTextContent(string.Empty));
                             }
-                            textBuffer.Append(text.Text);
-                            yield return new TextDelta(openTextIndex.Value, text.Text);
+                            if (!string.IsNullOrEmpty(sig))
+                                textSignature = sig;
+                            if (!string.IsNullOrEmpty(text.Text))
+                            {
+                                textBuffer.Append(text.Text);
+                                yield return new TextDelta(openTextIndex.Value, text.Text);
+                            }
                             break;
                         }
 
                         case TextReasoningContent reasoning:
                         {
-                            if (string.IsNullOrEmpty(reasoning.Text) && string.IsNullOrEmpty(reasoning.ProtectedData))
+                            var isRedacted = PiChatClient.ExtractAdditionalBool(reasoning.AdditionalProperties, PiChatAdditionalProperties.ThinkingRedacted, "redacted")
+                                || (reasoning.RawRepresentation is ThinkingContent rawThinking && PiChatClient.ExtractBool(rawThinking.ExtraProperties, "redacted"));
+                            if (string.IsNullOrEmpty(reasoning.Text) && string.IsNullOrEmpty(reasoning.ProtectedData) && !isRedacted)
                                 break;
                             if (openTextIndex is { } txtIdx)
                             {
-                                var endedText = CloseText(txtIdx, textBuffer, blocks);
+                                var endedText = CloseText(txtIdx, textBuffer, textSignature, blocks);
                                 openTextIndex = null;
+                                textSignature = null;
                                 yield return endedText;
                             }
                             if (openThinkingIndex is null)
@@ -134,10 +162,13 @@ public sealed class ChatClientTransportAdapter : IChatTransport, IDisposable
                                 openThinkingIndex = nextIndex++;
                                 thinkingBuffer.Clear();
                                 thinkingSignature = null;
+                                thinkingRedacted = false;
                                 yield return new ThinkingStarted(openThinkingIndex.Value, new ThinkingContent(string.Empty));
                             }
                             if (!string.IsNullOrEmpty(reasoning.ProtectedData))
                                 thinkingSignature = reasoning.ProtectedData;
+                            if (isRedacted)
+                                thinkingRedacted = true;
                             if (!string.IsNullOrEmpty(reasoning.Text))
                             {
                                 thinkingBuffer.Append(reasoning.Text);
@@ -150,15 +181,17 @@ public sealed class ChatClientTransportAdapter : IChatTransport, IDisposable
                         {
                             if (openTextIndex is { } txtIdx)
                             {
-                                var endedText = CloseText(txtIdx, textBuffer, blocks);
+                                var endedText = CloseText(txtIdx, textBuffer, textSignature, blocks);
                                 openTextIndex = null;
+                                textSignature = null;
                                 yield return endedText;
                             }
                             if (openThinkingIndex is { } tIdx)
                             {
-                                var endedThinking = CloseThinking(tIdx, thinkingBuffer, thinkingSignature, blocks);
+                                var endedThinking = CloseThinking(tIdx, thinkingBuffer, thinkingSignature, thinkingRedacted, blocks);
                                 openThinkingIndex = null;
                                 thinkingSignature = null;
+                                thinkingRedacted = false;
                                 yield return endedThinking;
                             }
 
@@ -168,7 +201,12 @@ public sealed class ChatClientTransportAdapter : IChatTransport, IDisposable
                             var argsNode = PiChatClient.SerializeArgumentsToNode(call.Arguments);
                             var argsJson = argsNode.ToJsonString();
                             var argsData = JsonData.Parse(argsJson);
-                            var finalCall = new PiToolCallContent(callId, callName, argsData);
+                            var thoughtSig = PiChatClient.ExtractAdditionalString(call.AdditionalProperties, PiChatAdditionalProperties.ThoughtSignature, "thoughtSignature")
+                                ?? (call.RawRepresentation is PiToolCallContent rawTool ? PiChatClient.ExtractString(rawTool.ExtraProperties, "thoughtSignature") : null);
+                            var callProps = string.IsNullOrEmpty(thoughtSig)
+                                ? null
+                                : JsonFields.Empty.Set("thoughtSignature", JsonData.Parse(JsonSerializer.Serialize(thoughtSig)));
+                            var finalCall = new PiToolCallContent(callId, callName, argsData, callProps);
 
                             yield return new ToolCallStarted(idx, new PiToolCallContent(callId, callName, JsonData.EmptyObject));
                             yield return new ToolCallDelta(idx, argsJson);
@@ -208,6 +246,19 @@ public sealed class ChatClientTransportAdapter : IChatTransport, IDisposable
 
         if (aborted || streamErrorMessage is not null)
         {
+            // Retain any open partial text/thinking buffers in the authoritative error terminal message
+            // so content already streamed via deltas is not lost in AssistantStreamReducer snapshots.
+            if (openTextIndex is not null)
+            {
+                blocks.Add(BuildTextBlock(textBuffer.ToString(), textSignature));
+                textBuffer.Clear();
+            }
+            if (openThinkingIndex is not null)
+            {
+                blocks.Add(BuildThinkingBlock(thinkingBuffer.ToString(), thinkingSignature, thinkingRedacted));
+                thinkingBuffer.Clear();
+            }
+
             var reason = aborted || cancellationToken.IsCancellationRequested ? StopReason.Aborted : StopReason.Error;
             var errorMsg = string.IsNullOrWhiteSpace(streamErrorMessage)
                 ? (reason == StopReason.Aborted ? "Chat request aborted." : "Chat request failed.")
@@ -219,9 +270,9 @@ public sealed class ChatClientTransportAdapter : IChatTransport, IDisposable
         }
 
         if (openTextIndex is { } remainingTextIdx)
-            yield return CloseText(remainingTextIdx, textBuffer, blocks);
+            yield return CloseText(remainingTextIdx, textBuffer, textSignature, blocks);
         if (openThinkingIndex is { } remainingThinkingIdx)
-            yield return CloseThinking(remainingThinkingIdx, thinkingBuffer, thinkingSignature, blocks);
+            yield return CloseThinking(remainingThinkingIdx, thinkingBuffer, thinkingSignature, thinkingRedacted, blocks);
 
         var finalStopReason = ResolveStopReason(finishReason, blocks);
         var finalMessage = new AssistantMessage(
@@ -393,14 +444,20 @@ public sealed class ChatClientTransportAdapter : IChatTransport, IDisposable
                 var type = GetString(block, "type");
                 if (type == "text")
                 {
-                    contents.Add(new AiTextContent(GetString(block, "text") ?? string.Empty));
+                    var textItem = new AiTextContent(GetString(block, "text") ?? string.Empty);
+                    if (GetString(block, "textSignature") is { Length: > 0 } textSig)
+                        textItem.AdditionalProperties = new AdditionalPropertiesDictionary { [PiChatAdditionalProperties.TextSignature] = textSig };
+                    contents.Add(textItem);
                 }
                 else if (type == "thinking")
                 {
-                    contents.Add(new TextReasoningContent(GetString(block, "thinking") ?? string.Empty)
+                    var reasoningItem = new TextReasoningContent(GetString(block, "thinking") ?? string.Empty)
                     {
                         ProtectedData = GetString(block, "thinkingSignature")
-                    });
+                    };
+                    if (block["redacted"] is JsonValue redVal && redVal.TryGetValue<bool>(out var isRedacted) && isRedacted)
+                        reasoningItem.AdditionalProperties = new AdditionalPropertiesDictionary { [PiChatAdditionalProperties.ThinkingRedacted] = true };
+                    contents.Add(reasoningItem);
                 }
                 else if (type == "toolCall")
                 {
@@ -408,7 +465,10 @@ public sealed class ChatClientTransportAdapter : IChatTransport, IDisposable
                     var name = GetString(block, "name") ?? string.Empty;
                     var argsJson = block["arguments"]?.ToJsonString() ?? "{}";
                     var argsDict = PiChatClient.ParseArgumentsDictionary(JsonData.Parse(argsJson));
-                    contents.Add(new FunctionCallContent(id, name, argsDict));
+                    var callItem = new FunctionCallContent(id, name, argsDict);
+                    if (GetString(block, "thoughtSignature") is { Length: > 0 } thoughtSig)
+                        callItem.AdditionalProperties = new AdditionalPropertiesDictionary { [PiChatAdditionalProperties.ThoughtSignature] = thoughtSig };
+                    contents.Add(callItem);
                 }
             }
         }
@@ -443,23 +503,40 @@ public sealed class ChatClientTransportAdapter : IChatTransport, IDisposable
         return new ChatMessage(ChatRole.Tool, [resultContent]);
     }
 
-    private static TextEnded CloseText(int index, StringBuilder buffer, List<AssistantContent> blocks)
+    private static PiTextContent BuildTextBlock(string text, string? signature)
     {
-        var text = buffer.ToString();
-        buffer.Clear();
-        blocks.Add(new PiTextContent(text));
-        return new TextEnded(index, text);
-    }
-
-    private static ThinkingEnded CloseThinking(int index, StringBuilder buffer, string? signature, List<AssistantContent> blocks)
-    {
-        var text = buffer.ToString();
-        buffer.Clear();
         var props = string.IsNullOrEmpty(signature)
             ? null
-            : JsonFields.Empty.Set("thinkingSignature", JsonData.Parse(JsonSerializer.Serialize(signature)));
-        blocks.Add(new ThinkingContent(text, props));
-        return new ThinkingEnded(index, text, props);
+            : JsonFields.Empty.Set("textSignature", JsonData.Parse(JsonSerializer.Serialize(signature)));
+        return new PiTextContent(text, props);
+    }
+
+    private static ThinkingContent BuildThinkingBlock(string text, string? signature, bool redacted)
+    {
+        JsonFields? props = null;
+        if (!string.IsNullOrEmpty(signature))
+            props = (props ?? JsonFields.Empty).Set("thinkingSignature", JsonData.Parse(JsonSerializer.Serialize(signature)));
+        if (redacted)
+            props = (props ?? JsonFields.Empty).Set("redacted", JsonData.Parse("true"));
+        return new ThinkingContent(text, props);
+    }
+
+    private static TextEnded CloseText(int index, StringBuilder buffer, string? signature, List<AssistantContent> blocks)
+    {
+        var text = buffer.ToString();
+        buffer.Clear();
+        var block = BuildTextBlock(text, signature);
+        blocks.Add(block);
+        return new TextEnded(index, text, block.ExtraProperties);
+    }
+
+    private static ThinkingEnded CloseThinking(int index, StringBuilder buffer, string? signature, bool redacted, List<AssistantContent> blocks)
+    {
+        var text = buffer.ToString();
+        buffer.Clear();
+        var block = BuildThinkingBlock(text, signature, redacted);
+        blocks.Add(block);
+        return new ThinkingEnded(index, text, block.ExtraProperties);
     }
 
     private static string AllocateCallId(string? preferred, int index, HashSet<string> used)
@@ -487,11 +564,14 @@ public sealed class ChatClientTransportAdapter : IChatTransport, IDisposable
         if (input == 0 && output == 0 && cacheRead == 0 && cacheWrite == 0 && total == 0 && reasoning == 0)
             return TokenUsage.Zero;
 
-        var computedTotal = total > 0 ? total : input + output + cacheRead + cacheWrite;
+        // Microsoft.Extensions.AI InputTokenCount includes cached input tokens, whereas PiSharp
+        // TokenUsage.Input records only uncached input tokens alongside CacheRead and CacheWrite.
+        var uncachedInput = Math.Max(0L, input - cacheRead - cacheWrite);
+        var computedTotal = total > 0 ? total : uncachedInput + output + cacheRead + cacheWrite;
         var extra = reasoning > 0
             ? JsonFields.Empty.Set("reasoning", JsonData.Parse(JsonSerializer.Serialize(reasoning)))
             : null;
-        return new TokenUsage(input, output, cacheRead, cacheWrite, computedTotal, new UsageCost(0, 0, 0, 0, 0), extra);
+        return new TokenUsage(uncachedInput, output, cacheRead, cacheWrite, computedTotal, new UsageCost(0, 0, 0, 0, 0), extra);
     }
 
     private static ReasoningEffort? MapThinkingLevel(string? level) => level?.Trim().ToLowerInvariant() switch

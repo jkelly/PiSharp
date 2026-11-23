@@ -31,9 +31,12 @@ internal static class Program
             ("pi-chat-client.history-images-and-tool-results", TestPiChatClientHistoryAndToolsAsync),
             ("pi-chat-client.errors-abort-eof-and-dispose", TestPiChatClientErrorsAndDisposeAsync),
             ("pi-chat-client.get-service-and-metadata", TestPiChatClientMetadataAsync),
+            ("pi-chat-client.preserves-tool-call-and-text-signatures-roundtrip", TestSignatureRoundTripAsync),
             ("transport-adapter.streaming-reducer-conformance-and-dedup", TestTransportAdapterReducerConformanceAsync),
             ("transport-adapter.transcript-system-sections-tool-deltas-and-images", TestTransportAdapterTranscriptProjectionAsync),
             ("transport-adapter.errors-and-cancellation", TestTransportAdapterErrorsAndCancellationAsync),
+            ("transport-adapter.error-and-cancel-preserve-open-buffers", TestErrorAndCancelPreserveOpenBuffersAsync),
+            ("transport-adapter.usage-inclusive-uncached-roundtrip", TestUsageCacheAccountingAsync),
             ("transport-adapter.agent-multi-turn-tool-loop", TestTransportAdapterDrivesPiSharpAgentAsync),
             ("roundtrip.pi-chat-client-over-transport-adapter", TestRoundTripBridgeAsync),
             ("embedding-generator.vectors-options-usage-and-errors", TestEmbeddingGeneratorAsync),
@@ -135,7 +138,7 @@ internal static class Program
         Equal("Let me think", reasoning.Text, "thinking text");
         Equal("sig-xyz", reasoning.ProtectedData, "thinking signature");
         Check(response.Usage is not null, "usage present");
-        Equal(100L, response.Usage!.InputTokenCount, "input tokens");
+        Equal(125L, response.Usage!.InputTokenCount, "inclusive input tokens (100 uncached + 20 cacheRead + 5 cacheWrite)");
         Equal(42L, response.Usage.OutputTokenCount, "output tokens");
         Equal(167L, response.Usage.TotalTokenCount, "total tokens");
         Equal(20L, response.Usage.CachedInputTokenCount, "cached tokens");
@@ -321,6 +324,209 @@ internal static class Program
         return Task.CompletedTask;
     }
 
+    private static async Task TestSignatureRoundTripAsync()
+    {
+        var turn = 0;
+        ChatRequest? turn2Request = null;
+        var transport = new ScriptedTransport((req, _) =>
+        {
+            turn++;
+            if (turn == 1)
+            {
+                var thinkingProps = JsonFields.Empty
+                    .Set("thinkingSignature", JsonData.Parse("\"think-sig-1\""))
+                    .Set("redacted", JsonData.Parse("true"));
+                var textProps = JsonFields.Empty.Set("textSignature", JsonData.Parse("\"text-sig-1\""));
+                var toolProps = JsonFields.Empty.Set("thoughtSignature", JsonData.Parse("\"gemini-thought-sig-99\""));
+                var toolCall = new PiToolCallContent("call-g1", "lookup", JsonData.Parse("{\"q\":\"pi\"}"), toolProps);
+                var msg = new AssistantMessage(
+                    req.Model.Api, req.Model.Provider, req.Model.Id, req.Timestamp,
+                    [new ThinkingContent("", thinkingProps), new PiTextContent("Checking", textProps), toolCall],
+                    TokenUsage.Zero, StopReason.ToolUse);
+                return
+                [
+                    new StreamStarted(new AssistantMessage(req.Model.Api, req.Model.Provider, req.Model.Id, req.Timestamp, [], TokenUsage.Zero, StopReason.Pending)),
+                    new ThinkingStarted(0, new ThinkingContent("")),
+                    new ThinkingEnded(0, "", thinkingProps),
+                    new TextStarted(1, new PiTextContent("")),
+                    new TextDelta(1, "Checking"),
+                    new TextEnded(1, "Checking", textProps),
+                    new ToolCallStarted(2, new PiToolCallContent("call-g1", "lookup", JsonData.EmptyObject)),
+                    new ToolCallDelta(2, "{\"q\":\"pi\"}"),
+                    new ToolCallEnded(2, toolCall),
+                    new StreamDone(StopReason.ToolUse, msg)
+                ];
+            }
+
+            turn2Request = req;
+            var doneMsg = new AssistantMessage(req.Model.Api, req.Model.Provider, req.Model.Id, req.Timestamp,
+                [new PiTextContent("Done")], TokenUsage.Zero, StopReason.Stop);
+            return
+            [
+                new StreamStarted(new AssistantMessage(req.Model.Api, req.Model.Provider, req.Model.Id, req.Timestamp, [], TokenUsage.Zero, StopReason.Pending)),
+                new StreamDone(StopReason.Stop, doneMsg)
+            ];
+        });
+
+        using var client = new PiChatClient(transport, new ModelDescriptor("gemini-2.5-pro", "google-generative-ai", "google"));
+        var first = await client.GetResponseAsync([new ChatMessage(ChatRole.User, "Look up pi")]);
+        var assistantMsg = first.Messages[0];
+
+        var call = assistantMsg.Contents.OfType<FunctionCallContent>().Single();
+        Equal("gemini-thought-sig-99", call.AdditionalProperties![PiChatAdditionalProperties.ThoughtSignature], "tool call thoughtSignature captured");
+        var textItem = assistantMsg.Contents.OfType<AiTextContent>().Single();
+        Equal("text-sig-1", textItem.AdditionalProperties![PiChatAdditionalProperties.TextSignature], "textSignature captured");
+        var thinkingItem = assistantMsg.Contents.OfType<TextReasoningContent>().Single();
+        Equal("think-sig-1", thinkingItem.ProtectedData, "thinkingSignature captured");
+        Equal(true, thinkingItem.AdditionalProperties![PiChatAdditionalProperties.ThinkingRedacted], "redacted flag captured");
+
+        // Pass the assistant message back in turn 2 (even after cloning/stripping RawRepresentation).
+        var rebuiltAssistant = new ChatMessage(ChatRole.Assistant,
+        [
+            new TextReasoningContent(thinkingItem.Text) { ProtectedData = thinkingItem.ProtectedData, AdditionalProperties = thinkingItem.AdditionalProperties },
+            new AiTextContent(textItem.Text) { AdditionalProperties = textItem.AdditionalProperties },
+            new FunctionCallContent(call.CallId, call.Name, call.Arguments) { AdditionalProperties = call.AdditionalProperties }
+        ]);
+        await client.GetResponseAsync(
+        [
+            new ChatMessage(ChatRole.User, "Look up pi"),
+            rebuiltAssistant,
+            new ChatMessage(ChatRole.Tool, [new FunctionResultContent("call-g1", "3.14159")])
+        ]);
+
+        Check(turn2Request is not null, "turn 2 request captured");
+        var assistantEntry = JsonNode.Parse(turn2Request!.Messages[1].WireBody.ToString())!.AsObject();
+        var blocks = assistantEntry["content"]!.AsArray();
+        Equal("think-sig-1", blocks[0]!["thinkingSignature"]!.GetValue<string>(), "turn 2 thinkingSignature restored");
+        Equal(true, blocks[0]!["redacted"]!.GetValue<bool>(), "turn 2 redacted flag restored");
+        Equal("text-sig-1", blocks[1]!["textSignature"]!.GetValue<string>(), "turn 2 textSignature restored");
+        Equal("gemini-thought-sig-99", blocks[2]!["thoughtSignature"]!.GetValue<string>(), "turn 2 thoughtSignature restored");
+
+        // Also verify reverse ChatClientTransportAdapter preserves all three signatures and passes AssistantStreamReducer.
+        var sigClient = new ScriptedChatClient((_, _) =>
+        [
+            new ChatResponseUpdate(ChatRole.Assistant, [new TextReasoningContent("") { ProtectedData = "rs-2", AdditionalProperties = new() { [PiChatAdditionalProperties.ThinkingRedacted] = true } }]),
+            new ChatResponseUpdate(ChatRole.Assistant, [new AiTextContent("Hi") { AdditionalProperties = new() { [PiChatAdditionalProperties.TextSignature] = "ts-2" } }]),
+            new ChatResponseUpdate(ChatRole.Assistant, [new FunctionCallContent("c-2", "fn", new Dictionary<string, object?>()) { AdditionalProperties = new() { [PiChatAdditionalProperties.ThoughtSignature] = "gs-2" } }])
+            { FinishReason = ChatFinishReason.ToolCalls }
+        ]);
+        using var adapter = new ChatClientTransportAdapter(sigClient);
+        var fallback = new AssistantMessage(TestModel.Api, TestModel.Provider, TestModel.Id, 77, [], TokenUsage.Zero, StopReason.Pending);
+        var reducer = new AssistantStreamReducer(fallback);
+        StreamDone? adaptedDone = null;
+        await foreach (var ev in adapter.StreamAsync(new ChatRequest(TestModel, [UserEntry("hi")], 77)))
+        {
+            reducer.Apply(ev);
+            if (ev is StreamDone d) adaptedDone = d;
+        }
+        Check(adaptedDone is not null, "adapted stream done");
+        Equal("rs-2", adaptedDone!.Message.Content[0].ExtraProperties!.TryGet("thinkingSignature", out var rs2) ? rs2!.Value.GetString() : null, "adapter thinkingSignature");
+        Check(adaptedDone.Message.Content[0].ExtraProperties!.TryGet("redacted", out var red2) && red2!.Value.GetBoolean(), "adapter redacted");
+        Equal("ts-2", adaptedDone.Message.Content[1].ExtraProperties!.TryGet("textSignature", out var ts2) ? ts2!.Value.GetString() : null, "adapter textSignature");
+        Equal("gs-2", adaptedDone.Message.Content[2].ExtraProperties!.TryGet("thoughtSignature", out var gs2) ? gs2!.Value.GetString() : null, "adapter thoughtSignature");
+    }
+
+    private static async Task TestErrorAndCancelPreserveOpenBuffersAsync()
+    {
+        // Mid-stream ErrorContent after partial thinking + text deltas must retain both buffers in StreamError.
+        var midErrorClient = new ScriptedChatClient((_, _) =>
+        [
+            new ChatResponseUpdate(ChatRole.Assistant, [new TextReasoningContent("partial thought")]),
+            new ChatResponseUpdate(ChatRole.Assistant, [new AiTextContent("partial "), new AiTextContent("reply")]),
+            new ChatResponseUpdate(ChatRole.Assistant, [new ErrorContent("upstream reset")])
+        ]);
+        using (var adapter = new ChatClientTransportAdapter(midErrorClient))
+        {
+            var fallback = new AssistantMessage(TestModel.Api, TestModel.Provider, TestModel.Id, 50, [], TokenUsage.Zero, StopReason.Pending);
+            var reducer = new AssistantStreamReducer(fallback);
+            StreamError? err = null;
+            await foreach (var ev in adapter.StreamAsync(new ChatRequest(TestModel, [UserEntry("go")], 50)))
+            {
+                reducer.Apply(ev);
+                if (ev is StreamError e) err = e;
+            }
+            Check(err is not null && reducer.IsTerminal, "mid-stream error reached terminal");
+            Equal(StopReason.Error, err!.Reason, "error stop reason");
+            Equal(2, err.Message.Content.Length, "both closed thinking and open text preserved");
+            Equal("partial thought", ((ThinkingContent)err.Message.Content[0]).Thinking, "thinking preserved");
+            Equal("partial reply", ((PiTextContent)err.Message.Content[1]).Text, "open text buffer preserved in error terminal");
+            Equal("partial reply", ((PiTextContent)reducer.Snapshot().Content[1]).Text, "reducer snapshot keeps partial text");
+        }
+
+        // Mid-stream cancellation after open thinking delta must preserve the partial thinking buffer.
+        var midCancelClient = new MidStreamCancelingChatClient();
+        using (var adapter = new ChatClientTransportAdapter(midCancelClient))
+        {
+            using var cts = new CancellationTokenSource();
+            var fallback = new AssistantMessage(TestModel.Api, TestModel.Provider, TestModel.Id, 51, [], TokenUsage.Zero, StopReason.Pending);
+            var reducer = new AssistantStreamReducer(fallback);
+            StreamError? err = null;
+            await foreach (var ev in adapter.StreamAsync(new ChatRequest(TestModel, [UserEntry("go")], 51), cts.Token))
+            {
+                reducer.Apply(ev);
+                if (ev is ThinkingDelta) cts.Cancel();
+                if (ev is StreamError e) err = e;
+            }
+            Check(err is not null && reducer.IsTerminal, "mid-stream cancel reached terminal");
+            Equal(StopReason.Aborted, err!.Reason, "aborted stop reason");
+            Equal(1, err.Message.Content.Length, "open thinking buffer preserved on cancel");
+            Equal("halfway thinking", ((ThinkingContent)err.Message.Content[0]).Thinking, "thinking content preserved on cancel");
+        }
+    }
+
+    private static async Task TestUsageCacheAccountingAsync()
+    {
+        // External M.E.AI client reports inclusive InputTokenCount = 120, CachedInputTokenCount = 80, OutputTokenCount = 30, Total = null.
+        var cachedClient = new ScriptedChatClient((_, _) =>
+        [
+            new ChatResponseUpdate(ChatRole.Assistant, "ok"),
+            new ChatResponseUpdate(ChatRole.Assistant, [new UsageContent(new UsageDetails
+            {
+                InputTokenCount = 120,
+                CachedInputTokenCount = 80,
+                OutputTokenCount = 30
+            })]) { FinishReason = ChatFinishReason.Stop }
+        ]);
+        using var adapter = new ChatClientTransportAdapter(cachedClient);
+        StreamDone? done = null;
+        await foreach (var ev in adapter.StreamAsync(new ChatRequest(TestModel, [UserEntry("go")], 10)))
+            if (ev is StreamDone d) done = d;
+
+        Check(done is not null, "stream done");
+        Equal(40d, done!.Message.Usage.Input, "uncached input = 120 - 80");
+        Equal(80d, done.Message.Usage.CacheRead, "cache read = 80");
+        Equal(30d, done.Message.Usage.Output, "output = 30");
+        Equal(150d, done.Message.Usage.TotalTokens, "total = 120 + 30 (no double counting)");
+
+        // Exact round-trip PiSharp -> PiChatClient -> ChatClientTransportAdapter -> PiSharp.
+        var innerTransport = new ScriptedTransport((req, _) =>
+        {
+            var usage = new TokenUsage(100, 42, 20, 5, 167, new UsageCost(0, 0, 0, 0, 0));
+            var msg = new AssistantMessage(req.Model.Api, req.Model.Provider, req.Model.Id, req.Timestamp,
+                [new PiTextContent("ok")], usage, StopReason.Stop);
+            return
+            [
+                new StreamStarted(new AssistantMessage(req.Model.Api, req.Model.Provider, req.Model.Id, req.Timestamp, [], TokenUsage.Zero, StopReason.Pending)),
+                new TextStarted(0, new PiTextContent("")),
+                new TextDelta(0, "ok"),
+                new TextEnded(0, "ok"),
+                new StreamDone(StopReason.Stop, msg)
+            ];
+        });
+        using var piClient = new PiChatClient(innerTransport, TestModel);
+        using var rtAdapter = new ChatClientTransportAdapter(piClient);
+        StreamDone? rtDone = null;
+        await foreach (var ev in rtAdapter.StreamAsync(new ChatRequest(TestModel, [UserEntry("go")], 11)))
+            if (ev is StreamDone d) rtDone = d;
+
+        Check(rtDone is not null, "roundtrip done");
+        Equal(100d, rtDone!.Message.Usage.Input, "roundtrip uncached input exact");
+        Equal(20d, rtDone.Message.Usage.CacheRead, "roundtrip cacheRead exact");
+        Equal(5d, rtDone.Message.Usage.CacheWrite, "roundtrip cacheWrite exact");
+        Equal(42d, rtDone.Message.Usage.Output, "roundtrip output exact");
+        Equal(167d, rtDone.Message.Usage.TotalTokens, "roundtrip total exact");
+    }
+
     private static async Task TestTransportAdapterReducerConformanceAsync()
     {
         var fakeClient = new ScriptedChatClient((_, _) =>
@@ -372,6 +578,7 @@ internal static class Program
         Equal(3, ids.Distinct().Count(), "tool call IDs deduplicated & non-empty");
         Check(ids.All(id => !string.IsNullOrWhiteSpace(id)), "all call IDs non-empty");
         Equal(24d, done.Message.Usage.TotalTokens, "usage total tokens");
+        Equal(8d, done.Message.Usage.Input, "uncached input = 12 - 4");
         Equal(4d, done.Message.Usage.CacheRead, "usage cache read");
     }
 
@@ -707,6 +914,24 @@ internal static class Program
             await Task.Yield();
             foreach (var update in script(messages, options))
                 yield return update;
+        }
+
+        public object? GetService(Type serviceType, object? serviceKey = null) => null;
+        public void Dispose() { }
+    }
+
+    private sealed class MidStreamCancelingChatClient : IChatClient
+    {
+        public Task<ChatResponse> GetResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public async IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(
+            IEnumerable<ChatMessage> messages, ChatOptions? options = null, [EnumeratorCancellation] CancellationToken cancellationToken = default)
+        {
+            await Task.Yield();
+            yield return new ChatResponseUpdate(ChatRole.Assistant, [new TextReasoningContent("halfway thinking")]);
+            await Task.Yield();
+            cancellationToken.ThrowIfCancellationRequested();
         }
 
         public object? GetService(Type serviceType, object? serviceKey = null) => null;
