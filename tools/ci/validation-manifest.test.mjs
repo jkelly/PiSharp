@@ -72,6 +72,13 @@ test('manifest-to-trx renders valid TRX XML and Markdown step summary for pass, 
         result: 'missing-or-invalid',
         error: 'ENOENT: missing report',
         cases: []
+      },
+      {
+        suite: 'PiSharp.Incomplete.Tests',
+        result: 'failed',
+        cases: [
+          { id: 'p1', name: 'only-recorded-case', result: 'passed', rawStatus: 'passed', reason: null }
+        ]
       }
     ]
   };
@@ -79,18 +86,21 @@ test('manifest-to-trx renders valid TRX XML and Markdown step summary for pass, 
   const trx = renderTrx(manifest);
   assert.match(trx, /^<\?xml version="1\.0" encoding="utf-8"\?>/);
   assert.match(trx, /outcome="Failed"/);
-  assert.match(trx, /total="4" executed="3" passed="1" failed="2"/);
+  assert.match(trx, /total="6" executed="5" passed="2" failed="3"/);
   assert.match(trx, /notExecuted="1"/);
   assert.match(trx, /case &lt;one&gt; &amp; &quot;ok&quot;/);
   assert.match(trx, /boom &lt;bad&gt;/);
   assert.doesNotMatch(trx, /\u0007/);
   assert.match(trx, /ENOENT: missing report/);
+  assert.match(trx, /PiSharp\.Incomplete\.Tests\.&lt;suite&gt;/);
 
   const md = renderSummary(manifest, 'Core Suite');
   assert.match(md, /### Core Suite/);
   assert.match(md, /\| `PiSharp\.Tools\.Tests` \| ❌ failed \| 1 \| 1 \| 1 \| 3 \|/);
   assert.match(md, /\| `PiSharp\.Missing\.Tests` \| ❌ missing-or-invalid \| 0 \| 0 \| 0 \| 0 \|/);
-  assert.match(md, /Failures \(2\)/);
+  assert.match(md, /\| `PiSharp\.Incomplete\.Tests` \| ❌ failed \| 1 \| 0 \| 0 \| 1 \|/);
+  assert.match(md, /Failures \(3\)/);
+  assert.match(md, /PiSharp\.Incomplete\.Tests.*&lt;suite&gt;|PiSharp\.Incomplete\.Tests.*`<suite>`/);
   assert.match(md, /Console skip observations \(1\)/);
 
   const dir = mkdtempSync(join(tmpdir(), 'pisharp-trx-'));

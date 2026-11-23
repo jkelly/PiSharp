@@ -60,6 +60,7 @@ export function renderTrx(manifest) {
       continue;
     }
 
+    let suiteFailedCases = 0;
     for (let i = 0; i < cases.length; i++) {
       const c = cases[i];
       total++;
@@ -79,6 +80,7 @@ export function renderTrx(manifest) {
         outcome = 'Failed';
         executed++;
         failed++;
+        suiteFailedCases++;
       }
 
       definitions.push(
@@ -93,6 +95,28 @@ export function renderTrx(manifest) {
       const closeTag = detail ? `${detail}</UnitTestResult>` : '</UnitTestResult>';
       results.push(
         `    <UnitTestResult executionId="${execId}" testId="${testId}" testName="${xmlEscape(fullName)}" computerName="${xmlEscape(manifest.platform?.runner ?? manifest.platform?.os ?? 'pisharp')}" duration="00:00:00.0000000" startTime="${xmlEscape(generated)}" endTime="${xmlEscape(generated)}" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="${outcome}" testListId="${testListId}">${closeTag}`
+      );
+    }
+
+    if (suite.result === 'failed' && suiteFailedCases === 0) {
+      // Suite failed at the suite level (e.g. incomplete report, truncated case count, or nonzero failures count)
+      // even though every recorded case passed; emit a synthetic suite-level failure so TRX parsers surface it.
+      total++; executed++; failed++;
+      const testId = deterministicGuid(`suite-error:${suiteName}`);
+      const execId = deterministicGuid(`exec:suite-error:${suiteName}`);
+      const fullName = `${suiteName}.<suite>`;
+      const msg = suite.error ?? `Suite ${suiteName} failed at suite level (incomplete report or failed prerequisite).`;
+      definitions.push(
+        `    <UnitTest name="${xmlEscape(fullName)}" storage="${xmlEscape(suiteName)}" id="${testId}">\n` +
+        `      <Execution id="${execId}" />\n` +
+        `      <TestMethod codeBase="${xmlEscape(suiteName)}" adapterTypeName="PiSharp.ConsoleRunner" className="${xmlEscape(suiteName)}" name="&lt;suite&gt;" />\n` +
+        `    </UnitTest>`
+      );
+      entries.push(`    <TestEntry testId="${testId}" executionId="${execId}" testListId="${testListId}" />`);
+      results.push(
+        `    <UnitTestResult executionId="${execId}" testId="${testId}" testName="${xmlEscape(fullName)}" computerName="${xmlEscape(manifest.platform?.runner ?? manifest.platform?.os ?? 'pisharp')}" duration="00:00:00.0000000" startTime="${xmlEscape(generated)}" endTime="${xmlEscape(generated)}" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="${testListId}">\n` +
+        `      <Output><ErrorInfo><Message>${xmlEscape(msg)}</Message></ErrorInfo></Output>\n` +
+        `    </UnitTestResult>`
       );
     }
   }
@@ -146,8 +170,8 @@ export function renderSummary(manifest, title = 'PiSharp Test Summary') {
       else if (c.result === 'skipped') s++;
       else { f++; failures.push({ suite: suite.suite, name: c.name ?? c.id, status: c.rawStatus ?? c.result, reason: c.reason }); }
     }
-    if (cases.length === 0 && suite.result !== 'passed') {
-      failures.push({ suite: suite.suite, name: '<suite>', status: suite.result, reason: suite.error ?? 'Missing or invalid report' });
+    if (f === 0 && suite.result !== 'passed' && suite.result !== 'passed-with-skips') {
+      failures.push({ suite: suite.suite, name: '<suite>', status: suite.result, reason: suite.error ?? (cases.length === 0 ? 'Missing or invalid report' : 'Suite failed at suite level (incomplete report or count mismatch)') });
     }
     for (const obs of suite.consoleSkipObservations ?? []) {
       skipNotes.push({ suite: suite.suite, line: obs });

@@ -360,7 +360,11 @@ public partial class Session
         {
             lock (listenersGate) commitListeners.Remove(guarded!);
         }, (error, context) => Report(error, ReportInfo.ListenerError, context));
-        lock (listenersGate) commitListeners.Add(guarded);
+        lock (listenersGate)
+        {
+            AssertUsable();
+            commitListeners.Add(guarded);
+        }
         return new CommitObservation(guarded);
     }
 
@@ -375,7 +379,11 @@ public partial class Session
         AssertUsable();
         // A distinct wrapper per subscription, so two subscriptions of one delegate are independent and removal is exact.
         Action<ObservedCommit, DurableContext> entry = (publication, context) => listener(publication, context);
-        lock (listenersGate) internalListeners.Add(entry);
+        lock (listenersGate)
+        {
+            AssertUsable();
+            internalListeners.Add(entry);
+        }
         return new Unsubscriber(() =>
         {
             lock (listenersGate) internalListeners.Remove(entry);
@@ -388,7 +396,11 @@ public partial class Session
         ArgumentNullException.ThrowIfNull(listener);
         AssertUsable();
         Action entry = () => listener();
-        lock (listenersGate) closeListeners.Add(entry);
+        lock (listenersGate)
+        {
+            AssertUsable();
+            closeListeners.Add(entry);
+        }
         return new Unsubscriber(() =>
         {
             lock (listenersGate) closeListeners.Remove(entry);

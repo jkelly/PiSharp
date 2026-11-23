@@ -14,6 +14,7 @@ if [[ -z "$SDK_VERSION" ]]; then
 fi
 
 mkdir -p "$INSTALL_DIR"
+INSTALL_DIR="$(cd "$INSTALL_DIR" && pwd)"
 if [[ -x "$INSTALL_DIR/dotnet" ]] && "$INSTALL_DIR/dotnet" --list-sdks 2>/dev/null | grep -q "^${SDK_VERSION} "; then
   echo ".NET SDK $SDK_VERSION is already installed in $INSTALL_DIR."
   echo "Activate in your shell:"

@@ -39,7 +39,14 @@ $installer = Join-Path $InstallDir 'dotnet-install.ps1'
 Write-Host "Downloading official Microsoft dotnet-install.ps1 for .NET SDK $sdkVersion..."
 Invoke-WebRequest -UseBasicParsing -Uri 'https://dot.net/v1/dotnet-install.ps1' -OutFile $installer
 & $installer -Version $sdkVersion -InstallDir $InstallDir -NoPath
-if ($LASTEXITCODE -ne 0) { throw "dotnet-install.ps1 failed with exit code $LASTEXITCODE" }
+
+if (-not (Test-Path -LiteralPath $dotnetExe)) {
+    throw "Expected dotnet executable at $dotnetExe after installation."
+}
+$verified = @(& $dotnetExe --list-sdks 2>$null)
+if ($LASTEXITCODE -ne 0 -or -not ($verified -match ("^" + [regex]::Escape($sdkVersion) + "\s"))) {
+    throw ".NET SDK $sdkVersion was not found in $InstallDir after installation."
+}
 
 Write-Host ""
 Write-Host "Installed .NET SDK $sdkVersion to $InstallDir."
