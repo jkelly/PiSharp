@@ -1039,13 +1039,14 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
                 if (anthropic) wire.Append("event: ").Append(observation.GetProperty("type").GetString()).Append('\n');
                 wire.Append("data: ").Append(observation.GetRawText()).Append("\n\n");
             }
+            if (completions) wire.Append("data: [DONE]\n\n");
             var literal = Encoding.UTF8.GetBytes(wire.ToString());
             HttpContent content;
             if (bodyGate && beforeSendAsync is not null)
             {
                 // The admitted source script is at most 1 MiB and 256 events per turn;
                 // the only extra wire bytes are fixed data/blank-line framing, not another queue.
-                if (literal.Length > 1_048_576 + 256 * 8)
+                if (literal.Length > 1_048_576 + 256 * 8 + (completions ? 14 : 0))
                     throw new SessionCommandException(SessionCommandFailure.ResourceLimit);
                 content = new StreamContent(new FirstReadGatedBody(literal, beforeSendAsync));
                 content.Headers.ContentLength = literal.Length;

@@ -115,6 +115,7 @@ public sealed class CompletionsHttpSseTransport : IChatTransport
         private bool _prepared;
         public CompletionsPublicFailure? PublicFailure { get; private set; }
         public bool LastFailureNonTransport { get; private set; }
+        public bool RetryUnexpectedEof => !LastFailureNonTransport && !_receivedDone;
         internal void MarkNonTransportFailure() => LastFailureNonTransport = true;
         private bool _receivedDone;
         private ReaderCleanupFault _readerCleanupFault;

@@ -148,6 +148,8 @@ public sealed class OpenAICompletionsWireSource : IChatTransport
                     yield return item;
                 }
             }
+            if (failure is null && enumerator is IPreparedCompletionsEnumerator { RetryUnexpectedEof: true })
+                state.RetryPrematureEof = true;
             finishedReading = true;
         }
         finally
@@ -245,6 +247,7 @@ public sealed class OpenAICompletionsWireSource : IChatTransport
         private bool _errorThinkingSignatureAttempted;
         private StopReason _reason = StopReason.Pending;
         internal bool RetryableTransportFailure;
+        internal bool RetryPrematureEof;
         public StreamStarted Start { get; }
 
         public State(ChatRequest request, OpenAICompletionsWireOptions options, CancellationToken token)
@@ -571,7 +574,7 @@ public sealed class OpenAICompletionsWireSource : IChatTransport
             var final = finalSnapshot with { Usage = _usage, StopReason = reason, ExtraProperties = properties };
             StreamTerminalEvent terminal = failure is null
                 ? new StreamDone(reason, final)
-                : new StreamError(reason, final) { IsRetryableTransportFailure = reason == StopReason.Error && (RetryableTransportFailure || failure == OpenAICompletionsWireFailure.UnexpectedEof) };
+                : new StreamError(reason, final) { IsRetryableTransportFailure = reason == StopReason.Error && (RetryableTransportFailure || (RetryPrematureEof && failure == OpenAICompletionsWireFailure.UnexpectedEof)) };
             if (failure is { } nativeFailure) terminal = terminal with { NativeDiagnostic = Diagnostic(nativeFailure) };
             // A resource failure may leave no space for another source-facing copy.
             // The native sanitized terminal still settles; no fabricated source trace

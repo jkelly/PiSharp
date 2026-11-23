@@ -179,7 +179,7 @@ internal static partial class Program
                 Equal(StopReason.Error, result.Message.StopReason);
                 Check(!result.IsRetryableTransportFailure, "Completions BodyReaderFactory TimeoutException must NOT be marked retryable.");
             }
-            // Completions premature EOF without finish_reason -> retryable UnexpectedEof.
+            // Completions premature EOF without [DONE] or finish_reason -> retryable UnexpectedEof; explicit [DONE] without finish_reason -> NOT retryable.
             using (var client = new HttpClient(new Handler(_ => Task.FromResult(Sse(null,
                 """data: {"id":"cmpl-1","choices":[{"index":0,"delta":{"role":"assistant","content":"partial"},"finish_reason":null}]}""" + "\n\n")))))
             {
@@ -187,7 +187,17 @@ internal static partial class Program
                     (_, _) => new HttpRequestMessage(HttpMethod.Post, "https://openai.invalid/v1/chat/completions"));
                 var result = await new ChatClient(transport).CompleteAsync(new(completionsModel, [Ask], 1)).WaitAsync(Deadline);
                 Equal(StopReason.Error, result.Message.StopReason);
-                Check(result.IsRetryableTransportFailure, "Completions premature EOF without finish_reason must be marked retryable.");
+                Check(result.IsRetryableTransportFailure, "Completions premature EOF without [DONE] or finish_reason must be marked retryable.");
+            }
+            using (var client = new HttpClient(new Handler(_ => Task.FromResult(Sse(null,
+                """data: {"id":"cmpl-1","choices":[{"index":0,"delta":{"role":"assistant","content":"partial"},"finish_reason":null}]}""" + "\n\n" +
+                "data: [DONE]\n\n")))))
+            {
+                var transport = new CompletionsHttpSseTransport(client,
+                    (_, _) => new HttpRequestMessage(HttpMethod.Post, "https://openai.invalid/v1/chat/completions"));
+                var result = await new ChatClient(transport).CompleteAsync(new(completionsModel, [Ask], 1)).WaitAsync(Deadline);
+                Equal(StopReason.Error, result.Message.StopReason);
+                Check(!result.IsRetryableTransportFailure, "Completions clean [DONE] without finish_reason must NOT be marked retryable.");
             }
         }
 
