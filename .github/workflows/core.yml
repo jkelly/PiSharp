@@ -3,7 +3,13 @@ name: Core validation
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - 'website/**'
+      - 'AI_DOCS/**'
   pull_request:
+    paths-ignore:
+      - 'website/**'
+      - 'AI_DOCS/**'
   workflow_dispatch:
   workflow_call:
     inputs:
@@ -24,13 +30,13 @@ jobs:
       matrix:
         suite: [Compatibility, Agent, Transport, Sessions, Tools, CodingAgent, Rpc, Extensions.ContractTests, ExtensionHost, Tui]
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           ref: ${{ inputs.source_sha || github.sha }}
-      - uses: actions/setup-dotnet@v5
+      - uses: actions/setup-dotnet@v6
         with:
           global-json-file: global.json
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: '22'
       - name: Install native search prerequisite
@@ -46,7 +52,7 @@ jobs:
           $suite = if ('${{ matrix.suite }}' -eq 'Extensions.ContractTests') { 'PiSharp.Extensions.ContractTests' } else { 'PiSharp.${{ matrix.suite }}.Tests' }
           node tools/ci/write-validation-manifest.mjs --output '${{ runner.temp }}/core/manifest.json' --execution '${{ runner.temp }}/core/execution.json' --report "$suite=${{ runner.temp }}/core/$suite.json" --console "$suite=${{ runner.temp }}/core/console.log" --prerequisite "dotnet-sdk=$(dotnet --version)" --prerequisite 'Windows native process and ConPTY support' --prerequisite 'native extension fixtures published for CodingAgent/Extensions.ContractTests by runner' --reject-skips
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: core-${{ matrix.suite }}
@@ -57,10 +63,10 @@ jobs:
     name: Offline and frozen-source applicability
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           ref: ${{ inputs.source_sha || github.sha }}
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: '22'
       - name: Offline applicability and worklist structure

@@ -1,10 +1,17 @@
 // @ts-check
 import { defineConfig } from 'astro/config';
+import { satteri } from '@astrojs/markdown-satteri';
 import starlight from '@astrojs/starlight';
+import createPiSharpVersionPlugin from './src/plugins/satteri-pisharp-version.mjs';
 
 // https://astro.build/config
 export default defineConfig({
 	site: 'https://pisharp.ai',
+	markdown: {
+		processor: satteri({
+			mdastPlugins: [createPiSharpVersionPlugin()],
+		}),
+	},
 	integrations: [
 		starlight({
 			title: 'PiSharp',

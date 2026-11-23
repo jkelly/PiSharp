@@ -1,0 +1,101 @@
+name: Security audit
+
+# Weekly scheduled and manual NuGet vulnerability audit across PiSharp.slnx.
+# Directory.Build.props keeps NuGetAudit=false so offline builds and deterministic restores never reach the network;
+# this workflow explicitly enables NuGetAudit=true against nuget.org and records any moderate+ advisories.
+on:
+  schedule:
+    - cron: '0 9 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: security-audit-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  nuget-audit:
+    name: NuGet vulnerability audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+
+      - name: Restore solution with NuGetAudit enabled
+        shell: bash
+        run: |
+          set -o pipefail
+          dotnet restore PiSharp.slnx \
+            -p:RestoreSources=https://api.nuget.org/v3/index.json \
+            -p:RestoreLockedMode=false \
+            -p:NuGetAudit=true \
+            -p:NuGetAuditMode=all \
+            -p:NuGetAuditLevel=moderate \
+            -p:TreatWarningsAsErrors=false \
+            2>&1 | tee "$RUNNER_TEMP/restore-audit.log"
+
+      - name: List vulnerable packages (direct and transitive)
+        id: audit
+        shell: bash
+        run: |
+          dotnet list PiSharp.slnx package --vulnerable --include-transitive \
+            --source https://api.nuget.org/v3/index.json \
+            --format json > "$RUNNER_TEMP/nuget-vulnerabilities.json"
+          node -e '
+            const fs = require("fs");
+            const data = JSON.parse(fs.readFileSync(process.env.RUNNER_TEMP + "/nuget-vulnerabilities.json", "utf8"));
+            const findings = [];
+            for (const project of data.projects ?? []) {
+              for (const fw of project.frameworks ?? []) {
+                for (const kind of ["topLevelPackages", "transitivePackages"]) {
+                  for (const pkg of fw[kind] ?? []) {
+                    for (const v of pkg.vulnerabilities ?? []) {
+                      findings.push({
+                        project: project.path,
+                        kind: kind === "topLevelPackages" ? "direct" : "transitive",
+                        package: pkg.id,
+                        version: pkg.resolvedVersion,
+                        severity: v.severity,
+                        advisory: v.advisoryurl
+                      });
+                    }
+                  }
+                }
+              }
+            }
+            const lines = ["# NuGet Vulnerability Audit", ""];
+            if (findings.length === 0) {
+              lines.push("No known vulnerable packages found across `PiSharp.slnx` (direct or transitive).");
+            } else {
+              lines.push(`Found **${findings.length}** vulnerability entries:`, "", "| Severity | Package | Version | Kind | Advisory |", "| --- | --- | --- | --- | --- |");
+              const seen = new Set();
+              for (const f of findings) {
+                const key = `${f.package}|${f.version}|${f.advisory}`;
+                if (seen.has(key)) continue;
+                seen.add(key);
+                lines.push(`| ${f.severity} | \`${f.package}\` | \`${f.version}\` | ${f.kind} | ${f.advisory} |`);
+              }
+            }
+            fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, lines.join("\n") + "\n");
+            console.log(`Vulnerable entries: ${findings.length}`);
+            const highOrCritical = findings.filter(f => /^(high|critical)$/i.test(f.severity));
+            if (highOrCritical.length > 0) {
+              console.error(`Found ${highOrCritical.length} High/Critical vulnerability entries.`);
+              process.exitCode = 1;
+            }
+          '
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: nuget-security-audit
+          path: |
+            ${{ runner.temp }}/restore-audit.log
+            ${{ runner.temp }}/nuget-vulnerabilities.json
+          if-no-files-found: warn

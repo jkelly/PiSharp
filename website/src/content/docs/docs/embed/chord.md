@@ -4,7 +4,7 @@ description: The experimental Chord v2 host, native plugins, HTTP and worker pro
 ---
 
 :::caution[Experimental — from 1.5.0.1]
-`PiSharp.Chord` and `PiSharp.Chord.Hosting` are available on NuGet at version **1.6.0**. Their public APIs use `PISHARP_CHORD001`; hosting also requires the ASP.NET Core shared framework. Keep all PiSharp sibling references at the same exact version. See the [package contract](https://github.com/jkelly/PiSharp/blob/main/docs/contracts/gap-package-admission.md).
+`PiSharp.Chord` and `PiSharp.Chord.Hosting` are available on NuGet at version **{{PISHARP_VERSION}}**. Their public APIs use `PISHARP_CHORD001`; hosting also requires the ASP.NET Core shared framework. Keep all PiSharp sibling references at the same exact version. See the [package contract](https://github.com/jkelly/PiSharp/blob/main/docs/contracts/gap-package-admission.md).
 :::
 
 :::note[Updated in 1.6.0]

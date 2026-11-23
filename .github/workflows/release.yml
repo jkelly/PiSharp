@@ -52,15 +52,15 @@ jobs:
     outputs:
       version: ${{ steps.version.outputs.version }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-dotnet@v5
+      - uses: actions/setup-dotnet@v6
         with:
           global-json-file: global.json
 
       # PiSharp.ExtensionParity.Tests runs TypeScript extensions with Node.js 22.13 or later (module.stripTypeScriptTypes) and
       # uses the exact Pi 1.6.0 packages; the runner image's default Node.js may be older.
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: '22'
 
@@ -109,7 +109,7 @@ jobs:
           reports=()
           for t in PiSharp.AzureResponses.Tests PiSharp.MistralConversations.Tests PiSharp.AnthropicAuthSync.Tests PiSharp.McpSync.Tests PiSharp.ProviderSync.Tests PiSharp.WireSync.Tests PiSharp.CliSync.Tests PiSharp.ToolSearch.Tests PiSharp.Classifiers.Tests PiSharp.Models.Tests PiSharp.Schema.Tests PiSharp.Telemetry.Tests PiSharp.Codemode.Tests PiSharp.ProviderApis.Tests PiSharp.CliParity.Tests PiSharp.McpParity.Tests PiSharp.SessionParity.Tests PiSharp.InteractiveParity.Tests PiSharp.ExtensionParity.Tests PiSharp.Durable.Tests PiSharp.DurableCli.Tests PiSharp.CustomAgents.Tests; do reports+=(--report "$t=$RUNNER_TEMP/release-reports/$t.json"); done
           node tools/ci/write-validation-manifest.mjs "${reports[@]}" --output "$RUNNER_TEMP/release-reports/manifest.json" --prerequisite "dotnet-sdk=$(dotnet --version)" --prerequisite "node=$(node --version); npm and frozen fixtures; no provider keys"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always() && (github.event_name == 'push' || !inputs.skip_tests)
         with:
           name: release-suite-reports
@@ -146,7 +146,7 @@ jobs:
             echo "$asset: SQLitePCLRaw.lib.e_sqlite3 $version"
           done
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: packages
           path: |
@@ -163,12 +163,12 @@ jobs:
     permissions:
       id-token: write
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: packages
           path: artifacts
 
-      - uses: actions/setup-dotnet@v5
+      - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: 10.0.x
 
@@ -194,13 +194,13 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: '22'
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: packages
           path: artifacts

@@ -5,8 +5,16 @@ name: Custom agents
 on:
   push:
     branches: [main, feature/custom-agents]
+    paths-ignore:
+      - 'website/**'
+      - 'docs/**'
+      - 'AI_DOCS/**'
   pull_request:
     branches: [main, feature/custom-agents]
+    paths-ignore:
+      - 'website/**'
+      - 'docs/**'
+      - 'AI_DOCS/**'
   workflow_dispatch:
 
 permissions:
@@ -26,9 +34,9 @@ jobs:
       matrix:
         os: [windows-latest, ubuntu-latest, macos-15]
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-dotnet@v5
+      - uses: actions/setup-dotnet@v6
         with:
           global-json-file: global.json
 
@@ -50,7 +58,7 @@ jobs:
             -- --parts 3 --dir "$RUNNER_TEMP/research" --out "$RUNNER_TEMP/research.md"
           grep -q '^# ' "$RUNNER_TEMP/research.md"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: custom-agents-report-${{ matrix.os }}

@@ -207,7 +207,8 @@ const serializedSamples = JSON.stringify(allSamples).replace(/</g, '\\u003c');
 					</div>
 					<div class="cmd-actions">
 						<button type="button" class="ps-toggle copy-btn" id="copy-cmd-btn">Copy command</button>
-						<span class="ps-fine" id="copy-cmd-status" role="status"></span>
+						<button type="button" class="ps-toggle copy-btn" id="copy-link-btn">Copy link</button>
+						<span class="ps-fine" id="copy-cmd-status" role="status" aria-live="polite"></span>
 					</div>
 				</div>
 
@@ -280,6 +281,7 @@ const serializedSamples = JSON.stringify(allSamples).replace(/</g, '\\u003c');
 	const cmdTabs = document.getElementById('cmd-tabs');
 	const inspCmd = document.getElementById('insp-cmd');
 	const copyBtn = document.getElementById('copy-cmd-btn');
+	const copyLinkBtn = document.getElementById('copy-link-btn');
 	const copyStatus = document.getElementById('copy-cmd-status');
 
 	let activeRt = 'all';
@@ -470,6 +472,10 @@ const serializedSamples = JSON.stringify(allSamples).replace(/</g, '\\u003c');
 		if (Array.from(categorySelect.options).some((o) => o.value === cat)) activeCat = cat;
 	}
 	if (initial.get('q') && searchInput) searchInput.value = initial.get('q')!;
+	const initialSample = initial.get('sample');
+	if (initialSample && byId.has(initialSample)) {
+		selectedId = initialSample;
+	}
 
 	for (const btn of rtButtons) {
 		btn.addEventListener('click', () => {
@@ -501,20 +507,40 @@ const serializedSamples = JSON.stringify(allSamples).replace(/</g, '\\u003c');
 			if (id) renderInspector(id);
 		});
 	}
+	let statusTimer: number | undefined;
+	function showCopyStatus(msg: string) {
+		if (!copyStatus) return;
+		copyStatus.textContent = msg;
+		window.clearTimeout(statusTimer);
+		statusTimer = window.setTimeout(() => {
+			copyStatus.textContent = '';
+		}, 1800);
+	}
 	copyBtn?.addEventListener('click', async () => {
 		try {
 			await navigator.clipboard.writeText(currentCommandText);
-			if (copyStatus) copyStatus.textContent = 'Copied.';
+			showCopyStatus('Command copied.');
 		} catch {
-			if (copyStatus) copyStatus.textContent = 'Select and copy the command above.';
+			showCopyStatus('Select and copy the command above.');
 		}
-		setTimeout(() => {
-			if (copyStatus) copyStatus.textContent = '';
-		}, 1800);
+	});
+	copyLinkBtn?.addEventListener('click', async () => {
+		const url = `${window.location.origin}${window.location.pathname}?sample=${encodeURIComponent(selectedId)}`;
+		try {
+			await navigator.clipboard.writeText(url);
+			showCopyStatus('Link copied.');
+		} catch {
+			showCopyStatus(url);
+		}
 	});
 
 	renderInspector(selectedId);
 	applyFilters(false);
+	if (initialSample && byId.has(initialSample)) {
+		renderInspector(initialSample);
+		const targetCard = cards.find((c) => c.dataset.sampleId === initialSample);
+		targetCard?.scrollIntoView({ block: 'nearest' });
+	}
 </script>
 
 <style>

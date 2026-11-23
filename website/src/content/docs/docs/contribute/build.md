@@ -124,7 +124,7 @@ Then install the tool from a folder outside the repository, because the reposito
 
 ```powershell
 cd ..
-dotnet tool install PiSharp.Cli --tool-path ./pisharp-dev --add-source PiSharp/artifacts/packages --version 1.6.0
+dotnet tool install PiSharp.Cli --tool-path ./pisharp-dev --add-source PiSharp/artifacts/packages --version {{PISHARP_VERSION}}
 ./pisharp-dev/pisharp --version
 ```
 

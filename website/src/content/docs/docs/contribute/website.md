@@ -40,7 +40,9 @@ Starlight renders the title, so a page starts with an intro paragraph and uses `
 
 No link checker runs when the site builds. Check new links yourself, and write internal links root-relative with a trailing slash, such as `/docs/reference/settings/`.
 
-`src/data/site.ts` reads the published version from `compatibility/public-release.json`, including `previousReleases` while a future candidate's publication flags are false. PiSharp 1.6.0 publishes 29 packages, including the five experimental libraries introduced in 1.5.0.1. Promote a changelog to `status: released` and add its actual UTC date only after publication is verified; released entries enter RSS and gain their GitHub release link. Future candidate changelogs use `status: in-progress` and stay out of released RSS. Mark any future unpublished SDK library with `unpublished: true` and provide a source guide instead of a NuGet install command.
+`src/data/site.ts` reads the published version from `compatibility/public-release.json`, including `previousReleases` while a future candidate's publication flags are false. Markdown pages under `src/content/docs/` can use `\{{PISHARP_VERSION}}` in prose or fenced code blocks; `src/plugins/satteri-pisharp-version.mjs` replaces it at build time with that published version so installation snippets stay current automatically. Promote a changelog to `status: released` and add its actual UTC date only after publication is verified; released entries enter RSS and gain their GitHub release link. Future candidate changelogs use `status: in-progress` and stay out of released RSS. Mark any future unpublished SDK library with `unpublished: true` and provide a source guide instead of a NuGet install command.
+
+At build time, `src/pages/llms.txt.ts` and `src/pages/llms-full.txt.ts` also generate `/llms.txt` and `/llms-full.txt` so coding agents can consume the documentation and sample catalog cleanly.
 
 ## The sidebar
 
@@ -121,12 +123,12 @@ npm run dev
 
 ## Deployment
 
-[`website.yml`](https://github.com/jkelly/PiSharp/blob/main/.github/workflows/website.yml) deploys the site to GitHub Pages. It runs on every push to `main` that touches `website/**`, `compatibility/**` or the workflow itself, and on demand. It installs the packages with Node.js 22, runs `npm run build`, and deploys `website/dist`.
+[`website.yml`](https://github.com/jkelly/PiSharp/blob/main/.github/workflows/website.yml) builds and verifies the site on pull requests and pushes to `main` that touch `website/**`, `compatibility/**`, `samples/agents/catalog.json` or the workflow itself, and deploys to GitHub Pages on `main` pushes and manual runs. It installs the packages with Node.js 22, runs `npm run build` and `npm run check`, and deploys `website/dist`.
 
 The workflow runs `npm install`, not `npm ci`, because `package-lock.json` is generated on Windows and leaves out Linux-only optional dependencies that `npm ci` would reject.
 
-:::caution[Merging publishes]
-There is no staging site and no build check on pull requests. A merge to `main` that touches the site goes live as soon as the workflow finishes, and a change that breaks the build shows up only after the merge. Build the site locally before you merge.
+:::note[PR checks & live deploys]
+Pull requests run the full Astro build and `npm run check` (internal links, `#anchor` targets, `\{{PISHARP_VERSION}}` token substitution, `/llms.txt` + `/llms-full.txt`, and all 62 `catalog.json` samples) without deploying. Merging to `main` publishes `website/dist` to GitHub Pages immediately.
 :::
 
 The custom domain is set in the repository's Pages settings, and its DNS is managed outside GitHub.
