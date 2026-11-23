@@ -4,7 +4,6 @@ using PiSharp.Durable;
 using ChordJson = PiSharp.Durable.Chord.JsonValue;
 using ChordObject = PiSharp.Durable.Chord.JsonObjectValue;
 
-#pragma warning disable PISHARP_IDENTITY001
 internal static partial class Program
 {
     private static IEnumerable<(string, Func<Task>)> AccountPayloadHookCases()

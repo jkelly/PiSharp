@@ -211,11 +211,9 @@ public sealed class AssistantStreamReducer
     /// The partial arguments of the tool block's text so far (streaming-json.ts <c>ToolCallArgumentsStream</c>), each delta read once.
     /// Display only, like <see cref="GetToolJsonPreview"/>: they never replace executable arguments.
     /// </summary>
-    [System.Diagnostics.CodeAnalysis.Experimental("PISHARP_AI001")]
     public JsonData GetToolArgumentsPreview(int index) => ToolArguments(index).Partial();
 
     /// <summary>The final arguments of the tool block's text: one <see cref="StreamingJson.ParseToolCallArguments"/> of it.</summary>
-    [System.Diagnostics.CodeAnalysis.Experimental("PISHARP_AI001")]
     public ToolCallArgumentsResult FinishToolArguments(int index) => ToolArguments(index).Finish();
 
     private ToolCallArgumentsStream ToolArguments(int index)

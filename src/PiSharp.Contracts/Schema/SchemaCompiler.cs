@@ -4,7 +4,6 @@
 // malformed schema or a reference that names nothing fails the compile. The compile's caches are locked, because errors and coercion
 // may compile further nodes (the explainer's annotation probes, a $dynamicRef target found at run time) while other threads check.
 #nullable enable
-#pragma warning disable PISHARP_SCHEMA001 // the engine uses its own experimental types
 
 using System.Runtime.CompilerServices;
 using System.Numerics;

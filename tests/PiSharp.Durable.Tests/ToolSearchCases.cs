@@ -359,10 +359,8 @@ internal static partial class ToolSearchTests
                 var query = count == 0 || shape < 0.55 ? RandomText(next, 1 + (int)(next() * 4))
                     : shape < 0.7 ? pick : shape < 0.85 ? pick.Split("__")[^1] : $"{RandomText(next, 1)} {pick.Split("__")[^1]}";
                 var limit = 1 + (int)(next() * 8);
-#pragma warning disable PISHARP_TOOLSEARCH001 // ToolSearchDocument.NamespaceText (main's experimental namespace field)
                 var main = new MainBm25Ranker().Rank(query, [.. documents.Select(document =>
                     new MainToolSearchDocument(document.Name, document.Text) { NamespaceText = document.NamespaceText })], limit);
-#pragma warning restore PISHARP_TOOLSEARCH001
                 Seq(main.Select(match => match.Name), Search.RankDocuments(query, documents, limit), $"trial {trial}: {JsonValue.String(query).ToJson()} limit {limit}");
             }
         });

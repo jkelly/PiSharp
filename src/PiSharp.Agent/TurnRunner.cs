@@ -19,12 +19,10 @@ public sealed class TurnRunner
     private readonly string? sessionId;
 
     /// <summary>PiSharp-only: the service tier stamped on every request that has none, read per request.</summary>
-    [System.Diagnostics.CodeAnalysis.Experimental("PISHARP_TIERS001")]
     public Func<string?>? ServiceTier { get; init; }
 
     /// <summary>Source agent-loop.ts: the agent identity, merged over <see cref="AgentConfiguration.DefaultIdentity"/> and under the
     /// request's own identity, field by field, on every request. Null leaves requests as they are.</summary>
-    [System.Diagnostics.CodeAnalysis.Experimental("PISHARP_IDENTITY001")]
     public ClientIdentity? Identity { get; init; }
 
     /// <param name="sessionId">Source agent.sessionId: stamped on every request that has none (prompt-cache keys, session headers).</param>

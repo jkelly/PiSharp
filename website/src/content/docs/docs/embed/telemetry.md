@@ -11,9 +11,9 @@ sidebar:
 `PiSharp.Telemetry` is new in PiSharp 1.5.0. Every public type in it, and the telemetry members of `PiSharp.AI`, are marked `[Experimental("PISHARP_TELEMETRY001")]`, so suppress `PISHARP_TELEMETRY001` in your project to compile against them. The API may change or be removed in any release, without notice or a deprecation period.
 :::
 
-`PiSharp.Telemetry` ports Pi's `pi-telemetry` v1.5.0 package: the contract for spans, span links, metrics and trace propagation. Like upstream it has no package dependencies and ships only two adapters, a no-op one and an in-memory one. It has no exporter, so nothing is sent anywhere. Telemetry is recorded only when your host passes in a context or a span. The CLI and the coding agent pass none, so they record nothing.
+`PiSharp.Telemetry` ports Pi's `pi-telemetry` v1.5.0 package: the contract for spans, span links, metrics and trace propagation. Like upstream it has no package dependencies and ships three adapters: a no-op adapter, an in-memory adapter, and `DiagnosticsTelemetry`, which bridges directly onto .NET's built-in `System.Diagnostics.ActivitySource` and `System.Diagnostics.Metrics.Meter`. It has no exporter of its own, so nothing is sent anywhere unless the host registers listeners (for example, the OpenTelemetry .NET SDK). Telemetry is recorded only when your host passes in a context or a span. The CLI and the coding agent pass none, so they record nothing.
 
-To send spans to a tracing backend, implement the contract yourself and check your adapter with the conformance kit described below.
+To send spans to a tracing backend, wire `DiagnosticsTelemetry` to your OpenTelemetry SDK, or implement the contract yourself and check your adapter with the conformance kit described below.
 
 PiSharp 1.5.0.1 adds a SQLite recorder in `PiSharp.Chord.TelemetrySqlite`, supplied by the new [Chord library](/docs/embed/chord/). `SqliteTelemetry.CreateAsync(database, options, timeProvider)` creates it; `SqliteTelemetryOptions` bounds retention and queued spans. It implements telemetry context, store, propagation and metrics, exposes dropped span/measurement counts, and is asynchronously disposable. The database remains caller-owned. See the [source](https://github.com/jkelly/PiSharp/blob/main/src/PiSharp.Chord/TelemetrySqlite/SqliteTelemetry.cs) for lifecycle and queue behavior. This recorder is host-owned and local; the CLI still does not enable telemetry automatically.
 
@@ -118,11 +118,44 @@ PiSharp redacts more than upstream does, under its rule that secrets never reach
 - **The response ID.** Upstream records it raw. PiSharp redacts and caps it the same way.
 - **Setup failures.** A failure before the stream starts records `ChatRun`'s sanitized message, never the transport's exception text.
 
+## OpenTelemetry and `System.Diagnostics` (`DiagnosticsTelemetry`)
+
+`DiagnosticsTelemetry` (added on `main` for **PiSharp 1.6.0.1**) is a zero-dependency adapter in `PiSharp.Telemetry` that maps PiSharp spans, events, initial and late links, W3C `traceparent`/`tracestate` propagation, and metrics (`Counter`, `UpDownCounter`, and `Histogram` with bucket boundary advice) directly onto `System.Diagnostics.ActivitySource` and `System.Diagnostics.Metrics.Meter`.
+
+Because it targets .NET's built-in diagnostics primitives, `PiSharp.Telemetry` stays dependency-free while plugging straight into the OpenTelemetry .NET SDK, .NET Aspire, Application Insights, Jaeger, or Grafana Tempo:
+
+```csharp
+using OpenTelemetry;
+using OpenTelemetry.Metrics;
+using OpenTelemetry.Trace;
+using PiSharp.AI;
+using PiSharp.Telemetry;
+
+using var tracerProvider = Sdk.CreateTracerProviderBuilder()
+    .AddSource("PiSharp")
+    .AddOtlpExporter()
+    .Build();
+
+using var meterProvider = Sdk.CreateMeterProviderBuilder()
+    .AddMeter("PiSharp")
+    .AddOtlpExporter()
+    .Build();
+
+using var telemetry = new DiagnosticsTelemetry("PiSharp", version: "1.6.0");
+
+await telemetry.StartSpanAsync("agent-turn", async parent =>
+{
+    var result = await client.CompleteAsync(new ChatRequest(model, messages) { Telemetry = parent });
+});
+```
+
+When no `ActivityListener` or `MeterListener` subscribes to the source or meter name, `DiagnosticsTelemetry` is a near-zero-allocation no-op and exports nothing. You can also pass an existing host-owned `ActivitySource` and `Meter` into `new DiagnosticsTelemetry(activitySource, meter)` so PiSharp spans share your application's diagnostics lifecycle.
+
 ## Testing an adapter
 
 `TelemetryAdapterConformance.Create(factory)` returns upstream's adapter conformance cases. Each is a `TelemetryAdapterConformanceCase` with a `Group`, a `Name` and `RunAsync()`, so any test runner can register them.
 
-The factory creates a fresh `TelemetryAdapterFixture` for each case. The fixture holds your `Context`, the optional `Propagation` and `Metrics` capabilities, and readers that return the recorded spans and measurements. A failed expectation throws `TelemetryConformanceException`. A case that needs a capability the fixture lacks returns without checking anything. PiSharp's own suite runs all 14 cases against `InMemoryTelemetryContext`, and the capability cases against the no-op adapter.
+The factory creates a fresh `TelemetryAdapterFixture` for each case. The fixture holds your `Context`, the optional `Propagation` and `Metrics` capabilities, and readers that return the recorded spans and measurements. A failed expectation throws `TelemetryConformanceException`. A case that needs a capability the fixture lacks returns without checking anything. PiSharp's own suite runs all 11 conformance groups against both `InMemoryTelemetryContext` and `DiagnosticsTelemetry` (via real `ActivityListener` and `MeterListener` hooks), plus capability cases against the no-op adapter.
 
 ## Upgrading from 1.2.0.x
 

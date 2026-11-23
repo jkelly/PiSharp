@@ -358,7 +358,6 @@ internal static class OriginalPiMessagesToolContinuationTests
     // Pi 1.5.0 pi-messages.ts sends getIdentityHeaders(model, identity) below every other header. The frozen fixture predates it, so
     // this authored v1.5.0 delta (not a Source capture) adds the detailed pi/<version> User-Agent when no case header sets one,
     // tokenized as HttpHeaders records it, as PiSharp.PiMessages.Tests does. The fixture itself stays unchanged and SHA-pinned.
-#pragma warning disable PISHARP_IDENTITY001
     private static JsonElement Pi150IdentityHeaders(JsonElement headers)
     {
         if (headers.EnumerateObject().Any(field => field.Name.Equals("user-agent", StringComparison.OrdinalIgnoreCase))) return headers;
@@ -368,7 +367,6 @@ internal static class OriginalPiMessagesToolContinuationTests
         foreach (var field in headers.EnumerateObject()) node[field.Name] = JsonNode.Parse(field.Value.GetRawText());
         return JsonSerializer.SerializeToElement(node);
     }
-#pragma warning restore PISHARP_IDENTITY001
     private static void SameJson(JsonElement expected, JsonElement actual)
     {
         Check(expected.ValueKind == actual.ValueKind, "JSON kind differs.");

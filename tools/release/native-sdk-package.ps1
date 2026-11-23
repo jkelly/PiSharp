@@ -4,7 +4,7 @@ $ErrorActionPreference='Stop'
 . (Join-Path $PSScriptRoot '../packaging/distribution-validation.ps1')
 function Assert-PiSharpNativeSdkPackage {
     param([Parameter(Mandatory)][string]$Package,
-        [Parameter(Mandatory)][ValidateSet('PiSharp.Contracts','PiSharp.AI','PiSharp.Agent','PiSharp.Sessions','PiSharp.Tools','PiSharp.Tools.Skia','PiSharp.CodingAgent',
+        [Parameter(Mandatory)][ValidateSet('PiSharp.Contracts','PiSharp.AI','PiSharp.Extensions.AI','PiSharp.Agent','PiSharp.Sessions','PiSharp.Tools','PiSharp.Tools.Skia','PiSharp.CodingAgent',
             'PiSharp.PromptTemplates.Yaml','PiSharp.Rpc','PiSharp.Tui','PiSharp.Extensions.Abstractions','PiSharp.Extensions.Runtime',
             'PiSharp.Extensions.Agent','PiSharp.ExtensionHost','PiSharp.Compatibility.Node','PiSharp.Codemode','PiSharp.Durable','PiSharp.Durable.Tools','PiSharp.Durable.Sqlite',
             'PiSharp.CustomAgents','PiSharp.CustomAgents.JavaScript','PiSharp.CustomAgents.Scripting','PiSharp.Telemetry','PiSharp.Chord','PiSharp.Chord.Hosting','PiSharp.Durable.Store','PiSharp.Env.Protocol','PiSharp.Env')][string]$PackageId,
@@ -29,6 +29,7 @@ function Assert-PiSharpNativeSdkPackage {
     if($PackageId-ceq'PiSharp.Durable.Sqlite'){$required+=@('licenses/Microsoft.Data.Sqlite.LICENSE.txt','licenses/SQLitePCLRaw.LICENSE.txt','licenses/SQLitePCLRaw.NOTICE.txt','licenses/SQLite.NOTICE.txt')}
     # Decision 0012 (experimental, released from 1.2.0.2): the C# script support carries Roslyn's license.
     if($PackageId-ceq'PiSharp.CustomAgents.Scripting'){$required+='licenses/Roslyn.LICENSE.txt'}
+    if($PackageId-ceq'PiSharp.Extensions.AI'){$required+='licenses/Microsoft.Extensions.AI.Abstractions.LICENSE.txt'}
     foreach($name in $required){if(-not$files.ContainsKey($name)){throw 'Required native SDK package member absent.'}}
     # SDK 10 deterministic pack names the core-properties part nuget.psmdcp; older packs use a random hex name.
     foreach($name in $files.Keys){if($name-cnotin$required-and$name-cnotmatch'^package/services/metadata/core-properties/(?:[0-9a-f]+|nuget)\.psmdcp$'){throw 'Unexpected SDK package member.'}}
@@ -72,7 +73,7 @@ function Assert-PiSharpNativeSdkPackage {
         'PiSharp.Durable.Store'=@('PiSharp.Durable','PiSharp.Chord','PiSharp.Durable.Sqlite')
         'PiSharp.Env.Protocol'=@()
         'PiSharp.Env'=@('PiSharp.Env.Protocol','PiSharp.Durable')
-        'PiSharp.AI'=@('PiSharp.Contracts','PiSharp.Telemetry');'PiSharp.Sessions'=@('PiSharp.Contracts');'PiSharp.ExtensionHost'=@('PiSharp.Contracts')
+        'PiSharp.AI'=@('PiSharp.Contracts','PiSharp.Telemetry');'PiSharp.Extensions.AI'=@('PiSharp.Contracts','PiSharp.AI');'PiSharp.Sessions'=@('PiSharp.Contracts');'PiSharp.ExtensionHost'=@('PiSharp.Contracts')
         'PiSharp.Extensions.Abstractions'=@('PiSharp.Contracts');'PiSharp.Extensions.Runtime'=@('PiSharp.Extensions.Abstractions')
         'PiSharp.Agent'=@('PiSharp.Contracts','PiSharp.AI');'PiSharp.Tools'=@('PiSharp.Agent','PiSharp.Contracts')
         'PiSharp.Tools.Skia'=@('PiSharp.Tools')
@@ -106,6 +107,10 @@ function Assert-PiSharpNativeSdkPackage {
     }
     # Decision 0012: Roslyn (Microsoft.CodeAnalysis.CSharp, which pins Microsoft.CodeAnalysis.Common) is pinned exactly.
     if($PackageId-ceq'PiSharp.CustomAgents.Scripting'){$external['Microsoft.CodeAnalysis.CSharp']='5.6.0'}
+    if($PackageId-ceq'PiSharp.Extensions.AI'){
+        $external['Microsoft.Extensions.AI.Abstractions']='10.11.1'
+        $external['Microsoft.Extensions.DependencyInjection.Abstractions']='10.0.0'
+    }
     $expected=[Collections.Generic.HashSet[string]]::new([string[]]@($siblings[$PackageId]+@($external.Keys)),[StringComparer]::Ordinal)
     if($dependencies.Count-ne$expected.Count){throw 'SDK dependency identity/version differs.'}
     foreach($dependency in $dependencies){
@@ -116,4 +121,50 @@ function Assert-PiSharpNativeSdkPackage {
     return [pscustomobject]@{schemaVersion=1;packageId=$PackageId;version=$Version;sourceCommit=$SourceCommit;
         archiveSha256=(Get-FileHash -LiteralPath $Package -Algorithm SHA256).Hash.ToLowerInvariant();files=@($files.Values);
         packageConsumptionProven=$false;releaseAccepted=$false;nodeFreePayload=(-not$nodeBridge)}
+}
+
+function Assert-PiSharpTemplatesPackage {
+    param([Parameter(Mandatory)][string]$Package,
+        [Parameter(Mandatory)][string]$Version,
+        [Parameter(Mandatory)][ValidatePattern('^[0-9a-f]{40}$')][string]$SourceCommit,
+        [Parameter(Mandatory)][string]$Repo)
+    if($Version-cnotmatch'^[0-9]+\.[0-9]+\.[0-9]+(?:\.[0-9]+)?(?:-[0-9A-Za-z]+(?:[.-][0-9A-Za-z]+)*)?$'){throw 'Explicit templates SemVer required.'}
+    $files=Get-PiSharpArchiveInventory -Path $Package
+    $required=@(
+        'PiSharp.Templates.nuspec','LICENSE','README.md','THIRD-PARTY-NOTICES.md','provenance.json','[Content_Types].xml','_rels/.rels',
+        'content/pisharp-agent/.template.config/template.json','content/pisharp-agent/MyPiSharpAgent.csproj','content/pisharp-agent/Program.cs',
+        'content/pisharp-extension/.template.config/template.json','content/pisharp-extension/MyPiSharpExtension.csproj','content/pisharp-extension/pisharp-extension.json','content/pisharp-extension/SampleExtension.cs',
+        'content/pisharp-workflow/.template.config/template.json','content/pisharp-workflow/MyPiSharpWorkflow.csproj','content/pisharp-workflow/Program.cs'
+    )
+    foreach($name in $required){if(-not$files.ContainsKey($name)){throw "Required templates package member absent: $name"}}
+    foreach($name in $files.Keys){
+        if($name-cnotin$required-and$name-cnotmatch'^package/services/metadata/core-properties/(?:[0-9a-f]+|nuget)\.psmdcp$'){
+            throw "Unexpected templates package member: $name"
+        }
+    }
+    if(@($files.Keys|Where-Object{$_-cmatch'^package/services/metadata/core-properties/'}).Count-ne1){throw 'Exactly one NuGet core-properties entry required.'}
+    foreach($name in @('LICENSE','README.md','THIRD-PARTY-NOTICES.md')){
+        if($files[$name].sha256-cne(Get-FileHash -LiteralPath (Join-Path $Repo $name) -Algorithm SHA256).Hash.ToLowerInvariant()){throw 'Templates source/license document differs.'}
+    }
+    $provenance=Read-PiSharpArchiveText -Path $Package -Entry 'provenance.json'|ConvertFrom-Json -AsHashtable -NoEnumerate
+    if($provenance.schemaVersion-ne1-or$provenance.kind-cne'templates'-or$provenance.sourceCommit-cne$SourceCommit-or
+       $provenance.version-cne$Version-or$provenance.sdk-cne'10.0.401'-or
+       $provenance.baselineCommit-cne(Get-Content -LiteralPath (Join-Path $Repo 'compatibility/target.lock.json') -Raw|ConvertFrom-Json).source.commit){throw 'Templates provenance differs.'}
+    $settings=[Xml.XmlReaderSettings]::new();$settings.DtdProcessing=[Xml.DtdProcessing]::Prohibit;$settings.XmlResolver=$null
+    $reader=[Xml.XmlReader]::Create([IO.StringReader]::new((Read-PiSharpArchiveText -Path $Package -Entry 'PiSharp.Templates.nuspec')),$settings)
+    $xml=[Xml.XmlDocument]::new();$xml.XmlResolver=$null
+    try{$xml.Load($reader)}finally{$reader.Dispose()}
+    $meta=$xml.SelectSingleNode('/*[local-name()="package"]/*[local-name()="metadata"]')
+    foreach($pair in @(@('id','PiSharp.Templates'),@('version',$Version),@('license','MIT'),@('readme','README.md'))){
+        $node=$meta.SelectSingleNode('*[local-name()="'+$pair[0]+'"]');if($null-eq$node-or$node.InnerText-cne$pair[1]){throw 'Templates nuspec metadata differs.'}
+    }
+    if($meta.SelectSingleNode('*[local-name()="license"]').GetAttribute('type')-cne'expression'){throw 'Templates SPDX expression required.'}
+    $repository=$meta.SelectSingleNode('*[local-name()="repository"]')
+    if($null-eq$repository-or$repository.GetAttribute('commit')-cne$SourceCommit-or$repository.GetAttribute('type')-cne'git'){throw 'Templates repository provenance absent.'}
+    $pkgTypes=@($meta.SelectNodes('*[local-name()="packageTypes"]/*[local-name()="packageType"]'))
+    if($pkgTypes.Count-ne1-or$pkgTypes[0].GetAttribute('name')-cne'Template'){throw 'Templates package must declare PackageType Template.'}
+    if($meta.SelectNodes('*[local-name()="dependencies"]//*[local-name()="dependency"]').Count-ne0){throw 'Templates package must not declare NuGet dependencies.'}
+    return [pscustomobject]@{schemaVersion=1;packageId='PiSharp.Templates';version=$Version;sourceCommit=$SourceCommit;
+        archiveSha256=(Get-FileHash -LiteralPath $Package -Algorithm SHA256).Hash.ToLowerInvariant();files=@($files.Values);
+        packageConsumptionProven=$false;releaseAccepted=$false;nodeFreePayload=$true}
 }

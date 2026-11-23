@@ -41,7 +41,6 @@ public sealed record ResponsesKeyAuthRequestOptions(
     [System.Text.Json.Serialization.JsonIgnore] public Func<JsonData, ModelDescriptor, CancellationToken, ValueTask>? OnProviderStreamEvent { get; init; }
     /// <summary>Source StreamOptions.identity (Pi 1.5.0 identity.ts): the User-Agent and attribution headers, below the model,
     /// session and request headers. Null: a detailed User-Agent and no attribution.</summary>
-    [System.Diagnostics.CodeAnalysis.Experimental("PISHARP_IDENTITY001")]
     [System.Text.Json.Serialization.JsonIgnore] public ClientIdentity? Identity { get; init; }
     /// <summary>Pi 1.5.0 openai-responses.ts getCompat <c>supportsMidConvoEffort</c>, from model metadata: the thinking level travels as
     /// configuration_update input items under a fixed <c>reasoning.effort</c>, so a level change keeps the prompt cache.</summary>

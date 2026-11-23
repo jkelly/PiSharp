@@ -50,7 +50,6 @@ public sealed record BedrockConverseOptions
     public int MaximumResponseCharacters { get; init; } = PiRequestBudget.StreamCharacters;
     /// <summary>Source StreamOptions.identity (Pi 1.5.0 identity.ts): the User-Agent (bedrockUserAgent); a request's own identity
     /// merges over it. Null: pi/&lt;version&gt;.</summary>
-    [System.Diagnostics.CodeAnalysis.Experimental("PISHARP_IDENTITY001")]
     public ClientIdentity? Identity { get; init; }
 }
 

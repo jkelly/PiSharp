@@ -159,7 +159,6 @@ Experimental APIs carry `[Experimental]`, and using one is a compiler error unti
 | [Durable agents](/docs/embed/durable/) (experimental) | `PiSharp.Durable`, `PiSharp.Durable.Sqlite`, `PiSharp.Durable.Tools` | `PISHARP_DURABLE001` |
 | [Custom agents](/docs/custom-agents/overview/) (experimental) | `PiSharp.CustomAgents`, `PiSharp.CustomAgents.JavaScript`, `PiSharp.CustomAgents.Scripting` | `PISHARP_AGENTS001` and `PISHARP_DURABLE001` |
 | [Media library](/docs/embed/media/) (experimental) | `PiSharp.AI`, namespace `PiSharp.AI.Media` | `PISHARP_MEDIA001` |
-| [Service tiers](/docs/guides/service-tiers/) (experimental) | `ServiceTiers` in `PiSharp.AI`, and the tier members in `PiSharp.AI`, `PiSharp.Agent` and `PiSharp.CodingAgent` | `PISHARP_TIERS001` |
 | [Telemetry](/docs/embed/telemetry/) (experimental) | `PiSharp.Telemetry`, and the telemetry members of `PiSharp.AI` | `PISHARP_TELEMETRY001` |
 
 The Pi 1.5.0 sync adds more ids for single types and members; the [SDK page](/docs/embed/sdk/#experimental-apis) lists them all.

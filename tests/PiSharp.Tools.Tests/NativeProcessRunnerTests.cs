@@ -7,7 +7,6 @@ using System.Text.Json;
 using System.Threading.Channels;
 using PiSharp.Agent.Tools;
 using PiSharp.Tools.Processes;
-#pragma warning disable PISHARP_EXEC001 // Exercise the explicit native exec capture contract.
 
 internal static partial class NativeProcessRunnerTests
 {

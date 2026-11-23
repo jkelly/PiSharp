@@ -19,7 +19,7 @@ $libraries = @(
     'PiSharp.Contracts',
     # Decision 0013: the experimental pi-telemetry port (1.5.0), before PiSharp.AI, which depends on it.
     'PiSharp.Telemetry',
-    'PiSharp.AI', 'PiSharp.Agent', 'PiSharp.Sessions', 'PiSharp.Tools', 'PiSharp.Tools.Skia', 'PiSharp.CodingAgent',
+    'PiSharp.AI', 'PiSharp.Extensions.AI', 'PiSharp.Agent', 'PiSharp.Sessions', 'PiSharp.Tools', 'PiSharp.Tools.Skia', 'PiSharp.CodingAgent',
     'PiSharp.PromptTemplates.Yaml', 'PiSharp.Rpc', 'PiSharp.Tui', 'PiSharp.Extensions.Abstractions',
     'PiSharp.Extensions.Runtime', 'PiSharp.Extensions.Agent', 'PiSharp.ExtensionHost', 'PiSharp.Compatibility.Node', 'PiSharp.Codemode',
     # Decision 0005: the experimental durable port (1.2.0.1), in dependency order.
@@ -62,6 +62,12 @@ $toolProvenance = Join-Path $inputs 'tool-provenance.json'
     kind = 'tool'; enablePromptTemplateYaml = $true; rid = $null
 } | ConvertTo-Json | Set-Content -LiteralPath $toolProvenance -Encoding utf8NoBOM
 
+$templatesProvenance = Join-Path $inputs 'templates-provenance.json'
+[ordered]@{
+    schemaVersion = 1; kind = 'templates'; sourceCommit = $SourceCommit; version = $Version
+    baselineTag = $baseline.source.tag; baselineCommit = $baseline.source.commit; sdk = $sdk
+} | ConvertTo-Json | Set-Content -LiteralPath $templatesProvenance -Encoding utf8NoBOM
+
 # The committed lock files predate the 0.99.1 version change, so restore is not locked here.
 $common = @(
     '-c', 'Release', '-o', $out, '--nologo',
@@ -101,8 +107,23 @@ $toolHash = (Get-FileHash -LiteralPath $tool -Algorithm SHA256).Hash.ToLowerInva
 Write-Host "Validated PiSharp.Cli $Version"
 Write-Host '::endgroup::'
 
+Write-Host '::group::Pack PiSharp.Templates (dotnet new templates)'
+dotnet pack (Join-Path $repo 'templates/PiSharp.Templates.csproj') @common `
+    "-p:PiSharpProvenanceFile=$templatesProvenance"
+$templatesPkg = Join-Path $out "PiSharp.Templates.$Version.nupkg"
+try {
+    $templatesReport = Assert-PiSharpTemplatesPackage -Package $templatesPkg -Version $Version -SourceCommit $SourceCommit -Repo $repo
+} catch {
+    $zip = [IO.Compression.ZipFile]::OpenRead($templatesPkg)
+    try { Write-Host "Package members of PiSharp.Templates:"; $zip.Entries | ForEach-Object { Write-Host "  $($_.FullName)" } } finally { $zip.Dispose() }
+    throw
+}
+$templatesReport | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $reports 'PiSharp.Templates.json') -Encoding utf8NoBOM
+Write-Host "Validated PiSharp.Templates $Version"
+Write-Host '::endgroup::'
+
 $packages = @(Get-ChildItem -LiteralPath $out -Filter '*.nupkg')
-if ($packages.Count -ne $libraries.Count + 1) {
-    throw "Expected $($libraries.Count + 1) packages, found $($packages.Count)."
+if ($packages.Count -ne $libraries.Count + 2) {
+    throw "Expected $($libraries.Count + 2) packages, found $($packages.Count)."
 }
 Write-Host "Built and validated $($packages.Count) packages for $Version in $out"

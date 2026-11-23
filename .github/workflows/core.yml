@@ -28,7 +28,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        suite: [Compatibility, Agent, Transport, Sessions, Tools, CodingAgent, Rpc, Extensions.ContractTests, ExtensionHost, Tui]
+        suite: [Compatibility, Agent, Transport, Sessions, Tools, CodingAgent, Rpc, Extensions.ContractTests, ExtensionHost, Tui, Extensions.AI]
     steps:
       - uses: actions/checkout@v7
         with:
@@ -115,3 +115,18 @@ jobs:
           test "$(git -C "$RUNNER_TEMP/pi" rev-parse HEAD)" = faac585884ae2c013a6b1400f3e9e77f10b34bac
           node --test tools/CompatibilityReport/sync-1.6.0-source.test.mjs tools/CompatibilityReport/sync-1.6.0-applicability.test.mjs
           node tools/CompatibilityReport/verify-baseline.mjs --upstream "$RUNNER_TEMP/pi"
+
+  templates:
+    name: Project templates (dotnet new)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.source_sha || github.sha }}
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+      - name: Pack and smoke-test PiSharp.Templates
+        shell: pwsh
+        run: ./tools/ci/test-templates.ps1

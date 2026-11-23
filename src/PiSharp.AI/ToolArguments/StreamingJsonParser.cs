@@ -8,7 +8,6 @@ using PiSharp.Contracts;
 namespace PiSharp.AI;
 
 /// <summary>One step of a <see cref="JsonChange"/> path: a member key or an array index.</summary>
-[Experimental("PISHARP_AI001")]
 public readonly record struct JsonPathSegment
 {
     private JsonPathSegment(string? key, int index) { Key = key; Index = index; }
@@ -23,15 +22,12 @@ public readonly record struct JsonPathSegment
 }
 
 /// <summary>One change a piece of text made to the value (streaming-json.ts <c>JsonChange</c>); see <see cref="StreamingJsonParser"/>.</summary>
-[Experimental("PISHARP_AI001")]
 public abstract record JsonChange(ImmutableArray<JsonPathSegment> Path);
 
 /// <summary>A key, an array item or a finished value appeared at <see cref="JsonChange.Path"/>.</summary>
-[Experimental("PISHARP_AI001")]
 public sealed record JsonSetChange(ImmutableArray<JsonPathSegment> Path, JsonData Value) : JsonChange(Path);
 
 /// <summary>The piece extended the open string at <see cref="JsonChange.Path"/>.</summary>
-[Experimental("PISHARP_AI001")]
 public sealed record JsonAppendChange(ImmutableArray<JsonPathSegment> Path, string Text) : JsonChange(Path);
 
 /// <summary>
@@ -64,7 +60,6 @@ public sealed record JsonAppendChange(ImmutableArray<JsonPathSegment> Path, stri
 /// makes the total work grow faster than the text. A value nested deeper than <see cref="JsonData.MaximumDepth"/> levels cannot be
 /// owned: snapshots then stay at the last value that could, and such a container's whole-value change is not reported.</para>
 /// </summary>
-[Experimental("PISHARP_AI001")]
 public sealed class StreamingJsonParser
 {
     // Changes are reported at most this deep, so a path costs O(1) to build.
@@ -636,7 +631,6 @@ public sealed class StreamingJsonParser
 /// when the call ends, and a <see cref="StreamingJsonParser"/> for the partial arguments in between. Providers keep one per call in
 /// their own stream state, never on the content block, so the raw text never reaches partial messages or transcripts.
 /// </summary>
-[Experimental("PISHARP_AI001")]
 public sealed class ToolCallArgumentsStream
 {
     private readonly StringBuilder _text = new();
@@ -722,7 +716,6 @@ public sealed class ToolCallArgumentsStream
 /// <summary>json-parse.ts <c>parseToolCallArguments</c>: the arguments of a finished tool call, and why they are malformed when they are.</summary>
 /// <param name="Arguments">The parsed arguments object; <c>{}</c> when the text was empty or malformed.</param>
 /// <param name="ArgumentsError">Set when the complete text was not a valid JSON object: the problem and the text the model sent.</param>
-[Experimental("PISHARP_AI001")]
 public sealed record ToolCallArgumentsResult(JsonData Arguments, string? ArgumentsError = null)
 {
     /// <summary>The ToolCall field that carries <see cref="ArgumentsError"/> (types.ts <c>ToolCall.argumentsError</c>).</summary>

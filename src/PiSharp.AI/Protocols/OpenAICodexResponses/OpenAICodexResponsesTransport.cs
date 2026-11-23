@@ -47,7 +47,6 @@ public sealed record OpenAICodexResponsesOptions
     public string Originator { get; init; } = "pi";
     /// <summary>Source StreamOptions.identity (Pi 1.5.0 identity.ts): the user-agent and attribution headers, below the model and
     /// caller headers; a request's own identity merges over it. Null: a detailed user-agent and no attribution.</summary>
-    [System.Diagnostics.CodeAnalysis.Experimental("PISHARP_IDENTITY001")]
     public ClientIdentity? Identity { get; init; }
     public Func<TimeSpan, CancellationToken, Task>? Delay { get; init; }
     public TimeProvider? Time { get; init; }

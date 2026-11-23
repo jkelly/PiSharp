@@ -24,7 +24,6 @@ using PiSharp.Contracts;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Chord.Delta;
 
-#pragma warning disable PISHARP_AI001 // PiSharp.AI's StreamingJsonParser (Pi v1.5.0) is experimental.
 
 namespace PiSharp.Durable;
 

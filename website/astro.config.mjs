@@ -105,6 +105,7 @@ export default defineConfig({
 					items: [
 						'docs/embed/sdk',
 						'docs/embed/chat',
+						'docs/embed/extensions-ai',
 						'docs/embed/agent',
 						'docs/embed/coding-agent',
 						'docs/embed/sessions',

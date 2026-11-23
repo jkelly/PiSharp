@@ -17,7 +17,6 @@ using PiSharp.Telemetry;
 // (models.ts' observeModelRequest around lazyStream, 2ec55d808): a request with telemetry is one pi.ai.request span, a deferred poll one
 // pi.ai.poll span, a cancel none, all under the caller's span and content-free; a throwing adapter never changes the request. Every
 // span is recorded in process by InMemoryTelemetryContext.
-#pragma warning disable PISHARP_IDENTITY001 // PiSharp.AI's ClientIdentity (Pi v1.5.0) is experimental.
 internal static partial class Program
 {
     private static IEnumerable<(string, Func<Task>)> ModelsCases() =>

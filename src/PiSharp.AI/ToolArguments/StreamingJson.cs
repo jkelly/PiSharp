@@ -128,7 +128,6 @@ public static class StreamingJson
     /// gives <c>{}</c> and an <c>argumentsError</c> that describes the problem and includes the text, so tool validation can report it
     /// back to the model. Empty or whitespace-only text is <c>{}</c> without an error.
     /// </summary>
-    [System.Diagnostics.CodeAnalysis.Experimental("PISHARP_AI001")]
     public static ToolCallArgumentsResult ParseToolCallArguments(string? json)
     {
         if (json is null || JsTrim(json).Length == 0) return new ToolCallArgumentsResult(JsonData.EmptyObject);

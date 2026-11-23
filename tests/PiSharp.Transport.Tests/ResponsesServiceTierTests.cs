@@ -1,5 +1,4 @@
 // PiSharp-only per-request service-tier controls are deliberately exercised here.
-#pragma warning disable PISHARP_TIERS001
 using System.Net;
 using System.Runtime.CompilerServices;
 using System.Text;

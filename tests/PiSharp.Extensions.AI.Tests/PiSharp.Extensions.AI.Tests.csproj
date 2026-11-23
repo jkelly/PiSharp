@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <NoWarn>$(NoWarn);PISHARP_MEDIA001</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/PiSharp.Extensions.AI/PiSharp.Extensions.AI.csproj" />
+    <ProjectReference Include="../../src/PiSharp.Agent/PiSharp.Agent.csproj" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="[10.0.0]" />
+  </ItemGroup>
+</Project>

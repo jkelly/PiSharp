@@ -39,9 +39,7 @@ internal sealed record InteractiveModeContext
     public required UiLoop Loop { get; init; }
     /// <summary>config.ts <c>VERSION</c>: the Pi release PiSharp tracks (decision 0013, Identity), for the changelog and install
     /// telemetry versions. The startup header shows <see cref="ProductVersion"/>.</summary>
-#pragma warning disable PISHARP_IDENTITY001
     public string Version { get; init; } = PiSharp.AI.ClientIdentities.PiVersion;
-#pragma warning restore PISHARP_IDENTITY001
     public string DocsPath { get; init; } = Path.Join(AppContext.BaseDirectory, "docs");
     public Func<string, string?> GetEnvironment { get; init; } = Environment.GetEnvironmentVariable;
     /// <summary>console.log before the TUI starts (written after the TUI stops, like other startup output).</summary>

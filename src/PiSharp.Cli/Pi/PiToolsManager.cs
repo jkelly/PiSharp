@@ -199,9 +199,7 @@ internal sealed class PiToolsManager
     /// retryable statuses, within one overall timeout. Redirects are followed here when asked (GitHub asset downloads redirect).</summary>
     /// <summary>Pi 1.5.0 tools-manager.ts: downloads send getPiUserAgent(VERSION), pi-ai's detailed formatUserAgent with the Pi version
     /// PiSharp tracks (<see cref="PiSharp.AI.ClientIdentities.FormatUserAgent"/>).</summary>
-#pragma warning disable PISHARP_IDENTITY001
     internal static string ToolsUserAgent { get; } = PiSharp.AI.ClientIdentities.FormatUserAgent(null);
-#pragma warning restore PISHARP_IDENTITY001
 
     private async Task<HttpResponseMessage> SendAsync(string url, int timeoutMs, bool followRedirects, CancellationToken cancellationToken)
     {

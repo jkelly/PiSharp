@@ -3,7 +3,6 @@ using PiSharp.AI;
 
 namespace PiSharp.CodingAgent;
 
-#pragma warning disable PISHARP_IDENTITY001
 /// <summary>
 /// client-identity.ts <c>getClientIdentity</c>: how the coding agent's requests identify it to providers, a detailed
 /// <c>User-Agent</c> with the Pi version PiSharp tracks (<see cref="ClientIdentities.FormatUserAgent"/>, decision 0013 Identity).
@@ -18,4 +17,3 @@ internal static class CodingAgentClientIdentity
     /// <summary>The identity of every coding agent request; sdk.ts sets it on each request, over the agent's default.</summary>
     public static ClientIdentity Get() => Identity;
 }
-#pragma warning restore PISHARP_IDENTITY001

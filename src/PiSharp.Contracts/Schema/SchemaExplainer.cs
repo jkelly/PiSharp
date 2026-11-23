@@ -3,7 +3,6 @@
 // Errors of a failed value: a walk over the schema that reports each failing keyword at the value it failed on. It runs only for values
 // that failed the check, using the compiler's checks for subschemas. One explainer serves one errors() call.
 #nullable enable
-#pragma warning disable PISHARP_SCHEMA001 // the engine uses its own experimental types
 
 using System.Runtime.CompilerServices;
 using System.Numerics;

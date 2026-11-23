@@ -25,7 +25,7 @@ public sealed record ProcessRequest(string Executable, ImmutableArray<string> Ar
     public byte[]? StandardInput { get; init; }
     /// <summary>Separated runs only: stop the process when stdout and stderr together exceed this many bytes, keeping the bytes
     /// within it (source execCommand maxBuffer). Replaces the per-pipe and raw-output limits for this capture; null keeps them.</summary>
-    [System.Diagnostics.CodeAnalysis.Experimental("PISHARP_EXEC001")] public long? CaptureLimitBytes { get; init; }
+    public long? CaptureLimitBytes { get; init; }
     /// <summary>Separated runs only: when set, stdout lines are filtered as they stream before entering the bounded capture buffer.</summary>
     internal Func<string, bool>? StandardOutputLineFilter { get; init; }
     /// <summary>Separated runs only: optional cap on matched stdout lines when <see cref="StandardOutputLineFilter"/> is set.</summary>

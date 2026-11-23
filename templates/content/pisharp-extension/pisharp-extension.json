@@ -1,0 +1,4 @@
+{
+  "assembly": "MyPiSharpExtension.dll",
+  "entryType": "MyPiSharpExtension.SampleExtension"
+}
