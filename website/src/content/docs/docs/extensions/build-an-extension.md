@@ -18,8 +18,8 @@ Reference the extension contracts without copying them into your output, and ena
     <EnableDynamicLoading>true</EnableDynamicLoading>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="PiSharp.Extensions.Abstractions" Version="1.6.0" ExcludeAssets="runtime" />
-    <PackageReference Include="PiSharp.Contracts" Version="1.6.0" ExcludeAssets="runtime" />
+    <PackageReference Include="PiSharp.Extensions.Abstractions" Version="{{PISHARP_VERSION}}" ExcludeAssets="runtime" />
+    <PackageReference Include="PiSharp.Contracts" Version="{{PISHARP_VERSION}}" ExcludeAssets="runtime" />
   </ItemGroup>
 </Project>
 ```

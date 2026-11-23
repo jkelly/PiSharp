@@ -8,6 +8,13 @@ on:
       - 'compatibility/**'
       - 'samples/agents/catalog.json'
       - '.github/workflows/website.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'website/**'
+      - 'compatibility/**'
+      - 'samples/agents/catalog.json'
+      - '.github/workflows/website.yml'
   workflow_dispatch:
 
 permissions:
@@ -16,15 +23,15 @@ permissions:
   id-token: write
 
 concurrency:
-  group: pages
-  cancel-in-progress: false
+  group: pages-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-node@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -36,20 +43,24 @@ jobs:
         run: npm install --no-audit --no-fund
       - name: Build
         working-directory: website
+        env:
+          ASTRO_TELEMETRY_DISABLED: '1'
         run: npm run build
-      - name: Verify links and sample catalog
+      - name: Verify links, tokens, llms.txt and sample catalog
         working-directory: website
         run: npm run check
-      - uses: actions/upload-pages-artifact@v4
+      - uses: actions/upload-pages-artifact@v5
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
         with:
           path: website/dist
 
   deploy:
     needs: build
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5

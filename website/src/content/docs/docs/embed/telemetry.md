@@ -27,7 +27,7 @@ PiSharp 1.5.0.1 adds a SQLite recorder in `PiSharp.Chord.TelemetrySqlite`, suppl
   <NoWarn>$(NoWarn);PISHARP_TELEMETRY001</NoWarn>
 </PropertyGroup>
 <ItemGroup>
-  <PackageReference Include="PiSharp.Telemetry" Version="1.6.0" />
+  <PackageReference Include="PiSharp.Telemetry" Version="{{PISHARP_VERSION}}" />
 </ItemGroup>
 ```
 

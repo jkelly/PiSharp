@@ -10,8 +10,16 @@ name: Durable
 on:
   push:
     branches: [main, feature/pi-durable, feature/durable-network, feature/web-agent]
+    paths-ignore:
+      - 'website/**'
+      - 'docs/**'
+      - 'AI_DOCS/**'
   pull_request:
     branches: [main, feature/pi-durable, feature/durable-network, feature/web-agent]
+    paths-ignore:
+      - 'website/**'
+      - 'docs/**'
+      - 'AI_DOCS/**'
   workflow_dispatch:
   workflow_call:
     inputs:
@@ -39,15 +47,15 @@ jobs:
       matrix:
         os: [windows-latest, ubuntu-latest, macos-15]
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           ref: ${{ inputs.source_sha || github.sha }}
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: '22'
 
-      - uses: actions/setup-dotnet@v5
+      - uses: actions/setup-dotnet@v6
         with:
           global-json-file: global.json
 
@@ -148,70 +156,70 @@ jobs:
           }
           node tools/ci/write-validation-manifest.mjs @reports --output '${{ runner.temp }}/durable-manifest.json' --prerequisite "dotnet-sdk=$(dotnet --version)" --prerequisite 'faux providers; native SQLite; retention default and zero; upstream-dependent cases may explicitly skip'
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: durable-manifest-${{ matrix.os }}
           path: ${{ runner.temp }}/durable-manifest.json
           if-no-files-found: error
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: webagent-report-${{ matrix.os }}
           path: ${{ runner.temp }}/webagent-${{ matrix.os }}.json
           if-no-files-found: ignore
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: model-runtime-report-${{ matrix.os }}
           path: ${{ runner.temp }}/model-runtime-${{ matrix.os }}.json
           if-no-files-found: ignore
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: durable-web-report-${{ matrix.os }}
           path: ${{ runner.temp }}/durable-web-${{ matrix.os }}.json
           if-no-files-found: ignore
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: durable-server-report-${{ matrix.os }}
           path: ${{ runner.temp }}/durable-server-${{ matrix.os }}.json
           if-no-files-found: ignore
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: durable-hosting-report-${{ matrix.os }}
           path: ${{ runner.temp }}/durable-hosting-${{ matrix.os }}.json
           if-no-files-found: ignore
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: durable-cli-report-${{ matrix.os }}
           path: ${{ runner.temp }}/durable-cli-${{ matrix.os }}.json
           if-no-files-found: ignore
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: durable-report-${{ matrix.os }}
           path: ${{ runner.temp }}/durable-${{ matrix.os }}.json
           if-no-files-found: ignore
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: durable-retention-0-report-${{ matrix.os }}
           path: ${{ runner.temp }}/durable-retention-0-${{ matrix.os }}.json
           if-no-files-found: ignore
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: chord-report-${{ matrix.os }}
@@ -225,15 +233,15 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           ref: ${{ inputs.source_sha || github.sha }}
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: '22'
 
-      - uses: actions/setup-dotnet@v5
+      - uses: actions/setup-dotnet@v6
         with:
           global-json-file: global.json
 
@@ -264,14 +272,14 @@ jobs:
         run: |
           node tools/ci/write-validation-manifest.mjs --report 'Durable-MSSQL=${{ runner.temp }}/durable-mssql.json' --output '${{ runner.temp }}/durable-mssql-manifest.json' --prerequisite "dotnet-sdk=$(dotnet --version)" --prerequisite 'SQL Server 2022 container ready via SELECT 1' --reject-skips
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: durable-mssql-manifest
           path: ${{ runner.temp }}/durable-mssql-manifest.json
           if-no-files-found: error
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: durable-mssql-report
@@ -290,11 +298,11 @@ jobs:
       matrix:
         os: [ubuntu-latest]
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           ref: ${{ inputs.source_sha || github.sha }}
 
-      - uses: actions/setup-dotnet@v5
+      - uses: actions/setup-dotnet@v6
         with:
           global-json-file: global.json
 
@@ -313,7 +321,7 @@ jobs:
           dotnet run --project tests/PiSharp.Durable.Web.BrowserTests/PiSharp.Durable.Web.BrowserTests.csproj -c Release --no-build \
             -- --report "$RUNNER_TEMP/durable-web-browser-${{ matrix.os }}.json" --artifacts "$RUNNER_TEMP/durable-web-browser-artifacts"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: durable-web-browser-report-${{ matrix.os }}
@@ -334,11 +342,11 @@ jobs:
       matrix:
         os: [ubuntu-latest]
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           ref: ${{ inputs.source_sha || github.sha }}
 
-      - uses: actions/setup-dotnet@v5
+      - uses: actions/setup-dotnet@v6
         with:
           global-json-file: global.json
 
@@ -356,7 +364,7 @@ jobs:
         run: |
           dotnet run --project tests/PiSharp.WebAgent.BrowserTests/PiSharp.WebAgent.BrowserTests.csproj -c Release --no-build             -- --report "$RUNNER_TEMP/webagent-browser-${{ matrix.os }}.json" --artifacts "$RUNNER_TEMP/webagent-browser-artifacts"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: webagent-browser-report-${{ matrix.os }}
@@ -382,11 +390,11 @@ jobs:
           - rid: osx-arm64
             asset: libe_sqlite3.dylib
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           ref: ${{ inputs.source_sha || github.sha }}
 
-      - uses: actions/setup-dotnet@v5
+      - uses: actions/setup-dotnet@v6
         with:
           global-json-file: global.json
 
@@ -414,10 +422,10 @@ jobs:
     name: Port map matches the pinned upstream
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           ref: ${{ inputs.source_sha || github.sha }}
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: '22'
       - name: Fetch Pi at the pinned commit and the previous pin

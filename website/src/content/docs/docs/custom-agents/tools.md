@@ -331,7 +331,7 @@ The plugin project references `PiSharp.CustomAgents` without copying it, because
     <NoWarn>$(NoWarn);PISHARP_DURABLE001;PISHARP_AGENTS001</NoWarn>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="PiSharp.CustomAgents" Version="1.6.0" ExcludeAssets="runtime" />
+    <PackageReference Include="PiSharp.CustomAgents" Version="{{PISHARP_VERSION}}" ExcludeAssets="runtime" />
     <None Include="pisharp-agents-plugin.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

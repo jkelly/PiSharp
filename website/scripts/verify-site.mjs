@@ -23,6 +23,7 @@ function walkHtml(dir) {
 
 const htmlFiles = walkHtml(distDir);
 const brokenLinks = [];
+const unreplacedTokens = [];
 
 // Verify all root-relative internal href targets (and #anchors) resolve to built files in dist/.
 const hrefPattern = /href="(\/[^"#?]*)(?:\?[^"#]*)?(?:#([^"]+))?"/g;
@@ -34,6 +35,9 @@ const readCached = (p) => {
 
 for (const file of htmlFiles) {
 	const content = readCached(file);
+	if (content.includes('{{PISHARP_VERSION}}') && !file.replace(/\\/g, '/').endsWith('/docs/contribute/website/index.html')) {
+		unreplacedTokens.push(file.replace(distDir, 'dist'));
+	}
 	let match;
 	while ((match = hrefPattern.exec(content)) !== null) {
 		const rawPath = match[1];
@@ -89,6 +93,29 @@ for (const entry of catalog) {
 	}
 }
 
+// Verify llms.txt and llms-full.txt agent-readable documentation bundles.
+for (const llmsFile of ['llms.txt', 'llms-full.txt']) {
+	const llmsPath = join(distDir, llmsFile);
+	if (!existsSync(llmsPath)) {
+		console.error(`Missing built ${llmsFile} at ${llmsPath}`);
+		process.exit(1);
+	}
+	const llmsText = readFileSync(llmsPath, 'utf8');
+	if (llmsText.trim().length < 200) {
+		console.error(`Built ${llmsFile} appears empty or truncated (${llmsText.length} bytes).`);
+		process.exit(1);
+	}
+	if (!llmsText.includes('# PiSharp')) {
+		console.error(`Built ${llmsFile} missing expected PiSharp header.`);
+		process.exit(1);
+	}
+}
+
+if (unreplacedTokens.length > 0) {
+	console.error(`Found unreplaced {{PISHARP_VERSION}} token in ${unreplacedTokens.length} file(s): ${unreplacedTokens.join(', ')}`);
+	process.exit(1);
+}
+
 if (brokenLinks.length > 0) {
 	console.error(`Found ${brokenLinks.length} broken internal link(s):`);
 	for (const item of brokenLinks.slice(0, 30)) {
@@ -103,5 +130,5 @@ if (missingSamples.length > 0) {
 }
 
 console.log(
-	`Verified ${htmlFiles.length} built HTML pages (0 broken internal links/anchors), all ${catalog.length} catalog.json samples, and ${renderedCards} explorer cards (${totalRunnable} runnable samples) on /samples/.`,
+	`Verified ${htmlFiles.length} built HTML pages (0 broken internal links/anchors, 0 unreplaced version tokens), llms.txt + llms-full.txt, all ${catalog.length} catalog.json samples, and ${renderedCards} explorer cards (${totalRunnable} runnable samples) on /samples/.`,
 );

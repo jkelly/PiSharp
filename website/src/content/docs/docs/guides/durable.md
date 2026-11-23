@@ -198,9 +198,9 @@ Every public type is marked `[Experimental("PISHARP_DURABLE001")]`, so the compi
   <NoWarn>$(NoWarn);PISHARP_DURABLE001</NoWarn>
 </PropertyGroup>
 <ItemGroup>
-  <PackageReference Include="PiSharp.Durable" Version="1.6.0" />
-  <PackageReference Include="PiSharp.Durable.Sqlite" Version="1.6.0" />
-  <PackageReference Include="PiSharp.Durable.Tools" Version="1.6.0" />
+  <PackageReference Include="PiSharp.Durable" Version="{{PISHARP_VERSION}}" />
+  <PackageReference Include="PiSharp.Durable.Sqlite" Version="{{PISHARP_VERSION}}" />
+  <PackageReference Include="PiSharp.Durable.Tools" Version="{{PISHARP_VERSION}}" />
 </ItemGroup>
 ```
 

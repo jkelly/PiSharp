@@ -1042,8 +1042,8 @@
       "originalSha256": "95932e0d9b7d1f8448b2af884adc83db7b5c1e88615cc6cc1da76e6506b696ab"
     },
     {
-      "currentSha256": "6ea7e98e856368d6702d6eeff1e7885c7c8c0afb4cc8c9d07b805bfea19900c1",
-      "currentBytes": 48836,
+      "currentSha256": "865d5177c0e050c00cc0dcfd5c7876ec3aa995e3225b5f97ebcb1f6261c764e2",
+      "currentBytes": 5799,
       "originalBytes": 48032,
       "path": "docs/architecture.md",
       "originalSha256": "d1441f7b2ecc7921e47dad68050d4c495047164aeb1e60d04c38f8e1c0eb6699"

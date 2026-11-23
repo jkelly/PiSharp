@@ -23,7 +23,7 @@ Add the `PiSharp.AI` package and suppress the diagnostic:
   <NoWarn>$(NoWarn);PISHARP_MEDIA001</NoWarn>
 </PropertyGroup>
 <ItemGroup>
-  <PackageReference Include="PiSharp.AI" Version="1.6.0" />
+  <PackageReference Include="PiSharp.AI" Version="{{PISHARP_VERSION}}" />
 </ItemGroup>
 ```
 

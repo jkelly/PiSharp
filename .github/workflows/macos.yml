@@ -8,8 +8,36 @@ name: macOS
 on:
   pull_request:
     branches: [main]
+    paths-ignore:
+      - 'AI_DOCS/**'
+      - 'docs/**'
+      - 'website/src/content/docs/**'
+      - 'website/src/pages/**'
+      - 'website/src/components/**'
+      - 'website/src/styles/**'
+      - 'website/src/plugins/**'
+      - 'website/src/data/**'
+      - 'website/scripts/**'
+      - 'website/public/**'
+      - 'website/src/assets/**'
+      - 'website/astro.config.mjs'
+      - 'website/package*.json'
   push:
     branches: [main]
+    paths-ignore:
+      - 'AI_DOCS/**'
+      - 'docs/**'
+      - 'website/src/content/docs/**'
+      - 'website/src/pages/**'
+      - 'website/src/components/**'
+      - 'website/src/styles/**'
+      - 'website/src/plugins/**'
+      - 'website/src/data/**'
+      - 'website/scripts/**'
+      - 'website/public/**'
+      - 'website/src/assets/**'
+      - 'website/astro.config.mjs'
+      - 'website/package*.json'
   workflow_dispatch:
 
 permissions:
@@ -48,14 +76,14 @@ jobs:
           - PiSharp.InteractiveParity.Tests
           - PiSharp.ExtensionParity.Tests
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-dotnet@v5
+      - uses: actions/setup-dotnet@v6
         with:
           global-json-file: global.json
 
       # PiSharp.ExtensionParity.Tests runs TypeScript extensions with Node.js 22.13 or later and installs Pi's npm packages.
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: '22'
 
@@ -71,7 +99,7 @@ jobs:
             -p:RestoreSources=https://api.nuget.org/v3/index.json -p:RestoreLockedMode=false \
             -- --report "$RUNNER_TEMP/${{ matrix.suite }}.json"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: report-${{ matrix.suite }}
@@ -83,9 +111,9 @@ jobs:
     runs-on: macos-15
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-dotnet@v5
+      - uses: actions/setup-dotnet@v6
         with:
           global-json-file: global.json
 

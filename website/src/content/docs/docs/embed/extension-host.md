@@ -16,9 +16,9 @@ The libraries `pisharp` uses to load extensions are public, so your own app can 
 | `PiSharp.ExtensionHost` | `NodeWorkerSupervisor` and the extension worker protocol |
 
 ```powershell
-dotnet add package PiSharp.Extensions.Runtime --version 1.6.0
-dotnet add package PiSharp.Extensions.Agent --version 1.6.0
-dotnet add package PiSharp.Sessions --version 1.6.0
+dotnet add package PiSharp.Extensions.Runtime --version {{PISHARP_VERSION}}
+dotnet add package PiSharp.Extensions.Agent --version {{PISHARP_VERSION}}
+dotnet add package PiSharp.Sessions --version {{PISHARP_VERSION}}
 ```
 
 ## Load an extension assembly

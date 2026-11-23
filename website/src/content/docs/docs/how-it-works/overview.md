@@ -16,7 +16,7 @@ PiSharp intentionally maintains **two distinct agent stacks** over the same prov
 | **Execution model** | In-memory turn loop (`Agent`) optionally backed by append-only Pi JSONL session trees (`PiSharp.Sessions`). | Commit-first state machine (`IHarness`): every turn, streamed progress, tool call, document and timer commits before display. |
 | **Crash mid-turn** | Loses the in-flight turn; committed prior entries remain in the JSONL tree. | Reopening the SQLite/JSONL/Chord store resumes unfinished turns and tasks automatically. |
 | **Interoperability with Pi** | Shares `~/.pi/agent`, `.pi`, JSONL session format, RPC wire protocol and TypeScript extensions with Pi. | Ports `pi-durable` (`pisharp durable`); `PiSharp.CustomAgents` adds C# workflows and teams on top. |
-| **API stability** | Stable (`1.6.0` on NuGet). | Experimental (`PISHARP_DURABLE001`, `PISHARP_AGENTS001`). |
+| **API stability** | Stable (`{{PISHARP_VERSION}}` on NuGet). | Experimental (`PISHARP_DURABLE001`, `PISHARP_AGENTS001`). |
 
 ## Pick the right layer for your project
 

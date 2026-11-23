@@ -4,8 +4,16 @@ name: Agent samples
 on:
   pull_request:
     branches: [main]
+    paths-ignore:
+      - 'website/**'
+      - 'docs/**'
+      - 'AI_DOCS/**'
   push:
     branches: [main]
+    paths-ignore:
+      - 'website/**'
+      - 'docs/**'
+      - 'AI_DOCS/**'
   workflow_dispatch:
 
 permissions:
@@ -25,9 +33,9 @@ jobs:
       matrix:
         os: [windows-latest, ubuntu-latest, macos-15]
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-dotnet@v5
+      - uses: actions/setup-dotnet@v6
         with:
           global-json-file: global.json
 
@@ -42,7 +50,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           ./samples/agents/scripts/run-all.ps1 -Dotnet (Get-Command dotnet).Source -SkipBuild
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: agent-samples-${{ matrix.os }}
