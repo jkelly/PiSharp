@@ -17,11 +17,11 @@
     "fixedSupervisorReason": "Retain the exact existing approved system-import identity; no loader guard is relaxed."
   },
   "qualification": {
-    "versionSpecificProductsQualified": false,
-    "versionSpecificPackageConsumptionQualified": false,
+    "versionSpecificProductsQualified": true,
+    "versionSpecificPackageConsumptionQualified": true,
     "fullProviderParity": false,
-    "completeNativeGateReady": false,
-    "status": "Release candidate on release/1.6.0.1: a C#-only patch release on the unchanged Pi v1.6.0 and Pi Durable 1.6.0 baseline (faac585884ae2c013a6b1400f3e9e77f10b34bac). Expands the package set to 29 libraries plus PiSharp.Cli and PiSharp.Templates (31 packages), adds PiSharp.Extensions.AI and DiagnosticsTelemetry, graduates seven Tier-1 [Experimental] diagnostic IDs (decision 0017), adds internal retry classification for four native transports (decision 0016), completes Durable 1.6.0 host/workflow wiring, adds JsonlStorage byte-offset indexing and ChordStore SQLite group commit, and trims PiSharp.Cli under an 80 MiB budget. Nothing is tagged or published; explicit owner approval (decision 0006) and exact-tag release verification are required before publication."
+    "completeNativeGateReady": true,
+    "status": "Released 2026-11-23 from immutable source 1a74a207b30613444d5f8ef884957e7580860539. All required tagged release gates passed (run 45198502548, 38/38 active jobs). All 31 NuGet packages (29 libraries, PiSharp.Cli and PiSharp.Templates) were downloaded from the official feed and matched the GitHub release payloads byte-for-byte, excluding NuGet's repository signature (verification run 45207181360). An isolated official-feed consumer, private CLI install, PiSharp.Templates scaffold and PiSharp.Extensions.AI + Microsoft.Extensions.AI smoke test passed. Native daemon validation remains separate; this package release does not replace the historical 1.5.0.1 native ZIPs. Explicit platform and provider limitations remain; no complete upstream, provider or all-platform parity is claimed."
   },
   "releaseCandidate": {
     "branch": "release/1.6.0.1",
@@ -62,9 +62,15 @@
     "reviewedUpstreamThrough": "faac585884ae2c013a6b1400f3e9e77f10b34bac"
   },
   "publication": {
-    "tagCreated": false,
-    "binaryReleasePublished": false,
-    "nugetPackagesPublished": false
+    "tagCreated": true,
+    "binaryReleasePublished": true,
+    "nugetPackagesPublished": true,
+    "publishedOn": "2026-11-23",
+    "publishedAt": "2026-11-23T15:22:25Z",
+    "tagCommit": "1a74a207b30613444d5f8ef884957e7580860539",
+    "releaseRun": "45198502548",
+    "verificationRun": "45207181360",
+    "evidence": "AI_DOCS/release-1.6.0.1-publication-results.md"
   },
   "previousReleases": [
     {

@@ -99,17 +99,16 @@ The third-party packages are pinned exactly, and their licenses are in [`third-p
 
 | Part | Status | Where |
 | --- | --- | --- |
-| The 28 libraries listed on the SDK page and the `PiSharp.Cli` tool (29 packages) | Released on NuGet, {{PISHARP_VERSION}} | [SDK](/sdk/) |
-| `PiSharp.Extensions.AI` and `PiSharp.Templates` (2 additional packages) | Prepared on `main` for the upcoming 1.6.0.1 release (not in 1.6.0 on NuGet) | [Microsoft.Extensions.AI](/docs/embed/extensions-ai/), [Project templates](/docs/embed/sdk/#project-templates) |
-| Durable libraries and `pisharp durable` | Released as experimental in 1.2.0.1, and moved to `pi-durable` v1.5.0 in 1.5.0. Every durable API carries `[Experimental("PISHARP_DURABLE001")]`. | [Pi Durable](/docs/guides/durable/) |
-| Telemetry (`PiSharp.Telemetry`) | Released as experimental in 1.5.0, with `DiagnosticsTelemetry` (`ActivitySource`/`Meter`) added on `main` for 1.6.0.1. `[Experimental("PISHARP_TELEMETRY001")]`. | [Telemetry](/docs/embed/telemetry/) |
+| The 29 libraries listed on the SDK page, `PiSharp.Cli`, and `PiSharp.Templates` (31 packages) | Released on NuGet, {{PISHARP_VERSION}} | [SDK](/sdk/), [Microsoft.Extensions.AI](/docs/embed/extensions-ai/), [Project templates](/docs/embed/sdk/#project-templates) |
+| Durable libraries and `pisharp durable` | Released as experimental in 1.2.0.1, and moved to `pi-durable` v1.6.0 in 1.6.0. Every durable API carries `[Experimental("PISHARP_DURABLE001")]`. | [Pi Durable](/docs/guides/durable/) |
+| Telemetry (`PiSharp.Telemetry`) | Released as experimental in 1.5.0, with `DiagnosticsTelemetry` (`ActivitySource`/`Meter`) added in 1.6.0.1. `[Experimental("PISHARP_TELEMETRY001")]`. | [Telemetry](/docs/embed/telemetry/) |
 | Media library (`PiSharp.AI.Media`) and the media tools | Released as experimental in 1.2.0.2. `[Experimental("PISHARP_MEDIA001")]`. | [Media](/docs/embed/media/) |
-| Service tiers | `[Experimental("PISHARP_TIERS001")]` in published 1.6.0; graduating to stable in 1.6.0.1 (ADR 0017). | [Service tiers](/docs/guides/service-tiers/) |
+| Service tiers | Graduated to stable in 1.6.0.1 (ADR 0017; `[Experimental("PISHARP_TIERS001")]` in earlier 1.6.0 packages). | [Service tiers](/docs/guides/service-tiers/) |
 | Custom agents | Released as experimental in 1.2.0.2, as three packages. `[Experimental("PISHARP_AGENTS001")]` on every public type. | [Custom agents](/docs/custom-agents/overview/) |
 | Durable device server (`pisharp durable serve`) | Released as experimental in 1.2.0.2, inside the CLI tool. `PiSharp.Durable.Hosting`, `PiSharp.Durable.Server` and `PiSharp.Durable.Client` are not packages. | [Device server](/docs/guides/durable/#device-server) |
 | `PiSharp.ModelRuntime` | Inside the CLI tool, not a package. | |
 
-PiSharp **1.5.0.1** publishes five more experimental libraries: [Chord and Chord.Hosting](/docs/embed/chord/) (`PISHARP_CHORD001`), [Durable.Store](/docs/embed/durable-store/) (`PISHARP_DURABLE001`), and [Env.Protocol and Env](/docs/embed/env/) (`PISHARP_ENV001`). This brings the published inventory to 28 libraries plus the CLI, **29 packages**. Chord now includes the real v2 host and a separate legacy runtime; hosting supplies native plugins, HTTP and workers. The Env daemon is a separate NativeAOT artifact. Use version {{PISHARP_VERSION}} for all sibling references, or [build from source](/docs/contribute/build/).
+PiSharp **1.5.0.1** added five experimental libraries — [Chord and Chord.Hosting](/docs/embed/chord/) (`PISHARP_CHORD001`), [Durable.Store](/docs/embed/durable-store/) (`PISHARP_DURABLE001`), and [Env.Protocol and Env](/docs/embed/env/) (`PISHARP_ENV001`) — bringing the inventory to 29 packages through 1.6.0; **1.6.0.1** added `PiSharp.Extensions.AI` and `PiSharp.Templates`, bringing the published inventory to **31 packages** (29 libraries, `PiSharp.Cli`, and `PiSharp.Templates`). The Env daemon is a separate NativeAOT artifact. Use version {{PISHARP_VERSION}} for all sibling references, or [build from source](/docs/contribute/build/).
 
 Other source-only applications include `PiSharp.WebAgent`, `PiSharp.Durable.Web`, `PiSharp.Durable.MSSQL`, `PiSharp.Web.Common` and [PiSharp.Evals](/docs/contribute/evaluations/). They are not added to the NuGet library inventory.
 

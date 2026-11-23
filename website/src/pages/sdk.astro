@@ -14,7 +14,7 @@ const groups = [
 	<div class="ps-row ps-pagehead">
 		<div>
 			<h1 class="ps-h1">Take the whole agent, or just a layer</h1>
-			<p class="ps-lede">Use the streaming LLM client on its own, add the agent loop, or embed the full coding agent. PiSharp {versions.pisharp} publishes 28 libraries and the CLI (29 packages) on NuGet; <code>PiSharp.Extensions.AI</code> and <code>PiSharp.Templates</code> are prepared on <code>main</code> for the upcoming 1.6.0.1 release.</p>
+			<p class="ps-lede">Use the streaming LLM client on its own, add the agent loop, or embed the full coding agent. PiSharp {versions.pisharp} publishes 29 libraries, the CLI tool, and the <code>dotnet new</code> template package (31 packages) on NuGet.</p>
 			<div class="ps-actions">
 				<a href="/docs/embed/sdk/" class="ps-button">Read the embedding guide</a>
 				<a href="/docs/reference/architecture/" class="ps-button ps-ghost">Architecture</a>
@@ -56,7 +56,7 @@ const groups = [
 								</div>
 								<div>
 									<p class="ps-muted">{p.description}</p>
-									{p.unpublished ? <p class="ps-fine"><a href={p.docs}>Unpublished. Read the source guide</a></p> : <code class="add">{p.tool ? `dotnet tool install -g ${p.id} --version ${versions.pisharp}` : p.template ? `dotnet new install ${p.id}::${versions.pisharp}` : `dotnet add package ${p.id} --version ${versions.pisharp}`}</code>}
+									{p.unpublished ? <p class="ps-fine"><a href={p.docs}>Unpublished. Read the source guide</a></p> : <code class="add">{p.tool ? `dotnet tool install -g ${p.id} --version ${versions.pisharp}` : p.template ? `dotnet new install ${p.id}@${versions.pisharp}` : `dotnet add package ${p.id} --version ${versions.pisharp}`}</code>}
 								</div>
 							</li>
 						))}

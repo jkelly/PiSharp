@@ -377,18 +377,18 @@
       "version": "1.6.0.1",
       "kind": "patch",
       "baseline": "v1.6.0",
-      "status": "release-candidate",
+      "status": "published",
       "branch": "release/1.6.0.1",
-      "ships": "PRs #68-#73 (post-1.6.0 improvement plan Waves 1-6): CI hygiene and website DX, CLI packaging diet (<80 MiB) and standalone manifests/post-publish verification, codebase health and exec test wiring, four-transport retry classification (decision 0016), native PowerShell tool, FindTool anchoring and native C# extension overrides + /reload diagnostics, Durable 1.6.0 host/signal/image-fitting wiring, CustomAgents workflow signals, JsonlStorage byte-offset indexing + LRU cache, ChordStore SQLite group commit, PiSharp.Extensions.AI, DiagnosticsTelemetry, PiSharp.Templates, and Tier-1 [Experimental] graduation (decision 0017); 29 libraries + CLI + Templates (31 packages).",
+      "ships": "PRs #68-#74 (post-1.6.0 improvement plan Waves 1-7): CI hygiene and website DX, CLI packaging diet (<80 MiB) and standalone manifests/post-publish verification, codebase health and exec test wiring, four-transport retry classification (decision 0016), native PowerShell tool, FindTool anchoring and native C# extension overrides + /reload diagnostics, Durable 1.6.0 host/signal/image-fitting wiring, CustomAgents workflow signals, JsonlStorage byte-offset indexing + LRU cache, ChordStore SQLite group commit, PiSharp.Extensions.AI, DiagnosticsTelemetry, PiSharp.Templates, and Tier-1 [Experimental] graduation (decision 0017); 29 libraries + CLI + Templates (31 packages).",
       "decisions": [
         "docs/decisions/0016-transport-retry-classification.md",
         "docs/decisions/0017-experimental-graduation-tier1.md"
       ],
       "notes": "docs/release-notes/1.6.0.1.md",
       "changelog": "website/src/content/changelog/1.6.0.1.md",
-      "blockers": [
-        "Owner go-ahead required before tagging v1.6.0.1 and publishing (decision 0006)"
-      ]
+      "blockers": [],
+      "publishedOn": "2026-11-23",
+      "tag": "v1.6.0.1 (1a74a207b30613444d5f8ef884957e7580860539), release run 45198502548"
     }
   },
   "messageCaps": {

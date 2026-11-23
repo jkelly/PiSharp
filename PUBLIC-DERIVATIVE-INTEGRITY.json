@@ -5872,8 +5872,8 @@
       "originalSha256": "0f5f73cc466a7aa3c8939d483b171da02d34d7fff0518ab80964f1311c92e6a9"
     },
     {
-      "currentSha256": "7843db2647c833fdebb95daff20e5e852f1b60486903a885363e17d23e8ae75c",
-      "currentBytes": 10343,
+      "currentSha256": "e94de4ba9b85fd199e21a638a94ebd2e05c8c6867ea01222ce43433e6b67d1c0",
+      "currentBytes": 10368,
       "originalBytes": 3622,
       "path": "README.md",
       "originalSha256": "1b053b228b07ff43b8ba7d37d19e4ea3a1d6214731dfa4a1f2ef6f3240f292df"
@@ -17345,8 +17345,8 @@
       "originalSha256": "e19cf1c735524baa2df474154c117399e4a3ecf2c7ba98e337cd12afecc77071"
     },
     {
-      "currentSha256": "15d6b372eabf9a1cd63b73246033870ce2a95226dc0169cc3f79d950f650e0f6",
-      "currentBytes": 40228,
+      "currentSha256": "2176f3b651d55f18999db43ec4fdfdc05c20285d69dbe64a5804a17ef511489d",
+      "currentBytes": 40168,
       "originalBytes": 11780,
       "path": "THIRD-PARTY-NOTICES.md",
       "originalSha256": "24221bb14cd6d8e6e579012398de5ef553806f67eaa182a5900d142fc20faf09"

@@ -11,7 +11,7 @@ on:
       version:
         description: Version to build and validate (dry run, nothing is published)
         required: true
-        default: '1.6.0'
+        default: '1.6.0.1'
       skip_tests:
         description: Skip the 23 release-list suites (dry runs only; core/Durable validation still runs)
         type: boolean
