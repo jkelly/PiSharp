@@ -41,7 +41,13 @@ internal static partial class DurableRemote
             call => call.Client.ExecutionArtifactsAsync(call.Session, call.LongArg(0), call.Token)) { Columns = ["id", "kind", "title"] },
         new("tasks", "signal", $"{InSession} <task> <signal> <key> [--payload <json>] [--file <payload.json>] [--request <id>]",
             "Delivers a typed signal to a live task.", "signals",
-            call => call.Client.SignalTaskAsync(call.Session, call.LongArg(0), call.Arg(1), call.Arg(2), SignalPayload(call), call.Args.Option("--request"), call.Token)),
+            call =>
+            {
+                var (hasPayload, payload) = SignalPayload(call);
+                return hasPayload
+                    ? call.Client.SignalTaskAsync(call.Session, call.LongArg(0), call.Arg(1), call.Arg(2), payload, call.Args.Option("--request"), call.Token)
+                    : call.Client.SignalTaskAsync(call.Session, call.LongArg(0), call.Arg(1), call.Arg(2), call.Args.Option("--request"), call.Token);
+            }),
 
         // ─── Schedules and trigger credentials ──────────────────────────────
         new("schedules", "list", "", "Recurring schedules.", null, call => call.Client.SchedulesAsync(call.Token))
@@ -161,13 +167,13 @@ internal static partial class DurableRemote
             call => call.Client.DeletePreferenceAsync(call.Arg(0), call.Revision, call.Token)),
     ];
 
-    private static JsonNode? SignalPayload(RemoteCall call)
+    private static (bool HasPayload, JsonNode? Payload) SignalPayload(RemoteCall call)
     {
-        if (call.Args.Option("--payload") is { } raw && call.Args.Option("--file") is not null)
+        if (call.Args.Option("--payload") is not null && call.Args.Option("--file") is not null)
             throw new RemoteUsageException("Pass either --payload or --file, not both.");
-        if (call.Args.Option("--file") is not null) return call.File("--file");
-        if (call.Args.Option("--payload") is not { } json) return new JsonObject();
-        try { return JsonNode.Parse(json); }
+        if (call.Args.Option("--file") is not null) return (true, call.JsonFile("--file"));
+        if (call.Args.Option("--payload") is not { } json) return (false, null);
+        try { return (true, JsonNode.Parse(json)); }
         catch (System.Text.Json.JsonException failure) { throw new RemoteUsageException($"--payload is not valid JSON: {failure.Message}"); }
     }
 

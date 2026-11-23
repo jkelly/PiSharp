@@ -91,6 +91,7 @@ public sealed partial class JsonlStorage : IStorage
     private readonly Dictionary<string, DocumentAddressIndex> documentAddresses = new(StringComparer.Ordinal);
     private readonly Dictionary<string, List<long>> documentIdsByScope = new(StringComparer.Ordinal);
     private readonly Dictionary<string, long> fileSizes = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, int> sidecarGenerations = new(StringComparer.Ordinal);
     private readonly HashSet<long> currentOnlyDocuments = [];
     private readonly HashSet<long> liveTaskSidecars = [];
     private long nextId = 2;
@@ -104,7 +105,7 @@ public sealed partial class JsonlStorage : IStorage
 
     // Bounded LRU caches for lazily read lines from main.jsonl and sidecars.
     private readonly ByteBudgetLruCache<(long Offset, int Length), JsonArrayValue> mainLineCache = new(DefaultMaxMainCacheEntries, DefaultMaxMainCacheBytes);
-    private readonly ByteBudgetLruCache<(string File, long Offset, int Length), object> sidecarCache = new(DefaultMaxSidecarCacheEntries, DefaultMaxSidecarCacheBytes);
+    private readonly ByteBudgetLruCache<(string File, int Generation, long Offset, int Length), object> sidecarCache = new(DefaultMaxSidecarCacheEntries, DefaultMaxSidecarCacheBytes);
 
     // Lazily opened reader for append-only main.jsonl (closed in CloseAsync).
     private readonly SemaphoreSlim mainReaderGate = new(1, 1);
@@ -116,8 +117,26 @@ public sealed partial class JsonlStorage : IStorage
     private readonly Lock readGate = new();
     /// <summary>Completes once the batches being appended are; index metadata runs ahead while appends run.</summary>
     private Task? writing;
-    /// <summary>Active per-file reclamation tasks so sidecar reads wait across atomic RenameFileAsync + offset rebasing.</summary>
-    private readonly Dictionary<string, Task> reclaimingFiles = new(StringComparer.Ordinal);
+    /// <summary>Per-sidecar reader/reclaimer coordination so reclamation never deletes or replaces a sidecar while a cold read holds it.</summary>
+    private readonly Dictionary<string, SidecarGate> sidecarGates = new(StringComparer.Ordinal);
+
+    private sealed class SidecarGate
+    {
+        public int Readers;
+        public bool Reclaiming;
+        public TaskCompletionSource? ReadersDrained;
+        public TaskCompletionSource? ReclaimDone;
+    }
+
+    private readonly struct SidecarReadLease(JsonlStorage owner, string file) : IDisposable
+    {
+        public void Dispose() => owner?.ReleaseSidecarRead(file);
+    }
+
+    private readonly struct SidecarReclaimLease(JsonlStorage owner, string file) : IDisposable
+    {
+        public void Dispose() => owner?.ReleaseSidecarReclaim(file);
+    }
 
     private JsonlStorage(IFileSystem fs, string directory, string mainPath, JsonlStorageOptions options)
     {
@@ -319,37 +338,24 @@ public sealed partial class JsonlStorage : IStorage
 
     /// <inheritdoc/>
     public Task<CommittedEntry?> GetEntryAsync(EntryId id, DurableContext context) =>
-        ReadableAsync(async () =>
-        {
-            EntryLocation location;
-            lock (indexGate)
-            {
-                if (!entries.TryGetValue(id.Value, out location)) return null;
-            }
-            var entry = await LoadEntryAsync(location, context).ConfigureAwait(false);
-            return new CommittedEntry(entry, location.CommitSeq);
-        });
+        ReadableSnapshotAsync(
+            () => entries.TryGetValue(id.Value, out var location) ? location : (EntryLocation?)null,
+            async found => found is { } location
+                ? new CommittedEntry(await LoadEntryAsync(location, context).ConfigureAwait(false), location.CommitSeq)
+                : null);
 
     /// <inheritdoc/>
     public Task<CommittedEntry?> GetEntryAsync(ConversationId conversationId, EntryId id, DurableContext context) =>
-        ReadableAsync(async () =>
-        {
-            EntryLocation? found;
-            lock (indexGate)
-            {
-                found = FindVisibleEntryLocation(conversationId, id.Value);
-            }
-            if (found is not { } location) return null;
-            var entry = await LoadEntryAsync(location, context).ConfigureAwait(false);
-            return new CommittedEntry(entry, location.CommitSeq);
-        });
+        ReadableSnapshotAsync(
+            () => FindVisibleEntryLocation(conversationId, id.Value),
+            async found => found is { } location
+                ? new CommittedEntry(await LoadEntryAsync(location, context).ConfigureAwait(false), location.CommitSeq)
+                : null);
 
     /// <inheritdoc/>
     public Task<EntryRecord?> FindLatestHeadMarkerAsync(ConversationId conversationId, EntryId? atOrBeforeEntryId, DurableContext context) =>
-        ReadableAsync(async () =>
-        {
-            EntryLocation? found = null;
-            lock (indexGate)
+        ReadableSnapshotAsync(
+            () =>
             {
                 if (!conversations.ContainsKey(conversationId.Value))
                     throw new StorageRequestException($"Unknown conversation: {conversationId}");
@@ -359,33 +365,28 @@ public sealed partial class JsonlStorage : IStorage
                 {
                     var ids = headEntryIds.GetValueOrDefault(currentId) ?? [];
                     var index = JsonlSortedIndex.UpperBound(ids, upperEntryId) - 1;
-                    if (index >= 0)
-                    {
-                        found = entries[ids[index]];
-                        break;
-                    }
+                    if (index >= 0) return (EntryLocation?)entries[ids[index]];
                     var conversation = conversations[currentId];
-                    if (conversation.Parent is not { } parent) break;
+                    if (conversation.Parent is not { } parent) return null;
                     upperEntryId = Math.Min(upperEntryId, parent.At.Value);
                     currentId = parent.ConversationId.Value;
                 }
-            }
-            return found is { } location ? await LoadEntryAsync(location, context).ConfigureAwait(false) : null;
-        });
+            },
+            async found => found is { } location ? await LoadEntryAsync(location, context).ConfigureAwait(false) : null);
 
     /// <inheritdoc/>
-    public Task<Page<EntryRecord>> ScanEntriesAsync(EntryQuery query, int limit, JsonObjectValue? cursor, DurableContext context) =>
-        ReadableAsync(async () =>
-        {
-            ArgumentNullException.ThrowIfNull(query);
-            var (order, after) = StorageScan.Start(query.Order, cursor, ScanOrder.Descending);
-            var minEntryId = query.MinEntryId?.Value;
-            var maxEntryId = query.MaxEntryId?.Value;
-            if (after is { } descendingAfter && order == ScanOrder.Descending) maxEntryId = Math.Min(maxEntryId ?? descendingAfter, descendingAfter - 1);
-            if (after is { } ascendingAfter && order == ScanOrder.Ascending) minEntryId = Math.Max(minEntryId ?? ascendingAfter, ascendingAfter + 1);
-            var locations = new List<EntryLocation>();
-            lock (indexGate)
+    public Task<Page<EntryRecord>> ScanEntriesAsync(EntryQuery query, int limit, JsonObjectValue? cursor, DurableContext context)
+    {
+        ArgumentNullException.ThrowIfNull(query);
+        var (order, after) = StorageScan.Start(query.Order, cursor, ScanOrder.Descending);
+        var minEntryId = query.MinEntryId?.Value;
+        var maxEntryId = query.MaxEntryId?.Value;
+        if (after is { } descendingAfter && order == ScanOrder.Descending) maxEntryId = Math.Min(maxEntryId ?? descendingAfter, descendingAfter - 1);
+        if (after is { } ascendingAfter && order == ScanOrder.Ascending) minEntryId = Math.Max(minEntryId ?? ascendingAfter, ascendingAfter + 1);
+        return ReadableSnapshotAsync(
+            () =>
             {
+                var locations = new List<EntryLocation>();
                 var ids = order == ScanOrder.Descending
                     ? VisibleEntryIdsDescending(query.ConversationId, minEntryId ?? long.MinValue, maxEntryId ?? long.MaxValue)
                     : VisibleEntryIdsAscending(query.ConversationId, minEntryId ?? long.MinValue, maxEntryId ?? long.MaxValue);
@@ -394,33 +395,35 @@ public sealed partial class JsonlStorage : IStorage
                     locations.Add(entries[entryId]);
                     if (locations.Count > limit) break;
                 }
-            }
-            var visible = new List<EntryRecord>(locations.Count);
-            foreach (var location in locations) visible.Add(await LoadEntryAsync(location, context).ConfigureAwait(false));
-            return StorageRules.MakePage(visible, limit, order, entry => entry.Id.Value);
-        });
+                return locations;
+            },
+            async locations =>
+            {
+                var visible = new List<EntryRecord>(locations.Count);
+                foreach (var location in locations) visible.Add(await LoadEntryAsync(location, context).ConfigureAwait(false));
+                return StorageRules.MakePage(visible, limit, order, entry => entry.Id.Value);
+            });
+    }
 
     /// <inheritdoc/>
     public Task<TaskRecord?> GetTaskAsync(TaskId id, DurableContext context) =>
-        ReadableAsync(async () =>
-        {
-            TaskLocation location;
-            lock (indexGate)
-            {
-                if (!tasks.TryGetValue(id.Value, out location)) return null;
-            }
-            return await LoadTaskAsync(id.Value, location, context).ConfigureAwait(false);
-        });
+        ReadableSnapshotAsync(
+            () => tasks.TryGetValue(id.Value, out var location)
+                ? (Found: true, Location: location, Generation: sidecarGenerations.GetValueOrDefault(SidecarName("task", id.Value)))
+                : (Found: false, Location: default(TaskLocation), Generation: 0),
+            async snapshot => snapshot.Found
+                ? await LoadTaskAsync(id.Value, snapshot.Location, snapshot.Generation, context).ConfigureAwait(false)
+                : null);
 
     /// <inheritdoc/>
-    public Task<Page<TaskRecord>> ScanTasksAsync(TaskQuery query, int limit, JsonObjectValue? cursor, DurableContext context) =>
-        ReadableAsync(async () =>
-        {
-            ArgumentNullException.ThrowIfNull(query);
-            var start = StorageScan.Start(query.Order, cursor, ScanOrder.Ascending);
-            var matched = new List<(long Id, TaskLocation Location)>();
-            lock (indexGate)
+    public Task<Page<TaskRecord>> ScanTasksAsync(TaskQuery query, int limit, JsonObjectValue? cursor, DurableContext context)
+    {
+        ArgumentNullException.ThrowIfNull(query);
+        var start = StorageScan.Start(query.Order, cursor, ScanOrder.Ascending);
+        return ReadableSnapshotAsync(
+            () =>
             {
+                var matched = new List<(long Id, TaskLocation Location, int Generation)>();
                 var ids = query.Status is { } status ? taskIdsByStatus[status] : taskIds;
                 foreach (var index in JsonlSortedIndex.ScanIndexes(ids, start))
                 {
@@ -431,35 +434,34 @@ public sealed partial class JsonlStorage : IStorage
                     if (query.Kind is { } kind && !string.Equals(meta.Kind, kind, StringComparison.Ordinal)) continue;
                     if (query.AbortRequested is { } abortRequested && meta.AbortRequested != abortRequested) continue;
                     if (query.Background is { } background && meta.Background != background) continue;
-                    matched.Add((taskId, meta));
+                    matched.Add((taskId, meta, meta.InMain ? 0 : sidecarGenerations.GetValueOrDefault(SidecarName("task", taskId))));
                 }
-            }
-            var values = new List<TaskRecord>(matched.Count);
-            foreach (var (taskId, location) in matched) values.Add(await LoadTaskAsync(taskId, location, context).ConfigureAwait(false));
-            return StorageRules.MakePage(values, limit, start.Order, value => value.Id.Value);
-        });
+                return matched;
+            },
+            async matched =>
+            {
+                var values = new List<TaskRecord>(matched.Count);
+                foreach (var (taskId, location, generation) in matched)
+                    values.Add(await LoadTaskAsync(taskId, location, generation, context).ConfigureAwait(false));
+                return StorageRules.MakePage(values, limit, start.Order, value => value.Id.Value);
+            });
+    }
 
     /// <inheritdoc/>
     public Task<SubmissionRecord?> GetSubmissionAsync(SubmissionId id, DurableContext context) =>
-        ReadableAsync(async () =>
-        {
-            SubmissionLocation location;
-            lock (indexGate)
-            {
-                if (!submissions.TryGetValue(id.Value, out location)) return null;
-            }
-            return await LoadSubmissionAsync(location, context).ConfigureAwait(false);
-        });
+        ReadableSnapshotAsync(
+            () => submissions.TryGetValue(id.Value, out var location) ? location : (SubmissionLocation?)null,
+            async found => found is { } location ? await LoadSubmissionAsync(location, context).ConfigureAwait(false) : null);
 
     /// <inheritdoc/>
-    public Task<Page<SubmissionRecord>> ScanSubmissionsAsync(SubmissionQuery query, int limit, JsonObjectValue? cursor, DurableContext context) =>
-        ReadableAsync(async () =>
-        {
-            ArgumentNullException.ThrowIfNull(query);
-            var start = StorageScan.Start(query.Order, cursor, ScanOrder.Ascending);
-            var matched = new List<SubmissionLocation>();
-            lock (indexGate)
+    public Task<Page<SubmissionRecord>> ScanSubmissionsAsync(SubmissionQuery query, int limit, JsonObjectValue? cursor, DurableContext context)
+    {
+        ArgumentNullException.ThrowIfNull(query);
+        var start = StorageScan.Start(query.Order, cursor, ScanOrder.Ascending);
+        return ReadableSnapshotAsync(
+            () =>
             {
+                var matched = new List<SubmissionLocation>();
                 var ids = query.Status is { } status ? submissionIdsByStatus[status] : submissionIds;
                 foreach (var index in JsonlSortedIndex.ScanIndexes(ids, start))
                 {
@@ -468,27 +470,26 @@ public sealed partial class JsonlStorage : IStorage
                     if (query.ConversationId is { } conversationId && meta.ConversationId != conversationId) continue;
                     matched.Add(meta);
                 }
-            }
-            var values = new List<SubmissionRecord>(matched.Count);
-            foreach (var location in matched) values.Add(await LoadSubmissionAsync(location, context).ConfigureAwait(false));
-            return StorageRules.MakePage(values, limit, start.Order, value => value.Id.Value);
-        });
+                return matched;
+            },
+            async matched =>
+            {
+                var values = new List<SubmissionRecord>(matched.Count);
+                foreach (var location in matched) values.Add(await LoadSubmissionAsync(location, context).ConfigureAwait(false));
+                return StorageRules.MakePage(values, limit, start.Order, value => value.Id.Value);
+            });
+    }
 
     /// <inheritdoc/>
-    public Task<SubmissionRecord?> GetSubmissionByRequestAsync(ConversationId conversationId, string requestId, DurableContext context) =>
-        ReadableAsync(async () =>
-        {
-            ArgumentNullException.ThrowIfNull(requestId);
-            SubmissionLocation location;
-            lock (indexGate)
-            {
-                if (!submissionIdsByRequest.TryGetValue(conversationId.Value, out var requests) ||
-                    !requests.TryGetValue(requestId, out var id))
-                    return null;
-                location = submissions[id];
-            }
-            return await LoadSubmissionAsync(location, context).ConfigureAwait(false);
-        });
+    public Task<SubmissionRecord?> GetSubmissionByRequestAsync(ConversationId conversationId, string requestId, DurableContext context)
+    {
+        ArgumentNullException.ThrowIfNull(requestId);
+        return ReadableSnapshotAsync(
+            () => submissionIdsByRequest.TryGetValue(conversationId.Value, out var requests) && requests.TryGetValue(requestId, out var id)
+                ? submissions[id]
+                : (SubmissionLocation?)null,
+            async found => found is { } location ? await LoadSubmissionAsync(location, context).ConfigureAwait(false) : null);
+    }
 
     /// <inheritdoc/>
     public Task<DocumentRecord?> FindDocumentAsync(DocumentAddress address, DocumentPoint at, DurableContext context) =>
@@ -507,7 +508,7 @@ public sealed partial class JsonlStorage : IStorage
 
     /// <inheritdoc/>
     public Task<StoredDocument?> GetDocumentAsync(DocumentId id, DocumentPoint at, DurableContext context) =>
-        ReadableAsync(() => MaterializeDocumentAsync(id, at, pendingSidecarBytes: null, context));
+        MaterializeDocumentAsync(id, at, pendingSidecarBytes: null, insideCommit: false, context);
 
     /// <inheritdoc/>
     public Task<Page<DocumentRecord>> ScanDocumentsAsync(DocumentQuery query, int limit, JsonObjectValue? cursor, DurableContext context) =>
@@ -614,7 +615,7 @@ public sealed partial class JsonlStorage : IStorage
                 var sourceId = copy.Source.Id;
                 if (changedDocumentIds.Contains(sourceId.Value))
                     throw new InvalidOperationException($"Fork source document {sourceId} is changed in the copy batch");
-                var stored = await MaterializeDocumentAsync(sourceId, copy.Source.At, pendingSidecarBytes, context).ConfigureAwait(false) ??
+                var stored = await MaterializeDocumentAsync(sourceId, copy.Source.At, pendingSidecarBytes, insideCommit: true, context).ConfigureAwait(false) ??
                     throw new InvalidOperationException($"Fork source document {sourceId} cannot be read");
                 StorageRules.CheckCopySource(stored, copy.Record);
                 resolved.Add(new DocumentCreateWrite(copy.Record, DocumentContent.Base(stored.Version, stored.Value)));
@@ -994,9 +995,17 @@ public sealed partial class JsonlStorage : IStorage
         if (!path.IsOk) return;
         if (plan.Bytes.Length == 0)
         {
-            await fs.RemoveAsync(path.Value, new RemoveOptions { Force = true }, context).ConfigureAwait(false);
-            sidecarCache.RemoveWhere(key => string.Equals(key.File, file, StringComparison.Ordinal));
-            lock (indexGate) fileSizes.Remove(file);
+            using (await AcquireSidecarReclaimAsync(file).ConfigureAwait(false))
+            {
+                await fs.RemoveAsync(path.Value, new RemoveOptions { Force = true }, context).ConfigureAwait(false);
+                lock (indexGate)
+                {
+                    fileSizes.Remove(file);
+                    sidecarGenerations[file] = sidecarGenerations.GetValueOrDefault(file) + 1;
+                    if (plan.DocumentId >= 0 && documents.TryGetValue(plan.DocumentId, out var doc)) doc.Generation++;
+                }
+                sidecarCache.RemoveWhere(key => string.Equals(key.File, file, StringComparison.Ordinal));
+            }
             return;
         }
         var temporaryPath = await fs.JoinPathAsync([directory, file + ReclaimSuffix], context).ConfigureAwait(false);
@@ -1009,9 +1018,7 @@ public sealed partial class JsonlStorage : IStorage
             if (!flushed.IsOk) return;
         }
 
-        var gateTcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        lock (readGate) reclaimingFiles[file] = gateTcs.Task;
-        try
+        using (await AcquireSidecarReclaimAsync(file).ConfigureAwait(false))
         {
             var renamed = await fs.RenameFileAsync(temporaryPath.Value, path.Value, context).ConfigureAwait(false);
             var applied = renamed.IsOk;
@@ -1023,26 +1030,18 @@ public sealed partial class JsonlStorage : IStorage
             }
             if (applied)
             {
-                sidecarCache.RemoveWhere(key => string.Equals(key.File, file, StringComparison.Ordinal));
                 lock (indexGate)
                 {
                     fileSizes[file] = plan.Bytes.Length;
+                    sidecarGenerations[file] = sidecarGenerations.GetValueOrDefault(file) + 1;
                     if (plan.DocumentId >= 0 && plan.RewrittenRevisions is { } rewritten && documents.TryGetValue(plan.DocumentId, out var doc))
                     {
                         doc.Revisions = [.. rewritten];
                         doc.Generation++;
                     }
                 }
+                sidecarCache.RemoveWhere(key => string.Equals(key.File, file, StringComparison.Ordinal));
             }
-        }
-        finally
-        {
-            lock (readGate)
-            {
-                if (reclaimingFiles.TryGetValue(file, out var current) && ReferenceEquals(current, gateTcs.Task))
-                    reclaimingFiles.Remove(file);
-            }
-            gateTcs.SetResult();
         }
     }
 
@@ -1438,67 +1437,140 @@ public sealed partial class JsonlStorage : IStorage
         return ((SubmissionWrite)StorageWrite.FromJson(writes[location.WriteIndex])).Value;
     }
 
-    private async Task<TaskRecord> LoadTaskAsync(long taskId, TaskLocation location, DurableContext context)
+    private async Task<TaskRecord> LoadTaskAsync(long taskId, TaskLocation location, int generation, DurableContext context)
     {
-        if (location.InMain)
-        {
-            var writes = await LoadMainWritesAsync(location.Offset, location.Length, context).ConfigureAwait(false);
-            return ((TaskWrite)StorageWrite.FromJson(writes[location.WriteIndex])).Value;
-        }
-        if (pinnedReadOnlyTasks is not null && pinnedReadOnlyTasks.TryGetValue(taskId, out var pinned)) return pinned;
         var file = SidecarName("task", taskId);
-        var key = (file, location.Offset, location.Length);
-        if (sidecarCache.TryGet(key, out var cached)) return (TaskRecord)cached;
-        await WaitForSidecarReclaimAsync(file).ConfigureAwait(false);
-        var path = await ResolveFileAsync(file, context).ConfigureAwait(false);
-        var opened = await fs.OpenBinaryReaderAsync(path, null, context).ConfigureAwait(false);
-        if (!opened.IsOk) throw ErrorFromFile($"open of {file}", opened.Error);
-        byte[] bytes;
-        try
+        while (true)
         {
-            var read = await opened.Value.ReadAsync(location.Offset, location.Length, context).ConfigureAwait(false);
-            if (!read.IsOk) throw ErrorFromFile($"positional read of {file}", read.Error);
-            if (read.Value.Length < location.Length) throw new JsonlCorruptionException($"Truncated read in {file} at offset {location.Offset}");
-            bytes = read.Value;
+            if (location.InMain)
+            {
+                var writes = await LoadMainWritesAsync(location.Offset, location.Length, context).ConfigureAwait(false);
+                return ((TaskWrite)StorageWrite.FromJson(writes[location.WriteIndex])).Value;
+            }
+            if (pinnedReadOnlyTasks is not null && pinnedReadOnlyTasks.TryGetValue(taskId, out var pinned)) return pinned;
+            var key = (file, generation, location.Offset, location.Length);
+            if (sidecarCache.TryGet(key, out var cached)) return (TaskRecord)cached;
+
+            await WaitForWritingAsync().ConfigureAwait(false);
+            AssertUsable();
+            using (await AcquireSidecarReadAsync(file).ConfigureAwait(false))
+            {
+                var retry = false;
+                lock (readGate)
+                {
+                    if (writing is not null)
+                    {
+                        retry = true;
+                    }
+                    else
+                    {
+                        AssertUsable();
+                        lock (indexGate)
+                        {
+                            location = tasks[taskId];
+                            generation = sidecarGenerations.GetValueOrDefault(file);
+                        }
+                    }
+                }
+                if (retry || location.InMain) continue;
+                key = (file, generation, location.Offset, location.Length);
+                if (sidecarCache.TryGet(key, out cached)) return (TaskRecord)cached;
+
+                var path = await ResolveFileAsync(file, context).ConfigureAwait(false);
+                var opened = await fs.OpenBinaryReaderAsync(path, null, context).ConfigureAwait(false);
+                if (!opened.IsOk) throw ErrorFromFile($"open of {file}", opened.Error);
+                byte[] bytes;
+                try
+                {
+                    var read = await opened.Value.ReadAsync(location.Offset, location.Length, context).ConfigureAwait(false);
+                    if (!read.IsOk) throw ErrorFromFile($"positional read of {file}", read.Error);
+                    if (read.Value.Length < location.Length) throw new JsonlCorruptionException($"Truncated read in {file} at offset {location.Offset}");
+                    bytes = read.Value;
+                }
+                finally
+                {
+                    await opened.Value.CloseAsync(context).ConfigureAwait(false);
+                }
+                var record = ParseSidecarTask(bytes.AsSpan(0, location.Length));
+                sidecarCache.Set(key, record, location.Length);
+                return record;
+            }
         }
-        finally
+    }
+
+    private bool TrySnapshotDocumentLocked(DocumentId id, DocumentPoint at, string file,
+        out DocumentRecord record, out StoredDocument? immediate, out List<RevisionLocation> needed, out int generation)
+    {
+        record = null!;
+        immediate = null;
+        needed = null!;
+        generation = 0;
+        if (!documents.TryGetValue(id.Value, out var stored)) return false;
+        if (!at.IsCurrent && StorageRules.IsCurrentOnly(stored.Record))
+            throw new StorageRequestException($"Document {id} does not retain historical content");
+        if (!StorageRules.IsAliveAt(stored.Record, at)) return false;
+        record = stored.Record;
+        if (pinnedReadOnlyCurrentDocs is not null && pinnedReadOnlyCurrentDocs.TryGetValue(id.Value, out var pinnedRevisions))
         {
-            await opened.Value.CloseAsync(context).ConfigureAwait(false);
+            immediate = MaterializeFromContents(id, record, at, pinnedRevisions);
+            return false;
         }
-        var record = ParseSidecarTask(bytes.AsSpan(0, location.Length));
-        sidecarCache.Set(key, record, location.Length);
-        return record;
+        var revisions = at.Seq is { } seq
+            ? stored.Revisions.Where(revision => revision.Seq <= seq).ToList()
+            : stored.Revisions;
+        var baseIndex = revisions.Count - 1;
+        while (baseIndex >= 0 && !revisions[baseIndex].IsBase) baseIndex--;
+        if (baseIndex < 0) throw new InvalidOperationException($"Document {id} is missing a required base");
+        needed = revisions.GetRange(baseIndex, revisions.Count - baseIndex);
+        generation = sidecarGenerations.GetValueOrDefault(file);
+        return true;
     }
 
     private async Task<StoredDocument?> MaterializeDocumentAsync(DocumentId id, DocumentPoint at,
-        Dictionary<(string File, long Offset, int Length), byte[]>? pendingSidecarBytes, DurableContext context)
+        Dictionary<(string File, long Offset, int Length), byte[]>? pendingSidecarBytes, bool insideCommit, DurableContext context)
     {
         var file = SidecarName("doc", id.Value);
-        for (var attempt = 0; attempt < 2; attempt++)
+        while (true)
         {
-            await WaitForSidecarReclaimAsync(file).ConfigureAwait(false);
-            DocumentRecord record;
-            int generation;
-            List<RevisionLocation> needed;
-            lock (indexGate)
+            if (!insideCommit)
             {
-                if (!documents.TryGetValue(id.Value, out var stored)) return null;
-                if (!at.IsCurrent && StorageRules.IsCurrentOnly(stored.Record))
-                    throw new StorageRequestException($"Document {id} does not retain historical content");
-                if (!StorageRules.IsAliveAt(stored.Record, at)) return null;
-                record = stored.Record;
-                generation = stored.Generation;
-
-                if (pinnedReadOnlyCurrentDocs is not null && pinnedReadOnlyCurrentDocs.TryGetValue(id.Value, out var pinnedRevisions))
-                    return MaterializeFromContents(id, record, at, pinnedRevisions);
-
-                var revisions = at.Seq is { } seq
-                    ? stored.Revisions.Where(revision => revision.Seq <= seq).ToList()
-                    : stored.Revisions;
-                var baseIndex = revisions.Count - 1;
-                while (baseIndex >= 0 && !revisions[baseIndex].IsBase) baseIndex--;
-                if (baseIndex < 0) throw new InvalidOperationException($"Document {id} is missing a required base");
-                needed = revisions.GetRange(baseIndex, revisions.Count - baseIndex);
+                await WaitForWritingAsync().ConfigureAwait(false);
+                AssertUsable();
+            }
+            using var readLease = insideCommit ? default : await AcquireSidecarReadAsync(file).ConfigureAwait(false);
+            DocumentRecord record = null!;
+            List<RevisionLocation> needed = null!;
+            var generation = 0;
+            if (insideCommit)
+            {
+                lock (indexGate)
+                {
+                    if (!TrySnapshotDocumentLocked(id, at, file, out record, out var immediate, out needed, out generation))
+                        return immediate;
+                }
+            }
+            else
+            {
+                var retry = false;
+                var found = false;
+                StoredDocument? immediate = null;
+                lock (readGate)
+                {
+                    if (writing is not null)
+                    {
+                        retry = true;
+                    }
+                    else
+                    {
+                        AssertUsable();
+                        lock (indexGate)
+                        {
+                            found = TrySnapshotDocumentLocked(id, at, file, out record, out immediate, out needed, out generation);
+                        }
+                    }
+                }
+                if (retry) continue;
+                if (!found) return immediate;
             }
 
             var loaded = new DocumentContent[needed.Count];
@@ -1511,7 +1583,7 @@ public sealed partial class JsonlStorage : IStorage
                     loaded[index] = ParseSidecarDocument(pending);
                     continue;
                 }
-                if (sidecarCache.TryGet((file, rev.Offset, rev.Length), out var cached))
+                if (sidecarCache.TryGet((file, generation, rev.Offset, rev.Length), out var cached))
                 {
                     loaded[index] = (DocumentContent)cached;
                     continue;
@@ -1521,14 +1593,9 @@ public sealed partial class JsonlStorage : IStorage
 
             if (missing.Count > 0)
             {
-                var retried = false;
                 var path = await ResolveFileAsync(file, context).ConfigureAwait(false);
                 var opened = await fs.OpenBinaryReaderAsync(path, null, context).ConfigureAwait(false);
-                if (!opened.IsOk)
-                {
-                    if (attempt == 0 && GenerationChanged(id.Value, generation)) continue;
-                    throw ErrorFromFile($"open of {file}", opened.Error);
-                }
+                if (!opened.IsOk) throw ErrorFromFile($"open of {file}", opened.Error);
                 try
                 {
                     // Coalesce contiguous/small spans into one positional read when multiple revisions miss cache.
@@ -1541,20 +1608,14 @@ public sealed partial class JsonlStorage : IStorage
                         var bulk = await opened.Value.ReadAsync(firstOffset, totalSpan, context).ConfigureAwait(false);
                         if (!bulk.IsOk) throw ErrorFromFile($"positional read of {file}", bulk.Error);
                         if (bulk.Value.Length < totalSpan)
+                            throw new JsonlCorruptionException($"Truncated read in {file} at offset {firstOffset}");
+                        foreach (var index in missing)
                         {
-                            if (attempt == 0 && GenerationChanged(id.Value, generation)) { retried = true; }
-                            else throw new JsonlCorruptionException($"Truncated read in {file} at offset {firstOffset}");
-                        }
-                        else
-                        {
-                            foreach (var index in missing)
-                            {
-                                var rev = needed[index];
-                                var slice = bulk.Value.AsSpan((int)(rev.Offset - firstOffset), rev.Length);
-                                var content = ParseSidecarDocument(slice);
-                                loaded[index] = content;
-                                sidecarCache.Set((file, rev.Offset, rev.Length), content, rev.Length);
-                            }
+                            var rev = needed[index];
+                            var slice = bulk.Value.AsSpan((int)(rev.Offset - firstOffset), rev.Length);
+                            var content = ParseSidecarDocument(slice);
+                            loaded[index] = content;
+                            sidecarCache.Set((file, generation, rev.Offset, rev.Length), content, rev.Length);
                         }
                     }
                     else
@@ -1565,13 +1626,10 @@ public sealed partial class JsonlStorage : IStorage
                             var read = await opened.Value.ReadAsync(rev.Offset, rev.Length, context).ConfigureAwait(false);
                             if (!read.IsOk) throw ErrorFromFile($"positional read of {file}", read.Error);
                             if (read.Value.Length < rev.Length)
-                            {
-                                if (attempt == 0 && GenerationChanged(id.Value, generation)) { retried = true; break; }
                                 throw new JsonlCorruptionException($"Truncated read in {file} at offset {rev.Offset}");
-                            }
                             var content = ParseSidecarDocument(read.Value.AsSpan(0, rev.Length));
                             loaded[index] = content;
-                            sidecarCache.Set((file, rev.Offset, rev.Length), content, rev.Length);
+                            sidecarCache.Set((file, generation, rev.Offset, rev.Length), content, rev.Length);
                         }
                     }
                 }
@@ -1579,7 +1637,6 @@ public sealed partial class JsonlStorage : IStorage
                 {
                     await opened.Value.CloseAsync(context).ConfigureAwait(false);
                 }
-                if (retried) continue;
             }
 
             if (loaded[0] is not DocumentBase documentBase)
@@ -1588,7 +1645,6 @@ public sealed partial class JsonlStorage : IStorage
                 content => (content is DocumentDelta, content.Version), content => ((DocumentDelta)content).Ops);
             return new StoredDocument(record, documentBase.Version, value, loaded.Length - 1);
         }
-        throw new InvalidOperationException($"Document {id} could not be read across concurrent reclamation");
     }
 
     private static StoredDocument MaterializeFromContents(DocumentId id, DocumentRecord record, DocumentPoint at,
@@ -1604,23 +1660,93 @@ public sealed partial class JsonlStorage : IStorage
         return new StoredDocument(record, documentBase.Version, value, slice.Count - baseIndex - 1);
     }
 
-    private bool GenerationChanged(long documentId, int expectedGeneration)
-    {
-        lock (indexGate)
-        {
-            return !documents.TryGetValue(documentId, out var doc) || doc.Generation != expectedGeneration;
-        }
-    }
-
-    private async Task WaitForSidecarReclaimAsync(string file)
+    private async Task WaitForWritingAsync()
     {
         while (true)
         {
-            Task? active;
-            lock (readGate) reclaimingFiles.TryGetValue(file, out active);
-            if (active is null) return;
-            await active.ConfigureAwait(false);
+            Task? pending;
+            lock (readGate) pending = writing;
+            if (pending is null) return;
+            await pending.ConfigureAwait(false);
         }
+    }
+
+    private async Task<SidecarReadLease> AcquireSidecarReadAsync(string file)
+    {
+        while (true)
+        {
+            Task? waitReclaim = null;
+            lock (readGate)
+            {
+                if (!sidecarGates.TryGetValue(file, out var gate)) sidecarGates[file] = gate = new SidecarGate();
+                if (!gate.Reclaiming)
+                {
+                    gate.Readers++;
+                    return new SidecarReadLease(this, file);
+                }
+                waitReclaim = gate.ReclaimDone!.Task;
+            }
+            await waitReclaim.ConfigureAwait(false);
+        }
+    }
+
+    private void ReleaseSidecarRead(string file)
+    {
+        TaskCompletionSource? drained = null;
+        lock (readGate)
+        {
+            if (file is null || !sidecarGates.TryGetValue(file, out var gate)) return;
+            gate.Readers--;
+            if (gate.Readers == 0)
+            {
+                drained = gate.ReadersDrained;
+                gate.ReadersDrained = null;
+                if (!gate.Reclaiming) sidecarGates.Remove(file);
+            }
+        }
+        drained?.TrySetResult();
+    }
+
+    private async Task<SidecarReclaimLease> AcquireSidecarReclaimAsync(string file)
+    {
+        while (true)
+        {
+            Task? wait;
+            var owned = false;
+            lock (readGate)
+            {
+                if (!sidecarGates.TryGetValue(file, out var gate)) sidecarGates[file] = gate = new SidecarGate();
+                if (gate.Reclaiming)
+                {
+                    wait = gate.ReclaimDone!.Task;
+                }
+                else
+                {
+                    gate.Reclaiming = true;
+                    gate.ReclaimDone = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+                    owned = true;
+                    if (gate.Readers == 0) return new SidecarReclaimLease(this, file);
+                    gate.ReadersDrained ??= new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+                    wait = gate.ReadersDrained.Task;
+                }
+            }
+            await wait.ConfigureAwait(false);
+            if (owned) return new SidecarReclaimLease(this, file);
+        }
+    }
+
+    private void ReleaseSidecarReclaim(string file)
+    {
+        TaskCompletionSource? done = null;
+        lock (readGate)
+        {
+            if (file is null || !sidecarGates.TryGetValue(file, out var gate)) return;
+            gate.Reclaiming = false;
+            done = gate.ReclaimDone;
+            gate.ReclaimDone = null;
+            if (gate.Readers == 0) sidecarGates.Remove(file);
+        }
+        done?.TrySetResult();
     }
 
     // ---- Fork-chain visibility queries (called under indexGate) ----
@@ -1740,17 +1866,25 @@ public sealed partial class JsonlStorage : IStorage
         return await ReadableSync(read).ConfigureAwait(false);
     }
 
-    private async Task<T> ReadableAsync<T>(Func<Task<T>> read)
+    private async Task<TResult> ReadableSnapshotAsync<TSnapshot, TResult>(Func<TSnapshot> snapshot, Func<TSnapshot, Task<TResult>> load)
     {
+        TSnapshot captured;
         while (true)
         {
             Task? pending;
-            lock (readGate) pending = writing;
-            if (pending is null) break;
+            lock (readGate)
+            {
+                pending = writing;
+                if (pending is null)
+                {
+                    AssertUsable();
+                    lock (indexGate) captured = snapshot();
+                    break;
+                }
+            }
             await pending.ConfigureAwait(false);
         }
-        AssertUsable();
-        return await read().ConfigureAwait(false);
+        return await load(captured).ConfigureAwait(false);
     }
 
     private JsonlStoragePoisonedException Poison(Exception cause) => poisonError ??= new JsonlStoragePoisonedException(cause);

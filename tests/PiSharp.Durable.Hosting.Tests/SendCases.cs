@@ -155,6 +155,21 @@ internal static partial class Program
             await ThrowsAsync<HostConflictException>(() => session.DeliverSignalAsync(waiterId.Value, approval.Name, "k1",
                 JsonValue.Object([KeyValuePair.Create("approved", (JsonValue)false)]), idempotencyKey: "sig-op-1"), "conflicting idempotency key");
 
+            // Cross-operation Idempotency-Key collision (e.g., an existing StartExecutionAsync receipt) must conflict without overwriting.
+            await harness.CommitAsync(async tx =>
+            {
+                var existing = await tx.DocAsync(SessionRecords.OperationDoc, "job-op-1", JsonValue.Null);
+                existing.Set("kind", "job:daily");
+                existing.Set("requestHash", "hash-job-1");
+                existing.Set("taskId", 123);
+                existing.Set("agentId", 1);
+            }, DurableContext.Background);
+            await ThrowsAsync<HostConflictException>(() => session.DeliverSignalAsync(waiterId.Value, approval.Name, "k1",
+                validPayload, idempotencyKey: "job-op-1"), "signal reuses job idempotency key");
+            var preserved = await harness.SnapshotAsync(SessionRecords.OperationDoc, "job-op-1", DurableContext.Background);
+            Equal("job:daily", ((JsonStringValue)preserved!["kind"]).Value, "job receipt kind untouched");
+            Check(!preserved.ContainsKey("status"), "job receipt not overwritten with signal fields");
+
             var settled = await harness.WaitForTaskAsync(waiterId, DurableContext.Background).WaitAsync(Answer);
             Equal(DurableTaskStatus.Terminal, settled.State.Status, "waiter completed");
 

@@ -216,13 +216,18 @@ internal sealed class RemoteCall(DurableDeviceClient client, RemoteArgs args, st
 
     /// <summary>The JSON object in the file an option names (<c>-</c> reads standard input).</summary>
     /// <exception cref="InvalidDataException">The file does not hold a JSON object.</exception>
-    public JsonObject File(string option)
+    public JsonObject File(string option) =>
+        JsonFile(option) as JsonObject ?? throw new InvalidDataException($"{args.Required(option)} must hold a JSON object.");
+
+    /// <summary>Any JSON value in the file an option names (<c>-</c> reads standard input).</summary>
+    /// <exception cref="InvalidDataException">The file does not hold valid JSON.</exception>
+    public JsonNode? JsonFile(string option)
     {
         var path = args.Required(option);
         var text = path == "-" ? stdin.ReadToEnd() : System.IO.File.ReadAllText(Path.GetFullPath(path, cwd));
         try
         {
-            return JsonNode.Parse(text) as JsonObject ?? throw new InvalidDataException($"{path} must hold a JSON object.");
+            return JsonNode.Parse(text);
         }
         catch (JsonException failure)
         {

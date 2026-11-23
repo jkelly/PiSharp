@@ -503,10 +503,15 @@ public sealed partial class HostedSession
         return await opened.CommitAsync(async tx =>
         {
             var receipt = await tx.DocAsync(SessionRecords.OperationDoc, idempotencyKey, JsonValue.Null).ConfigureAwait(false);
-            if (receipt.Get("status") is JsonStringValue recorded)
+            var existingKind = receipt.Get("kind") as JsonStringValue;
+            var existingHash = receipt.Get("requestHash") as JsonStringValue;
+            var existingStatus = receipt.Get("status") as JsonStringValue;
+            if (existingKind is not null || existingHash is not null || existingStatus is not null || receipt.Get("taskId") is not null)
             {
-                if (receipt.Get("requestHash") is JsonStringValue { Value: var earlier } && earlier == requestHash)
-                    return new SignalDelivery(ParseSignalResult(recorded.Value), Replayed: true);
+                if (existingKind is { Value: var recordedKind } && recordedKind == "signal:" + token.Name &&
+                    existingHash is { Value: var earlier } && earlier == requestHash &&
+                    existingStatus is { Value: var recordedStatus } && TryParseSignalResult(recordedStatus, out var replayedResult))
+                    return new SignalDelivery(replayedResult, Replayed: true);
                 throw new HostConflictException("This Idempotency-Key was already used for a different request.");
             }
             var delivered = await tx.SignalAsync(new TaskId(taskId), token, key, value).ConfigureAwait(false);
@@ -521,15 +526,18 @@ public sealed partial class HostedSession
         }, context).ConfigureAwait(false);
     }
 
-    private static SignalResult ParseSignalResult(string status) => status switch
+    private static bool TryParseSignalResult(string status, out SignalResult result)
     {
-        "delivered" => SignalResult.Delivered,
-        "duplicate" => SignalResult.Duplicate,
-        "invalid" => SignalResult.Invalid,
-        "closed" => SignalResult.Closed,
-        "not_found" => SignalResult.NotFound,
-        _ => SignalResult.Invalid,
-    };
+        switch (status)
+        {
+            case "delivered": result = SignalResult.Delivered; return true;
+            case "duplicate": result = SignalResult.Duplicate; return true;
+            case "invalid": result = SignalResult.Invalid; return true;
+            case "closed": result = SignalResult.Closed; return true;
+            case "not_found": result = SignalResult.NotFound; return true;
+            default: result = default; return false;
+        }
+    }
 
     // ─── Extensions ─────────────────────────────────────────────────────────
 
@@ -621,9 +629,13 @@ public sealed partial class HostedSession
             if (idempotencyKey is not null)
             {
                 receipt = await tx.DocAsync(SessionRecords.OperationDoc, idempotencyKey, JsonValue.Null).ConfigureAwait(false);
-                if (receipt.Get("taskId") is JsonNumberValue started)
+                var existingKind = receipt.Get("kind") as JsonStringValue;
+                var existingHash = receipt.Get("requestHash") as JsonStringValue;
+                if (existingKind is not null || existingHash is not null || receipt.Get("taskId") is not null || receipt.Get("status") is not null)
                 {
-                    if (receipt.Get("requestHash") is JsonStringValue { Value: var earlier } && earlier == requestHash)
+                    if (existingKind is { Value: var recordedKind } && recordedKind == "job:" + jobId &&
+                        existingHash is { Value: var earlier } && earlier == requestHash &&
+                        receipt.Get("taskId") is JsonNumberValue started)
                         return new ExecutionStart(new TaskId((long)started.Value), conversation.Id.Value, true);
                     throw new HostConflictException("This Idempotency-Key was already used for a different request.");
                 }

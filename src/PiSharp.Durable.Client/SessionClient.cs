@@ -50,13 +50,19 @@ public sealed partial class DurableDeviceClient
     public Task<JsonNode?> AbortTaskAsync(string session, long taskId, CancellationToken cancellationToken = default) =>
         SendAsync(HttpMethod.Post, $"{SessionPath(session)}/tasks/{Number(taskId)}/abort", new JsonObject(), cancellationToken: cancellationToken);
 
-    /// <summary>Delivers a signal to a live task (<c>POST /v1/sessions/{s}/tasks/{taskId}/signals</c>):
+    /// <summary>Delivers a signal with an empty object payload to a live task (<c>POST /v1/sessions/{s}/tasks/{taskId}/signals</c>):
     /// <c>{status: delivered|duplicate|invalid|closed|not_found}</c>.</summary>
-    public Task<JsonNode?> SignalTaskAsync(string session, long taskId, string signal, string key, JsonNode? payload = null,
+    public Task<JsonNode?> SignalTaskAsync(string session, long taskId, string signal, string key,
+        string? idempotencyKey = null, CancellationToken cancellationToken = default) =>
+        SendAsync(HttpMethod.Post, $"{SessionPath(session)}/tasks/{Number(taskId)}/signals",
+            new JsonObject { ["signal"] = signal, ["key"] = key }, idempotencyKey, cancellationToken: cancellationToken);
+
+    /// <summary>Delivers a signal with an explicit JSON <paramref name="payload"/> (including JSON <c>null</c>) to a live task
+    /// (<c>POST /v1/sessions/{s}/tasks/{taskId}/signals</c>): <c>{status: delivered|duplicate|invalid|closed|not_found}</c>.</summary>
+    public Task<JsonNode?> SignalTaskAsync(string session, long taskId, string signal, string key, JsonNode? payload,
         string? idempotencyKey = null, CancellationToken cancellationToken = default)
     {
-        var body = new JsonObject { ["signal"] = signal, ["key"] = key };
-        if (payload is not null) body["payload"] = payload.DeepClone();
+        var body = new JsonObject { ["signal"] = signal, ["key"] = key, ["payload"] = payload?.DeepClone() };
         return SendAsync(HttpMethod.Post, $"{SessionPath(session)}/tasks/{Number(taskId)}/signals", body, idempotencyKey, cancellationToken: cancellationToken);
     }
 

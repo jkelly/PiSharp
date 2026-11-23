@@ -155,7 +155,8 @@ internal static partial class Program
             }),
             Case("store.store.group-commit-isolates-a-refused-commit-and-commits-its-siblings", async () =>
             {
-                await using var store = await MemoryStore();
+                var db = new TestSqliteDatabase(":memory:");
+                await using var store = await StoreOver(db, outbox: true);
                 var held = HoldNextCommit(store);
                 var events = new List<string>();
                 CommitFence Fence(string name) => new(() => true, (seq, ids) => { lock (events) events.Add($"{name}:{seq}:{string.Join(",", ids)}"); });
@@ -163,7 +164,7 @@ internal static partial class Program
                 var running = store.CommitAsync([StoreCreate("a")], Fence("a"), context);
                 await held.Entered;
                 var first = store.CommitAsync([StoreCreate("b")], Fence("b"), context);
-                var broken = StoreRejection(store.CommitAsync([StoreBroken], Fence("broken"), context));
+                var broken = StoreRejection(store.CommitAsync([StoreCreate("doomed"), StoreBroken], Fence("broken"), context));
                 var second = store.CommitAsync([StoreCreate("c")], Fence("c"), context);
                 held.Release();
 
@@ -175,6 +176,14 @@ internal static partial class Program
                 Equal(3L, store.LastSeq, "last seq after isolated refusal");
                 Equal(3, events.Count, "all three valid commits adopted");
                 Check(!events.Any(e => e.StartsWith("broken:", StringComparison.Ordinal)), "refused commit never adopted");
+
+                var storedKeys = await store.ReadAsync(async exec =>
+                    (await exec.AllAsync("SELECT key FROM chord_documents ORDER BY id")).Select(r => (string)r["key"]!).ToList(), context);
+                Sequence(["a", "b", "c"], storedKeys, "doomed document rolled back and siblings persisted once");
+                var outboxRows = await store.ReadAsync(async exec =>
+                    (await exec.AllAsync("SELECT seq, writes FROM chord_outbox ORDER BY seq")).ToList(), context);
+                Equal(3, outboxRows.Count, "three committed outbox entries");
+                Check(!outboxRows.Any(r => ((string)r["writes"]!).Contains("\"doomed\"", StringComparison.Ordinal)), "doomed write absent from outbox");
             }),
             Case("store.store.group-commit-isolates-refused-admission-and-preserves-empty-commit-seq", async () =>
             {
@@ -219,6 +228,46 @@ internal static partial class Program
 
                 await Task.WhenAll(running, before, series, after);
                 Sequence(["a:1", "before:2", "series0:3", "series1:4", "after:5"], events, "exact FIFO barrier ordering");
+            }),
+            Case("store.store.settled-closes-open-group-so-later-commits-do-not-piggyback", async () =>
+            {
+                var db = new TestSqliteDatabase(":memory:");
+                var transactions = 0;
+                db.AfterTransaction = () => { Interlocked.Increment(ref transactions); return Task.CompletedTask; };
+                await using var store = await StoreOver(db, outbox: false);
+                Interlocked.Exchange(ref transactions, 0);
+
+                var held = HoldNextCommit(store);
+                var fence = StoreRecording().Fence;
+                var running = store.CommitAsync([StoreCreate("a")], fence, context);
+                await held.Entered;
+                var beforeSettled = store.CommitAsync([StoreCreate("before")], fence, context);
+                var settled = store.SettledAsync();
+                var afterSettled = store.CommitAsync([StoreCreate("after")], fence, context);
+                held.Release();
+
+                await settled;
+                Check(beforeSettled.IsCompleted, "commits queued before SettledAsync settled before SettledAsync returned");
+                await Task.WhenAll(running, beforeSettled, afterSettled);
+                Equal(3, Volatile.Read(ref transactions), "SettledAsync closed the open group so afterSettled ran in its own transaction");
+            }),
+            Case("store.store.group-commit-recomputes-seq-overflow-after-refusal", async () =>
+            {
+                await using var store = await StoreAtSeq(StoreInternal.MaxSafeIntegerLong - 2);
+                var held = HoldNextCommit(store);
+                var fence = StoreRecording().Fence;
+
+                // Blocker takes MaxSafeIntegerLong - 1 so broken and valid coalesce with only one seq slot left.
+                var blocker = store.CommitAsync([StoreCreate("blocker")], fence, context);
+                await held.Entered;
+                var broken = StoreRejection(store.CommitAsync([StoreBroken], fence, context));
+                var valid = store.CommitAsync([StoreCreate("fits-after-refusal")], fence, context);
+                held.Release();
+
+                Equal(StoreInternal.MaxSafeIntegerLong - 1, await blocker, "blocker takes MaxSafeIntegerLong - 1");
+                Check(StoreText(await broken).Contains("no such table", StringComparison.Ordinal), "broken commit refused");
+                Equal(StoreInternal.MaxSafeIntegerLong, await valid, "valid sibling slides into the freed final seq slot");
+                Equal(StoreInternal.MaxSafeIntegerLong, store.LastSeq, "store stays healthy at MAX_SAFE_INTEGER");
             }),
         ];
     }

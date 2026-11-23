@@ -106,6 +106,19 @@ internal static partial class Program
                 "--payload", """{"ok":true}""", "--request", "sig-cli-1", "--json", "--device", url);
             Equal(0, signaled.Exit, "tasks signal: " + signaled.Err);
             Equal("not_found", JsonNode.Parse(signaled.Out)!["status"]!.GetValue<string>(), "tasks signal status");
+            // Explicit JSON null payload must be preserved (distinct from omitted / {} payload under the same --request).
+            var signaledNull = await CliAsync(home, env, "tasks", "signal", "--session", sessionId, "999999", "test.wake", "k1",
+                "--payload", "null", "--request", "sig-cli-null", "--json", "--device", url);
+            Equal(0, signaledNull.Exit, "tasks signal null: " + signaledNull.Err);
+            var signaledObjConflict = await CliAsync(home, env, "tasks", "signal", "--session", sessionId, "999999", "test.wake", "k1",
+                "--request", "sig-cli-null", "--json", "--device", url);
+            Equal(DurableExit.Conflict, signaledObjConflict.Exit, "null payload conflicts with omitted {} payload under same request");
+            // --file accepts any valid JSON value (array/primitive/null), not just JSON objects.
+            var arrayPayload = Path.Combine(home, "signal-array.json");
+            File.WriteAllText(arrayPayload, "[1,2,3]");
+            var signaledFile = await CliAsync(home, env, "tasks", "signal", "--session", sessionId, "999999", "test.wake", "k1",
+                "--file", arrayPayload, "--json", "--device", url);
+            Equal(0, signaledFile.Exit, "tasks signal array file: " + signaledFile.Err);
 
             var budgets = JsonNode.Parse((await CliAsync(home, env, "budgets", "show", "--json", "--device", url)).Out)!;
             var revision = budgets["limits"]!["revision"]!.GetValue<long>().ToString(System.Globalization.CultureInfo.InvariantCulture);

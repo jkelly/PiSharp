@@ -779,6 +779,12 @@ internal sealed class DurableSession : IOpenDurable, IDurableViewSource, IDurabl
         Notice(DurableNoticeLevel.Info, $"Signal {signalName}/{key} -> task #{taskId.Value}: {status}.");
     });
 
+    /// <inheritdoc/>
+    public void ShowNotice(DurableNoticeLevel level, string message)
+    {
+        if (!ended) Notice(level, message);
+    }
+
     // ─── Close ──────────────────────────────────────────────────────────────
 
     /// <summary>Closes the Harness (writing no outcome: a running turn resumes with <c>--continue</c>), cleans up the environments and

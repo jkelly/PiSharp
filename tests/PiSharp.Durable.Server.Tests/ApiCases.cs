@@ -248,6 +248,11 @@ internal static partial class Program
             // Conflicting payload under the same Idempotency-Key fails conflict (409).
             await FailsAsync(() => server.Client.SignalTaskAsync(id, 999_999, "example.wake", "k1", new JsonObject { ["ok"] = false }, idempotencyKey: "sig-missing-1"),
                 "conflict", "conflicting signal idempotency key");
+            // Explicit JSON null payload is serialized as "payload": null (distinct from omitted {} payload).
+            var nullSignal = await server.Client.SignalTaskAsync(id, 999_999, "example.wake", "k1", (JsonNode?)null, idempotencyKey: "sig-null-1");
+            Equal("not_found", nullSignal!["status"]!.GetValue<string>(), "explicit null payload succeeds");
+            await FailsAsync(() => server.Client.SignalTaskAsync(id, 999_999, "example.wake", "k1", idempotencyKey: "sig-null-1"),
+                "conflict", "omitted payload ({}) conflicts with explicit null payload");
 
             // Validation rejects empty signal/key and bad onAbort/notify shapes.
             await FailsAsync(() => server.Post($"/v1/sessions/{id}/tasks/999999/signals", new JsonObject { ["signal"] = "", ["key"] = "k1", ["payload"] = true }),

@@ -284,7 +284,12 @@ public sealed class ChordStore : IStore, IChordStore
     public Task SettledAsync()
     {
         // Every turn of the queue ends its own failures: the tail never faults.
-        lock (gate) return tail;
+        // Close any open coalescing group so commits queued after SettledAsync do not piggyback on this barrier.
+        lock (gate)
+        {
+            pendingGroup = null;
+            return tail;
+        }
     }
 
     /// <summary>The open host's batch, in which an adapter publishes its commits; null without a host.</summary>
@@ -690,60 +695,55 @@ public sealed class ChordStore : IStore, IChordStore
         }
         if (admitted.Count == 0) return;
 
-        var remaining = new List<PendingCommit>(admitted.Count);
-        var overflow = new List<PendingCommit>();
-        var plannedSeq = LastSeq;
-        foreach (var item in admitted)
-        {
-            if (overflow.Count > 0)
-            {
-                overflow.Add(item);
-                continue;
-            }
-            if (item.Writes.Count > 0)
-            {
-                if (plannedSeq + 1 > StoreInternal.MaxSafeIntegerLong)
-                {
-                    overflow.Add(item);
-                    continue;
-                }
-                plannedSeq++;
-            }
-            remaining.Add(item);
-        }
-
-        if (remaining.Count > 0)
-        {
-            var ok = await CommitGroupAsync(remaining).ConfigureAwait(false);
-            if (!ok)
-            {
-                if (overflow.Count > 0)
-                {
-                    Exception stopped;
-                    try { AssertUsable(); stopped = StorageFailed(new InvalidOperationException("store: stopped")); }
-                    catch (Exception error) { stopped = error; }
-                    foreach (var item in overflow) item.Completion.TrySetException(stopped);
-                }
-                return;
-            }
-        }
-
-        if (overflow.Count > 0)
-        {
-            var failed = Fail(new InvalidOperationException("store: no seq past Number.MAX_SAFE_INTEGER"));
-            foreach (var item in overflow) item.Completion.TrySetException(failed);
-        }
+        await CommitGroupAsync(admitted).ConfigureAwait(false);
     }
 
-    /// <summary>Commits <paramref name="remaining"/> in one backend transaction; returns <c>true</c> if the store remains usable.</summary>
-    private async Task<bool> CommitGroupAsync(List<PendingCommit> remaining)
+    /// <summary>Commits <paramref name="admitted"/> in as few backend transactions as possible, recomputing the
+    /// <see cref="StoreInternal.MaxSafeIntegerLong"/> prefix after any D4 refusal so a freed sequence slot can be used by later siblings.</summary>
+    private async Task CommitGroupAsync(List<PendingCommit> admitted)
     {
-        while (remaining.Count > 0)
+        while (admitted.Count > 0)
         {
-            if (remaining.All(item => item.Writes.Count == 0))
+            var plannedSeq = LastSeq;
+            var prefixCount = 0;
+            while (prefixCount < admitted.Count)
+            {
+                if (admitted[prefixCount].Writes.Count > 0)
+                {
+                    if (plannedSeq + 1 > StoreInternal.MaxSafeIntegerLong) break;
+                    plannedSeq++;
+                }
+                prefixCount++;
+            }
+            if (prefixCount == 0)
+            {
+                var failed = Fail(new InvalidOperationException("store: no seq past Number.MAX_SAFE_INTEGER"));
+                foreach (var item in admitted) item.Completion.TrySetException(failed);
+                return;
+            }
+
+            var allEmpty = true;
+            for (var index = 0; index < prefixCount; index++)
+            {
+                if (admitted[index].Writes.Count > 0) { allEmpty = false; break; }
+            }
+            if (allEmpty)
             {
                 // Empty commits take no seq; a throwing adopt stops the store as for any commit.
-                return AdoptEmpty(remaining);
+                var emptyBatch = admitted.GetRange(0, prefixCount);
+                admitted.RemoveRange(0, prefixCount);
+                if (!AdoptEmpty(emptyBatch))
+                {
+                    if (admitted.Count > 0)
+                    {
+                        Exception stopped;
+                        try { AssertUsable(); stopped = StorageFailed(new InvalidOperationException("store: stopped")); }
+                        catch (Exception error) { stopped = error; }
+                        foreach (var item in admitted) item.Completion.TrySetException(stopped);
+                    }
+                    return;
+                }
+                continue;
             }
 
             Exception? thrown = null;
@@ -759,10 +759,10 @@ public sealed class ChordStore : IStore, IChordStore
                     var nextId = Ids.Value;
                     OrderedDictionary<string, TableRecord>? changed = null;
                     Step? lastStep = null;
-                    var entries = new List<GroupEntry>(remaining.Count);
-                    for (var index = 0; index < remaining.Count; index++)
+                    var entries = new List<GroupEntry>(prefixCount);
+                    for (var index = 0; index < prefixCount; index++)
                     {
-                        var item = remaining[index];
+                        var item = admitted[index];
                         if (item.Writes.Count == 0)
                         {
                             entries.Add(new GroupEntry(item, seq, null));
@@ -809,16 +809,16 @@ public sealed class ChordStore : IStore, IChordStore
                 // The facade rolled back and fails with a single step's own error: a refusal, reject that commit and retry the rest (D4).
                 if (failedIndex >= 0 && ReferenceEquals(error, thrown))
                 {
-                    remaining[failedIndex].Completion.TrySetException(error);
-                    remaining.RemoveAt(failedIndex);
+                    admitted[failedIndex].Completion.TrySetException(error);
+                    admitted.RemoveAt(failedIndex);
                     continue;
                 }
                 var failed = Fail(error);
-                foreach (var item in remaining) item.Completion.TrySetException(failed);
-                return false;
+                foreach (var item in admitted) item.Completion.TrySetException(failed);
+                return;
             }
 
-            // COMMIT returned: the group is durable, and memory follows.
+            // COMMIT returned: the group prefix is durable, and memory follows.
             Interlocked.Exchange(ref lastSeq, done.LastSeq);
             Interlocked.Exchange(ref committedNextId, done.NextId);
             if (done.Changed is not null) AdoptTables(done.Changed);
@@ -843,13 +843,13 @@ public sealed class ChordStore : IStore, IChordStore
                     var failed = Fail(error);
                     for (var prior = 0; prior < adopted; prior++) done.Entries[prior].Item.Completion.TrySetResult(done.Entries[prior].Seq);
                     for (var rest = adopted; rest < done.Entries.Count; rest++) done.Entries[rest].Item.Completion.TrySetException(failed);
-                    return false;
+                    for (var tail = prefixCount; tail < admitted.Count; tail++) admitted[tail].Completion.TrySetException(failed);
+                    return;
                 }
             }
             for (var index = 0; index < adopted; index++) done.Entries[index].Item.Completion.TrySetResult(done.Entries[index].Seq);
-            return true;
+            admitted.RemoveRange(0, prefixCount);
         }
-        return true;
     }
 
     private bool AdoptEmpty(List<PendingCommit> items)

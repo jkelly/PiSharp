@@ -594,51 +594,117 @@ internal static partial class Program
 
         yield return JsonlCase("bounds-retained-heap-under-large-payloads-and-reloads-lazily", async fixture =>
         {
+            static string MakeLargePayload(int index) =>
+                string.Create(64 * 1024, index, static (span, idx) =>
+                {
+                    var fill = (char)('A' + (idx % 26));
+                    span.Fill(fill);
+                    var header = $"payload-{idx:D4}:";
+                    header.AsSpan().CopyTo(span);
+                });
+
+            static long ForceManagedHeap()
+            {
+                for (var round = 0; round < 3; round++)
+                {
+                    GC.Collect(GC.MaxGeneration, GCCollectionMode.Forced, blocking: true, compacting: true);
+                    GC.WaitForPendingFinalizers();
+                }
+                return GC.GetTotalMemory(forceFullCollection: true);
+            }
+
+            static async Task<(List<EntryId> Ids, DocumentId DocId)> SeedLargePayloadsAsync(JsonlStorage target)
+            {
+                var seeded = new List<EntryId>(80);
+                for (var index = 0; index < 80; index++)
+                {
+                    var id = await target.MintIdAsync<EntryId>();
+                    seeded.Add(id);
+                    var blob = MakeLargePayload(index);
+                    await Commit(target, new EntryWrite(new()
+                    {
+                        Id = id, ConversationId = ConversationId.Root, Kind = "large",
+                        Data = JsonValue.Object([KeyValuePair.Create("index", (JsonValue)index), KeyValuePair.Create("blob", (JsonValue)blob)]),
+                    }));
+                }
+                var seededDocId = await target.MintIdAsync<DocumentId>();
+                await Commit(target, new DocumentCreateWrite(SessionDocument(seededDocId), DocumentContent.Base(1,
+                    JsonValue.Object([KeyValuePair.Create("blob", (JsonValue)MakeLargePayload(100))]))));
+                await Commit(target, new DocumentChangeWrite(seededDocId, DocumentContent.Base(1,
+                    JsonValue.Object([KeyValuePair.Create("blob", (JsonValue)("v2:" + MakeLargePayload(101)))]))));
+                return (seeded, seededDocId);
+            }
+
             var directory = fixture.NewDirectory();
             var storage = await fixture.Open(directory);
             await CreateRoot(storage);
-            var payload = new string('A', 64 * 1024);
-            var ids = new List<EntryId>();
-            for (var index = 0; index < 80; index++)
-            {
-                var id = await storage.MintIdAsync<EntryId>();
-                ids.Add(id);
-                await Commit(storage, new EntryWrite(new()
-                {
-                    Id = id, ConversationId = ConversationId.Root, Kind = "large",
-                    Data = JsonValue.Object([KeyValuePair.Create("index", (JsonValue)index), KeyValuePair.Create("blob", (JsonValue)payload)]),
-                }));
-            }
-            var docId = await storage.MintIdAsync<DocumentId>();
-            await Commit(storage, new DocumentCreateWrite(SessionDocument(docId), DocumentContent.Base(1,
-                JsonValue.Object([KeyValuePair.Create("blob", (JsonValue)payload)]))));
-            await Commit(storage, new DocumentChangeWrite(docId, DocumentContent.Base(1,
-                JsonValue.Object([KeyValuePair.Create("blob", (JsonValue)("v2:" + payload))]))));
+            var baselineHeap = ForceManagedHeap();
 
-            for (var round = 0; round < 3; round++)
-            {
-                GC.Collect(GC.MaxGeneration, GCCollectionMode.Forced, blocking: true, compacting: true);
-                GC.WaitForPendingFinalizers();
-            }
-            var retainedAfterWrites = GC.GetTotalMemory(forceFullCollection: true);
-            // ~5.1 MiB of payloads were written; only compact metadata + offsets should remain in RAM.
-            Check(retainedAfterWrites < 5 * 1024 * 1024 || retainedAfterWrites < new FileInfo(Path.Combine(directory, "main.jsonl")).Length,
-                $"retained heap should stay below raw main.jsonl payload size (heap {retainedAfterWrites}, main {new FileInfo(Path.Combine(directory, "main.jsonl")).Length})");
+            var (ids, docId) = await SeedLargePayloadsAsync(storage);
+
+            var retainedAfterWrites = ForceManagedHeap();
+            var heapDelta = Math.Max(0, retainedAfterWrites - baselineHeap);
+            var mainBytes = new FileInfo(Path.Combine(directory, "main.jsonl")).Length;
+            // 80 distinct 64 KiB payloads (~5.1 MiB) were written; retained heap delta must stay well below half of main.jsonl.
+            Check(heapDelta < mainBytes / 2,
+                $"retained heap delta should stay well below raw main.jsonl payload size (delta {heapDelta}, baseline {baselineHeap}, after {retainedAfterWrites}, main {mainBytes})");
 
             var first = await storage.GetEntryAsync(ids[0], JsonlContext);
             var last = await storage.GetEntryAsync(ids[^1], JsonlContext);
-            Equal(payload, ((JsonStringValue)((JsonObjectValue)first!.Entry.Data!)["blob"]).Value, "first lazy entry");
-            Equal(payload, ((JsonStringValue)((JsonObjectValue)last!.Entry.Data!)["blob"]).Value, "last lazy entry");
+            Equal(MakeLargePayload(0), ((JsonStringValue)((JsonObjectValue)first!.Entry.Data!)["blob"]).Value, "first lazy entry");
+            Equal(MakeLargePayload(79), ((JsonStringValue)((JsonObjectValue)last!.Entry.Data!)["blob"]).Value, "last lazy entry");
             var page = await storage.ScanEntriesAsync(new EntryQuery(ConversationId.Root), 10, null, JsonlContext);
             Equal(10, page.Items.Length, "paged lazy scan");
             var doc = await storage.GetDocumentAsync(docId, DocumentPoint.Current, JsonlContext);
-            Equal("v2:" + payload, ((JsonStringValue)doc!.Value["blob"]).Value, "reclaimed current-only document");
+            Equal("v2:" + MakeLargePayload(101), ((JsonStringValue)doc!.Value["blob"]).Value, "reclaimed current-only document");
 
             var reopened = await fixture.Open(directory);
             var reloaded = await reopened.GetEntryAsync(ids[40], JsonlContext);
-            Equal(payload, ((JsonStringValue)((JsonObjectValue)reloaded!.Entry.Data!)["blob"]).Value, "entry after reopen");
-            Equal("v2:" + payload, ((JsonStringValue)(await reopened.GetDocumentAsync(docId, DocumentPoint.Current, JsonlContext))!.Value["blob"]).Value,
+            Equal(MakeLargePayload(40), ((JsonStringValue)((JsonObjectValue)reloaded!.Entry.Data!)["blob"]).Value, "entry after reopen");
+            Equal("v2:" + MakeLargePayload(101), ((JsonStringValue)(await reopened.GetDocumentAsync(docId, DocumentPoint.Current, JsonlContext))!.Value["blob"]).Value,
                 "document after reopen");
+        });
+
+        yield return JsonlCase("protects-cold-sidecar-reads-from-concurrent-terminal-task-and-document-reclamation", async fixture =>
+        {
+            var directory = fixture.NewDirectory();
+            var taskPaused = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var taskRelease = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var docPaused = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var docRelease = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var fs = new PausingJoinFileSystem(directory);
+            var storage = await fixture.Open(directory, fs);
+            await CreateRoot(storage);
+            var taskId = await storage.MintIdAsync<TaskId>();
+            var docId = await storage.MintIdAsync<DocumentId>();
+            await Commit(storage, new TaskWrite(PendingTask(taskId, "live")),
+                new DocumentCreateWrite(SessionDocument(docId), DocumentContent.Base(1, JO("{\"v\":1}"))));
+
+            // Pause the cold GetTaskAsync inside sidecar path resolution while a concurrent commit makes the task terminal and reclaims its sidecar.
+            fs.PauseOnce($"task-{taskId}.jsonl", taskPaused, taskRelease.Task);
+            var taskRead = storage.GetTaskAsync(taskId, JsonlContext);
+            await taskPaused.Task;
+            var terminalCommit = Commit(storage, new TaskWrite(TerminalTask(taskId)));
+            await Task.Delay(50);
+            Check(File.Exists(Path.Combine(directory, $"task-{taskId}.jsonl")), "sidecar stays until in-flight cold task read finishes");
+            taskRelease.SetResult();
+            var readTask = await taskRead;
+            Check(readTask is not null && readTask.Id == taskId, "in-flight cold task read succeeds");
+            await terminalCommit;
+            Check(!File.Exists(Path.Combine(directory, $"task-{taskId}.jsonl")), "sidecar is reclaimed after reader finishes");
+            Equal<TaskRecord?>(TerminalTask(taskId), await storage.GetTaskAsync(taskId, JsonlContext), "subsequent read sees terminal task from main");
+
+            // Pause a cold GetDocumentAsync while a concurrent commit rewrites the current-only document base and reclaims its sidecar.
+            fs.PauseOnce($"doc-{docId}.jsonl", docPaused, docRelease.Task);
+            var docRead = storage.GetDocumentAsync(docId, DocumentPoint.Current, JsonlContext);
+            await docPaused.Task;
+            var baseCommit = Commit(storage, new DocumentChangeWrite(docId, DocumentContent.Base(1, JO("{\"v\":2}"))));
+            await Task.Delay(50);
+            docRelease.SetResult();
+            var readDoc = await docRead;
+            Check(readDoc is not null, "in-flight cold document read succeeds across concurrent base reclamation");
+            await baseCommit;
+            Same("{\"v\":2}", (await storage.GetDocumentAsync(docId, DocumentPoint.Current, JsonlContext))!.Value, "subsequent read sees reclaimed base");
         });
     }
 
@@ -695,6 +761,35 @@ internal static partial class Program
             if (!Fail) return await base.JoinPathAsync(parts, context);
             await gate;
             return new FileError(FileErrorCode.Unknown, "injected path resolution failure");
+        }
+    }
+
+    private sealed class PausingJoinFileSystem(string directory) : LocalFileSystem(directory)
+    {
+        private readonly Lock gate = new();
+        private readonly Dictionary<string, (TaskCompletionSource Paused, Task Release)> pauses = new(StringComparer.Ordinal);
+
+        public void PauseOnce(string fileName, TaskCompletionSource paused, Task release)
+        {
+            lock (gate) pauses[fileName] = (paused, release);
+        }
+
+        public override async Task<Result<string, FileError>> JoinPathAsync(IReadOnlyList<string> parts, DurableContext context)
+        {
+            (TaskCompletionSource Paused, Task Release)? match = null;
+            if (parts.Count > 0)
+            {
+                lock (gate)
+                {
+                    if (pauses.Remove(parts[^1], out var found)) match = found;
+                }
+            }
+            if (match is { } foundMatch)
+            {
+                foundMatch.Paused.TrySetResult();
+                await foundMatch.Release;
+            }
+            return await base.JoinPathAsync(parts, context);
         }
     }
 
