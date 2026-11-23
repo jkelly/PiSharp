@@ -112,9 +112,10 @@ public sealed class PowerShellTool : IToolArgumentSchemaAdapter
         var setup = string.IsNullOrEmpty(_options.CommandPrefix)
             ? PowerShellDiscovery.Utf8OutputPreamble
             : PowerShellDiscovery.Utf8OutputPreamble + "\n" + _options.CommandPrefix;
-        // Parse the user command in its own scriptblock boundary so leading `using` statements remain valid.
-        var escaped = command.Replace("'", "''", StringComparison.Ordinal);
-        return $"{setup}\n. ([scriptblock]::Create('{escaped}'))";
+        // Parse the user command in its own scriptblock boundary via UTF-8 Base64 so leading `using`
+        // statements and any Unicode quote characters (including smart apostrophes) execute verbatim.
+        var encoded = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(command));
+        return $"{setup}\n. ([scriptblock]::Create([System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String('{encoded}'))))";
     }
 
     public ValueTask<bool> ValidateAsync(PreparedToolAction action, CancellationToken cancellationToken)

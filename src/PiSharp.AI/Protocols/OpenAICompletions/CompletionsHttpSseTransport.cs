@@ -148,7 +148,7 @@ public sealed class CompletionsHttpSseTransport : IChatTransport
             {
                 _response = new(accepted, owner._framing);
                 _input = new(await _response.AcquireBodyAsync(_token).ConfigureAwait(false), owner._framing.ReadBufferBytes,
-                    owner._options.OnInputPublished, _token, _startup.AwaitDeliveryAsync);
+                    GuardObserver(owner._options.OnInputPublished), _token, _startup.AwaitDeliveryAsync);
                 if (owner._options.Hooks?.OnResponse is not null)
                     try
                     {
@@ -222,6 +222,12 @@ public sealed class CompletionsHttpSseTransport : IChatTransport
             }
         }
 
+        private static Action<T>? GuardObserver<T>(Action<T>? observer) => observer is null ? null : value =>
+        {
+            try { observer(value); }
+            catch (Exception error) { TransportRetryClassifier.MarkNonRetryable(error); throw; }
+        };
+
         private CancellationTokenSource? CreateRequestDeadline()
         {
             if (owner._options.RequestTimeoutMilliseconds is not { } milliseconds) return null;
@@ -243,14 +249,14 @@ public sealed class CompletionsHttpSseTransport : IChatTransport
             {
                 var executor = await resultFactory(body, token).ConfigureAwait(false);
                 _reader = CompletionsReaderStream.FromResultReader(executor ?? throw Protocol(), owner._framing.ReadBufferBytes,
-                    owner._options.MaximumConsecutiveEmptyBodyReads, owner._options.OnBodyRead, _startup, _input is not null);
+                    owner._options.MaximumConsecutiveEmptyBodyReads, GuardObserver(owner._options.OnBodyRead), _startup, _input is not null);
             }
             else
             {
                 var executor = owner._options.BodyReaderFactory is { } factory
                     ? await factory(body, token).ConfigureAwait(false)
                     : CompletionsResponseBodyReader.FromStream(body);
-                _reader = new(executor ?? throw Protocol(), owner._framing.ReadBufferBytes, owner._options.OnBodyRead, _startup, _input is not null);
+                _reader = new(executor ?? throw Protocol(), owner._framing.ReadBufferBytes, GuardObserver(owner._options.OnBodyRead), _startup, _input is not null);
             }
             token.ThrowIfCancellationRequested();
             return _reader;

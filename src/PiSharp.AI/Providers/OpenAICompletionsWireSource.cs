@@ -571,7 +571,7 @@ public sealed class OpenAICompletionsWireSource : IChatTransport
             var final = finalSnapshot with { Usage = _usage, StopReason = reason, ExtraProperties = properties };
             StreamTerminalEvent terminal = failure is null
                 ? new StreamDone(reason, final)
-                : new StreamError(reason, final) { IsRetryableTransportFailure = reason == StopReason.Error && RetryableTransportFailure };
+                : new StreamError(reason, final) { IsRetryableTransportFailure = reason == StopReason.Error && (RetryableTransportFailure || failure == OpenAICompletionsWireFailure.UnexpectedEof) };
             if (failure is { } nativeFailure) terminal = terminal with { NativeDiagnostic = Diagnostic(nativeFailure) };
             // A resource failure may leave no space for another source-facing copy.
             // The native sanitized terminal still settles; no fabricated source trace

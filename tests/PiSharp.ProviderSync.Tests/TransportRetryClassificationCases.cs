@@ -147,6 +147,38 @@ internal static partial class Program
                 Equal(StopReason.Error, result.Message.StopReason);
                 Check(!result.IsRetryableTransportFailure, "Completions Retry.OnRetry TimeoutException must NOT be marked retryable.");
             }
+            // Completions OnBodyRead and OnInputPublished observer failures -> NOT retryable.
+            using (var client = new HttpClient(new Handler(_ => Task.FromResult(CompletionsOk()))))
+            {
+                var transport = new CompletionsHttpSseTransport(client,
+                    (_, _) => new HttpRequestMessage(HttpMethod.Post, "https://openai.invalid/v1/chat/completions"),
+                    options: new CompletionsHttpSseOptions { OnBodyRead = _ => throw new TimeoutException("body observer timeout") });
+                var result = await new ChatClient(transport).CompleteAsync(new(completionsModel, [Ask], 1)).WaitAsync(Deadline);
+                Equal(StopReason.Error, result.Message.StopReason);
+                Check(!result.IsRetryableTransportFailure, "Completions OnBodyRead TimeoutException must NOT be marked retryable.");
+            }
+            using (var client = new HttpClient(new Handler(_ => Task.FromResult(CompletionsOk()))))
+            {
+                var transport = new CompletionsHttpSseTransport(client,
+                    (_, _) => new HttpRequestMessage(HttpMethod.Post, "https://openai.invalid/v1/chat/completions"),
+                    options: new CompletionsHttpSseOptions { OnInputPublished = _ => throw new TimeoutException("input observer timeout") });
+                await using var run = await transport.StartAsync(new(completionsModel, [Ask], 1)).AsTask().WaitAsync(Deadline);
+                StreamTerminalEvent? terminal = null;
+                await foreach (var frame in run.ReadCanonicalEventsAsync(CancellationToken.None))
+                    if (frame is StreamTerminalEvent done) terminal = done;
+                Check(terminal is StreamError { IsRetryableTransportFailure: false },
+                    "Completions OnInputPublished TimeoutException must NOT be marked retryable.");
+            }
+            // Completions premature EOF without finish_reason -> retryable UnexpectedEof.
+            using (var client = new HttpClient(new Handler(_ => Task.FromResult(Sse(null,
+                """data: {"id":"cmpl-1","choices":[{"index":0,"delta":{"role":"assistant","content":"partial"},"finish_reason":null}]}""" + "\n\n")))))
+            {
+                var transport = new CompletionsHttpSseTransport(client,
+                    (_, _) => new HttpRequestMessage(HttpMethod.Post, "https://openai.invalid/v1/chat/completions"));
+                var result = await new ChatClient(transport).CompleteAsync(new(completionsModel, [Ask], 1)).WaitAsync(Deadline);
+                Equal(StopReason.Error, result.Message.StopReason);
+                Check(result.IsRetryableTransportFailure, "Completions premature EOF without finish_reason must be marked retryable.");
+            }
         }
 
         // 8. Anthropic hooks (OnPayload, OnResponse, OnProviderStreamEvent) and permanent 401 error-body IO failures -> NOT retryable.
