@@ -265,7 +265,9 @@ internal sealed class PosixRawTerminalIo : IRawTerminalIo
 
     public (int Columns, int Rows) Size()
     {
-        nuint request = OperatingSystem.IsMacOS() || OperatingSystem.IsFreeBSD() ? 0x40087468u : 0x5413u;
+        // Darwin arm64 passes ioctl's variadic window-size argument on the stack.
+        if (OperatingSystem.IsMacOS()) return (Console.WindowWidth, Console.WindowHeight);
+        nuint request = OperatingSystem.IsFreeBSD() ? 0x40087468u : 0x5413u;
         if (ioctl(1, request, out var size) == 0 && size.Columns > 0) return (size.Columns, size.Rows);
         return ioctl(0, request, out size) == 0 ? (size.Columns, size.Rows) : (0, 0);
     }
