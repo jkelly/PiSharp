@@ -16,9 +16,7 @@ internal static class MistralLiveSelectionTests
     ];
     private static Task Catalog()
     {
-        // The rows are the current release's (Pi 1.6.0), which is where the CLI resolves --model. The frozen pi-ai 1.5.0 shard in
-        // PiSharp.Cli.Models differs from it in two rows since 1.6.0: mistral-large-latest (context window and prices) and
-        // deepseek-v4-1-flash-1017 (image input).
+        // Exercise every chat row from the same released catalog used by --model.
         var count = 0;
         foreach (var row in CurrentModelCatalog.Get("mistral")!.Models.Where(model => model.Type == CatalogModelType.Chat))
         {
@@ -29,24 +27,22 @@ internal static class MistralLiveSelectionTests
                 Check(selection.Definition.Raw.Value.GetProperty("cost").GetProperty(field).GetDouble() == value.GetProperty("cost").GetProperty(field).GetDouble());
             Check(selection.Definition.DeclaresImageInput == value.GetProperty("input").EnumerateArray().Any(item => item.GetString() == "image")); count++;
         }
-        // The @earendil-works/pi-ai@1.6.0 catalog has 34 Mistral chat rows, as 1.5.0 had (1.1.0 had 40; the v0.99.1 source catalog had 32).
-        Check(count == 34); return Task.CompletedTask;
+        Check(count == 23); return Task.CompletedTask;
     }
     private static async Task Routes()
     {
-        var selected = LiveSessionSelection.Parse("mistral", "open-mistral-nemo", "8000");
+        var selected = LiveSessionSelection.Parse("mistral", "codestral-2508", "8000");
         using var handler = new Handler(); var reads = new List<string>();
         using var connection = selected.Connect(new(name => { reads.Add(name); return name == "MISTRAL_API_KEY" ? "fixture-only" : null; }, () => handler));
         var normal = connection.CreateTransport(); var summary = connection.CreateTransport(summary: true);
-        // pi-ai 1.5.0 dropped open-mistral-7b, whose 8000-token context made the normal Simple route clamp max_tokens to the room left
-        // (simple-options.ts clampMaxTokensToContext: contextWindow - estimateContextTokens - CONTEXT_SAFETY_TOKENS 4096, at most 3904).
-        // open-mistral-nemo has a 128000-token context: an earlier answer that reports 120000 used tokens (estimateContextTokens starts
-        // from the last usage) leaves the same 3904 tokens of room.
+        // Leave 8,000 tokens in the model's context. The normal route reserves another 4,096
+        // for context safety, while the summary route keeps its explicitly requested cap.
+        var usedTokens = selected.Definition.Raw.Value.GetProperty("contextWindow").GetInt32() - 8_000;
         var earlier = JsonData.Parse(JsonSerializer.Serialize(new
         {
             role = "assistant", provider = selected.Model.Provider, api = selected.Model.Api, model = selected.Model.Id,
             content = new[] { new { type = "text", text = "earlier" } }, stopReason = "stop", timestamp = 2,
-            usage = new { input = 119_990, output = 10, cacheRead = 0, cacheWrite = 0, totalTokens = 120_000,
+            usage = new { input = usedTokens - 10, output = 10, cacheRead = 0, cacheWrite = 0, totalTokens = usedTokens,
                 cost = new { input = 0, output = 0, cacheRead = 0, cacheWrite = 0, total = 0 } }
         }));
         var request = new ChatRequest(selected.Model, [new("user", JsonData.Parse("{\"role\":\"user\",\"content\":\"hello\",\"timestamp\":1}")),
@@ -77,7 +73,7 @@ internal static class MistralLiveSelectionTests
     }
     private static async Task ImageRoutes()
     {
-        foreach (var (id, supportsImages) in new[] { ("mistral-large-latest", true), ("open-mistral-nemo", false) })
+        foreach (var (id, supportsImages) in new[] { ("mistral-large-latest", true), ("codestral-2508", false) })
         {
             var selected = LiveSessionSelection.Parse("mistral", id, "100");
             Check(selected.Definition.DeclaresImageInput == supportsImages);
@@ -123,7 +119,7 @@ internal static class MistralLiveSelectionTests
     }
     private static Task Refusals()
     {
-        foreach (var (provider, model, max) in new[] { ("mistral", "missing", "100"), ("mistral", "codestral-latest", "8192"), ("mistral", "open-mistral-nemo", "0") })
+        foreach (var (provider, model, max) in new[] { ("mistral", "missing", "100"), ("mistral", "codestral-latest", "8192"), ("mistral", "codestral-2508", "0") })
         {
             var refused = false;
             try { LiveSessionSelection.Parse(provider, model, max); } catch (Exception error) when (error is LiveSessionException or SessionCommandException) { refused = true; }
