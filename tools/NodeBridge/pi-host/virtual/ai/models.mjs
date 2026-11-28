@@ -1,4 +1,4 @@
-// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/ai/src/models.ts.
+// Pi fb0fe823539f6d04850f6e34748c01f01f212e1f (MIT): packages/ai/src/models.ts.
 // Ported to plain ESM for the PiSharp Node extension bridge (TypeScript types stripped mechanically; behaviour unchanged).
 import { lazyStream } from "./api/lazy.mjs";
 import { defaultProviderAuthContext as defaultAuthContext } from "./auth/context.mjs";
@@ -589,18 +589,32 @@ export function createProvider(input) {
         throw new Error(`Provider ${input.id}: at least one of "api", "images", or "classifiers" is required.`);
     }
     const baselineModels = input.models;
-    let dynamicModels = [];
     const fetchModels = input.fetchModels;
-    const currentModels = ()=>{
+    const chatModelsOf = (models)=>models.filter((model)=>isModelType(model, "chat"));
+    let allModels = baselineModels;
+    let chatModels = chatModelsOf(allModels);
+    const setDynamicModels = (dynamicModels)=>{
         const merged = [
             ...baselineModels
         ];
+        const indexByKey = new Map();
+        const keyOf = (model)=>`${getModelType(model)}\0${model.id}`;
+        merged.forEach((model, index)=>{
+            const key = keyOf(model);
+            if (!indexByKey.has(key)) indexByKey.set(key, index);
+        });
         for (const model of dynamicModels){
-            const index = merged.findIndex((entry)=>getModelType(entry) === getModelType(model) && entry.id === model.id);
-            if (index >= 0) merged[index] = model;
-            else merged.push(model);
+            const key = keyOf(model);
+            const index = indexByKey.get(key);
+            if (index !== undefined) {
+                merged[index] = model;
+            } else {
+                indexByKey.set(key, merged.length);
+                merged.push(model);
+            }
         }
-        return merged;
+        allModels = merged;
+        chatModels = chatModelsOf(merged);
     };
     const apiFor = (model)=>single ?? byApi?.[model.api];
     const dispatch = (model, run, signal)=>{
@@ -618,15 +632,13 @@ export function createProvider(input) {
         baseUrl: input.baseUrl,
         headers: input.headers,
         auth: input.auth,
-        getModels: ()=>currentModels().filter((model)=>isModelType(model, "chat")),
-        getAllModels: currentModels,
+        getModels: ()=>chatModels,
+        getAllModels: ()=>allModels,
         refreshModels: fetchModels ? async (context)=>{
             if (context.stored) {
                 const restored = context.stored.models.filter((model)=>model.provider === input.id).map((model)=>model);
                 if (!await context.publish({
-                    update: ()=>{
-                        dynamicModels = restored;
-                    }
+                    update: ()=>setDynamicModels(restored)
                 })) {
                     return;
                 }
@@ -640,9 +652,7 @@ export function createProvider(input) {
                     models: refreshed,
                     checkedAt: Date.now()
                 },
-                update: ()=>{
-                    dynamicModels = refreshed;
-                }
+                update: ()=>setDynamicModels(refreshed)
             });
         } : undefined,
         filterModels: input.filterModels,
@@ -703,8 +713,10 @@ export function calculateCost(model, usage) {
     }
     const longWrite = usage.cacheWrite1h ?? 0;
     const shortWrite = usage.cacheWrite - longWrite;
+    const imageRate = model.cost.imageOutput;
+    const imageTokens = imageRate === undefined ? 0 : Math.min(usage.output, usage.imageOutput ?? usage.output);
     usage.cost.input = rates.input / 1000000 * usage.input;
-    usage.cost.output = rates.output / 1000000 * usage.output;
+    usage.cost.output = (rates.output * (usage.output - imageTokens) + (imageRate ?? 0) * imageTokens) / 1000000;
     usage.cost.cacheRead = rates.cacheRead / 1000000 * usage.cacheRead;
     usage.cost.cacheWrite = (rates.cacheWrite * shortWrite + rates.input * 2 * longWrite) / 1000000;
     usage.cost.total = usage.cost.input + usage.cost.output + usage.cost.cacheRead + usage.cost.cacheWrite;

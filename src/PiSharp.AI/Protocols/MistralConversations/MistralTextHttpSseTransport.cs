@@ -3,7 +3,6 @@ using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
-using System.Text.RegularExpressions;
 using PiSharp.Contracts;
 
 namespace PiSharp.AI.Protocols.MistralConversations;
@@ -271,7 +270,7 @@ public sealed partial class MistralTextHttpSseTransport : IChatTransport, IModel
     private static bool IsRetryableHttpStatus(System.Net.HttpStatusCode status) => status is System.Net.HttpStatusCode.RequestTimeout
         or System.Net.HttpStatusCode.TooManyRequests or System.Net.HttpStatusCode.InternalServerError
         or System.Net.HttpStatusCode.BadGateway or System.Net.HttpStatusCode.ServiceUnavailable
-        or System.Net.HttpStatusCode.GatewayTimeout or (System.Net.HttpStatusCode)520 or (System.Net.HttpStatusCode)524;
+        or System.Net.HttpStatusCode.GatewayTimeout or (System.Net.HttpStatusCode)520 or (System.Net.HttpStatusCode)524 or (System.Net.HttpStatusCode)525;
     private async ValueTask<MistralTextException> HttpError(HttpResponseMessage response, Stream body, CancellationToken token, bool classifyTransport)
     {
         using var bytes = new MemoryStream(); var buffer = new byte[4096]; int count;
@@ -280,38 +279,18 @@ public sealed partial class MistralTextHttpSseTransport : IChatTransport, IModel
         var suffix = text.Length > 0 ? text.Length > 4000 ? text[..4000] + $"... [truncated {text.Length - 4000} chars]" : text : (string.IsNullOrEmpty(response.ReasonPhrase) ? $"Request failed with status {(int)response.StatusCode}" : response.ReasonPhrase);
         return Fail(NativeChatFailureCode.ProviderError, $"Mistral API error ({(int)response.StatusCode}): {suffix}");
     }
-    private static readonly Regex Boundary = new("\\r\\n\\r\\n|\\r\\n\\r|\\r\\n\\n|\\r\\r\\n|\\n\\r\\n|\\r\\r|\\n\\r|\\n\\n", RegexOptions.CultureInvariant);
     private static readonly char[] EcmaWhitespace = "\u0009\u000a\u000b\u000c\u000d\u0020\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000\ufeff".ToCharArray();
     private async IAsyncEnumerable<JsonData> Decode(Stream body, [EnumeratorCancellation] CancellationToken token)
     {
-        using var input = new StreamReader(body, new UTF8Encoding(false, false), detectEncodingFromByteOrderMarks: false, bufferSize: 4096, leaveOpen: true);
-        var buffer = new char[4096]; var pending = ""; long total = 0; int count; var first = true;
-        while ((count = await AwaitSource(() => input.ReadAsync(buffer.AsMemory(), token), classifyTransport: true).ConfigureAwait(false)) != 0)
+        ValueTask<int> Read(Memory<byte> bytes, CancellationToken cancellation) =>
+            AwaitSource(() => body.ReadAsync(bytes, cancellation), classifyTransport: true);
+        await foreach (var frame in ProviderShared.ProviderSseData.ReadAsync(Read, 4096, options.MaximumFrameCharacters,
+            options.MaximumTotalCharacters, () => Fail(NativeChatFailureCode.ResourceLimit, "Mistral data exceeds configured limits."), token).ConfigureAwait(false))
         {
-            total += count; Limit(total, options.MaximumTotalCharacters); var incoming = new string(buffer, 0, count);
-            if (first) { first = false; if (incoming.StartsWith('\uFEFF')) incoming = incoming[1..]; }
-            pending += incoming;
-            // Keep one buffer per read. Slicing the entire remainder after every event
-            // copied each character repeatedly when a read contained many small deltas.
-            var consumed = 0;
-            while (true)
-            {
-                var match = Boundary.Match(pending, consumed); if (!match.Success) break;
-                var raw = pending[consumed..match.Index]; consumed = match.Index + match.Length;
-                var data = ParseFrame(raw); if (data == "[DONE]") yield break;
-                if (data.Length > 0) yield return ParseChunk(data);
-            }
-            if (consumed != 0) pending = pending[consumed..];
-            Limit(pending.Length, options.MaximumFrameCharacters);
+            var data = frame.Trim(EcmaWhitespace);
+            if (data == "[DONE]") yield break;
+            if (data.Length > 0) yield return ParseChunk(data);
         }
-        var tail = ParseFrame(pending); if (tail.Length > 0 && tail != "[DONE]") yield return ParseChunk(tail);
-    }
-    private string ParseFrame(string raw)
-    {
-        Limit(raw.Length, options.MaximumFrameCharacters);
-        if (raw.StartsWith("data:", StringComparison.Ordinal) && raw.AsSpan().IndexOfAny('\r', '\n') < 0)
-            return raw.AsSpan(5).Trim(EcmaWhitespace).ToString();
-        return string.Join("\n", Regex.Split(raw, "\\r\\n|\\r|\\n").Where(x => x.StartsWith("data:", StringComparison.Ordinal)).Select(x => x[5..].TrimStart(EcmaWhitespace))).Trim(EcmaWhitespace);
     }
     private JsonData ParseChunk(string text) => Admit(() => ParseChunkCore(text));
     private JsonData ParseChunkCore(string text) { using var document = JsonDocument.Parse(text, new JsonDocumentOptions { MaxDepth = options.MaximumJsonDepth }); var value = document.RootElement; if (value.ValueKind != JsonValueKind.Object || !value.TryGetProperty("choices", out var choices) || choices.ValueKind != JsonValueKind.Array) throw Fail(NativeChatFailureCode.MalformedStream, "Invalid Mistral streaming event"); return JsonData.FromElement(value); }

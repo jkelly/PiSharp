@@ -1,6 +1,6 @@
 ---
 import SitePage from '../components/SitePage.astro';
-import { links, versions, inSync } from '../data/site';
+import { links, versions, hasSourceCandidate } from '../data/site';
 import { packages } from '../data/packages';
 import parity from '../data/parity.json';
 
@@ -28,15 +28,14 @@ const assessedOn = new Date(`${parity.assessedOn}T00:00:00Z`).toLocaleDateString
 	timeZone: 'UTC',
 });
 
-const install = 'dotnet tool install -g PiSharp.Cli';
+const install = `dotnet tool install -g PiSharp.Cli --version ${versions.pisharp}`;
 ---
 
 <SitePage title="The minimal agent harness, native to .NET" description="The minimal agent harness, native to .NET. An independent C# port of the Pi coding agent.">
 	<header class="hero">
 		<p class="release">
-			PiSharp {versions.pisharp} is out, matching Pi {versions.baseline}.
-			{!inSync && <>The unreleased source candidate targets Pi {versions.target}; local source validation is recorded with explicit limitations.</>}
-			{' '}<a href="/docs/guides/gap-updates/">See what's new</a>
+			<a href={`${links.releases}/tag/v${versions.pisharp}`}>PiSharp {versions.pisharp}</a> is the published release for Pi {versions.baseline}.
+			{hasSourceCandidate && <> The <a href={`/changelog/#v${versions.target}`}>unreleased {versions.target} preview</a> tracks Pi and Pi Durable {versions.target}.</>}
 		</p>
 		<h1 class="ps-h1">The minimal agent harness, native to .NET</h1>
 		<p class="ps-lede">
@@ -98,7 +97,7 @@ Tests pass. Want me to make the cap configurable?</pre>
 
 	<section class="ps-section">
 		<h2 class="ps-h2">How close to Pi it is</h2>
-		<p class="ps-muted">PiSharp makes three promises and tracks each one against {parity.baseline.replace(' v', ' ')}.</p>
+		<p class="ps-muted">These results come from the PiSharp {parity.release} assessment against {parity.baseline}.</p>
 		<ul class="status">
 			{
 				promises.map((p) => (

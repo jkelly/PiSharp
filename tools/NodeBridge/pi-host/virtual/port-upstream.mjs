@@ -7,14 +7,14 @@
 //
 //   node port-upstream.mjs <path-to-upstream-pi>/packages
 //
-// The upstream checkout must be Pi commit faac585884ae2c013a6b1400f3e9e77f10b34bac (v1.6.0, MIT).
+// The upstream checkout must be Pi commit fb0fe823539f6d04850f6e34748c01f01f212e1f (v1.7.0, MIT).
 import fs from "node:fs";
 import path from "node:path";
 import { stripTypeScriptTypes } from "node:module";
 import { fileURLToPath } from "node:url";
 import { execFileSync } from "node:child_process";
 
-const COMMIT = "faac585884ae2c013a6b1400f3e9e77f10b34bac";
+const COMMIT = "fb0fe823539f6d04850f6e34748c01f01f212e1f";
 const UP = path.resolve(process.argv[2] ?? process.env.PI_UPSTREAM_PACKAGES ?? "");
 if (!process.argv[2] && !process.env.PI_UPSTREAM_PACKAGES) {
 	console.error("usage: node port-upstream.mjs <upstream pi packages dir>");
@@ -212,10 +212,10 @@ const patchConfig = {
 		],
 	],
 	"coding-agent/src/config.ts": [
-		["let pkg: PackageJson = {};", 'let pkg: PackageJson = { name: "@earendil-works/pi-coding-agent", version: "1.6.0" };'],
+		["let pkg: PackageJson = {};", 'let pkg: PackageJson = { name: "@earendil-works/pi-coding-agent", version: "1.7.0" };'],
 		[
 			'try {\n\tconst packageJsonPath = getPackageJsonPath();\n\tpkg = JSON.parse(stripBom(readFileSync(packageJsonPath, "utf-8"))) as PackageJson;\n\tstartupPackageJsonPath = packageJsonPath;\n} catch (e: unknown) {\n\tconst err = e as NodeJS.ErrnoException;\n\tif (err.code !== "ENOENT") throw e;\n}',
-			"// PiSharp: the Node bridge ships no Pi package.json; it identifies as the ported Pi 1.6.0.\nstartupPackageJsonPath = undefined;",
+			"// PiSharp: the Node bridge ships no Pi package.json; it identifies as the ported Pi 1.7.0.\nstartupPackageJsonPath = undefined;",
 		],
 	],
 	"coding-agent/src/modes/interactive/theme/theme.ts": [

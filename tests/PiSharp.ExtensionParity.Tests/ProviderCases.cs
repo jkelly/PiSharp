@@ -70,8 +70,8 @@ internal static partial class Program
               log("classify", model.id, model.provider, Object.keys(context.questions), options?.apiKey ?? null);
               return { api: model.api, provider: model.provider, model: model.id, answers: { safe: { type: "bool", probability: 0.75 } }, stopReason: "stop", timestamp: 1 };
             } } },
-            images: { "acme-images": { async generateImages(model: any, context: any) {
-              log("images", model.id, context.input[0].text);
+            images: { "acme-images": { async generateImages(model: any, context: any, options: any) {
+              log("images", model.id, context.input[0].text, options?.aspectRatio, options?.size, options?.sessionId);
               return { api: model.api, provider: model.provider, model: model.id, output: [{ type: "image", data: "aGk=", mimeType: "image/png" }], stopReason: "stop", timestamp: 2 };
             } } },
           });
@@ -81,7 +81,7 @@ internal static partial class Program
               const judge = ctx.modelRegistry.getModelOfType("classifier", "acme", "judge");
               const painter = ctx.modelRegistry.getModelOfType("image", "acme", "painter");
               const verdict = await ctx.modelRegistry.classify(judge, { state: { text: "hello" }, questions: { safe: { type: "bool", instructions: "Is it safe?", criteria: { true: "safe", false: "unsafe" } } } });
-              const image = await ctx.modelRegistry.generateImages(painter, { input: [{ type: "text", text: "a cat" }] });
+              const image = await ctx.modelRegistry.generateImages(painter, { input: [{ type: "text", text: "a cat" }] }, { aspectRatio: "4:3", size: "2K", sessionId: "painting" });
               log("results", verdict.stopReason, verdict.answers?.safe?.probability ?? null, verdict.errorMessage ?? null, image.stopReason, image.output?.[0]?.mimeType ?? null, image.errorMessage ?? null);
               return { content: [{ type: "text", text: "judged" }], details: {} };
             },
@@ -100,7 +100,7 @@ internal static partial class Program
         var lines = LogLines(sandbox).Select(line => JsonNode.Parse(line)!.AsArray()).ToList();
         var classify = lines.Single(record => record[0]!.GetValue<string>() == "classify");
         Equal("""["classify","judge","acme",["safe"],"acme-secret"]""", classify.ToJsonString(), "classify reached the extension with the provider's resolved key");
-        Check(lines.Any(record => record.ToJsonString() == """["images","painter","a cat"]"""), "generateImages reached the extension: " + string.Join("\n", LogLines(sandbox)));
+        Check(lines.Any(record => record.ToJsonString() == """["images","painter","a cat","4:3","2K","painting"]"""), "generateImages reached the extension: " + string.Join("\n", LogLines(sandbox)));
         Equal("""["results","stop",0.75,null,"stop","image/png",null]""", lines.Single(record => record[0]!.GetValue<string>() == "results").ToJsonString(), "results returned to the tool");
     }
 

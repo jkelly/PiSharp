@@ -36,10 +36,12 @@ internal static class BashRenderers
         var truncated = ToolJson.Truthy(ToolJson.Get(truncation, "truncated"));
         var fullOutputPath = ToolJson.Get(details, "fullOutputPath");
         var fullOutputPathText = ToolJson.Truthy(fullOutputPath) ? ToolJson.Template(fullOutputPath) : null;
-        if (!options.IsPartial && truncated && fullOutputPathText is not null && output.EndsWith(']'))
+        var fullOutputError = ToolJson.GetString(details, "fullOutputError");
+        var footerMarker = fullOutputPathText ?? fullOutputError;
+        if (!options.IsPartial && truncated && !string.IsNullOrEmpty(footerMarker) && output.EndsWith(']'))
         {
             var footerStart = output.LastIndexOf("\n\n[", StringComparison.Ordinal);
-            if (footerStart != -1 && output[footerStart..].Contains(fullOutputPathText, StringComparison.Ordinal))
+            if (footerStart != -1 && output[footerStart..].Contains(footerMarker, StringComparison.Ordinal))
                 output = TuiTextJs.TrimEnd(output[..footerStart]);
         }
 
@@ -56,10 +58,11 @@ internal static class BashRenderers
             }
         }
 
-        if (truncated || fullOutputPathText is not null)
+        if (truncated || !string.IsNullOrEmpty(footerMarker))
         {
             var warnings = new List<string>();
             if (fullOutputPathText is not null) warnings.Add($"Full output: {fullOutputPathText}");
+            else if (!string.IsNullOrEmpty(fullOutputError)) warnings.Add($"Could not save the full output: {fullOutputError}");
             if (truncated)
             {
                 if (ToolJson.GetString(truncation, "truncatedBy") == "lines")

@@ -54,7 +54,7 @@ internal static class TerminalHistoryNavigationV2Tests
         var e = new TerminalTextEditorPasteController();
         for (var i = 0; i < 110; i++) e.AddToHistory("entry-" + i);
         Check(e.HistoryCount == 100 && e.History[0] == "entry-109" && e.History[^1] == "entry-10", "Entry eviction differs.");
-        e.AddToHistory("entry-10"); Check(e.History[0] == "entry-10" && e.HistoryCount == 100, "Nonconsecutive duplicate was removed.");
+        e.AddToHistory("entry-10"); Check(e.History[0] == "entry-10" && e.HistoryCount == 100 && e.History.Count(value => value == "entry-10") == 1, "Nonconsecutive duplicate must move to the front.");
     }
     private static void PayloadLimit()
     {

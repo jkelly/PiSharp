@@ -1,3 +1,4 @@
+// Pi fb0fe823539f6d04850f6e34748c01f01f212e1f (MIT): packages/chord/src/contracts/declare.ts (v1.7.0 updates).
 // Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/chord/src/contracts/declare.ts
 //
 // Declarations: Contract.Remote and Contract.Local, the checks every declared version passes, and the reading of declaration input.
@@ -207,8 +208,15 @@ internal static partial class ContractsInternal
     internal static QueriesData ReadQueries(QueriesMember member, string path)
     {
         var args = new OrderedDictionary<string, Snapshot>(StringComparer.Ordinal);
-        foreach (var (query, schema) in member.Declared) args[query] = SnapshotArguments(schema, $"{path}.args.{query}");
+        foreach (var (query, schema) in member.Declared) args[query] = QueryArguments(schema, $"{path}.args.{query}");
         return new QueriesData(SnapshotSchema(member.Item, $"{path}.item"), args);
+    }
+
+    internal static Snapshot QueryArguments(object? schema, string path)
+    {
+        var snapshot = SnapshotArguments(schema, path);
+        if (snapshot.Bytes) throw new ArgumentException($"{path}: a query's arguments are JSON only (no bytes())");
+        return snapshot;
     }
 
     /// <summary>Checks the members of every variant: a name keeps one kind across variants and the whole history (<paramref name="kinds"/>,

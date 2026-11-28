@@ -1,6 +1,8 @@
 # Contributing to PiSharp
 
-PiSharp is a .NET 10 port of a fixed Pi release, today Pi v1.2.0 (`compatibility/target.lock.json`). The contributor guides at [pisharp.ai/docs/contribute](https://pisharp.ai/docs/contribute/build/) cover building, [tests](https://pisharp.ai/docs/contribute/testing/), [how the port tracks Pi](https://pisharp.ai/docs/contribute/porting/), releasing and the website. Useful contributions include ported behavior with authored tests, source-linked compatibility fixtures and fixes to recorded differences from Pi.
+This checkout targets Pi and Pi Durable 1.7.0. PiSharp 1.6.0.2, the published package, tracks their 1.6.0 release. Use the source lock when checking a port and the public release record when documenting a NuGet install. [Source lock](compatibility/target.lock.json) · [Release record](compatibility/public-release.json) · [1.7.0 compatibility notes](docs/decisions/0018-pi-1.7.0-sync.md)
+
+The contributor guides cover [building](https://pisharp.ai/docs/contribute/build/), [testing](https://pisharp.ai/docs/contribute/testing/) and [porting](https://pisharp.ai/docs/contribute/porting/).
 
 1. Open an issue describing the proposed change and its rationale before substantial work.
 2. Keep pull requests focused. Distinguish planned behavior from verified observations and implemented functionality.
@@ -18,7 +20,7 @@ dotnet build src/PiSharp.Cli/PiSharp.Cli.csproj -c Release -p:RestoreSources=htt
 
 The suites under `tests/` are console programs. Each runs offline with no provider keys, prints a JSON report, and exits with 1 when a case fails. Run the suite for the area you change with `dotnet run --project tests/<suite> -c Release`.
 
-CI runs the release suites other than the two durable ones on macOS (`macos.yml`), the durable suites (`durable.yml`) and the custom agents suite (`custom-agents.yml`) on Windows, Linux and macOS, and all 19 release suites before a release (`release.yml`). No workflow runs the core suites, such as `PiSharp.Agent.Tests`, `PiSharp.Sessions.Tests` and `PiSharp.Tools.Tests`, or the companion suites, so run the one for a library you change yourself. A new suite needs an entry in `PiSharp.slnx`, and to run in CI, in the list in `release.yml` and the matrix in `macos.yml`.
+The macOS matrix runs 19 release suites. The release workflow runs 23 suites and calls the Core, Durable, gap regression and native Env workflows at the release commit. When adding a suite, include it in the solution and the workflow that exercises its platform and prerequisites. [Testing guide](https://pisharp.ai/docs/contribute/testing/)
 
 ## Records to keep current
 

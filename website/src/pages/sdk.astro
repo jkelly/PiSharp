@@ -1,7 +1,7 @@
 ---
 import SitePage from '../components/SitePage.astro';
 import { packages } from '../data/packages';
-import { versions } from '../data/site';
+import { versions, hasSourceCandidate } from '../data/site';
 
 const groups = [
 	{ id: 'Core', title: 'Core' },
@@ -15,6 +15,7 @@ const groups = [
 		<div>
 			<h1 class="ps-h1">Take the whole agent, or just a layer</h1>
 			<p class="ps-lede">Use the streaming LLM client on its own, add the agent loop, or embed the full coding agent. PiSharp {versions.pisharp} publishes 29 libraries, the CLI tool, and the <code>dotnet new</code> template package (31 packages) on NuGet.</p>
+			{hasSourceCandidate && <p class="ps-muted">Building the {versions.target} source preview? Its experimental Durable API changes transactional submissions and hook results. <a href={`/changelog/#v${versions.target}`}>Read the preview changes</a>.</p>}
 			<div class="ps-actions">
 				<a href="/docs/embed/sdk/" class="ps-button">Read the embedding guide</a>
 				<a href="/docs/reference/architecture/" class="ps-button ps-ghost">Architecture</a>
@@ -74,7 +75,7 @@ const groups = [
 					<a class="ps-chip" data-tone="experimental" href="/docs/embed/media/">Experimental</a>
 				</div>
 				<div>
-					<p class="ps-muted">Image, video, speech, music, transcription, embedding and rerank models in <code>PiSharp.AI.Media</code> (<code>PISHARP_MEDIA001</code>). Service tiers graduate to stable in 1.6.0.1 (ADR 0017); on 1.6.0 NuGet packages, suppress <code>PISHARP_TIERS001</code>.</p>
+					<p class="ps-muted">Image, video, speech, music, transcription, embedding and rerank models are available through <code>PiSharp.AI.Media</code> (<code>PISHARP_MEDIA001</code>).</p>
 					<p class="ps-fine"><a href="/docs/embed/media/">Read the media library guide</a></p>
 				</div>
 			</li>

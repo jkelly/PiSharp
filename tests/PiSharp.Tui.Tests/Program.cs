@@ -18,6 +18,7 @@ var tests = TerminalInputTests.Cases().Concat(TerminalLeaseTests.Cases())
     .Concat(TerminalTextComponentTests.Cases())
     .Concat(Sync152TuiTests.Cases())
     .Concat(Sync160TuiTests.Cases())
+    .Concat(Sync170TuiTests.Cases())
     .Concat(WindowsConPtyFixture.Cases(dotnetHost, typeof(TerminalInputTests).Assembly.Location))
     .Concat(WindowsConPtyRendererFixture.Cases(dotnetHost, typeof(TerminalInputTests).Assembly.Location)).ToArray();
 var availableTests = tests.Length;

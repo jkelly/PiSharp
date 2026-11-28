@@ -234,7 +234,7 @@ internal static partial class Program
                 new DurableStreamOptions { Identity = new PiSharp.AI.ClientIdentity { UserAgent = PiSharp.AI.ClientUserAgent.Custom("acme-agent/2") } },
                 CancellationToken.None);
             var detailed = PiSharp.AI.ClientIdentities.FormatUserAgent(null);
-            Check(detailed.StartsWith("pi/1.6.0 (", StringComparison.Ordinal), "the default user agent: " + detailed);
+            Check(detailed.StartsWith("pi/1.7.0 (", StringComparison.Ordinal), "the default user agent: " + detailed);
             // RecordingHandler joins a header's values with commas, and HttpHeaders splits User-Agent into its products and comment.
             static string Recorded(string userAgent)
             {
@@ -284,7 +284,7 @@ internal static partial class Program
         {
             var handler = new RecordingHandler(_ => Sse(CompletionsText));
             using var models = Models(new() { ["GROQ_API_KEY"] = "test-groq-key" }, handler);
-            var message = await models.CompleteSimpleAsync(models.GetModel("groq", "llama-3.3-70b-versatile")!, UserTurn("hi"),
+            var message = await models.CompleteSimpleAsync(models.GetModel("groq", "openai/gpt-oss-120b")!, UserTurn("hi"),
                 new DurableStreamOptions { MaxTokens = 77 }, CancellationToken.None);
             var request = handler.Requests.Single();
             Equal("https://api.groq.com/openai/v1/chat/completions", request.Uri, "endpoint");
@@ -531,8 +531,8 @@ internal static partial class Program
 
     /// <summary>Recorded OpenAI Chat Completions stream: "Hi".</summary>
     private const string CompletionsText =
-        "data: {\"id\":\"c1\",\"object\":\"chat.completion.chunk\",\"created\":1,\"model\":\"llama-3.3-70b-versatile\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\",\"content\":\"Hi\"},\"finish_reason\":null}]}\n\n" +
-        "data: {\"id\":\"c1\",\"object\":\"chat.completion.chunk\",\"created\":1,\"model\":\"llama-3.3-70b-versatile\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":5,\"completion_tokens\":1,\"total_tokens\":6}}\n\n" +
+        "data: {\"id\":\"c1\",\"object\":\"chat.completion.chunk\",\"created\":1,\"model\":\"openai/gpt-oss-120b\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\",\"content\":\"Hi\"},\"finish_reason\":null}]}\n\n" +
+        "data: {\"id\":\"c1\",\"object\":\"chat.completion.chunk\",\"created\":1,\"model\":\"openai/gpt-oss-120b\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":5,\"completion_tokens\":1,\"total_tokens\":6}}\n\n" +
         "data: [DONE]\n\n";
 
     /// <summary>A clock frozen at one instant (request timestamps and durationMs are deterministic).</summary>

@@ -1,3 +1,4 @@
+// Pi fb0fe823539f6d04850f6e34748c01f01f212e1f (MIT): packages/ai/src/api/classifier-shared.ts and json-request.ts.
 // Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/ai/src/api/classifier-shared.ts.
 using System.Collections.Immutable;
 using System.Text.Json;
@@ -62,8 +63,8 @@ internal static class ClassifierShared
 
     /// <summary><c>postClassifierRequest</c>: one JSON POST with bearer auth, the payload and response hooks, a fresh
     /// timeout per attempt and provider retries (default 2). <paramref name="noRetryStatuses"/> fail at once.</summary>
-    internal static async Task<JsonElement> PostAsync(string label, Uri url, ClassifierModel model, JsonNode body,
-        ClassifierOptions? options, CancellationToken signal, IReadOnlyCollection<int>? noRetryStatuses = null)
+    internal static async Task<JsonElement> PostAsync(string label, Uri url, OperationModel model, JsonNode body,
+        ModelRequestOptions? options, CancellationToken signal, IReadOnlyCollection<int>? noRetryStatuses = null)
     {
         if (string.IsNullOrEmpty(options?.ApiKey)) throw new InvalidOperationException($"No API key for provider: {model.Provider}");
         var payload = body;
@@ -75,15 +76,13 @@ internal static class ClassifierShared
             [new("authorization", "Bearer " + options.ApiKey), new("content-type", "application/json")],
             ProviderRequest.Nullable(model.Headers), options.Headers);
         var http = ProviderRequest.Http(options);
-        var (response, json) = await ProviderRequest.RetryAsync(async () =>
+        return await ProviderRequest.RetryAsync(async () =>
         {
-            var (info, responseText) = await ProviderRequest.PostAsync(http, url, headers, text, options, signal, ProviderRequest.FetchFailed).ConfigureAwait(false);
+            var (info, responseText) = await ProviderRequest.PostAsync(http, url, headers, text, options, signal, ProviderRequest.FetchFailed, model: model).ConfigureAwait(false);
             if (!ProviderRequest.IsSuccess(info.Status))
                 throw new ProviderRequestException($"{label} returned {info.Status}", info.Status, info.Headers, responseText);
-            return (info, ProviderRequest.ParseJson(label, responseText));
+            return ProviderRequest.ParseJson(label, responseText);
         }, options.MaxRetries ?? 2, options, noRetryStatuses, signal).ConfigureAwait(false);
-        if (options.OnResponse is { } onResponse) await onResponse(response, model, signal).ConfigureAwait(false);
-        return json;
     }
 
     // tokenCount: a finite positive number as it is (a fraction included), else 0.
@@ -100,7 +99,11 @@ internal static class ClassifierShared
         if (!hasInput && !hasOutput) return null;
         var input = TokenCount(hasInput ? inputTokens : null); var output = TokenCount(hasOutput ? outputTokens : null);
         // Pi f9a26365 models.ts calculateCost records totalFromProvider false.
-        return ProviderRequest.Usage(input, output, 0, 0, input + output, model.Cost.Calculate(input, output, 0, 0), totalFromProvider: false);
+        var details = Field(usage, "input_tokens_details") ?? default;
+        var read = Math.Min(input, TokenCount(Field(details, "cached_tokens")));
+        var write = Math.Min(input - read, TokenCount(Field(details, "cache_write_tokens")));
+        return ProviderRequest.Usage(input - read - write, output, read, write, input + output,
+            model.Cost.Calculate(input - read - write, output, read, write), totalFromProvider: false);
     }
 
     internal static JsonElement? Field(JsonElement value, string name) =>

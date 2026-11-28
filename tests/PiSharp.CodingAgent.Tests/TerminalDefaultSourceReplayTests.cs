@@ -103,18 +103,39 @@ internal static partial class TerminalDefaultSourceReplayTests
             originalSourceSha = "d86654abb8862e201933517d6f1fce9f88dd117f", originalSourceExpectedObjectsChanged = false,
             physicalRenderCountSeparateFromSourceFixtureCounters = true, sourceFiles = files, sourceCases = cases.Count, checkpoints,
             differentCases, differentCheckpoints, explicitApprovedCases = approvedCases, explicitApprovedCheckpoints = approvedCheckpoints,
+            historySource = "Pi fb0fe823539f6d04850f6e34748c01f01f212e1f packages/tui/src/components/editor.ts addToHistory",
             safetyApproval = "TERMINAL_SOURCE_VIEW_RENDERER_APPROVED_SAFETY_ADDENDUM_R3.json SHA256 2ec6dd6b67c1aabe459f0007f778fbf8d50a13f6cb528ee5202aa74daeddbd3b",
             completeSessionHostAcceptanceQualified = false, cases };
         Evidence.Add(report);
         var output = Environment.GetEnvironmentVariable("PISHARP_TERMINAL_DEFAULT_REPLAY_REPORT");
         if (output is not null) await File.WriteAllTextAsync(output, JsonSerializer.Serialize(report, new JsonSerializerOptions { WriteIndented = true }) + "\n");
-        Check(cases.Count == 40 && checkpoints == 745 && approvedCases == 1 && approvedCheckpoints == 3,
-            "Default replay did not retain the exact40/745 corpus and one explicit three-checkpoint display decision.");
+        Check(cases.Count == 40 && checkpoints == 745 && approvedCases == 2 && approvedCheckpoints == 9,
+            "Default replay did not retain the exact40/745 corpus and the three display and six Pi 1.7 history checkpoints.");
         Check(differentCases == 0 && differentCheckpoints == 0, $"Actual default Source replay differs: {differentCases} cases, {differentCheckpoints} checkpoints. Full original/approved/actual evidence retained.");
     }
 
     private static JsonElement ApprovedObservation(string id, JsonElement original)
     {
+        if (id == "history-trim-empty-consecutive-and-nonconsecutive-duplicates")
+        {
+            // In Pi 1.7 addToHistory moves an existing prompt to the front. After alpha, beta, alpha,
+            // navigation stops at beta on Up and returns to the empty draft on the second Down.
+            var current = JsonNode.Parse(original.GetRawText())!;
+            var changes = new List<string> { "", "alpha", "beta" };
+            for (var index = 8; index <= 13; index++)
+            {
+                var text = index switch { 8 or 9 => "beta", 10 => "alpha", _ => "" };
+                if (index is 10 or 11) changes.Add(text);
+                var step = current["steps"]![index]!;
+                step["text"] = text;
+                step["expandedText"] = text;
+                var column = index == 10 ? text.Length : 0;
+                step["cursor"]!["col"] = column;
+                step["cursorUtf16Offset"] = column;
+                step["changes"] = JsonSerializer.SerializeToNode(changes);
+            }
+            return JsonSerializer.SerializeToElement(current);
+        }
         if (id != "history-ecmascript-trim-preserves-nel-and-raw-line-controls") return original;
         var originalRows = JsonSerializer.SerializeToElement(new[] { "────────────────", "\u001b_pi:c\a\u001b[7m\u0085\u001b[0mA\u0085               ", "────────────────" });
         var displayRows = new[] { "────────────────", "\u001b_pi:c\a\u001b[7m\u2426\u001b[0mA\u2426             ", "────────────────" };

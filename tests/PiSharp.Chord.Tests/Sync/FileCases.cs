@@ -37,8 +37,8 @@ internal static partial class Program
                 var existing = await remote.PutBatchAsync("s", 0, 9, "b", SyncFilePoison(), context);
                 Equal(new PutBatchResult.Exists(3, "a"), existing, "same slot remains occupied");
                 Equal(new PutBatchResult.NotHead(3), await remote.PutBatchAsync("s", 1, 9, "b", SyncFilePoison(), context), "not head");
-                Check(await remote.PutBatchAsync("s", 3, 4, "a", SyncFileBody("d"), context, new(Epoch: 12)) is PutBatchResult.Created,
-                    "filesystem remote ignores epochs");
+                Check(await remote.PutBatchAsync("s", 3, 4, "a", SyncFileBody("d"), context) is PutBatchResult.Created,
+                    "next slot at head");
                 var listing = await remote.ListAsync("s", context);
                 Sequence(new long[] { 0, 3 }, listing.Batches.Select(batch => batch.After), "ordered slots");
                 Equal(4L, SyncRemote.Head(listing), "head");
@@ -46,6 +46,49 @@ internal static partial class Program
                 Check(File.Exists(Path.Combine(path, "s", "slots", "0000000000000000.json")), "fixed width slot");
                 Json("""{"after":0,"to":3,"device":"a"}""", JsonNode.Parse(await File.ReadAllTextAsync(Path.Combine(path, "s", "slots", "0000000000000000.json"))), "wire slot");
                 Equal<IAsyncEnumerable<ReadOnlyMemory<byte>>?>(null, await remote.GetBatchAsync("s", 4, context), "missing slot");
+            })),
+            Case("sync.files.head-recovers-after-crash-and-from-legacy-directory", () => SyncFileDirectory(async (path, fs) =>
+            {
+                var remote = new FileSystemSyncRemote(fs, path);
+                await remote.PutBatchAsync("s", 0, 2, "a", SyncFileBody("first"), context);
+                var head = Path.Combine(path, "s", "head.json");
+                Json("""{"head":2}""", JsonNode.Parse(await File.ReadAllTextAsync(head)), "head published");
+                fs.FailRename = destination => destination == head;
+                await SyncFails<IOException>(() => remote.PutBatchAsync("s", 2, 3, "a", SyncFileBody("second"), context));
+                Equal(3L, (await remote.SessionsAsync(null, context)).Sessions.Single().Head, "slot survived before head");
+                File.Delete(head);
+                fs.FailRename = null;
+                Equal(new PutBatchResult.Created(), await remote.PutBatchAsync("s", 3, 4, "a", SyncFileBody("third"), context),
+                    "legacy directory follows slots from zero");
+                Json("""{"head":4}""", JsonNode.Parse(await File.ReadAllTextAsync(head)), "head restored");
+            })),
+            Case("sync.files.flush-failure-never-publishes", () => SyncFileDirectory(async (path, fs) =>
+            {
+                var remote = new FileSystemSyncRemote(fs, path);
+                fs.FailFlush = true;
+                await SyncFails<IOException>(() => remote.PutBatchAsync("s", 0, 1, "a", SyncFileBody("data"), context));
+                Equal(0, Directory.GetFiles(path, "*", SearchOption.AllDirectories).Length, "nothing renamed and temp removed");
+            })),
+            Case("sync.files.sessions-write-independently", () => SyncFileDirectory(async (path, fs) =>
+            {
+                var remote = new FileSystemSyncRemote(fs, path);
+                var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+                var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+                async IAsyncEnumerable<ReadOnlyMemory<byte>> Held()
+                {
+                    started.SetResult();
+                    await release.Task;
+                    yield return new byte[] { 1 };
+                }
+                var pending = remote.PutBatchAsync("a", 0, 1, "x", Held(), context);
+                try
+                {
+                    await started.Task.WaitAsync(TimeSpan.FromSeconds(10));
+                    var other = await remote.PutBatchAsync("b", 0, 1, "y", SyncFileBody("other"), context)
+                        .WaitAsync(TimeSpan.FromSeconds(10));
+                    Equal(new PutBatchResult.Created(), other, "unrelated session finished");
+                }
+                finally { release.SetResult(); await pending; }
             })),
             Case("sync.files.fold-snapshot-and-session-enumeration", () => SyncFileDirectory(async (path, fs) =>
             {
@@ -228,6 +271,7 @@ internal static partial class Program
     {
         private readonly LocalSyncFileSystem native = new();
         public Func<string, bool>? FailRename { get; set; }
+        public bool FailFlush { get; set; }
         public bool FailRead { get; set; }
         public int OpenReaders { get; private set; }
         public Task<FileResult<string>> JoinPathAsync(IReadOnlyList<string> parts, ChordContext context) => native.JoinPathAsync(parts, context);
@@ -242,6 +286,9 @@ internal static partial class Program
         }
         public Task<FileResult<bool>> WriteFileAsync(string path, ReadOnlyMemory<byte> content, ChordContext context) => native.WriteFileAsync(path, content, context);
         public Task<FileResult<bool>> AppendFileAsync(string path, ReadOnlyMemory<byte> content, ChordContext context) => native.AppendFileAsync(path, content, context);
+        public Task<FileResult<bool>> FlushFileAsync(string path, ChordContext context)
+            => FailFlush ? Task.FromResult(FileResult<bool>.Failure(new IOException("Injected flush failure")))
+                : native.FlushFileAsync(path, context);
         public Task<FileResult<bool>> RenameFileAsync(string sourcePath, string destinationPath, ChordContext context)
             => FailRename?.Invoke(destinationPath) == true ? Task.FromResult(FileResult<bool>.Failure(new IOException("Injected rename failure")))
                 : native.RenameFileAsync(sourcePath, destinationPath, context);

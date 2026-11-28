@@ -1,4 +1,4 @@
-// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/coding-agent/src/core/session-manager.ts.
+// Pi fb0fe823539f6d04850f6e34748c01f01f212e1f (MIT): packages/coding-agent/src/core/session-manager.ts.
 // Ported to plain ESM for the PiSharp Node extension bridge (TypeScript types stripped mechanically; behaviour unchanged).
 import { getCurrentSystemMessage, uuidv7 } from "../../pi-ai.mjs";
 import { randomUUID } from "crypto";
@@ -217,7 +217,9 @@ export function buildContextEntries(entries, leafId, byId) {
             contextEntries.push(entry);
         }
     }
-    contextEntries.push(...path.slice(compactionIdx + 1));
+    for(let i = compactionIdx + 1; i < path.length; i++){
+        contextEntries.push(path[i]);
+    }
     return contextEntries;
 }
 export function projectContextEntry(entry, edit) {
@@ -312,16 +314,17 @@ export function loadEntriesFromFile(filePath) {
         while(true){
             const bytesRead = readSync(fd, buffer, 0, buffer.length, null);
             if (bytesRead === 0) break;
-            pending += decoder.write(buffer.subarray(0, bytesRead));
+            const text = decoder.write(buffer.subarray(0, bytesRead));
             let lineStart = 0;
-            let newlineIndex = pending.indexOf("\n", lineStart);
+            let newlineIndex = text.indexOf("\n", lineStart);
             while(newlineIndex !== -1){
-                const entry = parseSessionEntryLine(pending.slice(lineStart, newlineIndex));
+                const entry = parseSessionEntryLine(pending + text.slice(lineStart, newlineIndex));
                 if (entry) entries.push(entry);
+                pending = "";
                 lineStart = newlineIndex + 1;
-                newlineIndex = pending.indexOf("\n", lineStart);
+                newlineIndex = text.indexOf("\n", lineStart);
             }
-            pending = pending.slice(lineStart);
+            pending += text.slice(lineStart);
         }
         pending += decoder.end();
         const finalEntry = parseSessionEntryLine(pending);

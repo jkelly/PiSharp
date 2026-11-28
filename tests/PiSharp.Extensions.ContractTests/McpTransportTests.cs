@@ -270,7 +270,7 @@ internal static partial class McpTransportTests
             await channel.StartAsync(default);
             call = channel.RequestAsync("tools/call", Json("{\"_meta\":{\"keep\":7}}"), new(0, async (progress, _) => { Equal(2d, progress.Progress); entered.TrySetResult(); await release.Task; }), default).AsTask();
             var request = await lease.Next(); var meta = request.Value.GetProperty("params").GetProperty("_meta"); Equal(7, meta.GetProperty("keep").GetInt32()); Equal(request.Value.GetProperty("id").GetInt64(), meta.GetProperty("progressToken").GetInt64());
-            lease.Pipe.Push("{\"jsonrpc\":\"2.0\",\"method\":\"notifications/progress\",\"params\":{\"progressToken\":" + request.Value.GetProperty("id") + ",\"progress\":2}}\n");
+            lease.Pipe.Push("{\"jsonrpc\":\"2.0\",\"method\":\"notifications/progress\",\"params\":{\"progressToken\":\"" + request.Value.GetProperty("id") + "\",\"progress\":2}}\n");
             await entered.Task; lease.Respond(request); Check(!call.IsCompleted); release.TrySetResult(); await call;
         }
         finally { release.TrySetResult(); if (call is not null) await Observe(call); await channel.CloseAsync(); }
@@ -482,7 +482,11 @@ internal static partial class McpTransportTests
         {
             var row = await Record(request); seen.Add(row);
             if (row.Method == "POST") { original = Json(row.Body!); return Response("id: resume-marker\nretry: 0\nevent: ignored\ndata: {}\n\n", "text/event-stream"); }
-            return Response("event: message\ndata: " + Reply(original!, "{\"resumed\":true}"), "text/event-stream");
+            var id = original!.Value.GetProperty("id").GetInt64();
+            return Response("event: message\ndata: " + System.Text.Json.JsonSerializer.Serialize(new
+            {
+                jsonrpc = "2.0", id = id.ToString(System.Globalization.CultureInfo.InvariantCulture), result = new { resumed = true }
+            }), "text/event-stream");
         });
         var channel = new McpJsonRpcRequestChannel(wire);
         try { await channel.StartAsync(default); Check((await channel.RequestAsync("test", null, new(0), default)).Value.GetProperty("resumed").GetBoolean()); Equal("POST,GET", string.Join(',', seen.Select(row => row.Method))); Equal("resume-marker", seen[1].Headers["Last-Event-ID"]); }

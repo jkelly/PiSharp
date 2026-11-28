@@ -599,7 +599,7 @@ internal static class AnthropicMessagesHttpSseTransportTests
         var result = new Dictionary<string, string>(StringComparer.Ordinal);
         // HttpHeaders renders typed values with their parser's separator (e.g. spaces for User-Agent, commas for Accept).
         // Read the complete field text; enumerating GetValues and universally joining with commas changes field syntax.
-        foreach (var line in (request.Headers.ToString() + request.Content!.Headers.ToString()).Split("\r\n", StringSplitOptions.None))
+        foreach (var line in (request.Headers.ToString() + request.Content!.Headers.ToString()).Split(Environment.NewLine, StringSplitOptions.None))
         {
             if (line.Length == 0) continue;
             var colon = line.IndexOf(':');

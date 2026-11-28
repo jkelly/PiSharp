@@ -1,4 +1,4 @@
-// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/agent/src/agent-loop.ts.
+// Pi fb0fe823539f6d04850f6e34748c01f01f212e1f (MIT): packages/agent/src/agent-loop.ts.
 // Ported to plain ESM for the PiSharp Node extension bridge (TypeScript types stripped mechanically; behaviour unchanged except for the marked PiSharp adaptations).
 import { EventStream, getCurrentTools, getToolStateChanges, mergeClientIdentity, normalizeContext, PI_ATTRIBUTION, toToolDeclaration, validateToolArguments } from "../pi-ai.mjs";
 import { getDefaultStreamFn } from "./stream-fn.mjs";

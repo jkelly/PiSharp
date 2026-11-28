@@ -146,7 +146,9 @@ internal static class LovelyMermaidCases
                 Equal(markdown, transform(markdown, Context(type)), type + " excluded");
             TerminalImage.SetCapabilities(capabilities with { Hyperlinks = false });
             Check(!transform(markdown, Context(MarkdownMessageType.Assistant))!.Contains("\u001b]8;", StringComparison.Ordinal), "disabled terminal links");
-            Equal(markdown, transform(markdown, Context(MarkdownMessageType.Assistant, width: 1)), "too narrow");
+            var warning = Themes.Current.Fg("warning", "Mermaid diagram not rendered: needs 27 columns, 1 available");
+            Equal(markdown + "\n" + MermaidTransformer.CodeSpan(warning) + "  \n",
+                transform(markdown, Context(MarkdownMessageType.Assistant, width: 1)), "too narrow");
             mode = "final";
             Equal(markdown, transform(markdown, Context(MarkdownMessageType.Assistant, streaming: true)), "final skips streaming");
             mode = "off";

@@ -15,7 +15,7 @@ public static partial class Examples
         () => (JsonObjectValue)JsonValue.Parse("""{"muted":[],"sent":[]}"""), checkpointWhen: (_, _, _) => false);
 
     // 34: a host lets people message an agent while it works. A message must join the current run as a steer and never start a run of its
-    // own. SubmitAsync(tx, draft) admits it inside the host's own commit, together with the host's check and its own state; WhenIdle.Reject
+    // own. AdmitAsync(tx, draft) admits it inside the host's own commit, together with the host's check and its own state; WhenIdle.Reject
     // refuses it when no run is working.
     private static async Task SubmitInCommitAsync(Func<Task<IStorage>> open, TextWriter output)
     {
@@ -57,7 +57,7 @@ public static partial class Examples
                     if (visitors.GetArray("muted").ToValue() is JsonArrayValue muted && muted.Any(name => name is JsonStringValue { Value: var value } && value == from))
                         return $"{from} is muted";
                     // Before the commit's own table writes; document writes may come before or after.
-                    var id = await root.SubmitAsync(tx, SubmissionDraft.Input($"{from}: {text}", WhenBusy.Steer, requestId, whenIdle: WhenIdle.Reject));
+                    var id = await root.AdmitAsync(tx, SubmissionDraft.Input($"{from}: {text}", WhenBusy.Steer, requestId, whenIdle: WhenIdle.Reject));
                     visitors.GetArray("sent").Add(JsonValue.Object([new("from", from), new("text", text)]));
                     return $"{from}'s message is submission {id.Value}";
                 }, Context);

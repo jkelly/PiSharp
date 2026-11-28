@@ -1,4 +1,4 @@
-// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/chord/src/context/index.ts (Context, ContextKey, BACKGROUND_CONTEXT,
+// Pi fb0fe823539f6d04850f6e34748c01f01f212e1f (MIT): packages/chord/src/context/index.ts (Context, ContextKey, BACKGROUND_CONTEXT,
 // TODO_CONTEXT, createContextKey, withContextValue, withTelemetry, traceIn, withAbortSignal, withoutAbortSignal, withCancel,
 // awaitWithContext; v1.2.0 moved the Context and ContextKey types here from types.ts). Named DurableContext so it is never mistaken for a
 // conversation's context. Pi v1.5.0 sync (area telemetry): Context.telemetry, always a span (48909d987, 2ec55d808), withTelemetry, and
@@ -185,7 +185,13 @@ public sealed class DurableContext
         ArgumentNullException.ThrowIfNull(task);
         var observed = signal;
         if (observed is null) return task;
-        if (observed.Token.IsCancellationRequested) return Failed<T>(observed);
+        if (observed.Token.IsCancellationRequested)
+        {
+            // The caller already cancelled, but the abandoned task can still fail later.
+            _ = task.ContinueWith(static completed => { _ = completed.Exception; },
+                CancellationToken.None, TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
+            return Failed<T>(observed);
+        }
         if (task.IsCompleted) return task;
         // A flow with an OrderedLineDelivery (the scheduler's abort invocations, Session.cs) is resumed through that delivery, as its line
         // results are: the outcome is queued there, so the flow resumes in turn with the flows started with it, each running until it next

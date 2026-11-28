@@ -32,7 +32,7 @@ public sealed class BashTool : IToolArgumentSchemaAdapter
     /// It is tool metadata, not part of the model-facing declaration. Authored rendering of the TypeBox schema.
     /// </summary>
     public static JsonData OutputSchema { get; } = JsonData.Parse("""
-        {"type":"object","properties":{"output":{"type":"string","description":"Combined stdout and stderr, possibly truncated"},"truncated":{"type":"boolean"},"full_output_path":{"type":"string","description":"Full output, when truncated"},"exit_code":{"type":"number"},"wall_time_seconds":{"type":"number"}},"required":["output","truncated","exit_code","wall_time_seconds"]}
+        {"type":"object","properties":{"output":{"type":"string","description":"Combined stdout and stderr, possibly truncated"},"truncated":{"type":"boolean"},"full_output_path":{"type":"string","description":"Full output, when truncated"},"full_output_error":{"type":"string","description":"Why the full output could not be saved, when truncated and saving failed"},"exit_code":{"type":"number"},"wall_time_seconds":{"type":"number"}},"required":["output","truncated","exit_code","wall_time_seconds"]}
         """);
 
     public BashTool(IProcessRunner runner, BashToolOptions options, Func<string>? nextSpillFileName = null)
@@ -177,7 +177,7 @@ public sealed class BashTool : IToolArgumentSchemaAdapter
             cancellationToken.ThrowIfCancellationRequested();
             var request = new ProcessRequest(action.Target, action.CommandArguments, action.WorkingDirectory!,
                 action.Environment, input.OutputPath!, input.Timeout)
-            { StandardInput = input.StandardInput is null ? null : System.Text.Encoding.UTF8.GetBytes(input.StandardInput) };
+            { AllowSpillFailure = true, StandardInput = input.StandardInput is null ? null : System.Text.Encoding.UTF8.GetBytes(input.StandardInput) };
             var result = await _runner.RunAsync(request, async snapshot =>
             {
                 CheckOutput(snapshot, input.OutputPath!); lastOutput = snapshot;
@@ -303,6 +303,7 @@ public sealed class BashTool : IToolArgumentSchemaAdapter
                 outputBytes = value.OutputBytes, lastLinePartial = value.LastLinePartial,
                 firstLineExceedsLimit = value.FirstLineExceedsLimit, maxLines = value.MaxLines, maxBytes = value.MaxBytes };
         }
+        if (output.FullOutputError is not null) details["fullOutputError"] = output.FullOutputError;
         if (output.FullOutputPath is not null) details["fullOutputPath"] = output.FullOutputPath;
         return details.Count == 0 && !progress ? JsonData.Null : JsonData.Parse(JsonSerializer.Serialize(details));
     }
@@ -313,11 +314,12 @@ public sealed class BashTool : IToolArgumentSchemaAdapter
         if (!value.Truncated) return text;
         var start = value.TotalLines - value.OutputLines + 1;
         var end = value.TotalLines;
+        var note = output.FullOutputError is { } error ? $"Could not save the full output: {error}" : $"Full output: {output.FullOutputPath}";
         return text + (value.LastLinePartial
-            ? $"\n\n[Showing last {Size(value.OutputBytes)} of line {end} (line is {Size(output.LastLineBytes)}). Full output: {output.FullOutputPath}]"
+            ? $"\n\n[Showing last {Size(value.OutputBytes)} of line {start} (line is {Size(output.LastLineBytes)}). {note}]"
             : value.TruncatedBy == ToolOutputTruncationLimit.Lines
-                ? $"\n\n[Showing lines {start}-{end} of {value.TotalLines}. Full output: {output.FullOutputPath}]"
-                : $"\n\n[Showing lines {start}-{end} of {value.TotalLines} ({Size(ToolOutputTruncator.DefaultMaxBytes)} limit). Full output: {output.FullOutputPath}]");
+                ? $"\n\n[Showing lines {start}-{end} of {value.TotalLines}. {note}]"
+                : $"\n\n[Showing lines {start}-{end} of {value.TotalLines} ({Size(ToolOutputTruncator.DefaultMaxBytes)} limit). {note}]");
     }
     private static string Size(int bytes) => bytes < 1024 ? bytes.ToString(CultureInfo.InvariantCulture) + "B" :
         bytes < 1024 * 1024 ? (bytes / 1024d).ToString("F1", CultureInfo.InvariantCulture) + "KB" :
@@ -350,6 +352,7 @@ public sealed class BashTool : IToolArgumentSchemaAdapter
         var structured = new Dictionary<string, object?> { ["output"] = result.StructuredOutput.Content,
             ["truncated"] = result.StructuredOutput.Truncated, ["exit_code"] = code, ["wall_time_seconds"] = result.WallTimeSeconds };
         if (result.StructuredOutput.Truncated && result.Output.FullOutputPath is { } path) structured["full_output_path"] = path;
+        if (result.StructuredOutput.Truncated && result.Output.FullOutputError is { } error) structured["full_output_error"] = error;
         // Source formatOutput: details is undefined (absent from the result) unless the output was truncated.
         var details = Details(result.Output);
         ToolResult final = new([new TextContent(text)], details, IsError: code != 0) { StructuredContent = JsonData.Parse(JsonSerializer.Serialize(structured)) };

@@ -211,11 +211,15 @@ internal static class ToolParityTests
         var wsl = ShellDiscovery.Resolve(null, Host(env, @"C:\Windows\System32\bash.exe"));
         Check(wsl.Shell == @"C:\Windows\System32\bash.exe" && wsl.Arguments.SequenceEqual(["-s"]) && wsl.CommandTransport == ShellCommandTransport.Stdin, "WSL transport differs.");
         Check(wsl.CommandArguments("echo hi").SequenceEqual(["-s"]), "Stdin transport put the command in argv.");
+        var nonstandard = new ShellHost(true, name => name == "PATH" ? @"C:\Windows\System32;D:\tools" : null,
+            path => path is @"D:\tools\git.exe" or @"D:\portable\bin\bash.exe" or @"C:\Windows\System32\bash.exe", @"C:\Users\user")
+        { GetGitShellPath = _ => "D:/portable/usr/bin/sh.exe" };
+        Equal(@"D:\portable\bin\bash.exe", ShellDiscovery.Resolve(host: nonstandard).Shell);
         Check(ShellDiscovery.IsLegacyWslBashPath("c:/windows/sysnative/BASH.EXE") && !ShellDiscovery.IsLegacyWslBashPath(@"C:\Program Files\Git\bin\bash.exe"), "WSL path detection differs.");
         try { ShellDiscovery.Resolve(null, Host(env)); throw new InvalidOperationException("Missing bash resolved."); }
         catch (ShellDiscoveryException error)
         {
-            Equal("No bash shell found. Options:\n  1. Install Git for Windows: https://git-scm.com/download/win\n  2. Add your bash to PATH (Cygwin, MSYS2, etc.)\n  3. Set shellPath in settings.json\n\nSearched Git Bash in:\n  C:\\Program Files\\Git\\bin\\bash.exe\n  C:\\Program Files (x86)\\Git\\bin\\bash.exe", error.Message);
+            Equal("No bash shell found. Options:\n  1. Install Git for Windows: https://git-scm.com/download/win\n  2. Add your bash to PATH (Cygwin, MSYS2, etc.)\n  3. Set shellPath in settings.json\n\nSearched Git Bash in:\n  C:\\Program Files\\Git\\bin\\bash.exe\n  C:\\Program Files (x86)\\Git\\bin\\bash.exe\n  the Git for Windows installation of git.exe on PATH", error.Message);
         }
         Equal(@"D:\tools\bash.exe", ShellDiscovery.Resolve(@"D:\tools\bash.exe", Host(env, @"D:\tools\bash.exe")).Shell);
         try { ShellDiscovery.Resolve("/custom/bash", Host(env)); throw new InvalidOperationException("Missing custom shell resolved."); }

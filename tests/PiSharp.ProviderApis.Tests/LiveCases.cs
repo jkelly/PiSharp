@@ -76,7 +76,7 @@ internal static partial class Program
         var gateway = await Send("cloudflare-ai-gateway", "claude-fable-5");
         Check(gateway.Url == "https://gateway.ai.cloudflare.com/v1/acct/gw/anthropic/v1/messages?beta=true" && gateway.Header("cf-aig-authorization") == "Bearer cf-key" &&
             gateway.Header("x-api-key") is null, "gateway live route (stored key and env)");
-        var workers = await Send("cloudflare-workers-ai", "@cf/deepseek-ai/deepseek-v4-flash-0731", new() { ["CLOUDFLARE_API_KEY"] = "env-key", ["CLOUDFLARE_ACCOUNT_ID"] = "env-acct" });
+        var workers = await Send("cloudflare-workers-ai", "@cf/zai-org/glm-5.3", new() { ["CLOUDFLARE_API_KEY"] = "env-key", ["CLOUDFLARE_ACCOUNT_ID"] = "env-acct" });
         Check(workers.Url == "https://api.cloudflare.com/client/v4/accounts/env-acct/ai/v1/chat/completions" && workers.Header("authorization") == "Bearer env-key", "workers live route");
         var vertex = await Send("google-vertex", "gemini-2.5-flash", new() { ["GOOGLE_CLOUD_API_KEY"] = "vertex-key" });
         Check(vertex.Url == "https://aiplatform.googleapis.com/v1beta1/publishers/google/models/gemini-2.5-flash:streamGenerateContent?alt=sse" &&

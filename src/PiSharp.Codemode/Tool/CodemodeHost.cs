@@ -20,7 +20,14 @@ public interface ICodemodeModelRuntime
     /// <summary><paramref name="model"/> is the registry's own entry, resolved by provider and id.</summary>
     Task<ClassifierResult> ClassifyAsync(JsonData model, ClassifierContext context, CancellationToken cancellationToken);
     Task<AssistantImages> GenerateImagesAsync(JsonData model, ImagesContext context, CancellationToken cancellationToken);
+    /// <summary>Accepts the two model-specific image generation options exposed to scripts.</summary>
+    Task<AssistantImages> GenerateImagesAsync(JsonData model, ImagesContext context, CodemodeImageOptions? options, CancellationToken cancellationToken) =>
+        options is null ? GenerateImagesAsync(model, context, cancellationToken)
+            : throw new NotSupportedException("This model host does not support image generation options.");
 }
+
+/// <summary>Optional provider-specific aspect ratio and size for a script's image request.</summary>
+public sealed record CodemodeImageOptions(string? AspectRatio, string? Size);
 
 /// <summary>The outcome of one nested call through the session's tool pipeline. <paramref name="Result"/> is the tool result
 /// (<c>{ content, details?, structuredContent?, ... }</c>); <see cref="ScriptValue"/> overrides its <c>structuredContent</c>

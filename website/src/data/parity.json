@@ -1,5 +1,13 @@
 {
   "sourceCandidate": {
+    "version": "1.7.0",
+    "commit": "fb0fe823539f6d04850f6e34748c01f01f212e1f",
+    "status": "unreleased-source-candidate",
+    "publishedRelease": "1.6.0.2",
+    "publishedBaseline": "Pi v1.6.0",
+    "historicalAssessmentPreserved": true
+  },
+  "previousSourceAssessment": {
     "version": "1.6.0",
     "commit": "faac585884ae2c013a6b1400f3e9e77f10b34bac",
     "status": "released-with-limitations",

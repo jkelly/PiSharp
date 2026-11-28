@@ -1,4 +1,4 @@
-// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/chord/src/delta/diff.ts (diffRevisions)
+// Pi fb0fe823539f6d04850f6e34748c01f01f212e1f (MIT): packages/chord/src/delta/diff.ts (diffRevisions)
 //
 // Chord v2's copy (area cv2-state; see Ops.cs) of PiSharp.Durable's port of diff.ts, on JsonNode trees. Identity is JavaScript's ===:
 // containers (JsonObject, JsonArray) compare by reference and primitives by value (a string by its UTF-16 code units, a number as a double,
@@ -394,13 +394,48 @@ public static class DeltaDiff
     private static void DiffArray(JsonArray before, JsonArray after, ImmutableArray<PathSegment> path, Batch batch)
     {
         if (ReferenceEquals(before, after) || EqualJson(before, after)) return;
-        if (before.Count == after.Count && before.Count > 1 && !SameValue(before[0], after[0]) && !SameValue(before[^1], after[^1]) &&
-            Permutation(before, after) is { } order)
+        if (before.Count == after.Count && before.Count > 1 && !SameValue(before[0], after[0]) && !SameValue(before[^1], after[^1]))
         {
-            batch.Emit(new MoveOp(path, [.. order]));
-            return;
+            if (Shifted(before, after, path, batch)) return;
+            if (Permutation(before, after) is { } order)
+            {
+                batch.Emit(new MoveOp(path, [.. order]));
+                return;
+            }
         }
         DiffArrayRegion(before, after, path, batch, 0, before.Count, 0, after.Count, 0);
+    }
+
+    // The common window stays in order. Emit only the rows that entered and left it.
+    private static bool Shifted(JsonArray before, JsonArray after, ImmutableArray<PathSegment> path, Batch batch)
+    {
+        var length = before.Count;
+        var down = IndexOf(after, before[0], 1, length);
+        if (down > 0 && IndexOf(before, after[0], length - down, length) < 0 && SameRun(0, down, length - down))
+        {
+            batch.Emit(new SpliceOp(path, 0, 0, Slice(after, 0, down)));
+            batch.Emit(new SpliceOp(path, length, down, []));
+            return true;
+        }
+        var up = IndexOf(before, after[0], 1, length);
+        if (up > 0 && IndexOf(before, after[^1], 0, up) < 0 && SameRun(up, 0, length - up))
+        {
+            batch.Emit(new SpliceOp(path, 0, up, []));
+            batch.Emit(new SpliceOp(path, length - up, 0, Slice(after, length - up, length)));
+            return true;
+        }
+        return false;
+
+        static int IndexOf(JsonArray items, JsonNode? value, int start, int end)
+        {
+            for (var i = start; i < end; i++) if (Strict(items[i], value)) return i;
+            return -1;
+        }
+        bool SameRun(int from, int to, int count)
+        {
+            for (var i = 0; i < count; i++) if (!Strict(before[from + i], after[to + i])) return false;
+            return true;
+        }
     }
 
     private static void DiffObject(JsonObject before, JsonObject after, ImmutableArray<PathSegment> path, Batch batch)

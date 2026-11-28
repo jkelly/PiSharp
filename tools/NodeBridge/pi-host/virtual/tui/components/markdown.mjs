@@ -1,4 +1,4 @@
-// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/tui/src/components/markdown.ts.
+// Pi fb0fe823539f6d04850f6e34748c01f01f212e1f (MIT): packages/tui/src/components/markdown.ts.
 // Ported to plain ESM for the PiSharp Node extension bridge (TypeScript types stripped mechanically; behaviour unchanged).
 import { Marked, Tokenizer } from "../../vendor/marked.mjs";
 import markedCjkFriendly from "../../vendor/marked-cjk-friendly.mjs";
@@ -68,7 +68,7 @@ function tokenizeInlineLatex(source) {
     }
     if (closingIndex < 0) {
         const pendingSource = source.slice(opening.length);
-        if (opening.startsWith("\\") || looksLikePendingDollarMath(pendingSource)) {
+        if (opening.startsWith("\\") || !/^\d/.test(pendingSource) && !pendingSource.includes("\n") && looksLikePendingDollarMath(pendingSource)) {
             return {
                 type: "latex",
                 raw: source,

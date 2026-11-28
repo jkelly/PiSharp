@@ -1,6 +1,7 @@
 // Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/coding-agent/src/utils/shell.ts (getShellConfig, getShellEnv)
 // and utils/paths.ts (normalizePath for the shellPath setting).
 using System.Collections.Immutable;
+using System.Diagnostics;
 using System.Text.RegularExpressions;
 
 namespace PiSharp.Tools.Processes;
@@ -38,7 +39,32 @@ public sealed record ShellHost(bool IsWindows, Func<string, string?> GetEnvironm
     string HomeDirectory)
 {
     public static ShellHost Current { get; } = new(OperatingSystem.IsWindows(), Environment.GetEnvironmentVariable, File.Exists,
-        Environment.GetFolderPath(Environment.SpecialFolder.UserProfile));
+        Environment.GetFolderPath(Environment.SpecialFolder.UserProfile)) { GetGitShellPath = QueryGitShell };
+
+    public Func<string, string?>? GetGitShellPath { get; init; }
+
+    private static string? QueryGitShell(string git)
+    {
+        try
+        {
+            using var process = Process.Start(new ProcessStartInfo(git)
+            {
+                UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true,
+                ArgumentList = { "var", "GIT_SHELL_PATH" }
+            });
+            if (process is null) return null;
+            var output = process.StandardOutput.ReadToEndAsync();
+            var error = process.StandardError.ReadToEndAsync();
+            if (!Task.WhenAll(process.WaitForExitAsync(), output, error).Wait(TimeSpan.FromSeconds(5)))
+            {
+                if (!process.HasExited) process.Kill(entireProcessTree: true);
+                return null;
+            }
+            return process.ExitCode == 0 ? output.Result.Trim() : null;
+        }
+        catch (Exception error) when (error is System.ComponentModel.Win32Exception or InvalidOperationException or IOException or AggregateException)
+        { return null; }
+    }
 
     /// <summary>Source existsSync also accepts a directory as the custom shell path (spawn then refuses it). Null (the default, also for
     /// <see cref="Current"/>): a directory is not found; the pi policy then retries with it set and spawns the directory, as upstream does.</summary>
@@ -108,12 +134,19 @@ public static class ShellDiscovery
             if (host.GetEnvironmentVariable("ProgramFiles") is { Length: > 0 } programFiles) paths.Add($"{programFiles}\\Git\\bin\\bash.exe");
             if (host.GetEnvironmentVariable("ProgramFiles(x86)") is { Length: > 0 } programFilesX86) paths.Add($"{programFilesX86}\\Git\\bin\\bash.exe");
             foreach (var path in paths) if (host.FileExists(path)) return ForBash(path, host);
+            const string gitShellSuffix = @"\usr\bin\sh.exe";
+            if (FindExecutableOnPath("git.exe", host) is { } git && host.GetGitShellPath?.Invoke(git) is { } shell &&
+                Win32Normalize(shell) is { } normalized && normalized.EndsWith(gitShellSuffix, StringComparison.OrdinalIgnoreCase))
+            {
+                var launcher = normalized[..^gitShellSuffix.Length] + @"\bin\bash.exe";
+                if (host.FileExists(launcher)) return ForBash(launcher, host);
+            }
             if (FindExecutableOnPath("bash.exe", host) is { } onPath) return ForBash(onPath, host);
             throw new ShellDiscoveryException("No bash shell found. Options:\n" +
                 "  1. Install Git for Windows: https://git-scm.com/download/win\n" +
                 "  2. Add your bash to PATH (Cygwin, MSYS2, etc.)\n" +
                 "  3. Set shellPath in settings.json\n\n" +
-                "Searched Git Bash in:\n" + string.Join("\n", paths.Select(path => "  " + path)));
+                "Searched Git Bash in:\n" + string.Join("\n", paths.Select(path => "  " + path)) + "\n  the Git for Windows installation of git.exe on PATH");
         }
         if (host.FileExists("/bin/bash")) return ForBash("/bin/bash", host);
         if (FindExecutableOnPath("bash", host) is { } bash) return ForBash(bash, host);

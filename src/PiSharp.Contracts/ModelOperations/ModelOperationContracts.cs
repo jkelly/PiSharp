@@ -68,6 +68,7 @@ public sealed record ClassifierBoolAnswer(double Probability) : ClassifierAnswer
 public sealed record ClassifierResult(string Api, string Provider, string Model,
     ImmutableArray<KeyValuePair<string, ClassifierAnswer>> Answers, ModelOperationStopReason StopReason, long Timestamp)
 {
+    public string? ResponseId { get; init; }
     public TokenUsage? Usage { get; init; }
     public string? ErrorMessage { get; init; }
 

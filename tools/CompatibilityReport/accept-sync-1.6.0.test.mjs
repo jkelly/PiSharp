@@ -247,7 +247,9 @@ test('the committed policy maps every 1.6.0 work package to existing suites and 
 // Until root applies an acceptance, the candidate is an unreleased source candidate whose integrated validation is pending.
 test('the 1.6.0 candidate records match the acceptance state', () => {
   const policy = repoJson(SYNC.policy), table = repoJson(SYNC.table), candidate = repoJson(SYNC.implementationStatus)[SYNC.candidateKey];
-  const pointer = repoJson(SYNC.map).currentImplementation.candidate;
+  const implementation = repoJson(SYNC.map).currentImplementation;
+  const pointer = [implementation.candidate, ...implementation.previousCandidates].find(entry => entry.source.commit === policy.sourceCommit);
+  assert(pointer, 'the Durable map retains the 1.6.0 acceptance pointer');
   assert.deepEqual([candidate.sourceVersion, candidate.sourceCommit, candidate.released], [policy.version, policy.sourceCommit, false]);
   assert.deepEqual([candidate.applicability, candidate.durableOverlay, candidate.decision], [SYNC.table, SYNC.overlay, SYNC.decision]);
   if (!existsSync(resolve(repo, SYNC.record))) {

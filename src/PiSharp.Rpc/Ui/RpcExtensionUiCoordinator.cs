@@ -324,7 +324,7 @@ public sealed class RpcExtensionUiCoordinator : IExtensionUiProvider, IAsyncDisp
             if (coordinator is null) return Task.FromResult(Unavailable(ExtensionUiUnavailableReason.StaleContext));
             try
             {
-                var record = RpcExtensionUiCodec.Dialog(coordinator.NextId(), feature, title, extra, choices, timing, coordinator.requestLimits);
+                var record = RpcExtensionUiCodec.Dialog(coordinator.NextId(), feature, title, extra, choices, timing, coordinator.requestLimits, coordinator.presentation is not null);
                 return coordinator.RequestAsync(this, feature, record, timing?.TimeoutMilliseconds, token, dialog: true);
             }
             catch (RpcDispatchException error) when (error.Failure == RpcDispatchFailure.ResourceLimit)

@@ -85,6 +85,7 @@ internal static class InteractiveHostServices
                 }
                 catch (OperationCanceledException) { return new ModelsRefreshResult(true, []); }
             },
+            GetStoredProviderStatus = provider => registry?.GetProviderAuthStatus(provider),
             GetModelsJsonError = () => registry?.GetError(),
             IsBuiltinExtensionLoaded = options.BuiltinExtensions.IsEnabled,
             // extensions/llama/index.ts: getProviderAuth("llama.cpp"), and syncCatalog's setCatalog plus a live refresh of llama.cpp

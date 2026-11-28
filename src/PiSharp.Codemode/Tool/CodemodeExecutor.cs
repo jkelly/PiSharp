@@ -1,4 +1,4 @@
-// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/coding-agent/src/extensions/codemode/execute.ts.
+// Pi fb0fe823539f6d04850f6e34748c01f01f212e1f (MIT): packages/coding-agent/src/extensions/codemode/execute.ts.
 using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Globalization;
@@ -597,6 +597,27 @@ public static class CodemodeExecutor
         catch (FormatException error) { throw Fail(error.Message.TrimEnd('.')); }
     }
 
+    private static CodemodeImageOptions? CheckImageOptions(JsonElement options)
+    {
+        if (Missing(options)) return null;
+        Exception Fail(string problem) => new InvalidOperationException(
+            $"models.generateImages() {problem}. Expected options: {{ aspectRatio?, size? }}. See \"Generate images\" in {CodemodeToolDefinition.DocsPath}.");
+        if (!IsRecord(options)) throw Fail($"expects an options object as its third argument, got {DescribeValue(options)}");
+        foreach (var field in options.EnumerateObject())
+            if (field.Name is not ("aspectRatio" or "size")) throw Fail($"does not accept options.{field.Name}");
+
+        string? Read(string key)
+        {
+            if (!options.TryGetProperty(key, out var value)) return null;
+            if (value.ValueKind == JsonValueKind.String && Js.Trim(value.GetString()!) is { Length: > 0 } text) return text;
+            throw Fail($"options.{key} must be a non-empty string, got {DescribeValue(value)}");
+        }
+
+        var ratio = Read("aspectRatio");
+        var size = Read("size");
+        return ratio is null && size is null ? null : new(ratio, size);
+    }
+
     /// <summary>Runs at most <paramref name="limit"/> calls at once, in call order.</summary>
     private sealed class Limiter(int limit)
     {
@@ -694,12 +715,16 @@ public static class CodemodeExecutor
                 var result = await models.ClassifyAsync(resolved, context, token).ConfigureAwait(false);
                 return (ModelOperationJson.WriteClassifierResult(result), result.StopReason, result.ErrorMessage, result.Usage);
             }).ConfigureAwait(false)) { Spread = true };
-        yield return new("models.generateImages", async (arguments, token) => await RunModelCall("models.generateImages", ModelType.Image, Spread(arguments),
-            CheckImagesContext, async (resolved, context) =>
-            {
-                var result = await models.GenerateImagesAsync(resolved, context, token).ConfigureAwait(false);
-                addGeneratedImages(result.Output.IsDefault ? 0 : result.Output.Count(block => block is ImageContent));
-                return (ModelOperationJson.WriteAssistantImages(result), result.StopReason, result.ErrorMessage, result.Usage);
-            }).ConfigureAwait(false)) { Spread = true };
+        yield return new("models.generateImages", async (arguments, token) =>
+        {
+            var args = Spread(arguments);
+            return await RunModelCall("models.generateImages", ModelType.Image, args,
+                context => (Context: CheckImagesContext(context), Options: CheckImageOptions(At(args, 2))), async (resolved, request) =>
+                {
+                    var result = await models.GenerateImagesAsync(resolved, request.Context, request.Options, token).ConfigureAwait(false);
+                    addGeneratedImages(result.Output.IsDefault ? 0 : result.Output.Count(block => block is ImageContent));
+                    return (ModelOperationJson.WriteAssistantImages(result), result.StopReason, result.ErrorMessage, result.Usage);
+                }).ConfigureAwait(false);
+        }) { Spread = true };
     }
 }

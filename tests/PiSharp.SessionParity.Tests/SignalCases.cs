@@ -9,6 +9,18 @@ internal static partial class Program
     private static IEnumerable<(string, Func<Task>)> SignalCases() =>
     [
         Case("signals.exit-codes-first-signal-wins-and-cancellation", SignalExitCodes),
+        Case("signals.windows-console-close-waits-for-owned-cleanup", async () =>
+        {
+            using var signals = new ShutdownSignals(register: false);
+            var cancelled = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            using var registration = signals.Token.Register(() => cancelled.TrySetResult());
+            var handler = Task.Run(() => signals.HandleConsoleClose(PosixSignal.SIGHUP));
+            await cancelled.Task.WaitAsync(TimeSpan.FromSeconds(3));
+            Check(!handler.IsCompleted, "Console close returned before shutdown cleanup.");
+            signals.HostFinished();
+            await handler.WaitAsync(TimeSpan.FromSeconds(3));
+            Equal(129, signals.Exit(0), "closed console exit code");
+        }),
         Case("signals.sigterm-shuts-the-rpc-host-down-gracefully-with-143", SignalRpcHost),
     ];
 

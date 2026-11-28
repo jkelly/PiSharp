@@ -3,7 +3,7 @@ title: Command line
 description: Every pisharp option, mode and subcommand, with exit codes.
 ---
 
-`pisharp` takes the same command line as Pi v1.5.0, plus a few PiSharp options and commands. Pi's [Command Line](https://github.com/earendil-works/pi/blob/v1.5.0/packages/coding-agent/docs/cli.md) reference applies. This page lists every option the PiSharp parser accepts, checked against the source of `pisharp --help` and the parser itself.
+The published PiSharp CLI follows Pi 1.6.0 and adds commands for Durable and explicit session management. Use `pisharp --help` to check the options available in your build. See [Pi’s CLI reference](https://github.com/earendil-works/pi/blob/v1.6.0/packages/coding-agent/docs/cli.md).
 
 ```sh
 pisharp [options] [--] [@files...] [messages...]
@@ -46,11 +46,11 @@ Piped stdin is added in front of the first prompt. `@path` arguments add a text 
 | `--models <patterns>` | Comma-separated model patterns for `Ctrl+P` cycling. Globs (`anthropic/*`, `*sonnet*`), fuzzy matches and `:<thinking>` suffixes work. A model that several providers offer is added once for each, with a warning. |
 | `--thinking <level>` | `off`, `minimal`, `low`, `medium`, `high`, `xhigh` or `max`. An unknown level is a warning, not an error. |
 | `--api-key <key>` | API key for this run, instead of the environment or `auth.json`. Requires a model from `--model` or `--models`. It doesn't choose between providers that offer the same model. |
-| `--tier <tier>`, `--service-tier <tier>` | Service tier: `auto`, `normal`, `economy`, `priority`, `fast` or `ultrafast` (experimental). See below. |
+| `--tier <tier>`, `--service-tier <tier>` | Service tier: `auto`, `normal`, `economy`, `priority`, `fast` or `ultrafast`. See below. |
 | `--list-models [search]` | Lists the models you can use, with an optional fuzzy search, then exits. The search can't start with `-` or `@`. |
 
-:::caution[Service tiers are experimental]
-`--tier` is experimental, from PiSharp 1.2.0.2. It sets the session's tier for every request; `/tier` changes it later and `serviceTier` in settings sets a default. Names are case-insensitive and some aliases work: `default`, `standard`, `off` and `none` mean `normal`; `flex`, `cheap` and `eco` mean `economy`; `prio` means `priority`; `speed` means `fast`; `ultra`, `super`, `superspeed`, `super-speed` and `turbo` mean `ultrafast`. An unknown tier is a warning. See [Service tiers](/docs/guides/service-tiers/).
+:::note[Service tiers]
+The service tier API is stable from PiSharp 1.6.0.1. It sets the session's tier for every request; `/tier` changes it later and `serviceTier` in settings sets a default. Names are case-insensitive and some aliases work: `default`, `standard`, `off` and `none` mean `normal`; `flex`, `cheap` and `eco` mean `economy`; `prio` means `priority`; `speed` means `fast`; `ultra`, `super`, `superspeed`, `super-speed` and `turbo` mean `ultrafast`. An unknown tier is a warning. See [Service tiers](/docs/guides/service-tiers/).
 :::
 
 ## Prompt and input
@@ -78,6 +78,7 @@ pisharp -p -- "- Summarize these points"
 | `--session <path\|id>` | Opens a session file, or a session by id or id prefix. |
 | `--session-id <id>` | Opens the project session with this exact id, or creates it. |
 | `--fork <path\|id>` | Copies a session into a new one and opens the copy. |
+| `--agent-dir <dir>` *(1.7.0 candidate)* | Selects the agent profile for the run and overrides `PI_CODING_AGENT_DIR`. Supports separate settings, credentials and default session storage. |
 | `--session-dir <dir>` | Folder for session storage and lookup. |
 | `--no-session` | Keeps the session in memory only. |
 | `-n`, `--name <name>` | Sets the session's display name. An empty name is an error. |
@@ -363,7 +364,7 @@ The device commands exit with 0 on success, 1 when they fail, 2 on a usage error
 | | 1 | An error: bad options, a failed start, a failed export. |
 | | 130 | Cancelled with `Ctrl+C`. |
 | Print, JSON and RPC modes | 143 | Ended by SIGTERM. |
-| | 129 | Ended by SIGHUP (not on Windows). |
+| | 129 | Print or RPC mode ended by SIGHUP (on Windows, a console close). |
 | Print mode | 1 | The last answer stopped with an error or was aborted (the error goes to stderr), or it hit the output token limit (`Response was truncated: the model reached its output token limit.`). |
 | `auth check` | 0, 1, 2 | Ready, not ready, invalid or error. |
 | `mcp list` | 1 | A server failed. |

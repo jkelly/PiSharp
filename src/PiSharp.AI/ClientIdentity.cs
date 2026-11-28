@@ -62,7 +62,7 @@ public sealed record ClientIdentity
 public static class ClientIdentities
 {
     /// <summary>version.ts <c>PI_AI_VERSION</c>: decision 0015 has PiSharp identify as the Pi release it tracks.</summary>
-    public const string PiVersion = "1.6.0";
+    public const string PiVersion = "1.7.0";
 
     private const string NvidiaNimHost = "integrate.api.nvidia.com";
     private const string OpenCodeHost = "opencode.ai";

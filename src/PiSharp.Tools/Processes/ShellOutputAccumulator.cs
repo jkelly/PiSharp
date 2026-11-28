@@ -22,12 +22,13 @@ internal sealed class ShellOutputAccumulator : IAsyncDisposable
     private bool _openLine, _lineBoundary = true, _initialText = true, _finished, _outputIoFailed;
     private string _text = string.Empty;
     private Stream? _spill;
-    private string? _createdPath;
+    private readonly bool _allowSpillFailure;
+    private string? _createdPath, _spillError;
     private Task? _close;
 
-    public ShellOutputAccumulator(string spillPath, ProcessRunnerOptions options, IProcessOutputStorage storage)
+    public ShellOutputAccumulator(string spillPath, ProcessRunnerOptions options, IProcessOutputStorage storage, bool allowSpillFailure = false)
     {
-        _spillPath = spillPath; _options = options; _storage = storage;
+        _allowSpillFailure = allowSpillFailure; _spillPath = spillPath; _options = options; _storage = storage;
         _head = new byte[options.StructuredMaxBytes / 2];
         _tail = new byte[options.StructuredMaxBytes - _head.Length];
     }
@@ -44,13 +45,15 @@ internal sealed class ShellOutputAccumulator : IAsyncDisposable
             Decode(admitted.Span, flush: false);
             try
             {
-                if (_spill is not null || NeedsSpill())
+                if (_spillError is null && (_spill is not null || NeedsSpill()))
                 {
                     await EnsureSpillAsync().ConfigureAwait(false);
                     await _spill!.WriteAsync(admitted, CancellationToken.None).ConfigureAwait(false);
                 }
-                else await _prefix.WriteAsync(admitted, CancellationToken.None).ConfigureAwait(false);
+                else if (_spillError is null) await _prefix.WriteAsync(admitted, CancellationToken.None).ConfigureAwait(false);
             }
+            catch (Exception error) when (_allowSpillFailure && error is IOException or UnauthorizedAccessException)
+            { _spillError = error.Message; }
             catch { _outputIoFailed = true; throw; }
         }
         if (admitted.Length != bytes.Length) throw new ProcessOutputLimitException();
@@ -61,11 +64,16 @@ internal sealed class ShellOutputAccumulator : IAsyncDisposable
         if (_finished) return;
         _finished = true;
         Decode([], flush: true);
-        if (!_outputIoFailed && NeedsSpill()) await EnsureSpillAsync().ConfigureAwait(false);
-        if (_spill is not null) await _spill.FlushAsync(CancellationToken.None).ConfigureAwait(false);
+        try
+        {
+            if (!_outputIoFailed && _spillError is null && NeedsSpill()) await EnsureSpillAsync().ConfigureAwait(false);
+            if (_spillError is null && _spill is not null) await _spill.FlushAsync(CancellationToken.None).ConfigureAwait(false);
+        }
+        catch (Exception error) when (_allowSpillFailure && error is IOException or UnauthorizedAccessException)
+        { _spillError = error.Message; }
     }
 
-    public ProcessOutputSnapshot Snapshot()
+    private string RetainedText()
     {
         var content = _text;
         if (!_lineBoundary)
@@ -74,9 +82,14 @@ internal sealed class ShellOutputAccumulator : IAsyncDisposable
             if (newline >= 0) content = content[(newline + 1)..];
             // Clipping drops the partial first line of the retained tail. When the tail is only the end of one over-long line, that
             // is everything, so show the end of that line instead (#12062).
-            if (content.Length == 0) content = _text;
+            if (string.IsNullOrWhiteSpace(content)) content = _text;
         }
-        var tail = ToolOutputTruncator.Tail(content, new(_options.ModelMaxLines, _options.ModelMaxBytes));
+        return content;
+    }
+
+    public ProcessOutputSnapshot Snapshot()
+    {
+        var tail = ToolOutputTruncator.Tail(RetainedText(), new(_options.ModelMaxLines, _options.ModelMaxBytes));
         var truncated = _totalLines > _options.ModelMaxLines || _decodedBytes > _options.ModelMaxBytes;
         tail = tail with
         {
@@ -85,11 +98,21 @@ internal sealed class ShellOutputAccumulator : IAsyncDisposable
                 ? ToolOutputTruncationLimit.Bytes : ToolOutputTruncationLimit.Lines) : null,
             TotalLines = _totalLines, TotalBytes = _decodedBytes
         };
-        return new(tail.Content, tail, _rawBytes, _lastLineBytes, _createdPath);
+        return new(tail.Content, tail, _rawBytes, _lastLineBytes, _spillError is null ? _createdPath : null) { FullOutputError = _spillError };
     }
 
     public ProcessStructuredOutput Structured()
     {
+        if (_spillError is not null)
+        {
+            var bytes = Utf8.GetBytes(RetainedText());
+            var tailStart = Math.Max(0, bytes.Length - _options.StructuredMaxBytes);
+            while (tailStart < bytes.Length && (bytes[tailStart] & 0xc0) == 0x80) tailStart++;
+            var content = Utf8.GetString(bytes.AsSpan(tailStart));
+            var missingBytes = _decodedBytes - (bytes.Length - tailStart);
+            return missingBytes == 0 ? new(content, false)
+                : new($"[... {missingBytes.ToString(System.Globalization.CultureInfo.InvariantCulture)} bytes omitted ...]\n\n{content}", true);
+        }
         var tail = TailBytes();
         if (_rawBytes <= _options.StructuredMaxBytes)
         {
@@ -186,7 +209,15 @@ internal sealed class ShellOutputAccumulator : IAsyncDisposable
     private async Task CloseAsync()
     {
         try { if (_spill is not null) await _spill.DisposeAsync().ConfigureAwait(false); }
-        finally { _spill = null; _prefix.Dispose(); }
+        catch (Exception error) when (_allowSpillFailure && error is IOException or UnauthorizedAccessException)
+        { _spillError ??= error.Message; }
+        finally
+        {
+            _spill = null;
+            _prefix.Dispose();
+            if (_spillError is not null && _createdPath is not null && _storage is LocalProcessOutputStorage)
+                LocalProcessOutputStorage.RemoveIncomplete(_createdPath);
+        }
     }
     private static string DecodeWhole(ReadOnlySpan<byte> bytes) => StripBom(Utf8.GetString(bytes));
     private static string StripBom(string text) => text.StartsWith('\ufeff') ? text[1..] : text;

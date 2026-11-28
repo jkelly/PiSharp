@@ -1,4 +1,4 @@
-// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/chord/src/sync/filesystem.ts.
+// Pi fb0fe823539f6d04850f6e34748c01f01f212e1f (MIT): packages/chord/src/sync/filesystem.ts.
 using System.Globalization;
 using System.Runtime.CompilerServices;
 using System.Text;
@@ -22,7 +22,46 @@ public static class SyncPaths
 /// one process must own writing this directory. Cross-process compare-and-swap is not supported.</summary>
 public sealed class FileSystemSyncRemote(ISyncFileSystem fs, string root) : ISessionSyncMaintenance
 {
-    private static readonly SemaphoreSlim Writers = new(1, 1);
+    // Keep existing cross-instance serialization for one session and release unused gates.
+    private sealed class SessionWriter
+    {
+        public readonly SemaphoreSlim Semaphore = new(1, 1);
+        public int Users;
+    }
+    private static readonly Dictionary<string, SessionWriter> Writers = new(StringComparer.OrdinalIgnoreCase);
+
+    private static async Task<IDisposable> EnterWriterAsync(string id, ChordContext context)
+    {
+        SessionWriter writer;
+        lock (Writers)
+        {
+            if (!Writers.TryGetValue(id, out writer!)) Writers[id] = writer = new();
+            writer.Users++;
+        }
+        try { await writer.Semaphore.WaitAsync(context.AbortSignal ?? CancellationToken.None).ConfigureAwait(false); }
+        catch { ReleaseWriter(id, writer); throw; }
+        return new WriterLease(id, writer);
+    }
+
+    private static void ReleaseWriter(string id, SessionWriter writer)
+    {
+        lock (Writers)
+        {
+            if (--writer.Users == 0)
+            {
+                Writers.Remove(id);
+                writer.Semaphore.Dispose();
+            }
+        }
+    }
+    private sealed class WriterLease(string id, SessionWriter writer) : IDisposable
+    {
+        public void Dispose()
+        {
+            writer.Semaphore.Release();
+            ReleaseWriter(id, writer);
+        }
+    }
     private static readonly Regex SlotName = new(@"\A([0-9]{16})\.json\z", RegexOptions.CultureInvariant);
     private static readonly Regex SnapshotName = new(@"\A([0-9]{16})\.batch\z", RegexOptions.CultureInvariant);
 
@@ -31,19 +70,16 @@ public sealed class FileSystemSyncRemote(ISyncFileSystem fs, string root) : ISes
     {
         SyncPaths.CheckSessionId(sessionId);
         Pad(after); Pad(to);
-        await Writers.WaitAsync(context.AbortSignal ?? CancellationToken.None).ConfigureAwait(false);
-        try
-        {
-            var existing = await SlotAsync(sessionId, after, context).ConfigureAwait(false);
-            if (existing is not null) return new PutBatchResult.Exists(existing.To, existing.Device);
-            var head = SyncRemote.Head(await ListAsync(sessionId, context).ConfigureAwait(false));
-            if (after != head) return new PutBatchResult.NotHead(head);
-            await WriteAsync(sessionId, "batches", Pad(after) + ".batch", body, context).ConfigureAwait(false);
-            // The body is complete before this slot makes it visible to remote readers.
-            await WriteSlotAsync(sessionId, new(after, to, device, Archive: options?.Archive == true), context).ConfigureAwait(false);
-            return new PutBatchResult.Created();
-        }
-        finally { Writers.Release(); }
+        using var writer = await EnterWriterAsync(sessionId, context).ConfigureAwait(false);
+        var existing = await SlotAsync(sessionId, after, context).ConfigureAwait(false);
+        if (existing is not null) return new PutBatchResult.Exists(existing.To, existing.Device);
+        var head = await HeadAsync(sessionId, context).ConfigureAwait(false);
+        if (after != head) return new PutBatchResult.NotHead(head);
+        await WriteAsync(sessionId, "batches", Pad(after) + ".batch", body, context).ConfigureAwait(false);
+        // The body is complete before this slot makes it visible to remote readers.
+        await WriteSlotAsync(sessionId, new(after, to, device, Archive: options?.Archive == true), context).ConfigureAwait(false);
+        await WriteAsync(sessionId, null, "head.json", JsonBody(new() { ["head"] = to }), context).ConfigureAwait(false);
+        return new PutBatchResult.Created();
     }
 
     public async Task<IAsyncEnumerable<ReadOnlyMemory<byte>>?> GetBatchAsync(string sessionId, long after, ChordContext context)
@@ -59,19 +95,15 @@ public sealed class FileSystemSyncRemote(ISyncFileSystem fs, string root) : ISes
     public async Task FoldBatchesAsync(string sessionId, IReadOnlyList<long> afters, ChordContext context)
     {
         SyncPaths.CheckSessionId(sessionId);
-        await Writers.WaitAsync(context.AbortSignal ?? CancellationToken.None).ConfigureAwait(false);
-        try
+        using var writer = await EnterWriterAsync(sessionId, context).ConfigureAwait(false);
+        foreach (var after in afters)
         {
-            foreach (var after in afters)
-            {
-                var slot = await SlotAsync(sessionId, after, context).ConfigureAwait(false);
-                if (slot is null || slot.Folded) continue;
-                await WriteSlotAsync(sessionId, slot with { Folded = true }, context).ConfigureAwait(false);
-                var path = await PathAsync(sessionId, context, "batches", Pad(after) + ".batch").ConfigureAwait(false);
-                (await fs.RemoveAsync(path, new(Force: true), context).ConfigureAwait(false)).Unwrap();
-            }
+            var slot = await SlotAsync(sessionId, after, context).ConfigureAwait(false);
+            if (slot is null || slot.Folded) continue;
+            await WriteSlotAsync(sessionId, slot with { Folded = true }, context).ConfigureAwait(false);
+            var path = await PathAsync(sessionId, context, "batches", Pad(after) + ".batch").ConfigureAwait(false);
+            (await fs.RemoveAsync(path, new(Force: true), context).ConfigureAwait(false)).Unwrap();
         }
-        finally { Writers.Release(); }
     }
 
     public async Task DeleteSnapshotsAsync(string sessionId, IReadOnlyList<long> snapshots, ChordContext context)
@@ -107,7 +139,7 @@ public sealed class FileSystemSyncRemote(ISyncFileSystem fs, string root) : ISes
         var sessions = new List<SessionSummary>();
         foreach (var id in result.Unwrap().Where(info => info.Kind == "directory" && IsSessionId(info.Name))
                      .Select(info => info.Name).Order(StringComparer.Ordinal))
-            sessions.Add(new(id, SyncRemote.Head(await ListAsync(id, context).ConfigureAwait(false)),
+            sessions.Add(new(id, await HeadAsync(id, context).ConfigureAwait(false),
                 await GetMetaAsync(id, context).ConfigureAwait(false)));
         return new(sessions, "", false);
     }
@@ -118,6 +150,19 @@ public sealed class FileSystemSyncRemote(ISyncFileSystem fs, string root) : ISes
     {
         var bytes = await ReadAsync(sessionId, context, "meta.json").ConfigureAwait(false);
         return bytes is null ? null : JsonNode.Parse(bytes.Value.Span)?.AsObject();
+    }
+
+    private async Task<long> HeadAsync(string sessionId, ChordContext context)
+    {
+        var bytes = await ReadAsync(sessionId, context, "head.json").ConfigureAwait(false);
+        var head = bytes is null ? SyncRemote.LogStart : JsonNode.Parse(bytes.Value.Span)!["head"]!.GetValue<long>();
+        // Older stores have no head file. A crash can leave the last slot ahead of it.
+        while (await SlotAsync(sessionId, head, context).ConfigureAwait(false) is { } next)
+        {
+            if (next.To <= head) throw new InvalidDataException("Remote history does not increase the sequence");
+            head = next.To;
+        }
+        return head;
     }
 
     private async Task<BatchInfo?> SlotAsync(string sessionId, long after, ChordContext context)

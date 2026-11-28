@@ -133,6 +133,8 @@ internal static partial class Program
                 {"data":[
                 {"id":"gpt-5.5","model_picker_enabled":true,"policy":{"state":"enabled"}},
                 {"id":"claude-sonnet-4.6","model_picker_enabled":true,"policy":{"state":"unconfigured"}},
+                {"id":"gpt-6-luna-decisions","capabilities":{"type":"decisions"}},
+                {"id":"unavailable-decision","capabilities":{"type":"decisions"},"policy":{"state":"disabled"}},
                 {"id":"embedding","model_picker_enabled":true,"capabilities":{"supports":{"tool_calls":false}}},
                 {"id":"hidden","model_picker_enabled":false,"policy":{"state":"enabled"}},
                 {"id":"off","model_picker_enabled":true,"policy":{"state":"disabled"}}]}
@@ -146,6 +148,7 @@ internal static partial class Program
         Check(credential.Refresh == "ghu_token" && credential.ProviderData["enterpriseUrl"] == "ghe.example.com" &&
             credential.ExpiresUnixMilliseconds == (now + 1800) * 1000 - 300_000, "copilot credential");
         Equal("""["gpt-5.5","claude-sonnet-4.6"]""", credential.ProviderJson["availableModelIds"].ToString(), "available models (picker plus enabled policy)");
+        Equal("""["gpt-6-luna-decisions"]""", credential.ProviderJson["availableClassifierModelIds"].ToString(), "account classifier IDs");
         var token = http.All.Single(request => request.Url.EndsWith("/copilot_internal/v2/token", StringComparison.Ordinal));
         Check(token.Header("authorization") == "Bearer ghu_token" && token.Header("user-agent") == "GitHubCopilotChat/0.35.0" &&
             token.Header("editor-version") == "vscode/1.107.0" && token.Header("copilot-integration-id") == "vscode-chat", "copilot token headers");

@@ -27,7 +27,7 @@ internal static partial class Program
         cases.AddRange(LlamaCases()); cases.AddRange(ImagesCases()); cases.AddRange(RegistryCases()); cases.AddRange(JsonCases());
         cases.AddRange(ExtensionCases());
         cases.AddRange(Sync150Cases());
-        cases.AddRange(Sync160LlamaCases());
+        cases.AddRange(Sync160LlamaCases()); cases.AddRange(Sync170Cases());
         var results = new List<object>(); var failures = 0;
         foreach (var test in cases)
         {

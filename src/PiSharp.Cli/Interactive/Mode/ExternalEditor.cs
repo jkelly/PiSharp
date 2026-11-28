@@ -36,10 +36,11 @@ internal static class ExternalEditor
         ExternalEditorProcessRunner? processRunner = null, TextWriter? output = null)
     {
         // mkdtempSync(join(tmpdir(), "pi-editor-")): CreateTempSubdirectory creates it with mode 0700 on Unix.
-        var directory = Directory.CreateTempSubdirectory("pi-editor-").FullName;
-        var filePath = Path.Join(directory, "prompt.md");
+        string? directory = null;
         try
         {
+            directory = Directory.CreateTempSubdirectory("pi-editor-").FullName;
+            var filePath = Path.Join(directory, "prompt.md");
             await File.WriteAllTextAsync(filePath, options.Content, new UTF8Encoding(false)).ConfigureAwait(false);
             var parts = options.Command.Split(' ');
             var editor = parts[0];
@@ -62,9 +63,13 @@ internal static class ExternalEditor
             var content = StripBom(await File.ReadAllTextAsync(filePath, new UTF8Encoding(false)).ConfigureAwait(false));
             return ExternalEditorResult.Complete(content.EndsWith('\n') ? content[..^1] : content);
         }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+        {
+            return ExternalEditorResult.Failed($"External editor failed: {error.Message}; prompt unchanged");
+        }
         finally
         {
-            try { Directory.Delete(directory, recursive: true); }
+            try { if (directory is not null) Directory.Delete(directory, recursive: true); }
             catch (Exception)
             {
                 // Cleanup is best effort.

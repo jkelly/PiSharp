@@ -126,6 +126,12 @@ internal static class SessionContextInfluenceProjector
             throw Failure(SessionContextProjectionFailure.UnsupportedMessage);
         if (body.GetProperty("truncated").GetBoolean() && path.ValueKind == JsonValueKind.String && path.GetString()!.Length != 0)
             text.Append("\n\n[Output truncated. Full output: ").Append(path.GetString()).Append(']');
+        else if (body.GetProperty("truncated").GetBoolean())
+        {
+            if (body.TryGetProperty("fullOutputError", out var error) && error.ValueKind == JsonValueKind.String && error.GetString() is { Length: > 0 } reason)
+                text.Append("\n\n[Output truncated. Could not save the full output: ").Append(reason).Append(']');
+            else text.Append("\n\n[Output truncated]");
+        }
         return text.ToString();
     }
 

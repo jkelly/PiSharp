@@ -1,0 +1,64 @@
+{
+  "provider-catalog": {
+    "Models": ["sync170.catalog.exact-current-package-resources", "catalog-f09.default-map-exact-upstream"]
+  },
+  "image-and-decision": {
+    "Classifiers": ["sync170.pi-image.wire-retry-and-usage", "sync170.pi-decision.validates-answers-and-preserves-billing", "sync170.openrouter-image.options-native-error-and-usage"],
+    "Codemode": ["executor.models-bridge-usage-concurrency-and-errors"]
+  },
+  "chat-providers": {
+    "ProviderApis": ["bedrock.adaptive-opus-gpt-oss-gpt-and-govcloud-request-fields", "live.long-transcript-2000-messages-with-loadout-records-every-family"],
+    "ProviderSync": ["errors.in-stream-error-texts-google-and-vertex", "errors.in-stream-error-texts-completions-anthropic", "sync150.google-gemini-4-and-later-thinking-level"],
+    "Compatibility": ["Completions 1.7 opaque reasoning and gateway finish metadata"]
+  },
+  "stream-and-retry": {
+    "ProviderSync": ["sync150.retry-gateway-service-unavailable-node-fetch-and-codex-disconnect", "retry.google-unusable-delays-backoff-and-no-retry-statuses"],
+    "MistralConversations": ["mistral buffered framing matches fragmented reads and keeps frame limits", "http-error-response-hook-before-body-and-source-truncation"]
+  },
+  "model-runtime": {
+    "Models": ["sync170.radius.discovers-and-restores-image-and-classifier", "schemas.models-170-compatibility-and-pricing"]
+  },
+  "extension-runtime": {
+    "NodeRuntime": ["sameModels", "sameTui"],
+    "ExtensionParity": ["provider.classifier-and-image-providers-registered-by-an-extension", "sync150.bridge-stream-proxy-parses-tool-call-arguments-incrementally"]
+  },
+  "interactive-cli": {
+    "InteractiveParity": ["sync170.console-cancellation-restores-fullscreen-terminal", "sync170.extension-dialog-blocked-kind-and-first-line-select", "sync170.extension-dialog-blocked-kind-and-first-line-confirm", "sync170.extension-dialog-blocked-kind-and-first-line-input", "sync170.resume-registers-restricted-session-and-clears-on-quit", "startup.status.project-trust-permission-and-clear", "startup.status.input-cancellation-clears-terminal"]
+  },
+  "cli-sessions": {
+    "CliParity": ["sync170.agent-dir-last-wins-and-terminator-is-literal", "sync170.resume-preserves-restrictions-and-excludes-secrets-and-prompts", "sync170.transcript-notices-migrate-with-explicit-keys-taking-precedence"],
+    "SessionParity": ["boundary.resume-restores-virtual-branch-selection"]
+  },
+  "codemode": {
+    "Codemode": ["executor.models-bridge-usage-concurrency-and-errors"],
+    "ExtensionParity": ["provider.classifier-and-image-providers-registered-by-an-extension", "native.classifier-and-image-provider-reaches-node-extensions"]
+  },
+  "shell-and-tools": {
+    "CliSync": ["wire.rpc-bash.interactive-bang-commands-abort-and-bounded-deltas"],
+    "WireSync": ["wire.rpc-bash.excluded-abort-truncation-and-spill", "tools.bash.output-schema-descriptions", "tools.bash.spill-files-exclusive-and-owner-only"],
+    "InteractiveParity": ["tool.exec.bash-spill-failure-appears-once"]
+  },
+  "mcp": {
+    "McpSync": ["sync170.public-model-content-and-result-schema"],
+    "McpParity": ["retry.tool-calls-are-not-retried-after-transient-errors"]
+  },
+  "terminal-ui": {
+    "Tui": ["sync170.program-resume.encodes-and-validates", "sync170.input.large-paste-with-split-terminator", "sync170.image.hyperlink-length-bound"],
+    "InteractiveParity": ["sync170.resume-registers-restricted-session-and-clears-on-quit"]
+  },
+  "durable": {
+    "Durable": ["sync170.tagged-public-results", "sync170.accumulates-optional-image-output-in-usage", "chord.diff.sliding-windows-retain-shared-rows-in-both-directions"]
+  },
+  "chord-consumers": {
+    "Chord": ["contracts.declare.query-args-are-json-only", "host.runtime.follow-failed-member-recovers-with-whole-value", "registries.record.changed-version-cannot-return-an-older-versions-last-good-composition", "store.outbox.switch-in-flight-orders-commits-and-persists", "sync.files.head-recovers-after-crash-and-from-legacy-directory", "sync.files.flush-failure-never-publishes", "sync.files.sessions-write-independently", "sync.session.lost-response-is-idempotent-and-refusal-preserves-outbox"],
+    "Chord.Durable.Integration": ["real-host.store-publication.adopts-two-durable-views-in-one-batch"]
+  },
+  "native-environment": {
+    "Env.Terminal": ["native-terminal-background-job-ends-on-exit", "native-terminal-background-job-ends-on-close"],
+    "Env.Process": ["blocked-stdin-write-remains-cancellable"],
+    "Env.Adapter": ["real daemon actual Durable write/read/edit/bash tool differential trace"]
+  },
+  "source-and-attribution": {
+    "SourceLock": ["the exact prior source lock and historical evidence remain preserved", "the candidate lock covers every surviving changed path and package manifest", "the complete inventory reproduces from local upstream Git objects"]
+  }
+}

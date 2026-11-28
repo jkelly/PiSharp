@@ -130,7 +130,7 @@ internal static class ToolEdgeInputTests
         string error;
         try { ShellDiscovery.Resolve(host: host); throw new InvalidOperationException("A shell was found."); }
         catch (ShellDiscoveryException discovery) { error = discovery.Message; }
-        Check(error.StartsWith("No bash shell found. Options:\n", StringComparison.Ordinal) && error.EndsWith("Searched Git Bash in:\n  C:\\Program Files\\Git\\bin\\bash.exe", StringComparison.Ordinal), error);
+        Check(error.StartsWith("No bash shell found. Options:\n", StringComparison.Ordinal) && error.EndsWith("Searched Git Bash in:\n  C:\\Program Files\\Git\\bin\\bash.exe\n  the Git for Windows installation of git.exe on PATH", StringComparison.Ordinal), error);
         var tool = new BashTool(new NoRunner(), BashToolOptions.Unavailable(error, "bash", temp.Root, ImmutableDictionary<string, string>.Empty, temp.Root));
         Equal("bash", tool.Name, "registered name");
         var bash = new ToolInvoker([tool], new Allow());

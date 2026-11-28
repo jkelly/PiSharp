@@ -122,7 +122,11 @@ public sealed class SessionShare
     public async Task ShareSessionAsync(SessionShareSession session, SessionShareUi ui, CancellationToken abort = default)
     {
         ArgumentNullException.ThrowIfNull(session); ArgumentNullException.ThrowIfNull(ui);
-        var tempDir = MakeTempDirectory(); LastTempDirectory = tempDir;
+        string tempDir;
+        try { tempDir = MakeTempDirectory(); }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+        { ui.ShowError("Failed to export session: " + error.Message); return; }
+        LastTempDirectory = tempDir;
         var jsonlFile = Path.Combine(tempDir, "session.jsonl"); var htmlFile = Path.Combine(tempDir, "session.html");
         try
         {

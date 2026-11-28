@@ -37,6 +37,7 @@ internal static partial class Program
 
     private static IEnumerable<(string, Func<Task>)> RemoteCases() =>
     [
+        ("sync170.radius.discovers-and-restores-image-and-classifier", RadiusTypedCatalog),
         ("remote.refresh-merges-persists-and-revalidates", RemoteRefresh),
         ("remote.not-found-older-catalogs-and-failures", RemoteFailures),
         ("remote.parse-catalog-shapes", Sync(RemoteParse)),
@@ -49,6 +50,33 @@ internal static partial class Program
         Environment = Env(("GROQ_API_KEY", "k")), ModelsStore = store, CatalogBaseUrl = "https://catalog.invalid",
         CreateCatalogClient = () => new HttpClient(endpoint, disposeHandler: false), Now = now
     });
+
+    private static async Task RadiusTypedCatalog()
+    {
+        var endpoint = new CatalogEndpoint(_ => Catalog("""
+            {"baseUrl":"https://gateway.invalid/v1","models":[],"decision":[{"id":"d","name":"D","input":["text"],"cost":{"input":1,"output":2,"cacheRead":0,"cacheWrite":0},"contextWindow":20}],
+             "images":[{"id":"i","name":"I","input":["text","future"],"output":["image","future"],"cost":{"input":1,"output":2,"cacheRead":0,"cacheWrite":0}},
+                       {"id":"bad","name":"Bad","input":[],"output":["future"],"cost":{"input":1,"output":2,"cacheRead":0,"cacheWrite":0}}]}
+            """));
+        var store = new InMemoryModelsStore();
+        var options = new ModelRegistryOptions { ModelsStore = store, Environment = Env(("RADIUS_API_KEY", "fixture")),
+            CreateCatalogClient = () => new HttpClient(endpoint, disposeHandler: false) };
+        var registry = ModelRegistry.Create(options);
+        var errors = await registry.RefreshAsync(true, null, ["radius"], CancellationToken.None);
+        Equal(0, errors.Count, "gateway refresh");
+        Equal("https://radius.pi.dev/v1/config", endpoint.Requests.Single().Url, "gateway address");
+        Equal("Bearer fixture", endpoint.Requests.Single().Headers["authorization"], "bearer");
+        Equal("pi-decision", registry.GetAllOfType(CatalogModelType.Classifier, "radius").Single().Api, "decision route");
+        var restored = await ModelRegistry.CreateAsync(options, CancellationToken.None);
+        var image = restored.GetAllOfType(CatalogModelType.Image, "radius").Single();
+        Equal("pi-image", image.Api, "restored image route");
+        Names(["text"], image.Input, "recognized image modalities");
+        var operations = PiSharp.Cli.Extensions.NativeExtensionModelOperations.CreateDefaultRegistry(
+            options.Environment, null, null, null, () => false, restored);
+        Check(operations.GetModelOfType(PiSharp.Contracts.ModelOperations.ModelType.Image, "radius", "i")?.Api == "pi-image", "run-bound extensions see the same image");
+        Check(operations.GetModelOfType(PiSharp.Contracts.ModelOperations.ModelType.Classifier, "radius", "d")?.Api == "pi-decision", "run-bound extensions see the same classifier");
+        Equal(1, endpoint.Requests.Count, "offline startup");
+    }
 
     private static async Task RemoteRefresh()
     {
@@ -63,7 +91,7 @@ internal static partial class Program
         var request = endpoint.Requests.Single();
         Equal("https://catalog.invalid/api/models/providers/groq?types=chat%2Cimage%2Cclassifier", request.Url, "catalog URL");
         Equal("application/json", request.Headers["accept"], "accept");
-        Check(System.Text.RegularExpressions.Regex.IsMatch(request.Headers["User-Agent"], @"^pi/1\.6\.0 \((win32|linux|darwin); dotnet/[0-9.]+; [a-z0-9]+\)$"), "user agent: " + request.Headers["User-Agent"]);
+        Check(System.Text.RegularExpressions.Regex.IsMatch(request.Headers["User-Agent"], @"^pi/1\.7\.0 \((win32|linux|darwin); dotnet/[0-9.]+; [a-z0-9]+\)$"), "user agent: " + request.Headers["User-Agent"]);
         Check(!request.Headers.ContainsKey("if-none-match"), "no validator without a cached body");
         Equal("GPT OSS 120B (remote)", registry.Find("groq", "openai/gpt-oss-120b")!.Name, "remote entry replaces the built-in in place");
         Equal("groq/groq-new", registry.GetAll().Where(model => model.Provider == "groq").Last().Reference, "new entries are appended");

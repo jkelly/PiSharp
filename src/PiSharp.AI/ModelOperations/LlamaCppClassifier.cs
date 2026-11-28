@@ -181,15 +181,13 @@ public sealed class LlamaCppClassifier : IClassifierApi
         var headers = ProviderRequest.MergeHeaders(defaults, ProviderRequest.Nullable(model.Headers), options?.Headers ?? []);
         var http = ProviderRequest.Http(options);
         var url = new Uri(root + path);
-        var (response, json) = await ProviderRequest.RetryAsync(async () =>
+        return await ProviderRequest.RetryAsync(async () =>
         {
-            var (info, responseText) = await ProviderRequest.PostAsync(http, url, headers, text, options, signal, ProviderRequest.FetchFailed).ConfigureAwait(false);
+            var (info, responseText) = await ProviderRequest.PostAsync(http, url, headers, text, options, signal, ProviderRequest.FetchFailed, model: observe ? model : null).ConfigureAwait(false);
             if (!ProviderRequest.IsSuccess(info.Status))
                 throw new ProviderRequestException($"{Label} returned {info.Status}", info.Status, info.Headers, responseText);
-            return (info, ProviderRequest.ParseJson(Label, responseText));
+            return ProviderRequest.ParseJson(Label, responseText);
         }, options?.MaxRetries ?? 2, options, null, signal).ConfigureAwait(false);
-        if (observe && options?.OnResponse is { } onResponse) await onResponse(response, model, signal).ConfigureAwait(false);
-        return json;
     }
 
     private static ImmutableArray<double> TokenIds(JsonElement body)

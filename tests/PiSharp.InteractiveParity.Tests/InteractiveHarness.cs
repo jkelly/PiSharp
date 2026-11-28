@@ -148,6 +148,7 @@ internal sealed class InteractiveHarness : IAsyncDisposable
         return await waiting;
     }
 
+    public void CancelHost() => deadline.Cancel();
     public void Type(string text) => Terminal.Send(text);
     public async Task Submit(string text)
     {

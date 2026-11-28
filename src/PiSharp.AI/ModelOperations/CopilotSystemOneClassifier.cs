@@ -5,12 +5,13 @@ namespace PiSharp.AI.ModelOperations;
 
 /// <summary>Copilot chat endpoints are unversioned, but System One lives beneath /v1. Append the prefix after
 /// account auth has replaced the catalog base URL; keep the shared System One protocol unchanged.</summary>
-internal sealed class CopilotSystemOneClassifier : IClassifierApi
+internal sealed class CopilotSystemOneClassifier(IClassifierApi implementation) : IClassifierApi
 {
-    internal static CopilotSystemOneClassifier Instance { get; } = new();
-    public string Api => TypeSafeSystemOneClassifier.ApiId;
+    internal static CopilotSystemOneClassifier Instance { get; } = new(TypeSafeSystemOneClassifier.Instance);
+    internal static CopilotSystemOneClassifier Decisions { get; } = new(OpenAIDecisionsClassifier.Instance);
+    public string Api => implementation.Api;
 
     public Task<ClassifierResult> ClassifyAsync(ClassifierModel model, ClassifierContext context, ClassifierOptions? options = null,
-        CancellationToken cancellationToken = default) => TypeSafeSystemOneClassifier.Instance.ClassifyAsync(
+        CancellationToken cancellationToken = default) => implementation.ClassifyAsync(
             model with { BaseUrl = model.BaseUrl.TrimEnd('/') + "/v1" }, context, options, cancellationToken);
 }

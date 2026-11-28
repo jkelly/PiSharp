@@ -1,4 +1,4 @@
-// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/ai/src/api/openai-codex-responses.ts (stream over SSE with the zstd
+// Pi fb0fe823539f6d04850f6e34748c01f01f212e1f (MIT): packages/ai/src/api/openai-codex-responses.ts (stream over SSE with the zstd
 // request body, streamSimple, buildRequestBody, getConfigurationUpdateEffort, resolveReasoningEffort, resolveCodexUrl, mapCodexEvents,
 // normalizeCodexStatus, parseErrorResponse, extractAccountId, buildSSEHeaders, the retry helpers and service tier pricing; the
 // WebSocket transport is in the .WebSocket part), api/simple-options.ts (buildBaseOptions' maxTokens) and providers/openai-codex.ts.
@@ -94,8 +94,6 @@ public sealed partial class OpenAICodexResponsesTransport : IChatTransport, IThi
     private readonly bool _grammar, _strictMode, _midConversation, _developerRole, _additionalTools, _toolSearch, _midEffort, _maxOutputTokens;
     // The Responses API rejects max_output_tokens below 16 (https://github.com/earendil-works/pi/issues/6265).
     private const double MinOutputTokens = 16;
-    // CONFIGURATION_UPDATE_REQUEST_EFFORT: the fixed reasoning.effort while configuration_update items carry the thinking level.
-    private const string ConfigurationUpdateRequestEffort = "medium";
 
     public OpenAICodexResponsesTransport(HttpClient client, ModelDescriptor model, JsonData modelMetadata, OpenAICodexResponsesOptions options,
         Func<CancellationToken, ValueTask<string>> accessToken, string? defaultThinkingLevel = null)
@@ -172,7 +170,7 @@ public sealed partial class OpenAICodexResponsesTransport : IChatTransport, IThi
             SupportsAdditionalTools = _additionalTools, SupportsToolSearch = _toolSearch,
             ModelSupportsImages = _metadata.TryGetProperty("input", out var inputs) && inputs.ValueKind == JsonValueKind.Array &&
                 inputs.EnumerateArray().Any(item => item.ValueKind == JsonValueKind.String && item.GetString() == "image"),
-            ConfigurationUpdateEffort = configurationUpdateEffort
+            ConfigurationUpdateEffort = configurationUpdateEffort, UseInitialEffortBaseline = true
         };
 
     private bool ModelReasoning => _metadata.TryGetProperty("reasoning", out var reasoning) && reasoning.ValueKind == JsonValueKind.True;
@@ -221,7 +219,7 @@ public sealed partial class OpenAICodexResponsesTransport : IChatTransport, IThi
         var configurationUpdateEffort = ConfigurationUpdateEffort(request);
         var projection = ProjectionOptions(configurationUpdateEffort);
         var projector = new ResponsesTranscriptProjector(projection);
-        var input = JsonNode.Parse(projector.ProjectInput(request, CancellationToken.None).ToString(), documentOptions: JsonData.DocumentOptions);
+        var input = JsonNode.Parse(projector.ProjectInput(request, CancellationToken.None, out var initialEffort).ToString(), documentOptions: JsonData.DocumentOptions);
         var tools = JsonNode.Parse(projector.ProjectTools(request, CancellationToken.None).ToString(), documentOptions: JsonData.DocumentOptions) as JsonArray;
         var cacheKey = _options.CacheRetention == "none" ? null : ClampCacheKey(_options.SessionId ?? request.SessionId);
         var body = new JsonObject
@@ -246,7 +244,7 @@ public sealed partial class OpenAICodexResponsesTransport : IChatTransport, IThi
         if (tools is { Count: > 0 }) body["tools"] = tools;
         // streamSimple leaves reasoningEffort undefined only for a model without reasoning, which takes no reasoning field.
         if (reasoningEffort is not null &&
-            (configurationUpdateEffort is null ? ResolveReasoningEffort(reasoningEffort) : ConfigurationUpdateRequestEffort) is { } effort)
+            (initialEffort ?? ResolveReasoningEffort(reasoningEffort)) is { } effort)
             body["reasoning"] = new JsonObject { ["effort"] = effort, ["summary"] = _options.ReasoningSummary ?? "auto" };
         return body;
     }
@@ -577,7 +575,7 @@ public sealed partial class OpenAICodexResponsesTransport : IChatTransport, IThi
 
     private async IAsyncEnumerable<JsonData> ReadEventsAsync(Stream body, Invocation invocation, [EnumeratorCancellation] CancellationToken token)
     {
-        await foreach (var frame in new SseDecoder(new(RejectInvalidUtf8: true)).DecodeAsync(body, leaveOpen: true, token).ConfigureAwait(false))
+        await foreach (var frame in new SseDecoder(new(EofBehavior: SseEofBehavior.DispatchPendingEvent)).DecodeAsync(body, leaveOpen: true, token).ConfigureAwait(false))
         {
             var data = frame.Data.Trim();
             if (data.Length == 0 || data == "[DONE]") continue;

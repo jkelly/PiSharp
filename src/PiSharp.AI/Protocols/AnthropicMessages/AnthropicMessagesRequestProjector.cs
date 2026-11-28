@@ -572,7 +572,7 @@ public sealed class AnthropicMessagesRequestProjector
             // root additionalProperties, so the model knows whether extra arguments are allowed; other root keywords stay out
             // (Anthropic rejects root anyOf/oneOf/allOf with a 400).
             if (!strict)
-                foreach (var kept in new[] { "additionalProperties", "$defs", "definitions" })
+                foreach (var kept in new[] { "additionalProperties", "$schema", "$defs", "definitions" })
                     if (schema.TryGetPropertyValue(kept, out var value)) input[kept] = value?.DeepClone();
             var tool = new JsonObject { ["name"] = name, ["description"] = String(declaration, "description"), ["input_schema"] = input };
             if (options.SupportsEagerToolInputStreaming != false) tool["eager_input_streaming"] = true;

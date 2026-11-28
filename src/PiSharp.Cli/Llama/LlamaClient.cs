@@ -207,35 +207,16 @@ internal sealed class LlamaClient
         using var response = await SendAsync(request, token, streaming: true).ConfigureAwait(false);
         if (!response.IsSuccessStatusCode) throw new InvalidOperationException($"llama.cpp SSE returned HTTP {(int)response.StatusCode}");
         await using var stream = await response.Content.ReadAsStreamAsync(token).ConfigureAwait(false);
-        var decoder = Encoding.UTF8.GetDecoder();
-        var bytes = new byte[8192]; var chars = new char[Encoding.UTF8.GetMaxCharCount(bytes.Length)];
-        var buffer = new StringBuilder();
-        while (true)
+        await foreach (var frame in new PiSharp.AI.Transports.SseDecoder().DecodeAsync(stream, leaveOpen: true, cancellationToken: token).ConfigureAwait(false))
         {
-            var read = await stream.ReadAsync(bytes, token).ConfigureAwait(false);
-            if (read == 0) break;
-            var count = decoder.GetChars(bytes, 0, read, chars, 0);
-            buffer.Append(chars, 0, count).Replace("\r\n", "\n");
-            var text = buffer.ToString();
-            var boundary = text.IndexOf("\n\n", StringComparison.Ordinal);
-            while (boundary >= 0)
+            if (frame.Data.Length == 0) continue;
+            try
             {
-                var frame = text[..boundary];
-                text = text[(boundary + 2)..];
-                var data = string.Join("\n", frame.Split('\n').Where(line => line.StartsWith("data:", StringComparison.Ordinal)).Select(line => line[5..].TrimStart()));
-                if (data.Length > 0)
-                {
-                    try
-                    {
-                        if (JsonNode.Parse(data) is JsonObject value && value["model"] is JsonValue model && model.TryGetValue<string>(out var modelId) &&
-                            value["event"] is JsonValue name && name.TryGetValue<string>(out var eventName))
-                            onEvent(new(modelId, eventName, value["data"]));
-                    }
-                    catch (JsonException) { }
-                }
-                boundary = text.IndexOf("\n\n", StringComparison.Ordinal);
+                if (JsonNode.Parse(frame.Data) is JsonObject value && value["model"] is JsonValue model && model.TryGetValue<string>(out var modelId) &&
+                    value["event"] is JsonValue name && name.TryGetValue<string>(out var eventName))
+                    onEvent(new(modelId, eventName, value["data"]));
             }
-            buffer.Clear().Append(text);
+            catch (JsonException) { }
         }
     }
 

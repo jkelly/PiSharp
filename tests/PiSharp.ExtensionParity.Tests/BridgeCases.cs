@@ -462,7 +462,7 @@ internal static partial class Program
     private const string DialogExtension = """
         export default function (pi: any) {
           pi.registerCommand("ask", { description: "Ask", handler: async (args: string, ctx: any) => {
-            const choice = await ctx.ui.select("Pick one", ["red", "blue"]);
+            const choice = await ctx.ui.select("Pick one", ["red", "blue"], {blockedKind: "auth"});
             ctx.ui.notify("picked " + choice, "info");
           } });
         }
@@ -492,6 +492,7 @@ internal static partial class Program
         var code = await PiCommand.RunAsync(["--mode", "rpc", .. Model, "-e", extension], host, deadline.Token);
         Equal(0, code, "exit; " + stderr + "; output: " + string.Join("\n", lines));
         string[] all; lock (lines) all = [.. lines];
+        Check(!all.Any(line => line.Contains("\"blockedKind\"", StringComparison.Ordinal)), "native blocked status stays out of the upstream RPC protocol");
         Check(all.Any(line => line.Contains("\"method\":\"select\"", StringComparison.Ordinal) && line.Contains("Pick one", StringComparison.Ordinal)), "select request: " + string.Join("\n", all));
         Check(all.Any(line => line.Contains("\"method\":\"notify\"", StringComparison.Ordinal) && line.Contains("picked blue", StringComparison.Ordinal)), "notify with the answer: " + string.Join("\n", all));
     }

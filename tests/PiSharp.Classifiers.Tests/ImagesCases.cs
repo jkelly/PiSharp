@@ -52,7 +52,7 @@ internal static partial class Program
             Check(output.Usage is { Input: 70, Output: 5, CacheRead: 20, CacheWrite: 10, TotalTokens: 105 }, "cache-aware usage");
             var empty = await OpenRouterImages.Instance.GenerateImagesAsync(Flux, DogPrompt, new ImagesOptions
             { ApiKey = "test", Http = FakeHttp.Always(() => FakeHttp.Json("""{"choices":[]}""")).Client });
-            Equal(ModelOperationStopReason.Stop, empty.StopReason, "no choices"); Equal(0, empty.Output.Length, "no output"); Equal(null, empty.ResponseId, "no id");
+            Equal(ModelOperationStopReason.Error, empty.StopReason, "no choices"); Equal("Provider returned no choices", empty.ErrorMessage, "empty response error"); Equal(0, empty.Output.Length, "no output"); Equal(null, empty.ResponseId, "no id");
         }),
         ("images.http-errors-follow-the-sdk-messages", async () =>
         {

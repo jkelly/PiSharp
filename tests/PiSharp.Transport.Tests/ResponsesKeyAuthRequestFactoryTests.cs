@@ -194,10 +194,12 @@ internal static class ResponsesKeyAuthRequestFactoryTests
     // Pi 1.5.0 transformMessages drops every thinking block from another model; the v0.99.1 capture still turns the foreign model's
     // readable thinking into an assistant text message. The foreign case expects the capture without that message, the next text
     // renumbered (textBlockIndex 0 gives msg_pi_1, not msg_pi_1_1): an authored delta from the Pi 1.5.0 source, not a capture.
-    private static JsonElement WithoutForeignThinking(string caseId, JsonElement captured)
+    private static JsonElement ApplyReplayDeltas(string caseId, JsonElement captured)
     {
-        if (caseId != "foreign-provider-system-fold") return captured;
         var items = System.Text.Json.Nodes.JsonNode.Parse(captured.GetRawText())!.AsArray();
+        foreach (var item in items.OfType<System.Text.Json.Nodes.JsonObject>().Where(item => (string?)item["type"] == "function_call"))
+            item["status"] = "completed"; // Pi 1.7.0 replays completed calls after a reconnect.
+        if (caseId != "foreign-provider-system-fold") return JsonSerializer.SerializeToElement(items);
         items.Remove(items.OfType<System.Text.Json.Nodes.JsonObject>().Single(item => item["content"] is System.Text.Json.Nodes.JsonArray { Count: 1 } parts &&
             parts[0]?["text"]?.GetValue<string>() == "Visible foreign reasoning π"));
         items.OfType<System.Text.Json.Nodes.JsonObject>().Single(item => item["id"]?.GetValue<string>() == "msg_pi_1_1")["id"] = "msg_pi_1";
@@ -225,7 +227,7 @@ internal static class ResponsesKeyAuthRequestFactoryTests
             using var request = new ResponsesKeyAuthRequestFactory(Endpoint, model, projection).Create(new(model, transcript), Key);
             using var payload = JsonDocument.Parse(await request.Content!.ReadAsStringAsync());
             var actual = payload.RootElement.GetProperty("input");
-            var capturedSuffix = WithoutForeignThinking(item.GetProperty("caseId").GetString()!, oracle.GetProperty("requestInput")).EnumerateArray().Skip(1).ToArray();
+            var capturedSuffix = ApplyReplayDeltas(item.GetProperty("caseId").GetString()!, oracle.GetProperty("requestInput")).EnumerateArray().Skip(1).ToArray();
             Equal(new[] { 5, 4, 5 }[index], actual.GetArrayLength());
             Equal(capturedSuffix.Length, actual.GetArrayLength());
             Check(actual.EnumerateArray().Zip(capturedSuffix).All(pair => Same(pair.First, pair.Second)), "Captured non-system input overlap changed.");

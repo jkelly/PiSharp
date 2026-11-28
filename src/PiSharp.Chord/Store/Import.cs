@@ -1,3 +1,4 @@
+// Pi fb0fe823539f6d04850f6e34748c01f01f212e1f (MIT): packages/chord/src/store/import.ts (v1.7.0 updates).
 // Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/chord/src/next/store/import.ts
 //
 // Tables.ImportStoreAsync(backend, parts, ctx, { Outbox }) (slice 6a §13, rules 12, 24, 25): a store made from an archive, a trust
@@ -21,14 +22,14 @@ public static partial class Tables
     /// manifest's <c>lastSeq</c>, its outbox (when <c>options.Outbox</c> is true) starting after it. A refused archive, a stalled input
     /// cancelled by <paramref name="context"/> or a backend error fails; the backend is closed then (rule 12; upstream
     /// <c>importStore</c>).</summary>
-    public static Task<IStore> ImportStoreAsync(Backend backend, IAsyncEnumerable<JsonNode?> parts, ChordContext context, StoreOptions? options = null)
+    public static Task<ChordStore> ImportStoreAsync(Backend backend, IAsyncEnumerable<JsonNode?> parts, ChordContext context, StoreOptions? options = null)
     {
         ArgumentNullException.ThrowIfNull(parts);
         return StoreInternal.ImportAsync(backend, () => parts.GetAsyncEnumerator(), context, options);
     }
 
     /// <summary><see cref="ImportStoreAsync(Backend, IAsyncEnumerable{JsonNode}, ChordContext, StoreOptions)"/> of parts in memory.</summary>
-    public static Task<IStore> ImportStoreAsync(Backend backend, IEnumerable<JsonNode?> parts, ChordContext context, StoreOptions? options = null)
+    public static Task<ChordStore> ImportStoreAsync(Backend backend, IEnumerable<JsonNode?> parts, ChordContext context, StoreOptions? options = null)
     {
         ArgumentNullException.ThrowIfNull(parts);
         return StoreInternal.ImportAsync(backend, () => new StoreInternal.SyncParts(parts.GetEnumerator()), context, options);
@@ -39,7 +40,7 @@ internal static partial class StoreInternal
 {
     /// <summary>The import (upstream <c>importStore</c>'s body): the backend checked to hold no store, the store's schema and the archive
     /// applied in one backend transaction, the store opened on what it stored.</summary>
-    internal static async Task<IStore> ImportAsync(Backend backend, Func<IAsyncEnumerator<JsonNode?>> parts, ChordContext context, StoreOptions? options)
+    internal static async Task<ChordStore> ImportAsync(Backend backend, Func<IAsyncEnumerator<JsonNode?>> parts, ChordContext context, StoreOptions? options)
     {
         ArgumentNullException.ThrowIfNull(backend);
         ArgumentNullException.ThrowIfNull(context);

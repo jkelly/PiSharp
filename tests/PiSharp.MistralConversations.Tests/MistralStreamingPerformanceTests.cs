@@ -10,6 +10,7 @@ internal static class MistralStreamingPerformanceTests
     public static IEnumerable<(string Name, Func<Task> Run)> Cases()
     {
         foreach (var item in IncrementalSnapshotTests.Cases()) yield return item;
+        yield return ("pi-messages 1.7 SSE data fields across fragmented CRLF and EOF", PiMessagesFraming);
         yield return ("mistral lazy emission snapshots retain each historical value", Snapshots);
         yield return ("mistral deferred and materialized reducer admission agree at limits", Admission);
         yield return ("mistral compact progress allocation budget", Allocations);
@@ -34,6 +35,15 @@ internal static class MistralStreamingPerformanceTests
         var events = new List<StreamEvent>();
         await foreach (var frame in transport.StreamAsync(request)) { if (reduce) reducer.Apply(frame); events.Add(frame); }
         return events;
+    }
+    private static async Task PiMessagesFraming()
+    {
+        var options = new PiSharp.AI.Protocols.PiMessages.PiMessagesOptions(JsonData.Parse("{}"));
+        var decoder = new PiSharp.AI.Protocols.PiMessages.PiMessagesSseDecoder(options);
+        using var input = new SplitStream("\uFEFF:event\r\ndata: {\"n\":\r\ndata: 7}\r\n\r\ndata: null\r\rdata: [DONE]\n\ndata: {\"n\":8}", 1);
+        var values = new List<int>();
+        await foreach (var value in decoder.DecodeAsync(input)) values.Add(value.Value.GetProperty("n").GetInt32());
+        Check(values.SequenceEqual([7, 8]), "SSE data lines join with a newline and an unterminated final frame is dispatched.");
     }
     private static async Task Snapshots()
     {
@@ -91,6 +101,10 @@ internal static class MistralStreamingPerformanceTests
             var actual = (await Read(wire, true, readSize: readSize)).Select(Describe).ToArray();
             Check(expected.SequenceEqual(actual), $"Frame/snapshot changed with read size {readSize}.");
         }
+        var finalFrame = "data: {\"choices\":\r\ndata:  [{\"delta\":{},\"finish_reason\":\"stop\"}]}";
+        Check((await Read(finalFrame, readSize: 1))[^1] is StreamDone, "A split CRLF and a final unterminated multiline event must decode.");
+        var malformed = finalFrame.Replace("data:  [", "data: \u00a0[", StringComparison.Ordinal);
+        Check((await Read(malformed, readSize: 1))[^1] is StreamError, "Only one ASCII space follows the data field separator.");
         // A read can contain many individually small frames even when the whole
         // buffer exceeds the per-frame bound. An oversized individual frame fails.
         var small = await Read(Wire("x", 300), true, frameLimit: 160);

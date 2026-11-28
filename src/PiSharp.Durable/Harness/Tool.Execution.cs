@@ -145,16 +145,15 @@ internal static partial class ToolPhases
         ToolExecutionResult returned, Attempt attempt, DurableContext context)
     {
         if (Parks.ParkError(tool, returned, attempt.Api) is { } shape) return shape;
-        var park = returned.Park!;
-        var sleep = park.Sleep;
-        var wait = park.Wait;
-        if (wait is not null)
+        var park = (ToolPark)returned;
+        if (park.Kind == "wait")
         {
-            if (wait.On.IsDefault) return "a wait names the tasks it waits on";
-            foreach (var id in wait.On)
+            if (park.On.IsDefault) return "a wait names the tasks it waits on";
+            if (park.Policy is null) return "a wait names a join policy";
+            foreach (var id in park.On)
                 if ((await runtime.GetTaskAsync(id, context).ConfigureAwait(false))?.Owner != runtime.TaskId) return $"task {id} is not owned by the call";
         }
-        var checkpoint = sleep is not null ? sleep.Checkpoint : wait!.Checkpoint;
+        var checkpoint = park.Checkpoint;
         var parked = new RecordJson.Writer()
             .Add("phase", "parked")
             .Add("arguments", args)
@@ -174,11 +173,11 @@ internal static partial class ToolPhases
                     if (streams && diagnostics.Count > 0)
                         HarnessJson.AssignJson(slot, "diagnostics", JsonValue.Array(diagnostics.Select(ToolResults.DiagnosticJson)));
                     Live.ClearOutput(slot);
-                    slot.Set("status", sleep is not null ? "sleeping" : "waiting");
+                    slot.Set("status", park.Kind == "sleep" ? "sleeping" : "waiting");
                 }
-                return (TaskState?)(sleep is not null
-                    ? new SleepingTaskState(parked, sleep.Until, sleep.Signals)
-                    : new WaitingTaskState(parked, wait!.On, wait.Policy));
+                return (TaskState?)(park.Kind == "sleep"
+                    ? new SleepingTaskState(parked, park.Until, park.Signals)
+                    : new WaitingTaskState(parked, park.On, park.Policy!.Value));
             }, context).ConfigureAwait(false);
         }
         catch (Exception error)
@@ -454,7 +453,7 @@ internal static partial class ToolPhases
             // keeps the last attempt's execution time.
             var durationMs = current.Record.StartedAt is { } startedAt ? runtime.Now() - startedAt : measured;
             var live = await tx.DocAsync(Live.LiveDoc, conversationId).ConfigureAwait(false);
-            var slot = Live.ToolSlot(live, runtime.TaskId);
+            var slot = Live.ToolSlot(live, runtime.TaskId, out var nestedSlot);
             JsonObjectValue settled;
             if (input.Nested)
             {
@@ -465,7 +464,7 @@ internal static partial class ToolPhases
                 if (!(state.Get("taskId") is JsonNumberValue member && (long)member.Value == runtime.TaskId.Value))
                     throw new InvalidOperationException($"Nested call {((JsonStringValue)call["id"]).Value} is not in its caller's index");
                 state.Set("result", nested.ToJson());
-                if (slot is not null && Live.IsNested(slot))
+                if (slot is not null && nestedSlot)
                 {
                     Live.FinishSlot(slot);
                     slot.Set("summary", SummaryOf(nested, result.Output ?? JsonArrayValue.Empty));
@@ -475,7 +474,7 @@ internal static partial class ToolPhases
             else
             {
                 var entry = await ToolResults.AppendToolResultAsync(tx, conversationId, call, result, runtime.Now(), durationMs).ConfigureAwait(false);
-                if (slot is not null && !Live.IsNested(slot))
+                if (slot is not null && !nestedSlot)
                 {
                     Live.FinishSlot(slot);
                     slot.Set("entry", entry.Id.ToJson());

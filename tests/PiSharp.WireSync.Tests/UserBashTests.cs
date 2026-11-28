@@ -51,7 +51,7 @@ internal static class UserBashTests
         public async Task<UserBashResult> ExecuteAsync(UserBashExecutionRequest request, UserBashProgress progress, CancellationToken token)
         {
             var result = await executor.ExecuteAsync(request.Command, request.WorkingDirectory, chunk => new(progress(chunk)), token);
-            return new(result.Output, result.ExitCode, result.Cancelled, result.Truncated, result.FullOutputPath);
+            return new(result.Output, result.ExitCode, result.Cancelled, result.Truncated, result.FullOutputPath, result.FullOutputError);
         }
     }
 
@@ -185,6 +185,16 @@ internal static class UserBashTests
             Equal(string.Concat(big), spilled);
             // The byte limit keeps whole lines only: twelve 4097-byte lines fit in 50KB.
             Equal(string.Concat(big[^12..])[..^1], rolled.Output);
+            // The large first chunk falls out of the rolling buffer. Even when the remaining text
+            // fits, the result reports the missing output and the reason the full file is absent.
+            var unavailable = Path.Combine(directory, "missing");
+            var lost = await new ShellCommandExecutor(new Operations(0, Bytes(new string('x', 120_000)), Bytes("TAIL")),
+                unavailable).ExecuteAsync("x", directory, null, CancellationToken.None);
+            Check(lost is { Truncated: true, FullOutputPath: null, FullOutputError.Length: > 0, Output: "TAIL", ExitCode: 0 }, "unwritable spill keeps the tail");
+            // Raw bytes can cross the spill threshold before sanitization even when visible text fits.
+            var clean = await new ShellCommandExecutor(new Operations(0, Bytes(new string('\r', 60_000) + "ok")), unavailable)
+                .ExecuteAsync("x", directory, null, CancellationToken.None);
+            Check(clean is { Truncated: false, FullOutputError: null, Output: "ok" }, "failed unneeded spill is silent");
         }
         finally { Directory.Delete(directory, recursive: true); }
     }

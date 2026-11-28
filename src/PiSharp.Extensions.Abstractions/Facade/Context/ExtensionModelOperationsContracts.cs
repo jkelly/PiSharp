@@ -14,6 +14,12 @@ public sealed record ExtensionModelRequestOptions
 {
     /// <summary>An explicit provider key used instead of the stored or environment credential.</summary>
     public string? ApiKey { get; init; }
+    /// <summary>Provider session identifier for this request.</summary>
+    public string? SessionId { get; init; }
+    /// <summary>Requested image aspect ratio, for example 16:9.</summary>
+    public string? AspectRatio { get; init; }
+    /// <summary>Requested image resolution, for example 2K.</summary>
+    public string? Size { get; init; }
     /// <summary>Extra request headers; a null value suppresses a model or default header of that name.</summary>
     public ImmutableArray<KeyValuePair<string, string?>> Headers { get; init; } = [];
     public int? TimeoutMs { get; init; }

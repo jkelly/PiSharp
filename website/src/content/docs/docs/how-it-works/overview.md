@@ -66,7 +66,7 @@ var summarize = Workflow.For<Note>("summarize")
 5. **Everything can be tested offline:** both stacks support deterministic scripted models (`FauxAgentModels`, `ScriptedModels`, and the fixture host used across all 62 practical agent samples) so CI and local development need no provider credentials.
 
 :::note[PiSharp 1.6.0 highlights]
-The published NuGet inventory is **1.6.0** (29 packages). PiSharp 1.6.0 ships Durable signals, parked tools, `BeforeTool` approval gates, `OnYield`/`AfterTools` `HookTask`s, extension-declared code-mode namespaces, `FitImages`, and Durable examples `38–47`, alongside Chord events, named queries, lists and admission.
+The published {{PISHARP_VERSION}} inventory contains 31 NuGet packages. Its Pi and Pi Durable baseline is 1.6.0. PiSharp 1.6.0 ships Durable signals, parked tools, `BeforeTool` approval gates, `OnYield`/`AfterTools` `HookTask`s, extension-declared code-mode namespaces, `FitImages`, and Durable examples `38–47`, alongside Chord events, named queries, lists and admission.
 :::
 
 ## Continue reading

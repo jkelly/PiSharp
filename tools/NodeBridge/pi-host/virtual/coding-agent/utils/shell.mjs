@@ -1,4 +1,4 @@
-// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/coding-agent/src/utils/shell.ts.
+// Pi fb0fe823539f6d04850f6e34748c01f01f212e1f (MIT): packages/coding-agent/src/utils/shell.ts.
 // Ported to plain ESM for the PiSharp Node extension bridge (TypeScript types stripped mechanically; behaviour unchanged).
 import { accessSync, constants } from "node:fs";
 import { delimiter, join, win32 } from "node:path";
@@ -73,6 +73,24 @@ function findExecutableOnPath(executable) {
     } catch  {}
     return null;
 }
+const GIT_FOR_WINDOWS_SHELL_SUFFIX = win32.join("usr", "bin", "sh.exe");
+function findGitBashOfGitOnPath() {
+    const git = findExecutableOnPath("git.exe");
+    if (!git) return null;
+    const result = spawnSync(git, [
+        "var",
+        "GIT_SHELL_PATH"
+    ], {
+        encoding: "utf-8",
+        timeout: 5000,
+        windowsHide: true
+    });
+    if (result.status !== 0) return null;
+    const gitShell = win32.normalize(result.stdout.trim());
+    if (!gitShell.toLowerCase().endsWith(`\\${GIT_FOR_WINDOWS_SHELL_SUFFIX}`)) return null;
+    const bash = win32.join(gitShell.slice(0, -GIT_FOR_WINDOWS_SHELL_SUFFIX.length), "bin", "bash.exe");
+    return shellPathExists(bash) ? bash : null;
+}
 export function getShellConfig(customShellPath) {
     if (customShellPath) {
         if (shellPathExists(customShellPath)) {
@@ -95,11 +113,15 @@ export function getShellConfig(customShellPath) {
                 return getBashShellConfig(path);
             }
         }
+        const gitBash = findGitBashOfGitOnPath();
+        if (gitBash) {
+            return getBashShellConfig(gitBash);
+        }
         const bashOnPath = findExecutableOnPath("bash.exe");
         if (bashOnPath) {
             return getBashShellConfig(bashOnPath);
         }
-        throw new Error(`No bash shell found. Options:\n` + `  1. Install Git for Windows: https://git-scm.com/download/win\n` + `  2. Add your bash to PATH (Cygwin, MSYS2, etc.)\n` + "  3. Set shellPath in settings.json\n\n" + `Searched Git Bash in:\n${paths.map((p)=>`  ${p}`).join("\n")}`);
+        throw new Error(`No bash shell found. Options:\n` + `  1. Install Git for Windows: https://git-scm.com/download/win\n` + `  2. Add your bash to PATH (Cygwin, MSYS2, etc.)\n` + "  3. Set shellPath in settings.json\n\n" + `Searched Git Bash in:\n${paths.map((p)=>`  ${p}`).join("\n")}\n` + "  the Git for Windows installation of git.exe on PATH");
     }
     if (shellPathExists("/bin/bash")) {
         return getBashShellConfig("/bin/bash");
@@ -174,15 +196,37 @@ export function untrackDetachedChildPid(pid) {
     trackedDetachedChildPids.delete(pid);
 }
 export function killTrackedDetachedChildren() {
-    for (const pid of trackedDetachedChildPids){
-        killProcessTree(pid);
+    if (trackedDetachedChildPids.size === 0) return;
+    if (process.platform === "win32") {
+        const pidArgs = [
+            ...trackedDetachedChildPids
+        ].flatMap((pid)=>[
+                "/PID",
+                String(pid)
+            ]);
+        spawnSync(getTaskkillPath(), [
+            "/F",
+            "/T",
+            ...pidArgs
+        ], {
+            stdio: "ignore",
+            timeout: 2000,
+            windowsHide: true
+        });
+    } else {
+        for (const pid of trackedDetachedChildPids){
+            killProcessTree(pid);
+        }
     }
     trackedDetachedChildPids.clear();
+}
+function getTaskkillPath() {
+    return join(process.env.SystemRoot || "C:\\Windows", "System32", "taskkill.exe");
 }
 export function killProcessTree(pid) {
     if (process.platform === "win32") {
         try {
-            const child = spawn(join(process.env.SystemRoot || "C:\\Windows", "System32", "taskkill.exe"), [
+            const child = spawn(getTaskkillPath(), [
                 "/F",
                 "/T",
                 "/PID",

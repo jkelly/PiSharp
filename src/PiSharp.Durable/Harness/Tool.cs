@@ -1,4 +1,4 @@
-// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/src/harness/tool.ts.
+// Pi fb0fe823539f6d04850f6e34748c01f01f212e1f (MIT): packages/durable/src/harness/tool.ts.
 //
 // Mappings:
 // - Input, checkpoints and results are upstream's JSON in its key order. Input (version 3) {kind: "model", assistant, callId, unoffered?:
@@ -58,7 +58,7 @@
 //   (pi.tool version 3): it resolves nothing, so it settles tool_unavailable through afterTool even when the agent has the tool, and its
 //   abort handler settles tool_unavailable too.
 // - Pi v1.6.0 sync (faac585884ae2c013a6b1400f3e9e77f10b34bac): pi.tool is version 4. A call may park: `Execute` returns a park
-//   (ToolExecutionResult.Park; Parks.cs) and the task sleeps or waits at the `parked` checkpoint {phase: "parked", arguments, replay,
+//   (ToolPark; Parks.cs) and the task sleeps or waits at the `parked` checkpoint {phase: "parked", arguments, replay,
 //   checkpoint?}, its slot `sleeping` or `waiting` without output; once woken, the `parked` phase resolves the tool again, records intent
 //   with the wake ({phase: "execute", arguments, replay, wake?, checkpoint?}) and runs `Execute` again (api.Wake, api.Checkpoint). A
 //   beforeTool hook may park the call at its gates (ParkAtGateAsync): the task sleeps at `call`, and every wake runs the whole phase
@@ -294,11 +294,11 @@ internal static partial class ToolPhases
         await runtime.CommitAsync((_, _) => (TaskState?)NextTaskState.Running(intent), context).ConfigureAwait(false);
         await runtime.CommitAsync(async (tx, _) =>
         {
-            var slot = Live.ToolSlot(await tx.DocAsync(Live.LiveDoc, runtime.ConversationId).ConfigureAwait(false), runtime.TaskId);
+            var slot = Live.ToolSlot(await tx.DocAsync(Live.LiveDoc, runtime.ConversationId).ConfigureAwait(false), runtime.TaskId, out var nestedSlot);
             slot?.Set("status", "running");
             // A nested slot shows the arguments the call runs with, which repair, hooks, and coercion may have changed. Assigned whole: an
             // equal value records no change, and a rerun corrects what an earlier attempt showed.
-            if (slot is not null && Live.IsNested(slot)) slot.Set("arguments", args);
+            if (slot is not null && nestedSlot) slot.Set("arguments", args);
         }, context, Live.ProgressCommit).ConfigureAwait(false);
     }
 
@@ -376,12 +376,12 @@ internal static partial class ToolPhases
             // diagnostics earlier runs left, as a park does.
             await runtime.CommitAsync(async (tx, _) =>
             {
-                if (Live.ToolSlot(await tx.DocAsync(Live.LiveDoc, runtime.ConversationId).ConfigureAwait(false), runtime.TaskId) is { } slot)
+                if (Live.ToolSlot(await tx.DocAsync(Live.LiveDoc, runtime.ConversationId).ConfigureAwait(false), runtime.TaskId, out var nestedSlot) is { } slot)
                 {
                     if (wake is null) Live.ClearProgress(slot);
                     else Live.ClearOutput(slot);
                     slot.Set("status", "running");
-                    if (Live.IsNested(slot)) slot.Set("arguments", args);
+                    if (nestedSlot) slot.Set("arguments", args);
                 }
             }, context).ConfigureAwait(false);
             await RunAsync(runtime, input, call, tool, args, new Resumed(wake, parked), context).ConfigureAwait(false);

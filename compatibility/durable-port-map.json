@@ -11,36 +11,47 @@
     "statusScope": "Release-baseline status/notes and immutable upstream pins are retained; currentImplementation points to the current source mapping. Source implementation is not runtime acceptance.",
     "candidate": {
       "source": {
-        "tag": "v1.6.0",
-        "commit": "faac585884ae2c013a6b1400f3e9e77f10b34bac",
-        "tree": "7b395e942aa81ffe0dba09ae2939184c200e4d3b"
+        "tag": "v1.7.0",
+        "commit": "fb0fe823539f6d04850f6e34748c01f01f212e1f",
+        "tree": "12bd22b80a5e430b42054f55b5cf7885320950fb"
       },
-      "status": "tested-with-limitations",
-      "overlay": "compatibility/durable-sync-1.6.0-overlay.json",
+      "status": "source-mapped",
+      "overlay": "compatibility/durable-sync-1.7.0-overlay.json",
       "preservedMap": "compatibility/durable-port-map.v1.5.0.json",
-      "note": "Top-level source pin, rows, status counts and notes remain historical v1.5.0 evidence. The candidate overlay carries the 1.6.0 source disposition and no completed-port assertion.",
-      "supersededNotes": [
-        {
-          "upstream": "packages/durable/src/codemode/describe.ts",
-          "names": [
-            "CodemodeNamespace",
-            "NamespaceOf"
-          ],
-          "current": "compatibility/durable-sync-1.6.0-overlay.json",
-          "note": "The 1.6.0 port removed CodemodeNamespace, its prefix and namespaceOf; namespacesOf is DurableCodemode.NamespacesOf. The overlay row carries the current location as nativeMapping."
-        },
-        {
-          "upstream": "packages/durable/src/codemode/index.ts",
-          "names": [
-            "CodemodeNamespace"
-          ],
-          "current": "compatibility/durable-sync-1.6.0-overlay.json",
-          "note": "CodemodeNamespace and CodemodeToolOptions.Namespaces were removed by the 1.6.0 port (durable-edge report, breaking native API changes). The overlay row is current."
-        }
-      ],
-      "acceptance": "compatibility/sync-1.6.0-acceptance.json"
+      "note": "The overlay identifies immutable upstream deltas. Row-level historical evidence remains pinned to its original release."
     },
     "previousCandidates": [
+      {
+        "source": {
+          "tag": "v1.6.0",
+          "commit": "faac585884ae2c013a6b1400f3e9e77f10b34bac",
+          "tree": "7b395e942aa81ffe0dba09ae2939184c200e4d3b"
+        },
+        "status": "tested-with-limitations",
+        "overlay": "compatibility/durable-sync-1.6.0-overlay.json",
+        "preservedMap": "compatibility/durable-port-map.v1.5.0.json",
+        "note": "Top-level source pin, rows, status counts and notes remain historical v1.5.0 evidence. The candidate overlay carries the 1.6.0 source disposition and no completed-port assertion.",
+        "supersededNotes": [
+          {
+            "upstream": "packages/durable/src/codemode/describe.ts",
+            "names": [
+              "CodemodeNamespace",
+              "NamespaceOf"
+            ],
+            "current": "compatibility/durable-sync-1.6.0-overlay.json",
+            "note": "The 1.6.0 port removed CodemodeNamespace, its prefix and namespaceOf; namespacesOf is DurableCodemode.NamespacesOf. The overlay row carries the current location as nativeMapping."
+          },
+          {
+            "upstream": "packages/durable/src/codemode/index.ts",
+            "names": [
+              "CodemodeNamespace"
+            ],
+            "current": "compatibility/durable-sync-1.6.0-overlay.json",
+            "note": "CodemodeNamespace and CodemodeToolOptions.Namespaces were removed by the 1.6.0 port (durable-edge report, breaking native API changes). The overlay row is current."
+          }
+        ],
+        "acceptance": "compatibility/sync-1.6.0-acceptance.json"
+      },
       {
         "source": {
           "tag": "v1.5.2",

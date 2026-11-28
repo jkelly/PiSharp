@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 1,
+  "sync": "1.7.0",
+  "source": {
+    "tag": "v1.7.0",
+    "commit": "fb0fe823539f6d04850f6e34748c01f01f212e1f",
+    "tree": "12bd22b80a5e430b42054f55b5cf7885320950fb"
+  },
+  "appliedAt": "2026-11-28T05:16:36.629Z",
+  "eligible": true,
+  "status": "tested-with-limitations",
+  "problems": [],
+  "scope": "File disposition in the frozen v1.6.0..v1.7.0 inventory. Runtime and upstream test files map to native behavior groups. Suite evidence applies to those groups, not one-to-one test equivalence or upstream test execution.",
+  "decision": "docs/decisions/0018-pi-1.7.0-sync.md",
+  "ledger": {
+    "path": "AI_DOCS/sync-1.7.0-source-validation.json",
+    "sha256": "3a1f0e5daac76acb4d985b49819e6f7b07275bcd7c9ce902768249e6ef6fb70d"
+  },
+  "coverage": {
+    "path": "AI_DOCS/sync-1.7.0-coverage.json",
+    "sha256": "ef62ef7e8e9f4f6de7755c9f7b2c8b6eb8e9e9c756860e8e71b9d3e5a1aba240"
+  },
+  "applicabilityInput": {
+    "path": "compatibility/sync-1.7.0-applicability.json",
+    "sha256": "0c4e401dceac9e58a2a7e4dfc145af9f7bfc34ce5896b9b527bb8e56a20ad802"
+  },
+  "suiteCount": 29,
+  "coverageGroups": 16,
+  "fileDispositions": {
+    "files": 1683,
+    "byStatus": {
+      "no-op": 1310,
+      "tested-with-limitations": 373
+    }
+  },
+  "limitations": [
+    "This scope validates the native behavior groups in the 1.7.0 coverage record. The source freeze and native tests do not establish complete upstream behavioral equivalence.",
+    "The original full clean-checkout ExtensionParity run lacked two sample manifests. Both sample cases passed after building the samples; the selected complete ExtensionParity report covers 181 cases including production installation.",
+    "Historical v0.99.1 Pi Messages qualification reported nine failures and one open outcome, versus six failures and one open outcome on the previous release. Three additional historical comparisons concern first-data-only and split-CRLF framing superseded by Pi 1.7. Current SSE regression cases passed.",
+    "The historical macOS MCP transport suite retained two failures also reproduced on the previous release. The Google preterminal resource-limit fixture exceeded the system JSON serializer limit on both revisions.",
+    "Suite-specific skips are recorded by case ID. Live provider accounts, physical Windows console delivery, upstream Chord v2 peer interoperability and full legacy qualification are outside this source acceptance.",
+    "Package qualification and publication have separate gates. These source receipts do not record a published or fully qualified package."
+  ],
+  "packageValidation": {
+    "status": "pending",
+    "scope": "This ledger records source validation only."
+  }
+}

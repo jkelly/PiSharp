@@ -67,6 +67,8 @@ The globals are `tools`, `text()`, `image()`, `console`, `exit()`, `store()` and
 
 `models` lists the model catalog and runs classifier and image models with the session's credentials: `models.classify()` answers typed questions about JSON state, and `models.generateImages()` makes images. Chat models are listed but can't be run from scripts. As in Pi, the listed models leave out `headers`, which can hold credentials; the calls still send them. At most four such calls run at once per script; more wait for a slot. Their cost counts toward the session. See [Classifier and image models](/docs/guides/providers/#classifier-and-image-models).
 
+In the **1.7.0 candidate**, to request image dimensions, pass a third argument such as `{ aspectRatio: "16:9", size: "2K" }` to `models.generateImages(model, context, options)`. The provider determines which values the selected model supports.
+
 ## MCP tools
 
 With the default `codemode` exposure, an MCP server's tools aren't declared to the model and aren't listed in the `codemode` description either, so the description stays the same while servers connect. Scripts find them with `searchTools()`, `describeTool()`, `describeNamespace()` or `ALL_TOOLS`, and call them like any other tool. Before a script runs, PiSharp waits for the servers it may reach: those whose names appear in the script, or all of them when it uses `searchTools()`, `describeTool()`, `describeNamespace()` or `ALL_TOOLS`. See [MCP](/docs/guides/mcp/) for the other exposures.

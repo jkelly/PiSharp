@@ -1,4 +1,4 @@
-// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/agent/src/proxy.ts.
+// Pi fb0fe823539f6d04850f6e34748c01f01f212e1f (MIT): packages/agent/src/proxy.ts.
 // Ported to plain ESM for the PiSharp Node extension bridge (TypeScript types stripped mechanically; behaviour unchanged).
 import { createAssistantMessageEventStream, ToolCallArgumentsStream } from "../pi-ai.mjs";
 function buildProxyRequestOptions(options) {
@@ -98,10 +98,10 @@ export function streamProxy(model, context, options) {
                 if (options.signal?.aborted) {
                     throw new Error("Request aborted by user");
                 }
-                buffer += decoder.decode(value, {
+                const lines = decoder.decode(value, {
                     stream: true
-                });
-                const lines = buffer.split("\n");
+                }).split("\n");
+                lines[0] = buffer + lines[0];
                 buffer = lines.pop() || "";
                 for (const line of lines){
                     processLine(line);

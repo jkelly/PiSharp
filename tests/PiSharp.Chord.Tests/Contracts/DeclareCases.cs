@@ -53,6 +53,13 @@ internal static partial class Program
             Equal("app.session-info", info.Name, "local name");
             Equal(3L, info.Version, "local version");
         }),
+        Case("contracts.declare.query-args-are-json-only", () =>
+            Throws<ArgumentException>(() => Contract.Local("notes", new()
+            {
+                Version = 1,
+                Params = new(),
+                Members = new() { ["notes"] = Queries(Str(), ("byOwner", Obj(("id", Bytes())))) },
+            }), "query rejects nested bytes in its arguments")),
         .. RemoteRefusals(),
         .. LocalRefusals(),
         Case("contracts.declare.refuse-a-remote-declaration-without-a-host-address", () =>

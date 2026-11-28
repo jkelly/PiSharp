@@ -1,4 +1,4 @@
-// Pi d86654abb8862e201933517d6f1fce9f88dd117f (MIT): google-vertex.ts:streamSimple/getGoogleBudget,
+// Pi fb0fe823539f6d04850f6e34748c01f01f212e1f (MIT): google-vertex.ts:streamSimple/getGoogleBudget,
 // google-shared.ts:resolveGoogleThinkingLevel/usesGoogleThinkingLevel, models.ts and simple-options.ts.
 using System.Collections.Immutable;
 using System.Text.Json;
@@ -92,9 +92,9 @@ public sealed class GoogleVertexSimpleTransport : IChatTransport
         {
             var mapped = _levelMap.ValueKind == JsonValueKind.Object && _levelMap.TryGetProperty(clamped, out var value) &&
                 value.ValueKind == JsonValueKind.String ? value.GetString()!.ToLowerInvariant() : clamped;
-            if (mapped is not ("minimal" or "low" or "medium" or "high")) throw GoogleData.Fail(GoogleFailure.UnsupportedValue);
+            if (mapped is not ("minimal" or "low" or "medium" or "high" or "xhigh")) throw GoogleData.Fail(GoogleFailure.UnsupportedValue);
             resolved = mapped;
-            thinking = UsesThinkingLevel(_model.Id) ? new(true, Level: mapped.ToUpperInvariant()) : new(true, BudgetTokens: Budget(mapped));
+            thinking = UsesThinkingLevel(_model.Id) ? new(true, Level: mapped.ToUpperInvariant()) : new(true, BudgetTokens: Budget(mapped == "xhigh" ? "high" : mapped));
         }
         return new(estimate, maximum, GetSupportedThinkingLevels(), clamped, resolved, thinking);
     }

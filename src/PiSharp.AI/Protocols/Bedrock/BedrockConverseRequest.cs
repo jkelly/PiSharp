@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/ai/src/api/bedrock-converse-stream.ts (stream request building:
+// Pi fb0fe823539f6d04850f6e34748c01f01f212e1f (MIT): packages/ai/src/api/bedrock-converse-stream.ts (stream request building:
 // convertMessages, buildSystemPrompt, convertToolConfig, buildAdditionalModelRequestFields, streamSimple and the model capability
 // predicates). The body is the ConverseStream REST JSON the SDK 3.1127.0 serializes (members in its schema's order, blobs as base64).
 using System.Collections.Immutable;
@@ -67,6 +67,8 @@ internal sealed class BedrockModel
         ContextWindow = Raw.TryGetProperty("contextWindow", out var window) && window.ValueKind == JsonValueKind.Number ? window.GetDouble() : 0;
         SupportsStrictMode = Raw.TryGetProperty("compat", out var compat) && compat.ValueKind == JsonValueKind.Object &&
             compat.TryGetProperty("supportsStrictMode", out var strict) && strict.ValueKind == JsonValueKind.True;
+        SupportsReasoningReplay = compat.ValueKind != JsonValueKind.Object ||
+            !compat.TryGetProperty("supportsReasoningReplay", out var replay) || replay.ValueKind != JsonValueKind.False;
         Cost = Raw.TryGetProperty("cost", out var cost) ? PromptLengthPricing.ReadCost(cost) : (0, 0, 0, 0, []);
     }
     internal ModelDescriptor Descriptor { get; }
@@ -79,6 +81,7 @@ internal sealed class BedrockModel
     internal double MaxTokens { get; }
     internal double ContextWindow { get; }
     internal bool SupportsStrictMode { get; }
+    internal bool SupportsReasoningReplay { get; }
     internal (decimal Input, decimal Output, decimal CacheRead, decimal CacheWrite, ImmutableArray<TokenRateTier> Tiers) Cost { get; }
 }
 
@@ -236,6 +239,7 @@ internal static partial class BedrockConverseRequest
                                 break;
                             case "thinking":
                             {
+                                if (!model.SupportsReasoningReplay) break;
                                 if (block["redacted"] is JsonValue redacted && redacted.TryGetValue<bool>(out var isRedacted) && isRedacted)
                                 {
                                     // Encrypted reasoning replays its stored payload; an undecodable payload drops the block.
@@ -381,7 +385,14 @@ internal static partial class BedrockConverseRequest
 
     private static JsonObject? BuildAdditionalModelRequestFields(BedrockModel model, BedrockConverseOptions options, BedrockStreamOptions stream, string? configuredRegion)
     {
-        if (stream.Reasoning is not { } level || !model.Reasoning) return null;
+        if (!model.Reasoning) return null;
+        var candidates = MatchCandidates(model.Id, model.Name);
+        if (!IsAnthropicClaude(model) && !candidates.Any(value => value.Contains("gpt-", StringComparison.Ordinal)))
+        {
+            var (_, effort) = ProviderTranscript.MappedLevel(model.Raw, stream.Reasoning ?? "off");
+            return effort is null ? null : new JsonObject { ["reasoning_effort"] = effort };
+        }
+        if (stream.Reasoning is not { } level) return null;
         if (IsAnthropicClaude(model))
         {
             // GovCloud rejects thinking.display and block binding.
@@ -411,7 +422,6 @@ internal static partial class BedrockConverseRequest
             if (!adaptive && (options.InterleavedThinking ?? true)) result["anthropic_beta"] = new JsonArray("interleaved-thinking-2025-05-14");
             return result;
         }
-        var candidates = MatchCandidates(model.Id, model.Name);
         if (candidates.Any(value => value.Contains("gpt-oss", StringComparison.Ordinal)))
             return new JsonObject { ["reasoning_effort"] = GptOssEffort[level] };
         if (candidates.Any(value => value.Contains("gpt-", StringComparison.Ordinal)))

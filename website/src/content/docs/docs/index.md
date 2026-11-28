@@ -5,7 +5,7 @@ description: What PiSharp is, what it targets, and where to start.
 
 PiSharp is an independent native .NET implementation of the [Pi coding agent](https://pi.dev). It targets .NET 10. The agent itself runs without Node; Node is only needed for TypeScript extensions.
 
-The published **PiSharp 1.6.0** release follows **Pi v1.6.0** and **Pi Durable 1.6.0**, pinned to `faac5858`. Source, hosted and package validation retain explicit limitations; matching the version does not claim complete parity. See [How versions work](/docs/versioning/) and the [1.6.0 release notes](https://github.com/jkelly/PiSharp/blob/main/docs/release-notes/1.6.0.md).
+Published **PiSharp {{PISHARP_VERSION}}** targets Pi and Pi Durable **1.6.0**. The latest patch fixes interactive startup on Apple Silicon. The **1.7.0 source candidate** adds terminal session resume, profile selection, updated model catalogs and a revised Durable API. See [Quickstart](/docs/quickstart/) for installation and [How versions work](/docs/versioning/) for the release history.
 
 ## What's included
 
@@ -29,7 +29,7 @@ PiSharp 1.5.0 moves from Pi v1.2.0 to Pi v1.5.0, with Pi 1.3.0 and 1.4.0 in betw
 - Tool arguments are validated as JSON Schema by a port of Pi's pi-schema.
 - [`pisharp update`](/docs/reference/cli/) can run your own update command, and `/share` can upload to Radius ([`sessionShareDestination`](/docs/reference/settings/)).
 
-The custom agents, media tools, service tiers and the durable device server, new in 1.2.0.2, are still PiSharp's own and experimental.
+The custom agents, media tools, service tiers and the durable device server, new in 1.2.0.2, are PiSharp additions. The service tier API is stable from 1.6.0.1. The custom agents, media tools and durable device server remain experimental.
 
 ## New in 1.6.0
 
@@ -57,5 +57,5 @@ The [1.5.0.1 release](/docs/guides/gap-updates/) adds Chord/hosting, Durable.Sto
 - [Parity](/parity/): how close PiSharp is to Pi today, and the differences that remain.
 
 :::note
-PiSharp is an independent port, not an official Pi release. Pi's own [documentation](https://github.com/earendil-works/pi/tree/v1.5.0/packages/coding-agent/docs) describes the behaviour PiSharp follows. Where PiSharp differs, these pages and the [Parity](/parity/) page say so.
+PiSharp is an independent port, not an official Pi release. Pi's own [documentation](https://github.com/earendil-works/pi/tree/v1.6.0/packages/coding-agent/docs) describes the behaviour PiSharp follows. Where PiSharp differs, these pages and the [Parity](/parity/) page say so.
 :::

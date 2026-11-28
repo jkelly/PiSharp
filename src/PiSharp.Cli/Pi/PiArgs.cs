@@ -21,6 +21,14 @@ internal sealed class PiArgs
     public string? ListModels;
     /// <summary>Source <c>projectTrustOverride</c>: <c>--approve</c> true, <c>--no-approve</c> false.</summary>
     public bool? ProjectTrustOverride;
+    public List<string> ResumeFlags { get; } = [];
+    private static readonly HashSet<string> RetainedFlags = new(StringComparer.Ordinal)
+    {
+        "--tools", "-t", "--exclude-tools", "-xt", "--no-tools", "-nt", "--no-builtin-tools", "-nbt", "--tool-policy",
+        "--extension", "-e", "--no-extensions", "-ne", "--no-mcp", "--skill", "--no-skills", "-ns",
+        "--prompt-template", "--no-prompt-templates", "-np", "--theme", "--no-themes", "--no-context-files", "-nc",
+        "--system-prompt", "--append-system-prompt", "--approve", "-a", "--no-approve", "-na", "--models", "--offline"
+    };
     public List<string> Messages { get; } = [];
     public List<string> FileArgs { get; } = [];
     /// <summary>Unknown long flags (potential extension flags): name to a string value, or null for a boolean flag.</summary>
@@ -29,6 +37,22 @@ internal sealed class PiArgs
 
     internal static readonly ImmutableArray<string> ValidThinkingLevels = ["off", "minimal", "low", "medium", "high", "xhigh", "max"];
     internal static bool IsValidThinkingLevel(string level) => ValidThinkingLevels.Contains(level, StringComparer.Ordinal);
+
+    internal static bool TakeAgentDir(ref string[] args, out string? directory)
+    {
+        directory = null;
+        if (!args.Contains("--agent-dir", StringComparer.Ordinal)) return true;
+        var remaining = new List<string>();
+        for (var i = 0; i < args.Length; i++)
+        {
+            if (args[i] == "--") { remaining.AddRange(args[i..]); break; }
+            if (args[i] != "--agent-dir") { remaining.Add(args[i]); continue; }
+            if (++i == args.Length || args[i].Length == 0) return false;
+            directory = args[i];
+        }
+        args = remaining.ToArray();
+        return true;
+    }
 
     /// <summary>Source normalizeSessionName: the trimmed name, or null when it is empty.</summary>
     internal static string? NormalizeSessionName(string value)
@@ -52,6 +76,7 @@ internal sealed class PiArgs
         var result = new PiArgs();
         for (var i = 0; i < args.Count; i++)
         {
+            var start = i;
             var arg = args[i];
             bool HasValue() => i + 1 < args.Count;
             if (arg == "--")
@@ -176,6 +201,8 @@ internal sealed class PiArgs
             }
             else if (arg.StartsWith('-')) result.Diagnostics.Add(new("error", $"Unknown option: {arg}"));
             else result.Messages.Add(arg);
+            if (RetainedFlags.Contains(arg))
+                for (var j = start; j <= i; j++) result.ResumeFlags.Add(args[j]);
         }
         return result;
     }

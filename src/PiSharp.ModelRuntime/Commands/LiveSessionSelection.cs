@@ -59,10 +59,14 @@ internal record LiveRouteRuntime(Func<string, string?> ReadEnvironment, Func<Htt
             {
                 foreach (var (provider, _) in await store.ListAsync(cancellationToken).ConfigureAwait(false))
                     if (await store.ReadEntryAsync(provider, cancellationToken).ConfigureAwait(false) is { } entry)
-                        stored[provider] = new(entry.Type, entry.Key, entry.Environment,
-                            // github-copilot filterModels: the OAuth credential's availableModelIds (IMPL-A1 keeps JSON-valued fields).
-                            entry.Type == "oauth" && PiSharp.AI.Authentication.OAuth.GitHubCopilotOAuth.AvailableModels(
-                                await store.ReadAsync(provider, cancellationToken).ConfigureAwait(false)) is { } ids ? [.. ids] : null);
+                    {
+                        var oauth = entry.Type == "oauth" ? await store.ReadAsync(provider, cancellationToken).ConfigureAwait(false) : null;
+                        var ids = PiSharp.AI.Authentication.OAuth.GitHubCopilotOAuth.AvailableModels(oauth);
+                        stored[provider] = new(entry.Type, entry.Key, entry.Environment, ids is null ? null : [.. ids])
+                        {
+                            GatewayConfig = provider == "radius" && oauth?.ProviderJson.TryGetValue("gatewayConfig", out var config) == true ? config : null
+                        };
+                    }
             }
             catch (Exception error) when (error is InvalidDataException or IOException or UnauthorizedAccessException or PiSharp.AI.Authentication.OAuth.OAuthLifecycleException)
             { stored.Clear(); } // An unreadable store leaves the environment as the only credential source, as for availability upstream.

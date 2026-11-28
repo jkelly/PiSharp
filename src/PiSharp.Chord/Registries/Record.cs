@@ -1,3 +1,4 @@
+// Pi fb0fe823539f6d04850f6e34748c01f01f212e1f (MIT): packages/chord/src/registries/record.ts (v1.7.0 updates).
 // Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/chord/src/next/registries/record.ts
 //
 // A registry on a host (slice 8 §1): its provider (replaced or removed by a reload, slice 7b §3), its contributions in table order
@@ -153,9 +154,10 @@ internal sealed class RegistryRecord
     public void Serve(long version, IRegistryProvider served, object? callbackOwner = null)
     {
         ArgumentNullException.ThrowIfNull(served);
+        if (provider?.Version != version) composition = Never;
         provider = new Provider(version, served, callbackOwner);
         table = null;
-        Invalidate();
+        AvailabilityChanged();
     }
 
     /// <summary>
@@ -167,7 +169,7 @@ internal sealed class RegistryRecord
         provider = null;
         table = null;
         composition = Never;
-        Invalidate();
+        AvailabilityChanged();
     }
 
     /// <summary>The first composition of a served registry, at <c>load</c>'s publication or a reload's commit, inside its batch.</summary>
@@ -287,6 +289,12 @@ internal sealed class RegistryRecord
             for (var index = 0; index < valuesInOrder.Count; index++) valuesInOrder[index].Relisted();
             return;
         }
+        AvailabilityChanged();
+    }
+
+    // A missing or mismatched provider leaves the table dirty. Its readers still need a new notification.
+    private void AvailabilityChanged()
+    {
         dirty = true;
         for (var index = 0; index < valuesInOrder.Count; index++) valuesInOrder[index].Recomposed();
     }

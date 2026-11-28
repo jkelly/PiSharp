@@ -3,7 +3,7 @@ title: Durable library
 description: "Build crash-safe agents on PiSharp.Durable: the harness, storage, tools and tests."
 ---
 
-`PiSharp.Durable` is the library behind [`pisharp durable`](/docs/guides/durable/). It is a port of Pi's `pi-durable` v1.5.0 package: an agent harness that commits every model turn, streamed partial, tool call and queued message to storage before anything sees it. Open the same storage after a crash and the harness finishes what was running. This page shows how to build your own agent on it.
+`PiSharp.Durable` powers [`pisharp durable`](/docs/guides/durable/). It commits model turns, streamed partials, tool calls and queued messages to storage so a host can reopen a conversation after a crash. The published {{PISHARP_VERSION}} libraries follow Pi Durable 1.6.0.
 
 :::caution[Experimental]
 The durable libraries ship as experimental from PiSharp 1.2.0.1, the members marked "(from 1.2.0.2)" from 1.2.0.2, and those marked "(from 1.5.0)" from 1.5.0. Every public type carries `[Experimental("PISHARP_DURABLE001")]`, and the API may change or be removed in any release without notice. PiSharp 1.5.0 follows `pi-durable` v1.5.0 and breaks code and storage written for 1.2.0.x: see [Upgrading from 1.2.0.x](#upgrading-from-120x).
@@ -51,6 +51,23 @@ PiSharp 1.5.0 follows `pi-durable` v1.5.0, which changed the API and the stored 
 - **One-time effects.** The built-in tools are declared with a different key order, so the next turn of a 1.2.0.x conversation records their declarations once more. A model request that was in flight when a 1.2.0.x process died counts as a failed attempt and waits for the retry backoff, instead of being sent again.
 - **Streamed progress is deferred.** Partial answers and tool output are stored about once a second, so a crash loses up to about a second of streamed text. `ProgressSettings.PersistWithinMs = 0` stores each one at once.
 - **The examples were renumbered** to upstream v1.5.0's names (see [Samples](#samples)).
+
+## Migrating to the 1.7.0 API
+
+When moving an extension or host to the 1.7.0 source candidate, update transaction-scoped submissions. Replace `conversation.SubmitAsync(tx, draft)` with `conversation.AdmitAsync(tx, draft)`. It returns the submission ID. Outside a transaction, continue to use `conversation.SubmitAsync(draft, context)` to get an `ISubmission` that you can wait on.
+
+Read the public result’s `Kind` to decide which fields to consume. For example, a signal with kind `value` can carry JSON null. An expired signal has kind `expired`.
+
+| Result | Kind values |
+| --- | --- |
+| Tool park | `sleep`, `wait` |
+| Extension wrapper | `tool`, `section` |
+| Yield hook decision | `continue`, `tasks` |
+| Compaction decision | `decline`, `summary` |
+| Signal state | `value`, `expired` |
+| Storage commit result | `stored`, `refused` |
+
+Use `ToolPark.Sleeping` and `ToolPark.Waiting` to construct parks. A tool wrapper that receives a park should return that same object. Stored signal memos retain their existing format.
 
 ## New in 1.6.0
 
@@ -141,7 +158,7 @@ Cancel = async (_, api, ctx) => { /* stop the external work of a parked call tha
 
 `TextOutput`, `Trigger` and `ciResult` stand for your own code. The pieces:
 
-- `ToolPark.Sleeping(until, signals, checkpoint)` sleeps until a time, a signal or both. `ToolPark.Waiting(on, policy, checkpoint)` waits for tasks. A `ToolPark` converts to a `ToolExecutionResult`, so `Execute`'s signature is unchanged.
+- `ToolPark.Sleeping(until, signals, checkpoint)` sleeps until a time, a signal or both. `ToolPark.Waiting(on, policy, checkpoint)` waits for tasks. A `ToolPark` derives from `ToolExecutionResult`, so `Execute`'s signature is unchanged.
 - An invalid park, such as one with a result field, ends the call with an `invalid_park` result.
 - `ToolRegistration.Cancel` cleans up the external work of a parked call that is aborted.
 - Wrappers never park: a composite's park that its base did not return is invalid.
@@ -158,7 +175,7 @@ BeforeTool = async (call, api, ctx) =>
 {
     var state = await api.ReadSignalAsync(approval, key, ctx);
     if (state is null) return new BeforeToolDecision(Sleep: new GateSleep(until, ImmutableArray.Create(approval.Key(key))));
-    if (state.Expired) return new BeforeToolDecision(Block: "No approval within a day");
+    if (state.Kind == "expired") return new BeforeToolDecision(Block: "No approval within a day");
     return IsAllowed(state.Value) ? null : new BeforeToolDecision(Block: "Not approved");
 },
 ```
@@ -470,7 +487,7 @@ From `ISession` it has `CommitAsync` (four overloads over an `ITx`, each with op
 | `AgentAsync(context)` | The agent choices resolved against the registry: model, thinking level, extensions, tools, sections, instructions, cwd. |
 | `ConfigureAsync(change, context)` | Applies an `AgentChange`. |
 | `SubmitAsync(draft, context)` | Queues an input or a passive write; returns an `ISubmission`. |
-| `SubmitAsync(tx, draft)` | (from 1.5.0) Admits a submission inside your own commit, with the same rules, and returns its id. |
+| `AdmitAsync(tx, draft)` | Admits a submission inside your own commit, with the same rules, and returns its id. |
 | `CompactAsync(instructions, context)` | Starts a manual compaction task. |
 | `ResetAsync(handoff, context)` | Starts the context over from a reset entry. |
 | `CommitAsync(...)` | A transaction scoped to this conversation. |
@@ -809,7 +826,7 @@ To test your own agent, script the model as in [A first agent](#a-first-agent), 
 
 From 1.5.0, `HarnessOptions.Telemetry` takes a host-owned `ITelemetryContext` from `PiSharp.Telemetry`, with optional propagation and metrics; without one, nothing is recorded. `DurableTelemetry.Schema` lists its typed spans, events and metrics. Attributes hold record IDs and fixed categories, never messages, arguments or results; the IDs point to the transcript. Every async call takes a `DurableContext`, which carries cancellation and its current span (`DurableContext.Background` never cancels and records nothing).
 
-- **`pi.durable.submit`** covers a public submission and its commit. For `SubmitAsync(tx, draft)` it covers the admission only: its result is provisional until your commit is stored, and the commit's events go to your commit's context. Each input starts a new trace linked to its caller's current span, and a write is a child of its caller. A duplicate `RequestId` keeps the original submission and its carrier.
+- **`pi.durable.submit`** covers a public submission and its commit. For `AdmitAsync(tx, draft)` it covers the admission only: its result is provisional until your commit is stored, and the commit's events go to your commit's context. Each input starts a new trace linked to its caller's current span, and a write is a child of its caller. A duplicate `RequestId` keeps the original submission and its carrier.
 - **`pi.durable.phase`** covers one run or abort phase of a task, with its decision commit; never the next phase, a durable wait or a restart. It names the task, the phase, the attempt, whether it resumed and its outcome, and for a tool phase the tool and call. Nested tasks and background compactions inherit the phase that created them, and model requests get its context. Hooks add no spans.
 - **Failures.** A faulted, failed or orphaned outcome sets error status with `task_faulted`, `task_failed` or `task_orphaned` and the outcome's diagnostic, cut to 500 characters. Diagnostics can contain caller content; no exception detail is recorded. An aborted outcome keeps status ok.
 - **Reports.** Every `OnReport` report also becomes a `pi.durable.report` event on its current span, with only its kind, a fixed reason, the extension and the task ID. `pi.durable.reports` counts reports by kind. The `OnReport` callback is unchanged.
@@ -834,7 +851,7 @@ The [model contracts](https://github.com/jkelly/PiSharp/blob/main/src/PiSharp.Du
 
 ## Registries from Chord
 
-`RegistryReader.Create` in `PiSharp.Durable.Store` from 1.5.0.1 adapts a registry composed by the real Chord v2 host, so a harness follows extensions contributed by plugins. [Examples 35–37](/docs/embed/durable-store/) now exercise host load, shared storage, followed views and registry contributions. The adapter is published as experimental.
+`RegistryReader.Create` in `PiSharp.Durable.Store` from 1.5.0.1 adapts a registry composed by the second-generation PiSharp Chord host, so a harness follows extensions contributed by plugins. [Examples 35–37](/docs/embed/durable-store/) now exercise host load, shared storage, followed views and registry contributions. The adapter is published as experimental.
 
 ## Samples
 

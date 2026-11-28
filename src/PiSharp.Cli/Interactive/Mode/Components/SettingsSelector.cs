@@ -50,9 +50,8 @@ internal sealed class SettingsConfig
     public bool HideThinkingBlock { get; init; }
     /// <summary>"off" | "final" | "streaming".</summary>
     public string MermaidRenderingMode { get; init; } = "streaming";
-    public bool ShowCacheMissNotices { get; init; }
+    public Func<string, bool> Notice { get; init; } = _ => false;
     public bool CollapseChangelog { get; init; }
-    public bool EnableInstallTelemetry { get; init; }
     /// <summary>"fork" | "tree" | "none".</summary>
     public string DoubleEscapeAction { get; init; } = "tree";
     /// <summary>"default" | "no-tools" | "user-only" | "labeled-only" | "all".</summary>
@@ -103,9 +102,8 @@ internal sealed class SettingsCallbacks
     public Action<string>? OnThemePreview { get; init; }
     public Action<bool> OnHideThinkingBlockChange { get; init; } = _ => { };
     public Action<string> OnMermaidRenderingModeChange { get; init; } = _ => { };
-    public Action<bool> OnShowCacheMissNoticesChange { get; init; } = _ => { };
+    public Action<string, bool> OnNoticeChange { get; init; } = (_, _) => { };
     public Action<bool> OnCollapseChangelogChange { get; init; } = _ => { };
-    public Action<bool> OnEnableInstallTelemetryChange { get; init; } = _ => { };
     public Action<string> OnDoubleEscapeActionChange { get; init; } = _ => { };
     public Action<string> OnTreeFilterModeChange { get; init; } = _ => { };
     public Action<bool> OnShowHardwareCursorChange { get; init; } = _ => { };
@@ -425,6 +423,14 @@ internal sealed class SettingsSelectorComponent : Container
         })];
     }
 
+    private static readonly (string Key, string Label, string Description)[] NoticeTypes =
+    [
+        ("cacheMisses", "Cache misses", "Show a notice when a response re-bills a significant part of the prompt cache"),
+        ("cacheWarming", "Cache warming", "Show the cost of cache warming requests"),
+        ("compactionCosts", "Compaction costs", "Show the cost of compactions and branch summaries"),
+        ("reasoningDrops", "Reasoning drops", "Show a notice when a provider drops reasoning items from a request")
+    ];
+
     public SettingsSelectorComponent(SettingsConfig config, SettingsCallbacks callbacks)
     {
         var supportsImages = TerminalImage.GetCapabilities().Images != ImageProtocol.None;
@@ -517,11 +523,17 @@ internal sealed class SettingsSelectorComponent : Container
             },
             new()
             {
-                Id = "cache-miss-notices",
-                Label = "Cache miss notices",
-                Description = "Show transcript notices for cache costs and provider recovery diagnostics",
-                CurrentValue = config.ShowCacheMissNotices ? "true" : "false",
-                Values = ["true", "false"],
+                Id = "notices",
+                Label = "Notices",
+                Description = "Notices about cache misses, cache warming, compaction costs and dropped reasoning",
+                CurrentValue = "configure",
+                Submenu = (_, done) => new SettingsList(
+                    NoticeTypes.Select(item => new SettingItem
+                    {
+                        Id = item.Key, Label = item.Label, Description = item.Description,
+                        CurrentValue = config.Notice(item.Key) ? "true" : "false", Values = ["true", "false"]
+                    }).ToList(), 4, Themes.GetSettingsListTheme(),
+                    (key, value) => callbacks.OnNoticeChange(key, value == "true"), () => done(null, null)),
             },
             new()
             {
@@ -538,14 +550,6 @@ internal sealed class SettingsSelectorComponent : Container
                 Description = "Disable verbose printing at startup (header: keep only the startup header)",
                 CurrentValue = config.QuietStartup is bool quiet ? (quiet ? "true" : "false") : config.QuietStartup.ToString() ?? "false",
                 Values = ["true", "header", "false"],
-            },
-            new()
-            {
-                Id = "install-telemetry",
-                Label = "Install telemetry",
-                Description = "Send an anonymous version/update ping after changelog-detected updates",
-                CurrentValue = config.EnableInstallTelemetry ? "true" : "false",
-                Values = ["true", "false"],
             },
             new()
             {
@@ -695,7 +699,7 @@ internal sealed class SettingsSelectorComponent : Container
             {
                 Id = "fullscreen-copy-on-select",
                 Label = "Fullscreen copy on select",
-                Description = "Automatically copy selected text in fullscreen mode; disable to copy selections with Ctrl+X",
+                Description = $"Automatically copy selected text in fullscreen mode; disable to copy selections with {KeybindingHints.KeyDisplayText("app.message.copy")}",
                 CurrentValue = config.FullscreenCopyOnSelect ? "true" : "false",
                 Values = ["true", "false"],
             },
@@ -856,10 +860,8 @@ internal sealed class SettingsSelectorComponent : Container
                 case "cache-warming-mode": callbacks.OnCacheWarmingModeChange(newValue); break;
                 case "hide-thinking": callbacks.OnHideThinkingBlockChange(newValue == "true"); break;
                 case "mermaid-rendering": callbacks.OnMermaidRenderingModeChange(newValue); break;
-                case "cache-miss-notices": callbacks.OnShowCacheMissNoticesChange(newValue == "true"); break;
                 case "collapse-changelog": callbacks.OnCollapseChangelogChange(newValue == "true"); break;
                 case "quiet-startup": callbacks.OnQuietStartupChange(newValue == "header" ? "header" : newValue == "true"); break;
-                case "install-telemetry": callbacks.OnEnableInstallTelemetryChange(newValue == "true"); break;
                 case "default-project-trust":
                     foreach (var entry in DefaultProjectTrustLabels)
                         if (entry.Label == newValue) { callbacks.OnDefaultProjectTrustChange(entry.Value); break; }

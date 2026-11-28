@@ -24,7 +24,7 @@ internal static class DurableErrors
     }
 }
 
-/// <summary>A transaction read a table after its first table write, or admitted a submission (<c>SubmitAsync(tx, draft)</c>) after it. Read
+/// <summary>A transaction read a table after its first table write, or admitted a submission (<c>AdmitAsync(tx, draft)</c>) after it. Read
 /// every required row, and admit, before writing (upstream <c>ReadAfterWrite</c>).</summary>
 /// <param name="operation">The call, such as <c>Tx.task()</c> or <c>submit(tx, draft)</c>.</param>
 public sealed class ReadAfterWriteException(string operation)

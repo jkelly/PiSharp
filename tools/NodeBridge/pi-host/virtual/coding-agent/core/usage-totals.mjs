@@ -1,4 +1,4 @@
-// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/coding-agent/src/core/usage-totals.ts.
+// Pi fb0fe823539f6d04850f6e34748c01f01f212e1f (MIT): packages/coding-agent/src/core/usage-totals.ts.
 // Ported to plain ESM for the PiSharp Node extension bridge (TypeScript types stripped mechanically; behaviour unchanged).
 export function createUsageTotals() {
     return {
@@ -27,6 +27,9 @@ export function combineUsage(first, second) {
         } : {},
         ...first.reasoning !== undefined || second.reasoning !== undefined ? {
             reasoning: (first.reasoning ?? 0) + (second.reasoning ?? 0)
+        } : {},
+        ...first.imageOutput !== undefined || second.imageOutput !== undefined ? {
+            imageOutput: (first.imageOutput ?? 0) + (second.imageOutput ?? 0)
         } : {},
         totalTokens: first.totalTokens + second.totalTokens,
         cost: {

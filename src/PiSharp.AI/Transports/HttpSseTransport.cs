@@ -68,7 +68,8 @@ public sealed class HttpSseTransport
     // Source providers may need to acquire input before an awaited response hook.
     // Transfer the physical owner first, so a rejecting hook cannot dispose an active pull.
     // Existing canonical preparation deliberately keeps its zero-acquisition path above.
-    internal async ValueTask<OwnedResponse> PrepareOwnedAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+    internal async ValueTask<OwnedResponse> PrepareOwnedAsync(HttpRequestMessage request, CancellationToken cancellationToken,
+        Func<HttpResponseMessage, CancellationToken, ValueTask>? onRejected = null)
     {
         cancellationToken.ThrowIfCancellationRequested();
         var response = await _client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken)
@@ -76,7 +77,12 @@ public sealed class HttpSseTransport
         try
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (!response.IsSuccessStatusCode) throw await RejectAsync(response, cancellationToken).ConfigureAwait(false);
+            if (!response.IsSuccessStatusCode)
+            {
+                if (onRejected is not null) await onRejected(response, cancellationToken).ConfigureAwait(false);
+                cancellationToken.ThrowIfCancellationRequested();
+                throw await RejectAsync(response, cancellationToken).ConfigureAwait(false);
+            }
             return new(response, _options);
         }
         catch (Exception preparationError)

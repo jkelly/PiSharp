@@ -324,6 +324,7 @@ internal sealed class PiNodeOwner(PiExtensionHost host, PiLoadedExtension initia
                                 ran.TryGetProperty("cancelled", out var cancelled) && cancelled.ValueKind == JsonValueKind.True,
                                 ran.TryGetProperty("truncated", out var truncated) && truncated.ValueKind == JsonValueKind.True,
                                 ran.TryGetProperty("fullOutputPath", out var full) && full.ValueKind == JsonValueKind.String ? full.GetString() : null)
+                            { FullOutputError = ran.TryGetProperty("fullOutputError", out var spillError) ? spillError.GetString() : null }
                         };
                     return null;
                 }));

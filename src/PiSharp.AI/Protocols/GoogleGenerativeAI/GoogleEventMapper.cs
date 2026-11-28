@@ -1,4 +1,4 @@
-// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/ai/src/api/google-generative-ai.ts (response mapping) and google-shared.ts (mapStopReason).
+// Pi fb0fe823539f6d04850f6e34748c01f01f212e1f (MIT): packages/ai/src/api/google-generative-ai.ts (response mapping) and google-shared.ts (mapStopReason).
 // Native progress is immutable.
 using System.Collections.Immutable;
 using System.Text.Json;
@@ -19,7 +19,9 @@ internal sealed class GoogleEventMapper
     private TokenUsage _usage = TokenUsage.Zero;
     private StopReason _reason = StopReason.Pending;
     private JsonFields _extra = JsonFields.Empty;
-    private long _characters;
+    private long _characters, _chunks;
+    private string? _promptBlock;
+    private string ProviderName => _request.Model.Api == "google-vertex" ? "Google Vertex" : "Google";
     internal GoogleFailure? FailureKind { get; private set; }
     internal GoogleEventMapper(ChatRequest request, GoogleGenerativeAIOptions options) { _request = request; _options = options; }
     internal StreamStarted Start() => new(Message(StopReason.Pending));
@@ -48,7 +50,26 @@ internal sealed class GoogleEventMapper
         // @google/genai generateContentResponseFromMldev/FromVertex keeps only the response fields it knows: a JSON value that is not
         // an object (null, array, string, number) carries none, and a frame's `error` member is dropped (an in-stream error is only
         // raised for a whole read chunk, in the decoder). Neither ends the stream.
+        _chunks++;
         var value = chunk.Value; if (value.ValueKind != JsonValueKind.Object) return [];
+        if (_promptBlock is null && value.TryGetProperty("promptFeedback", out var feedback) &&
+            feedback.ValueKind == JsonValueKind.Object && GoogleData.String(feedback, "blockReason") is { Length: > 0 } reason)
+        {
+            var details = new List<string> { $"{ProviderName} prompt blocked: {reason}" };
+            if (GoogleData.String(feedback, "blockReasonMessage") is { Length: > 0 } message) details.Add(message);
+            if (feedback.TryGetProperty("safetyRatings", out var ratings) && ratings.ValueKind == JsonValueKind.Array)
+            {
+                var labels = new List<string>();
+                foreach (var rating in ratings.EnumerateArray())
+                {
+                    if (rating.ValueKind != JsonValueKind.Object || GoogleData.String(rating, "category") is not { Length: > 0 } category) continue;
+                    labels.Add(GoogleData.String(rating, "probability") is { Length: > 0 } probability ? $"{category} ({probability})" : category);
+                }
+                if (labels.Count > 0) details.Add($"Safety rating{(labels.Count == 1 ? "" : "s")}: {string.Join(", ", labels)}");
+            }
+            _promptBlock = string.Join(". ", details);
+            Charge(_promptBlock.Length);
+        }
         var frames = new List<StreamEvent>();
         var responseId = GoogleData.String(value, "responseId");
         if (!_extra.TryGet("responseId", out _) && !string.IsNullOrEmpty(responseId))
@@ -196,10 +217,12 @@ internal sealed class GoogleEventMapper
     internal IReadOnlyList<StreamEvent> EndContent() { var frames = new List<StreamEvent>(); End(frames); return frames; }
     internal StreamTerminalEvent Finish()
     {
-        // google-vertex.ts names its provider in this text; google-generative-ai.ts does not.
-        if (_reason == StopReason.Pending) return Error(_request.Model.Api == "google-vertex"
-            ? new GoogleGenerativeAIException(GoogleFailure.UnexpectedEof, "Google Vertex stream ended without a finish reason")
-            : GoogleData.Fail(GoogleFailure.UnexpectedEof), false);
+        if (_reason == StopReason.Pending)
+        {
+            if (_promptBlock is not null) return Error(new GoogleGenerativeAIException(GoogleFailure.ProviderError, _promptBlock), false);
+            var message = $"{ProviderName} stream ended without a finish reason after receiving {_chunks} {(_chunks == 1 ? "chunk" : "chunks")}";
+            return Error(new GoogleGenerativeAIException(GoogleFailure.UnexpectedEof, message), false);
+        }
         if (_reason == StopReason.Error)
         {
             var raw = _extra.TryGet("rawStopReason", out var value) ? value!.Value.GetString() : "";

@@ -1,3 +1,4 @@
+// Pi fb0fe823539f6d04850f6e34748c01f01f212e1f (MIT): packages/chord/src/context/index.ts (v1.7.0 updates).
 // Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/chord/src/context/index.ts (Context, BACKGROUND_CONTEXT, TODO_CONTEXT,
 // withTelemetry, withAbortSignal, withoutAbortSignal, withCancel)
 //
@@ -115,6 +116,13 @@ public sealed class ChordContext
         ArgumentNullException.ThrowIfNull(context);
         var controller = new CancellationTokenSource();
         return (WithAbortSignal(controller.Token, context), controller.Cancel);
+    }
+
+    // A cancelled wait leaves the work running. Observe its eventual failure even if it had already settled.
+    internal static void ObserveAbandoned(Task task)
+    {
+        _ = task.ContinueWith(static finished => { _ = finished.Exception; }, CancellationToken.None,
+            TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
     }
 
     /// <summary>Adds <paramref name="value"/> to the counter <paramref name="counter"/> of the telemetry's metrics, if it has metrics

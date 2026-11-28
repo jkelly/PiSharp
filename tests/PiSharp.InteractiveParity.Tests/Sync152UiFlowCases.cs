@@ -36,15 +36,12 @@ internal static class Sync152UiFlowCases
         Check(!Changelog.TryParseVersion("latest", out _), "invalid marker distinguished");
         await using var pi = new InteractiveHarness("sync152-invalid-marker");
         pi.Write(Path.Combine(pi.AgentDir, "settings.json"), "{\"lastChangelogVersion\":\"broken\"}");
-        var telemetry = 0;
         pi.Configure = context => context with
         {
             ParseChangelogEntries = () => [new(1, 5, 2, "## [1.5.2]\nshould not appear")],
-            ReportInstallTelemetry = (_, _) => telemetry++
         };
         Start(pi); await pi.WaitFor("escape interrupt");
         Equal(Field<string>(pi.Mode!, "version"), Field<InteractiveSettings>(pi.Mode!, "settings").LastChangelogVersion, "invalid app marker replaced");
-        Equal(0, telemetry, "repair is not an installation event");
         Check(!pi.Terminal.Text.Contains("should not appear", StringComparison.Ordinal), "no stale notes");
 
         var package = pi.Write("extension/package.json", "{\"name\":\"test\",\"version\":\"1.5.2\"}");
@@ -70,7 +67,7 @@ internal static class Sync152UiFlowCases
         {
             var mode = pi.Mode!;
             var chat = Field<Container>(mode, "chatContainer");
-            Field<InteractiveSettings>(mode, "settings").SetShowCacheMissNotices(true);
+            Field<InteractiveSettings>(mode, "settings").SetNotice("cacheWarming", true);
             chat.Clear();
             JsonObject Warm(double cost, string note) => new() { ["note"] = note, ["usage"] = new JsonObject { ["cost"] = new JsonObject { ["total"] = cost } } };
             Call(mode, "AddCacheWarmingUsage", Warm(1, "a"));
@@ -83,7 +80,7 @@ internal static class Sync152UiFlowCases
             chat.AddChild(new Text("intervening content"));
             Call(mode, "AddCacheWarmingUsage", Warm(5, "b"));
             Equal(7, chat.Children.Count, "intervening content prevents merge");
-            Field<InteractiveSettings>(mode, "settings").SetShowCacheMissNotices(false);
+            Field<InteractiveSettings>(mode, "settings").SetNotice("cacheWarming", false);
             Call(mode, "AddCacheWarmingUsage", Warm(6, "b"));
             Equal(7, chat.Children.Count, "disabled notices ignored");
         });

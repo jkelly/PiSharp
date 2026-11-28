@@ -1,4 +1,4 @@
-// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/coding-agent/src/core/tools/truncate.ts.
+// Pi fb0fe823539f6d04850f6e34748c01f01f212e1f (MIT): packages/coding-agent/src/core/tools/truncate.ts.
 // Ported to plain ESM for the PiSharp Node extension bridge (TypeScript types stripped mechanically; behaviour unchanged).
 export const DEFAULT_MAX_LINES = 2000;
 export const DEFAULT_MAX_BYTES = 50 * 1024;
@@ -12,6 +12,9 @@ function splitLinesForCounting(content) {
         lines.pop();
     }
     return lines;
+}
+function isBlankLine(line) {
+    return line.trim().length === 0;
 }
 export function formatSize(bytes) {
     if (bytes < 1024) {
@@ -121,10 +124,11 @@ export function truncateTail(content, options = {}) {
         const lineBytes = Buffer.byteLength(line, "utf-8") + (outputLinesArr.length > 0 ? 1 : 0);
         if (outputBytesCount + lineBytes > maxBytes) {
             truncatedBy = "bytes";
-            if (outputLinesArr.length === 0) {
-                const truncatedLine = truncateStringToBytesFromEnd(line, maxBytes);
+            const remainingBytes = maxBytes - outputBytesCount - (outputLinesArr.length > 0 ? 1 : 0);
+            if (outputLinesArr.length === 0 || !isBlankLine(line) && outputLinesArr.every(isBlankLine) && remainingBytes > 0) {
+                const truncatedLine = truncateStringToBytesFromEnd(line, remainingBytes);
                 outputLinesArr.unshift(truncatedLine);
-                outputBytesCount = Buffer.byteLength(truncatedLine, "utf-8");
+                outputBytesCount += lineBytes - Buffer.byteLength(line, "utf-8") + Buffer.byteLength(truncatedLine, "utf-8");
                 lastLinePartial = true;
             }
             break;

@@ -6,8 +6,7 @@ namespace PiSharp.CodingAgent;
 /// <summary>
 /// client-identity.ts <c>getClientIdentity</c>: how the coding agent's requests identify it to providers, a detailed
 /// <c>User-Agent</c> with the Pi version PiSharp tracks (<see cref="ClientIdentities.FormatUserAgent"/>, decision 0013 Identity).
-/// Upstream attributes requests to Pi (<c>PI_ATTRIBUTION</c>) while install telemetry is enabled. PiSharp sends no attribution,
-/// whatever <c>enableInstallTelemetry</c> says (owner decision 2026-11-05, "Use safe defaults", core.client-identity-attribution):
+/// Upstream attributes requests to Pi (<c>PI_ATTRIBUTION</c>). PiSharp sends no attribution (owner decision 2026-11-05, "Use safe defaults", core.client-identity-attribution):
 /// PiSharp must not report as Pi, so attribution is <c>null</c>, which also turns off attribution set by an identity below it.
 /// </summary>
 internal static class CodingAgentClientIdentity

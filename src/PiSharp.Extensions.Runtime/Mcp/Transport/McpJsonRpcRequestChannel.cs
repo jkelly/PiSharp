@@ -207,7 +207,7 @@ public sealed class McpJsonRpcRequestChannel : IMcpAdmittedRequestChannel, IMcpN
         {
             lock (gate)
             {
-                if (closed || !pending.TryGetValue(McpWireJson.Key(value.GetProperty("id")), out var entry) || !entry.Accepting) return ValueTask.CompletedTask;
+                if (closed || !pending.TryGetValue(McpWireJson.OwnRequestKey(value.GetProperty("id")), out var entry) || !entry.Accepting) return ValueTask.CompletedTask;
                 entry.Accepting = false;
                 if (value.TryGetProperty("error", out var error))
                     entry.Reply.TrySetException(new McpRemoteErrorException(error.GetProperty("code").GetDouble(), error.GetProperty("message").GetString()!, error.TryGetProperty("data", out var data) ? JsonData.FromElement(data) : null));
@@ -268,7 +268,7 @@ public sealed class McpJsonRpcRequestChannel : IMcpAdmittedRequestChannel, IMcpN
         if (value.ValueKind != JsonValueKind.Object || !value.TryGetProperty("progressToken", out var progressId) || !McpWireJson.Id(progressId) || !value.TryGetProperty("progress", out var number) || number.ValueKind != JsonValueKind.Number || !number.TryGetDouble(out var amount)) return;
         lock (gate)
         {
-            if (closed || !pending.TryGetValue(McpWireJson.Key(progressId), out var entry) || !entry.Accepting || entry.Options.OnProgress is not { } callback) return;
+            if (closed || !pending.TryGetValue(McpWireJson.OwnRequestKey(progressId), out var entry) || !entry.Accepting || entry.Options.OnProgress is not { } callback) return;
             if (entry.Timer is not null) entry.Timer.Change(TimeSpan.FromMilliseconds(Math.Min(entry.Options.TimeoutMilliseconds, uint.MaxValue - 1d)), Timeout.InfiniteTimeSpan);
             var total = value.TryGetProperty("total", out var supplied) && supplied.ValueKind == JsonValueKind.Number && supplied.TryGetDouble(out var t) ? (double?)t : null;
             var text = value.TryGetProperty("message", out var message) && message.ValueKind == JsonValueKind.String ? message.GetString() : null;

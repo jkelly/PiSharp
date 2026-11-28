@@ -1,6 +1,6 @@
 ---
 title: Chord and native hosting
-description: The experimental Chord v2 host, native plugins, HTTP and worker processes.
+description: The experimental Chord host, its v1 peer protocol, native plugins, HTTP and worker processes.
 ---
 
 :::caution[Experimental — from 1.5.0.1]
@@ -11,7 +11,9 @@ description: The experimental Chord v2 host, native plugins, HTTP and worker pro
 PiSharp 1.6.0 follows Chord 1.6.0: events, named queries, lists, column sets, shared holds, admission, and sign-ins in place of the app kit's sessions. Everyone signs in again after the update, and 1.5.x and 1.6.0 hosts do not interoperate over trusted links. See [New in 1.6.0](#new-in-160).
 :::
 
-Chord is the reactive host and store used by the [Durable.Store adapter](/docs/embed/durable-store/). The v2 implementation includes host roots and resources, facet loading/reload, jobs, links, remote routes, registries, state watches and a SQLite store. See [host source](https://github.com/jkelly/PiSharp/tree/main/src/PiSharp.Chord/Host) and the [current mapping](https://github.com/jkelly/PiSharp/blob/main/compatibility/gap-status-2026-11-08.json) for implementation and test boundaries.
+Chord is the reactive host and store used by the [Durable.Store adapter](/docs/embed/durable-store/). PiSharp’s second-generation host includes host roots and resources, facet loading/reload, jobs, links, remote routes, registries, state watches and a SQLite store. See [host source](https://github.com/jkelly/PiSharp/tree/main/src/PiSharp.Chord/Host) and the [current mapping](https://github.com/jkelly/PiSharp/blob/main/compatibility/gap-status-2026-11-08.json) for implementation and test boundaries.
+
+The **1.7.0 source candidate** updates the storage and watch operations used by Durable. Its peer connections still use Chord protocol v1. Upstream Chord v2 peers require a separate protocol migration.
 
 ## Native plugin generations
 
@@ -35,7 +37,7 @@ The entry implements `IChordPlugin.CreateFacet(PluginContext)`; `PluginContext.K
 | Request lifetime | Routes, streams and sockets hold a Chord root through response settlement. Contributions include wrappers, allowed hosts, relay validation, origins and CSP. Cross-site webhooks receive an anonymous root. |
 | Shutdown | Close HTTP before the host, then dispose the plugin runtime. Requests drain to `CloseTimeout`, after which their scopes are cancelled. |
 | `ProcessWorkers` | Create before host load and include its stable facet. Supply executable/arguments, build provider, principal factory, authorization, lock directory and the server host's `Store` (required). An optional `Admit` decides per principal and address before a worker starts. Authorized, admitted references start addressed workers; `ProcessWorkerState.Incarnation` names the running one. |
-| `WorkerMain.RunAsync` | Child entry point; the callback creates the host and loads plugins through `WorkerContext.LoadPluginsAsync`. Separate current-user named pipes carry private control and framed Chord v2 traffic. |
+| `WorkerMain.RunAsync` | Child entry point; the callback creates the host and loads plugins through `WorkerContext.LoadPluginsAsync`. Separate current-user named pipes carry private control messages and framed Chord protocol v1 traffic. |
 
 Worker crash/retry, reload and retained process-tree cleanup are tested with real child processes in [hosting tests](https://github.com/jkelly/PiSharp/tree/main/tests/PiSharp.Chord.Hosting.Tests). The framing is distinct from Node IPC. The package does not provide JavaScript module evaluation, npm installation, browser asset compilation or arbitrary Node child compatibility.
 
@@ -115,4 +117,4 @@ A commit runs a live query again only when its writes can change it. The store i
 
 ## Legacy Chord is separate
 
-The source also implements the older **protocol-4** runtime and cluster/manager behavior. It has its own lifecycle and compatibility tests and is not interchangeable with the v2 host or wire protocol. Use the [source mapping](https://github.com/jkelly/PiSharp/blob/main/compatibility/gap-status-2026-11-08.json) to select the appropriate runtime; the native hosting package describes v2 only.
+The source also implements an older **protocol-4** runtime with its own cluster manager, lifecycle and compatibility tests. PiSharp’s second-generation host uses peer protocol v1. Use the [source mapping](https://github.com/jkelly/PiSharp/blob/main/compatibility/gap-status-2026-11-08.json) to select the appropriate runtime; the native hosting package covers the second-generation host.

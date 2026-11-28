@@ -56,8 +56,19 @@ public abstract class SystemOneClassifier : IClassifierApi
             var body = await ClassifierShared.PostAsync(Label, Url(model), model, Payload(model, request), requestOptions,
                 cancellationToken).ConfigureAwait(false);
             var result = Output(body);
+            if (ProviderRequest.IsString(result, "id", out var responseId) && responseId.Length > 0) output = output with { ResponseId = responseId };
             // Set before parsing answers: a request with malformed answers was still billed.
-            if (ClassifierShared.ParseUsage(ClassifierShared.Field(result, "usage"), model) is { } usage) output = output with { Usage = usage };
+            if (ClassifierShared.Field(result, "usage") is { } raw && ClassifierShared.ParseUsage(raw, model) is { } usage)
+            {
+                if (Protocols.ProviderShared.ProviderCost.IsOpenRouter(model.Provider, model.BaseUrl) &&
+                    Protocols.ProviderShared.ProviderCost.OpenRouterReportedTotal(raw) is { } total)
+                {
+                    var cost = model.Cost.Calculate(usage.Input, usage.Output, usage.CacheRead, usage.CacheWrite);
+                    cost.Total = total;
+                    usage = ProviderRequest.Usage(usage.Input, usage.Output, usage.CacheRead, usage.CacheWrite, usage.TotalTokens, cost, true);
+                }
+                output = output with { Usage = usage };
+            }
             return output with { Answers = ParseAnswers(ClassifierShared.Field(result, "answers"), context) };
         }
         catch (Exception error)
@@ -169,7 +180,7 @@ public sealed class TypeSafeSystemOneClassifier : SystemOneClassifier
     protected override Uri Url(ClassifierModel model) => new(new Uri(TrimmedBase(model)), "systemone");
     // OpenRouter by provider ID, which survives baseUrl overrides, or by host, which covers regional endpoints.
     private protected override (string ImageInput, bool SendImageOptInHeader) DetectCompat(ClassifierModel model) =>
-        model.Provider == "openrouter" || model.BaseUrl.Contains("openrouter.ai", StringComparison.Ordinal) ? ("state-image-urls", false) : ("assets", true);
+        Protocols.ProviderShared.ProviderCost.IsOpenRouter(model.Provider, model.BaseUrl) ? ("state-image-urls", false) : ("assets", true);
     protected override JsonNode Payload(ClassifierModel model, JsonObject request)
     {
         var payload = new JsonObject { ["model"] = model.Id };

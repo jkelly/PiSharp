@@ -1,3 +1,4 @@
+// Pi fb0fe823539f6d04850f6e34748c01f01f212e1f (MIT): packages/chord/src/context/index.ts (v1.7.0 updates).
 // Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/chord/src/next/documents/keyed-slot.ts
 //
 // Keyed slots (slice 6a §1.2, §4, §10, §11): the documents of one keyed name on one object, by key. In memory, every present document
@@ -488,8 +489,19 @@ internal sealed class KeyedSlot : IDocumentSlot, IPersistedSlot, IDeclaredSlot, 
 
     /// <summary><paramref name="task"/>, or a cancellation once <paramref name="signal"/> aborts: an aborted signal fails at once, even for a
     /// settled task (upstream <c>awaitWithContext</c>).</summary>
-    private static Task AwaitWithContext(Task task, CancellationToken signal) =>
-        signal.IsCancellationRequested ? Task.FromCanceled(signal) : task.WaitAsync(signal);
+    private static async Task AwaitWithContext(Task task, CancellationToken signal)
+    {
+        try
+        {
+            signal.ThrowIfCancellationRequested();
+            await task.WaitAsync(signal).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (signal.IsCancellationRequested)
+        {
+            ChordContext.ObserveAbandoned(task);
+            throw;
+        }
+    }
 
     /// <summary>The resident at <paramref name="key"/>, migrated to the slot's version first when it is older (migration on access).</summary>
     private Resident? ResidentAt(string key)

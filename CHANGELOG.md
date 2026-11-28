@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.7.0]
+
+Unreleased source candidate for Pi and Pi Durable 1.7.0.
+
+- Terminals supporting OSC 7577 can resume a session with its agent directory and startup restrictions. Use `--agent-dir <directory>` to select a profile.
+- The CLI now uses the 1.7.0 model catalog and extension runtime. Image generation accepts aspect ratio and size options. Image and classifier usage can include reasoning and image output tokens.
+- The experimental Durable API exposes tagged tool parks, hook results, storage commit results and signal states. Inside a transaction, use `AdmitAsync(tx, draft)`. Ordinary submissions still use `SubmitAsync(draft, context)`.
+- Transcript notices can be configured separately for cache misses, cache warming, compaction costs and dropped reasoning. The CLI no longer sends install telemetry.
+
+## [1.6.0.2] - 2026-11-27
+
+Fixed interactive startup on Apple Silicon by reading the terminal dimensions through .NET.
+
 ## [1.6.0.1] - 2026-11-23
 
 PiSharp 1.6.0.1 is a C#-only patch release on the unchanged Pi v1.6.0 and Pi Durable 1.6.0 baseline. All 31 packages (29 libraries, `PiSharp.Cli`, and `PiSharp.Templates`) are available on NuGet. It graduates seven Tier-1 `[Experimental]` diagnostic IDs to stable, completes Durable 1.6.0 host/workflow wiring and storage indexing, fixes transport retry classification, and trims the CLI tool archive. See the [release notes](https://github.com/jkelly/PiSharp/blob/main/docs/release-notes/1.6.0.1.md) and [publication evidence](https://github.com/jkelly/PiSharp/blob/main/AI_DOCS/release-1.6.0.1-publication-results.md) for full details and validation boundaries.

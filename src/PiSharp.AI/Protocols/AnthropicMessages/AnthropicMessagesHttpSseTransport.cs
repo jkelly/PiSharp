@@ -201,7 +201,7 @@ public sealed class AnthropicMessagesHttpSseTransport : IChatTransport
                         _request = prepared.CompleteClaimed(replacement, token);
                     }
                     else _request = (attempt == 0 ? transport._requestFactory(request,token) : fallback!(token)) ?? throw Protocol();
-                    var send = transport.SendThreadRequestAsync(_request, Diagnostics, token);
+                    var send = transport.SendThreadRequestAsync(_request, Diagnostics, token, transport._hooks!.OnResponse is null ? null : ObserveResponseAsync);
                     actual = send;
                     try { var sent = await Await(send).ConfigureAwait(false); _request = sent.Request; _response = sent.Response; break; }
                     catch (Exception error) when (attempt == 0 && !token.IsCancellationRequested && AnthropicStrictToolsFallback.IsStrictToolLimitRejection(error) &&
@@ -216,21 +216,27 @@ public sealed class AnthropicMessagesHttpSseTransport : IChatTransport
                 actual = _response.AcquireBodyAsync(token).AsTask();
                 _body = await Await((Task<Stream>)actual).ConfigureAwait(false);
                 // Acquisition claims the body but performs no SSE read or mapper mutation.
-                if (transport._hooks!.OnResponse is { } hook)
+                if (transport._hooks!.OnResponse is not null)
                 {
-                    actual = _response.InspectAsync(async (physical,cancellation) =>
-                    {
-                        var headers = physical.Headers.Concat(physical.Content.Headers).GroupBy(h=>h.Key,StringComparer.OrdinalIgnoreCase)
-                            .ToImmutableDictionary(group=>group.Key.ToLowerInvariant(),group=>string.Join(", ",group.SelectMany(h=>h.Value)),StringComparer.Ordinal);
-                        Task? callback = null;
-                        try { callback = Invoke(hook,new AnthropicMessagesResponseInfo((int)physical.StatusCode,headers),request.Model,cancellation,"onResponse");await Await(callback).ConfigureAwait(false); }
-                        catch (Exception error) { Primary(error,callback,isHookFailure:true); throw; }
-                    },token).AsTask();
+                    actual = _response.InspectAsync(ObserveResponseAsync, token).AsTask();
                     await Await(actual).ConfigureAwait(false);
                 }
                 token.ThrowIfCancellationRequested(); return true;
             }
             catch (Exception error) { Primary(error,actual); return false; }
+        }
+        private async ValueTask ObserveResponseAsync(HttpResponseMessage response, CancellationToken cancellation)
+        {
+            var headers = response.Headers.Concat(response.Content.Headers).GroupBy(h => h.Key, StringComparer.OrdinalIgnoreCase)
+                .ToImmutableDictionary(group => group.Key.ToLowerInvariant(), group => string.Join(", ", group.SelectMany(h => h.Value)), StringComparer.Ordinal);
+            Task? callback = null;
+            try
+            {
+                callback = Invoke(transport._hooks!.OnResponse!, new AnthropicMessagesResponseInfo((int)response.StatusCode, headers),
+                    request.Model, cancellation, "onResponse");
+                await Await(callback).ConfigureAwait(false);
+            }
+            catch (Exception error) { Primary(error, callback, isHookFailure: true); throw; }
         }
         internal async Task<bool> MoveNextAsync(IAsyncEnumerator<StreamEvent> iterator)
         {
@@ -351,12 +357,13 @@ public sealed class AnthropicMessagesHttpSseTransport : IChatTransport
     }
 
     private async Task<(HttpRequestMessage Request, HttpSseTransport.OwnedResponse Response)> SendThreadRequestAsync(
-        HttpRequestMessage first, AnthropicRequestDiagnostics diagnostics, CancellationToken token)
+        HttpRequestMessage first, AnthropicRequestDiagnostics diagnostics, CancellationToken token,
+        Func<HttpResponseMessage, CancellationToken, ValueTask>? onRejected = null)
     {
         token.ThrowIfCancellationRequested();
         diagnostics.Thread = null;
         if (!first.Options.TryGetValue(AnthropicThreadContext.RequestKey, out var context) || context.Store.Prepare(context) is not { } thread)
-            return (first, await _http.PrepareOwnedAsync(first, token).ConfigureAwait(false));
+            return (first, await _http.PrepareOwnedAsync(first, token, onRejected).ConfigureAwait(false));
         HttpRequestMessage? current = null;
         try
         {
@@ -364,7 +371,7 @@ public sealed class AnthropicMessagesHttpSseTransport : IChatTransport
             first.Dispose();
             try
             {
-                var response = await _http.PrepareOwnedAsync(current, token).ConfigureAwait(false);
+                var response = await _http.PrepareOwnedAsync(current, token, onRejected).ConfigureAwait(false);
                 diagnostics.Thread = thread;
                 return (current, response);
             }
@@ -375,7 +382,7 @@ public sealed class AnthropicMessagesHttpSseTransport : IChatTransport
                 var unsupported = reason is "thread_unsupported_request" or "400";
                 current.Dispose(); current = null;
                 current = context.Rebuild(thread.RetryPayload(unsupported), token);
-                var response = await _http.PrepareOwnedAsync(current, token).ConfigureAwait(false);
+                var response = await _http.PrepareOwnedAsync(current, token, onRejected).ConfigureAwait(false);
                 if (unsupported) context.Store.Disable(thread);
                 else diagnostics.Thread = thread;
                 return (current, response);

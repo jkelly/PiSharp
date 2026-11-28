@@ -132,10 +132,10 @@ internal sealed class AuthJsonCredentialStore : IProviderCredentialSource
     }
 
     /// <summary>Source ModelRuntime.login for an api-key method: store <c>{"type":"api_key","key"?,"env"?}</c>.</summary>
-    public Task WriteApiKeyAsync(string provider, string? key, IReadOnlyDictionary<string, string>? environment, CancellationToken cancellationToken)
+    public async Task WriteApiKeyAsync(string provider, string? key, IReadOnlyDictionary<string, string>? environment, CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrEmpty(provider);
-        return WithLockAsync(document =>
+        await WithLockAsync(document =>
         {
             var entry = new JsonObject { ["type"] = "api_key" };
             if (key is not null) entry["key"] = key;
@@ -147,7 +147,8 @@ internal sealed class AuthJsonCredentialStore : IProviderCredentialSource
             }
             document[provider] = entry;
             return Task.FromResult(((OAuthCredentialSnapshot?)null, (JsonObject?)document));
-        }, cancellationToken);
+        }, cancellationToken).ConfigureAwait(false);
+        if (key is not null) PiSharp.Cli.Models.ConfigValueResolver.Process.ClearCacheEntry(key);
     }
 
     private async Task<T> WithLockAsync<T>(Func<JsonObject, Task<(T Result, JsonObject? Next)>> operation, CancellationToken token)

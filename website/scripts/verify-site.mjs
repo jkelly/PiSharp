@@ -65,6 +65,16 @@ for (const file of htmlFiles) {
 	}
 }
 
+// The feed contains published releases only. A newer source preview must never become the install version.
+const rss = readFileSync(join(distDir, 'changelog/rss.xml'), 'utf8');
+const published = rss.match(/<item><title>PiSharp ([0-9]+(?:\.[0-9]+){2,3})<\/title>/)?.[1];
+if (!published) throw new Error('The changelog feed must name a published PiSharp release.');
+const install = `dotnet tool install -g PiSharp.Cli --version ${published}`;
+for (const page of ['index.html', 'sdk/index.html', 'llms.txt']) {
+	if (!readFileSync(join(distDir, page), 'utf8').includes(install))
+		throw new Error(`${page} must offer the published CLI install command: ${install}`);
+}
+
 // Verify every entry in samples/agents/catalog.json appears on /samples/.
 const samplesPagePath = join(distDir, 'samples', 'index.html');
 if (!existsSync(samplesPagePath)) {

@@ -1,4 +1,4 @@
-// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/coding-agent/src/core/messages.ts.
+// Pi fb0fe823539f6d04850f6e34748c01f01f212e1f (MIT): packages/coding-agent/src/core/messages.ts.
 // Ported to plain ESM for the PiSharp Node extension bridge (TypeScript types stripped mechanically; behaviour unchanged).
 export const COMPACTION_SUMMARY_PREFIX = `The conversation history before this point was compacted into the following summary:
 
@@ -23,10 +23,15 @@ export function bashExecutionToText(msg) {
     } else if (msg.exitCode !== null && msg.exitCode !== undefined && msg.exitCode !== 0) {
         text += `\n\nCommand exited with code ${msg.exitCode}`;
     }
-    if (msg.truncated && msg.fullOutputPath) {
-        text += `\n\n[Output truncated. Full output: ${msg.fullOutputPath}]`;
+    if (msg.truncated) {
+        text += `\n\n[${bashTruncationNote(msg)}]`;
     }
     return text;
+}
+export function bashTruncationNote(msg) {
+    if (msg.fullOutputPath) return `Output truncated. Full output: ${msg.fullOutputPath}`;
+    if (msg.fullOutputError) return `Output truncated. Could not save the full output: ${msg.fullOutputError}`;
+    return "Output truncated";
 }
 export function createBranchSummaryMessage(summary, fromId, timestamp) {
     return {

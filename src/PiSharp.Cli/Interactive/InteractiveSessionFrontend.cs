@@ -470,6 +470,9 @@ internal sealed partial class InteractiveSessionFrontend : IDisposable, IRpcExte
         else if (result.TryGetProperty("exitCode", out var exit) && exit.GetInt32() != 0) parts.Add("(exit " + exit.GetRawText() + ")");
         if (result.GetProperty("truncated").GetBoolean() && result.TryGetProperty("fullOutputPath", out var full))
             parts.Add("Output truncated. Full output: " + full.GetString());
+        else if (result.GetProperty("truncated").GetBoolean())
+            parts.Add(result.TryGetProperty("fullOutputError", out var error) && error.ValueKind == JsonValueKind.String
+                ? "Output truncated. Could not save the full output: " + error.GetString() : "Output truncated");
         return parts.Count == 0 ? null : string.Join('\n', parts);
     }
     private void ClearDialogs() { dialog = null; dialogs.Clear(); dialogEditor.Clear(); dialogResponsePending = false; uiCharacters = 0; }

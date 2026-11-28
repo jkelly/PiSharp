@@ -1,4 +1,4 @@
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): coding-agent/src/cli/startup-ui.ts (createStartupTui, startStartupTui,
+// Pi fb0fe823539f6d04850f6e34748c01f01f212e1f (MIT): coding-agent/src/cli/startup-ui.ts (createStartupTui, startStartupTui,
 // showStartupSelector, showStartupInput, showFirstTimeSetup, shouldRunFirstTimeSetup), coding-agent/src/cli/session-picker.ts
 // (selectSession), coding-agent/src/cli/config-selector.ts (selectConfig) and the interactive prompts main.ts runs before the session\n// starts (project trust, missing session cwd).
 using System.Collections.Immutable;
@@ -49,7 +49,7 @@ internal sealed class StartupUi(string agentDir, string cwd, Func<string, string
         await Task.Delay(25);
     }
 
-    private async Task<T?> RunAsync<T>(Func<TuiMainScreen, InteractiveSettings, Action<T?>, IComponent> build, CancellationToken token, bool focusChild = true,
+    private async Task<T?> RunAsync<T>(Func<TuiMainScreen, InteractiveSettings, Action<T?>, IComponent> build, CancellationToken token, BlockedStatus? blocked = null,
         Func<IComponent, IComponent>? focus = null)
     {
         var settings = Settings();
@@ -69,6 +69,8 @@ internal sealed class StartupUi(string agentDir, string cwd, Func<string, string
                 });
                 ui.AddChild(component);
                 ui.SetFocus(focus?.Invoke(component) ?? component);
+                if (blocked is not null)
+                    ui.Terminal.SetProgramStatus(new(ProgramState.Blocked, InteractiveMode.AppName, blocked.Kind, blocked.Message));
                 Start(ui, settings);
             });
             return await result.Task;
@@ -81,18 +83,20 @@ internal sealed class StartupUi(string agentDir, string cwd, Func<string, string
     }
 
     /// <summary>showStartupSelector: the chosen option's value, or default when cancelled.</summary>
-    public Task<T?> ShowStartupSelectorAsync<T>(string title, IReadOnlyList<(string Label, T Value)> options, CancellationToken token = default) =>
+    public Task<T?> ShowStartupSelectorAsync<T>(string title, IReadOnlyList<(string Label, T Value)> options, CancellationToken token = default,
+        ProgramBlockedKind blockedKind = ProgramBlockedKind.Question) =>
         RunAsync<T>((ui, _, finish) => new ExtensionSelectorComponent(title, options.Select(option => option.Label).ToList(),
-            label => finish(options.First(option => option.Label == label).Value), () => finish(default), new ExtensionSelectorOptions(ui)), token);
+            label => finish(options.First(option => option.Label == label).Value), () => finish(default), new ExtensionSelectorOptions(ui)), token, BlockedStatus.ForDialog(blockedKind, title));
 
     /// <summary>showStartupInput.</summary>
-    public Task<string?> ShowStartupInputAsync(string title, string? placeholder, CancellationToken token = default) =>
-        RunAsync<string>((ui, _, finish) => new ExtensionInputComponent(title, placeholder, value => finish(value), () => finish(null), new ExtensionInputOptions(ui)), token);
+    public Task<string?> ShowStartupInputAsync(string title, string? placeholder, CancellationToken token = default,
+        ProgramBlockedKind blockedKind = ProgramBlockedKind.Question) =>
+        RunAsync<string>((ui, _, finish) => new ExtensionInputComponent(title, placeholder, value => finish(value), () => finish(null), new ExtensionInputOptions(ui)), token, BlockedStatus.ForDialog(blockedKind, title));
 
     /// <summary>The project trust prompt (core/project-trust.ts through ctx.ui.select).</summary>
     public async Task<ProjectTrustOption?> PromptProjectTrustAsync(string title, ImmutableArray<ProjectTrustOption> options, CancellationToken token)
     {
-        var chosen = await ShowStartupSelectorAsync(title, options.Select(option => (option.Label, option.Label)).ToList(), token);
+        var chosen = await ShowStartupSelectorAsync(title, options.Select(option => (option.Label, option.Label)).ToList(), token, ProgramBlockedKind.Permission);
         return chosen is null ? null : options.FirstOrDefault(option => option.Label == chosen);
     }
 

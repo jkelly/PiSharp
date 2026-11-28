@@ -9,6 +9,20 @@ internal static class Program
 
     private static async Task<int> Main(string[] args)
     {
+        try { return await RunAsync(args).ConfigureAwait(false); }
+        finally { ShutdownSignals.ProcessFinished(); }
+    }
+
+    private static async Task<int> RunAsync(string[] args)
+    {
+        var resumeToken = PiSharp.Tui.Pi.ProgramResume.TakeProgramResumeToken();
+        if (!Pi.PiArgs.TakeAgentDir(ref args, out var agentDirectory))
+        { Console.Error.WriteLine("Error: --agent-dir requires a directory"); return 1; }
+        if (agentDirectory is not null)
+        {
+            var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+            Environment.SetEnvironmentVariable(Pi.PiConfig.EnvAgentDir, Path.GetFullPath(Pi.PiPaths.NormalizePath(agentDirectory, home)));
+        }
         // Codemode scripts run in a child process of this executable (see PiSharp.Codemode.CodemodeWorker).
         if (args is [PiSharp.Codemode.CodemodeWorker.Argument])
             return await PiSharp.Codemode.CodemodeWorker.RunAsync(Console.OpenStandardInput(), Console.OpenStandardOutput()).ConfigureAwait(false);
@@ -27,7 +41,7 @@ internal static class Program
             return args is ["session", "terminal", ..] ? await RunSessionAsync(args).ConfigureAwait(false)
                 : ShutdownSignals.Process.Exit(await RunSessionAsync(args).ConfigureAwait(false));
         // Pi's own command line (plain pisharp, -p, --mode json|rpc, --help, --list-models, mcp, ...); the offline demo keeps its form.
-        if (args is not ["--offline-demo", ..]) return await RunPiAsync(args).ConfigureAwait(false);
+        if (args is not ["--offline-demo", ..]) return await RunPiAsync(args, resumeToken).ConfigureAwait(false);
         Stream standardOutput;
         try { standardOutput = StandardOutputStream.Open(); }
         catch (Exception) { return Fail("StandardOutputUnavailable", "Standard output could not be opened.", 1); }
@@ -62,7 +76,7 @@ internal static class Program
 
     /// <summary>The Pi-compatible entry over the real console. Standard output carries only the mode's own output: other console
     /// writes go to standard error (source output-guard.ts takeOverStdout).</summary>
-    private static async Task<int> RunPiAsync(string[] args)
+    private static async Task<int> RunPiAsync(string[] args, string? resumeToken)
     {
         Stream standardOutput;
         try { standardOutput = StandardOutputStream.Open(); }
@@ -82,7 +96,7 @@ internal static class Program
             var host = new Pi.PiHost
             {
                 Cwd = cwd ?? "", CwdMissing = cwd is null, Home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-                GetEnvironment = Environment.GetEnvironmentVariable, SetEnvironment = Environment.SetEnvironmentVariable,
+                ProgramResumeToken = resumeToken, GetEnvironment = Environment.GetEnvironmentVariable, SetEnvironment = Environment.SetEnvironmentVariable,
                 Stdout = output, Stderr = Console.Error,
                 Stdin = stdinRedirected ? new StreamReader(Console.OpenStandardInput(), new System.Text.UTF8Encoding(false), false) : Console.In,
                 StdinIsTty = !stdinRedirected, StdoutIsTty = !Console.IsOutputRedirected,

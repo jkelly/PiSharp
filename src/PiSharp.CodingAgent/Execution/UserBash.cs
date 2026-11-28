@@ -8,12 +8,20 @@ namespace PiSharp.CodingAgent.Execution;
 
 public sealed record UserBashExecutionRequest(string Command, string WorkingDirectory,
     bool? ExcludeFromContext = null, string? Id = null);
+[method: JsonConstructor]
 public sealed record UserBashResult(
     [property: JsonPropertyName("output")] string Output,
     [property: JsonPropertyName("exitCode"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] int? ExitCode,
     [property: JsonPropertyName("cancelled")] bool Cancelled,
     [property: JsonPropertyName("truncated")] bool Truncated,
-    [property: JsonPropertyName("fullOutputPath"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? FullOutputPath = null);
+    [property: JsonPropertyName("fullOutputPath"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? FullOutputPath = null)
+{
+    [JsonPropertyName("fullOutputError"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? FullOutputError { get; init; }
+
+    public UserBashResult(string output, int? exitCode, bool cancelled, bool truncated, string? fullOutputPath, string? fullOutputError)
+        : this(output, exitCode, cancelled, truncated, fullOutputPath) => FullOutputError = fullOutputError;
+}
 public sealed record UserBashExecutionUpdate(string? Id, string Delta);
 public delegate Task UserBashProgress(string sanitizedDelta);
 
@@ -44,7 +52,7 @@ public static class UserBash
     {
         ArgumentNullException.ThrowIfNull(result);
         if (!Sanitized(result.Output) || result.Output.Length > 51_200 || ToolOutputTruncator.Tail(result.Output).Truncated ||
-            result.Cancelled && result.ExitCode is not null || result.Truncated && result.FullOutputPath is null ||
+            result.Cancelled && result.ExitCode is not null || result.Truncated && result.FullOutputPath is null && string.IsNullOrEmpty(result.FullOutputError) ||
             result.FullOutputPath is not null && !Absolute(result.FullOutputPath))
             throw new ArgumentException("User Bash result is not a bounded sanitized finalized tail.", nameof(result));
     }
@@ -66,6 +74,7 @@ public static class UserBash
             if (result.ExitCode is { } exit) writer.WriteNumber("exitCode", exit);
             writer.WriteBoolean("cancelled", result.Cancelled); writer.WriteBoolean("truncated", result.Truncated);
             if (result.FullOutputPath is { } full) writer.WriteString("fullOutputPath", full);
+            if (result.FullOutputError is { } spillError) writer.WriteString("fullOutputError", spillError);
             writer.WriteNumber("timestamp", timestamp);
             if (request.ExcludeFromContext is { } excluded) writer.WriteBoolean("excludeFromContext", excluded);
             writer.WriteEndObject();

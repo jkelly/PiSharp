@@ -11,7 +11,7 @@ Boolean variables differ in what they accept. Where a row says `1`, only `1` tur
 
 | Variable | Effect | Default |
 | --- | --- | --- |
-| `PI_CODING_AGENT_DIR` | The agent folder: settings, credentials, sessions and resources. A leading `~` expands. | `~/.pi/agent` |
+| `PI_CODING_AGENT_DIR` | The agent folder: settings, credentials, sessions and resources. A leading `~` expands. The 1.7.0 candidate also accepts the higher-priority `--agent-dir` flag. | `~/.pi/agent` |
 | `PI_CODING_AGENT_SESSION_DIR` | The session folder. `--session-dir` wins over it; it wins over the `sessionDir` setting. | `<agentDir>/sessions` |
 | `PI_PACKAGE_DIR` | The folder PiSharp treats as its install folder, for its bundled docs and changelog. Meant for Nix or Guix store paths. | The tool's folder |
 | `PISHARP_PI_RUNTIME_DIR` | Parent folder of the version and policy cache for Pi's npm packages. PiSharp only. | `<agentDir>/pisharp/pi-runtime` |

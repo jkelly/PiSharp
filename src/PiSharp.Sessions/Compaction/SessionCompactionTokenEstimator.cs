@@ -34,7 +34,11 @@ public static class SessionCompactionTokenEstimator
                     _ => 0
                 };
         }
-        else if (message.Role == "bashExecution") chars = Length(body.GetProperty("command")) + Length(body.GetProperty("output"));
+        else if (message.Role == "bashExecution")
+        {
+            if (body.TryGetProperty("excludeFromContext", out var excluded) && excluded.ValueKind == JsonValueKind.True) return 0;
+            chars = Length(body.GetProperty("command")) + Length(body.GetProperty("output"));
+        }
         else if (message.Role is "branchSummary" or "compactionSummary") chars = Length(body.GetProperty("summary"));
         return Math.Ceiling(chars / 4);
     }

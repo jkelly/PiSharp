@@ -51,6 +51,7 @@ internal static partial class AuthSelectorFormatting
     public static string FormatAuthSelectorProviderStatus(AuthSelectorProvider provider)
     {
         if (provider.Status is not { } status) return theme.Fg("muted", " • not configured");
+        if (status.Type == "unresolved") return theme.Fg("muted", " • ") + theme.Fg("error", "stored key did not resolve");
         if (status.Type != provider.AuthType)
         {
             var label = $"{FormatAuthSelectorProviderType(status.Type, provider.Subscription)} configured";
@@ -71,7 +72,7 @@ internal static partial class AuthSelectorFormatting
             var authStatus = runtime.GetProviderAuthStatus(provider.Id);
             var status = authStatus.Configured
                 ? new AuthCheck(runtime.IsUsingOAuth(provider.Id) ? "oauth" : "api_key", authStatus.Label ?? authStatus.Source)
-                : null;
+                : authStatus.Source == "stored" ? new AuthCheck("unresolved") : null;
             var subscription = provider.OAuth?.IsSubscription == true;
             if ((authType is null || authType == "oauth") && provider.OAuth is { } oauth)
                 options.Add(new(provider.Id, provider.Name, "oauth", oauth, status, subscription));

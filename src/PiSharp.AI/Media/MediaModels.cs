@@ -27,6 +27,7 @@ public sealed record MediaModel(MediaKind Kind, string Provider, string Id, stri
     public ImmutableArray<KeyValuePair<string, string>> Headers { get; init; } = [];
     /// <summary>Embeddings: the vector size the model returns by default.</summary>
     public int? Dimensions { get; init; }
+    public ModelCost ImageCost { get; init; } = ModelCost.Free;
     /// <summary>Images and videos: whether reference images (or a first frame) are accepted.</summary>
     public bool AcceptsImages { get; init; }
     /// <summary>Images: whether the model can also answer in text.</summary>
@@ -42,7 +43,7 @@ public sealed record MediaModel(MediaKind Kind, string Provider, string Id, stri
 
     /// <summary>This image model as the image API contract's <see cref="ImageModel"/> at <paramref name="baseUrl"/>.</summary>
     public ImageModel ToImageModel(string baseUrl) => new(Id, DisplayName, Api, Provider, baseUrl,
-        AcceptsImages ? ["text", "image"] : ["text"], ModelCost.Free, OutputsText ? ["image", "text"] : ["image"]) { Headers = Headers };
+        AcceptsImages ? ["text", "image"] : ["text"], ImageCost, OutputsText ? ["image", "text"] : ["image"]) { Headers = Headers };
 }
 
 /// <summary>Where and how one request is sent: the resolved base URL, credential and headers. Secrets never appear in ToString.</summary>

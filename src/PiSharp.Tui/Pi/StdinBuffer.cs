@@ -1,4 +1,5 @@
-// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/tui/src/stdin-buffer.ts (based on OpenTUI, MIT Copyright (c) 2025 opentui).
+// Pi fb0fe823539f6d04850f6e34748c01f01f212e1f (MIT): packages/tui/src/stdin-buffer.ts (based on OpenTUI, MIT Copyright (c) 2025 opentui).
+using System.Text;
 using System.Text.RegularExpressions;
 
 namespace PiSharp.Tui.Pi;
@@ -12,7 +13,8 @@ public sealed partial class StdinBuffer
     private string buffer = "";
     private IDisposable? timer;
     private bool pasteMode;
-    private string pasteBuffer = "";
+    private readonly StringBuilder pasteBuffer = new();
+    private string pasteTail = "";
     private int? pendingKittyPrintable;
     public event Action<string>? Data;
     public event Action<string>? Paste;
@@ -122,9 +124,7 @@ public sealed partial class StdinBuffer
         buffer += str;
         if (pasteMode)
         {
-            pasteBuffer += buffer; buffer = "";
-            var endIndex = pasteBuffer.IndexOf(PasteEnd, StringComparison.Ordinal);
-            if (endIndex != -1) FinishPaste(endIndex);
+            AppendPaste(buffer);
             return;
         }
         var startIndex = buffer.IndexOf(PasteStart, StringComparison.Ordinal);
@@ -132,9 +132,8 @@ public sealed partial class StdinBuffer
         {
             if (startIndex > 0) foreach (var sequence in Extract(buffer[..startIndex]).Sequences) EmitData(sequence);
             pendingKittyPrintable = null;
-            pasteMode = true; pasteBuffer = buffer[(startIndex + PasteStart.Length)..]; buffer = "";
-            var endIndex = pasteBuffer.IndexOf(PasteEnd, StringComparison.Ordinal);
-            if (endIndex != -1) FinishPaste(endIndex);
+            pasteMode = true;
+            AppendPaste(buffer[(startIndex + PasteStart.Length)..]);
             return;
         }
         var (sequences, remainder) = Extract(buffer);
@@ -162,11 +161,24 @@ public sealed partial class StdinBuffer
         }
     }
 
-    private void FinishPaste(int endIndex)
+    private void AppendPaste(string chunk)
     {
-        var content = pasteBuffer[..endIndex];
-        var remaining = pasteBuffer[(endIndex + PasteEnd.Length)..];
-        pasteMode = false; pasteBuffer = ""; pendingKittyPrintable = null;
+        buffer = "";
+        var searched = pasteTail + chunk;
+        var end = searched.IndexOf(PasteEnd, StringComparison.Ordinal);
+        if (end < 0)
+        {
+            var tailStart = Math.Max(0, searched.Length - (PasteEnd.Length - 1));
+            pasteBuffer.Append(searched.AsSpan(0, tailStart));
+            pasteTail = searched[tailStart..];
+            return;
+        }
+        var content = pasteBuffer.Append(searched.AsSpan(0, end)).ToString();
+        var remaining = searched[(end + PasteEnd.Length)..];
+        pasteMode = false;
+        pasteBuffer.Clear();
+        pasteTail = "";
+        pendingKittyPrintable = null;
         Paste?.Invoke(content);
         if (remaining.Length > 0) Process(remaining);
     }
@@ -188,7 +200,7 @@ public sealed partial class StdinBuffer
         return result;
     }
 
-    public void Clear() { timer?.Dispose(); timer = null; buffer = ""; pasteMode = false; pasteBuffer = ""; pendingKittyPrintable = null; }
+    public void Clear() { timer?.Dispose(); timer = null; buffer = ""; pasteMode = false; pasteBuffer.Clear(); pasteTail = ""; pendingKittyPrintable = null; }
     public string Buffered => buffer;
     public void Destroy() => Clear();
 }

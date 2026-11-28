@@ -1,4 +1,4 @@
-// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/coding-agent/src/core/compaction/compaction.ts.
+// Pi fb0fe823539f6d04850f6e34748c01f01f212e1f (MIT): packages/coding-agent/src/core/compaction/compaction.ts.
 // Ported to plain ESM for the PiSharp Node extension bridge (TypeScript types stripped mechanically; behaviour unchanged).
 import { contentText, getCurrentSystemMessage, normalizeContext, retryAssistantCall, uuidv7 } from "../../../pi-ai.mjs";
 import { completeSimple } from "../../../pi-ai.mjs";
@@ -189,6 +189,7 @@ export function estimateTokens(message) {
             }
         case "bashExecution":
             {
+                if (message.excludeFromContext) return 0;
                 chars = message.command.length + message.output.length;
                 return Math.ceil(chars / 4);
             }

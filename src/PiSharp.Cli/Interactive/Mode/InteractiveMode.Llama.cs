@@ -631,7 +631,7 @@ internal sealed partial class InteractiveMode
             }
             if (keys.Matches(data, "tui.select.confirm"))
             {
-                var exact = ExactModel().IsMatch(query) ? query : null;
+                var exact = !selectionTouched && ExactModel().IsMatch(query) ? query : null;
                 var selected = exact ?? (selectedIndex < filteredResults.Count ? filteredResults[selectedIndex].Id : null);
                 if (!string.IsNullOrEmpty(selected)) Close(selected);
                 return;

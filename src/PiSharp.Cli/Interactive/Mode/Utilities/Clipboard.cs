@@ -125,7 +125,7 @@ internal static class Clipboard
             else
             {
                 if (environment.HasEnv("TERMUX_VERSION")) commands.Add(("termux-clipboard-set", []));
-                if (environment.HasEnv("WAYLAND_DISPLAY")) commands.Add(("wl-copy", []));
+                if (environment.HasEnv("WAYLAND_DISPLAY")) commands.Add(("wl-copy", ["--type", "text/plain"]));
                 if (environment.HasEnv("DISPLAY"))
                 {
                     commands.Add(("xclip", ["-selection", "clipboard"]));

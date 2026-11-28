@@ -67,13 +67,14 @@ public static class ToolOutputTruncator
             if ((long)outputBytes + lineBytes + (kept.Count > 0 ? 1 : 0) > options.MaxBytes)
             {
                 truncatedBy = ToolOutputTruncationLimit.Bytes;
-                if (fromTail && kept.Count == 0)
+                var remaining = options.MaxBytes - outputBytes - (kept.Count > 0 ? 1 : 0);
+                if (fromTail && (kept.Count == 0 || remaining > 0 && !string.IsNullOrWhiteSpace(line) && kept.All(string.IsNullOrWhiteSpace)))
                 {
                     var bytes = Utf8.GetBytes(line);
-                    var start = bytes.Length - options.MaxBytes;
+                    var start = bytes.Length - remaining;
                     while (start < bytes.Length && (bytes[start] & 0xc0) == 0x80) start++;
                     kept.Add(Utf8.GetString(bytes.AsSpan(start)));
-                    outputBytes = bytes.Length - start;
+                    outputBytes += bytes.Length - start + (kept.Count > 1 ? 1 : 0);
                     partial = true;
                 }
                 break;

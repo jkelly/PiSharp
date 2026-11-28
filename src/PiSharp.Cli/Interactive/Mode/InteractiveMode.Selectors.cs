@@ -48,11 +48,10 @@ internal sealed partial class InteractiveMode
                 HideThinkingBlock = hideThinkingBlock,
                 MermaidRenderingMode = settings.MermaidRenderingMode,
                 CollapseChangelog = settings.CollapseChangelog,
-                EnableInstallTelemetry = settings.EnableInstallTelemetry,
                 DoubleEscapeAction = settings.DoubleEscapeAction,
                 TreeFilterMode = settings.TreeFilterMode,
                 ShowHardwareCursor = settings.ShowHardwareCursor,
-                ShowCacheMissNotices = settings.ShowCacheMissNotices,
+                Notice = settings.Notice,
                 DefaultProjectTrust = settings.DefaultProjectTrust,
                 EditorPaddingX = settings.EditorPaddingX,
                 OutputPad = settings.OutputPad,
@@ -147,13 +146,12 @@ internal sealed partial class InteractiveMode
                     chatContainer.Invalidate();
                     ui.RequestRender();
                 },
-                OnShowCacheMissNoticesChange = shown =>
+                OnNoticeChange = (key, shown) =>
                 {
-                    settings.SetShowCacheMissNotices(shown);
+                    settings.SetNotice(key, shown);
                     RebuildChatFromMessages();
                 },
                 OnCollapseChangelogChange = settings.SetCollapseChangelog,
-                OnEnableInstallTelemetryChange = settings.SetEnableInstallTelemetry,
                 OnQuietStartupChange = settings.SetQuietStartup,
                 OnDefaultProjectTrustChange = settings.SetDefaultProjectTrust,
                 OnDoubleEscapeActionChange = settings.SetDoubleEscapeAction,

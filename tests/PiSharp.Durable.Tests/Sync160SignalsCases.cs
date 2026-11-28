@@ -45,7 +45,7 @@ internal static class SignalTests
     private static IEnumerable<string> Keys(RunningTask task) => ((JsonArrayValue)((JsonObjectValue)task.Input)["keys"]).Select(key => ((JsonStringValue)key).Value);
 
     private static JsonValue StateJson(SignalState? state) =>
-        state is null ? JsonValue.Null : state.Expired ? O("""{"expired":true}""") : Obj(("value", state.Value!));
+        state is null ? JsonValue.Null : state.ToJson();
 
     /// <summary>Sleeps on <c>Answer</c> under <c>keys</c> (and <c>until</c>), then completes with its wake and every key's state (null:
     /// none) (upstream <c>Ask</c>).</summary>
@@ -201,7 +201,7 @@ internal static class SignalTests
                 tx.SignalAsync(id, Answer, "a", Text("second")),
                 tx.SignalAsync(id, Answer, "b", Text("bee"))), Context);
             Check(results.SequenceEqual([SignalResult.Delivered, SignalResult.Duplicate, SignalResult.Delivered]), "results: " + string.Join(",", results));
-            MatchJson("""{"result":{"states":[{"value":{"text":"first"}},{"value":{"text":"bee"}}]}}""", await OutcomeOf(harness, id), "outcome");
+            MatchJson("""{"result":{"states":[{"kind":"value","value":{"text":"first"}},{"kind":"value","value":{"text":"bee"}}]}}""", await OutcomeOf(harness, id), "outcome");
             await harness.CloseAsync(Context);
         });
 
@@ -234,7 +234,7 @@ internal static class SignalTests
             var id = await StartAsk(harness, ["a"]);
             // Not running yet: the value waits in the task.
             Equal(SignalResult.Delivered, await harness.SignalAsync(id, Answer, "a", Text("early"), Context), "delivered");
-            SameJson("""{"status":"completed","result":{"wake":{"reason":"signal","signal":"test.answer","key":"a"},"states":[{"value":{"text":"early"}}]}}""",
+            SameJson("""{"status":"completed","result":{"wake":{"reason":"signal","signal":"test.answer","key":"a"},"states":[{"kind":"value","value":{"text":"early"}}]}}""",
                 await OutcomeOf(harness, id), "outcome");
             await harness.CloseAsync(Context);
         });
@@ -257,7 +257,7 @@ internal static class SignalTests
             Equal(TaskInspectionKind.Sleeping, inspected.Kind, "inspection kind");
             Equal<double?>(null, inspected.Until, "inspection until");
             Equal(SignalResult.Delivered, await harness.SignalAsync(id, Answer, "b", Text("bee"), Context), "delivered");
-            SameJson("""{"status":"completed","result":{"wake":{"reason":"signal","signal":"test.answer","key":"b"},"states":[null,{"value":{"text":"bee"}}]}}""",
+            SameJson("""{"status":"completed","result":{"wake":{"reason":"signal","signal":"test.answer","key":"b"},"states":[null,{"kind":"value","value":{"text":"bee"}}]}}""",
                 await OutcomeOf(harness, id), "outcome");
             await harness.CloseAsync(Context);
         });
@@ -273,7 +273,7 @@ internal static class SignalTests
             Equal(new Wake(false, 2_000), harness.Wake(), "wake while asleep");
             Volatile.Write(ref clock, 2_000);
             harness.Resume();
-            SameJson("""{"status":"completed","result":{"wake":{"reason":"expired"},"states":[{"expired":true}]}}""", await OutcomeOf(harness, id), "outcome");
+            SameJson("""{"status":"completed","result":{"wake":{"reason":"expired"},"states":[{"kind":"expired"}]}}""", await OutcomeOf(harness, id), "outcome");
             await harness.CloseAsync(Context);
         });
 
@@ -287,7 +287,7 @@ internal static class SignalTests
             // Due, but no pass ran since: the delivery itself finds the deadline passed.
             Volatile.Write(ref clock, 2_500);
             Equal(SignalResult.Closed, await harness.SignalAsync(id, Answer, "a", Text("late"), Context), "late delivery");
-            MatchJson("""{"result":{"wake":{"reason":"expired"},"states":[{"expired":true}]}}""", await OutcomeOf(harness, id), "outcome");
+            MatchJson("""{"result":{"wake":{"reason":"expired"},"states":[{"kind":"expired"}]}}""", await OutcomeOf(harness, id), "outcome");
             await harness.CloseAsync(Context);
         });
 
@@ -446,7 +446,7 @@ internal static class SignalTests
             var id = await Start(harness, read, JsonValue.Null);
             Equal(SignalResult.Delivered, await harness.SignalAsync(id, old, "k", O("""{"n":"42"}"""), Context), "delivered");
             await harness.WaitForTaskAsync(id, Context);
-            SameJson("""[{"value":{"n":42}}]""", JsonValue.Array(reads.Snapshot()), "reads");
+            SameJson("""[{"kind":"value","value":{"n":42}}]""", JsonValue.Array(reads.Snapshot()), "reads");
             await harness.CloseAsync(Context);
         });
 
@@ -514,7 +514,7 @@ internal static class SignalTests
             await harness.CommitAsync(tx => tx.SignalAsync(id, Answer, "a", Text("later")), Context);
             await Eventually(() => harness.Wake().Active);
             harness.Resume();
-            MatchJson("""{"result":{"states":[{"value":{"text":"later"}}]}}""", await OutcomeOf(harness, id), "outcome");
+            MatchJson("""{"result":{"states":[{"kind":"value","value":{"text":"later"}}]}}""", await OutcomeOf(harness, id), "outcome");
             await harness.CloseAsync(Context);
         });
 

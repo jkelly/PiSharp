@@ -41,7 +41,7 @@ internal sealed record SettingsModelSelection(string? Provider, string? Model, s
     {
         var registry = await runtime.CreateModelRegistryAsync(cancellationToken).ConfigureAwait(false);
         var warnings = ImmutableArray.CreateBuilder<string>();
-        if (registry.GetError() is { } loadError) warnings.Add("errors loading models.json:\n" + loadError);
+        if (registry.GetError() is { } loadError) warnings.Add("models.json error: " + loadError);
         var patterns = ModelPatterns ?? ReadPatterns(settings);
         LiveSessionSelection selection;
         try { selection = Select(registry, settings, patterns, continuing, warnings); }

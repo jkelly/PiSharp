@@ -30,7 +30,7 @@ $log=$run+'.log'
 $receiptPath=Join-Path $run 'receipt.json'
 $receipt=[ordered]@{project=$projectPath;label=$Label;configuration=$Configuration;result='waiting';startedUtc=[DateTime]::UtcNow.ToString('o');stages=[Collections.Generic.List[object]]::new()}
 $filters=[ordered]@{}
-foreach($key in @('EXTPARITY_FILTER','CLIPARITY_FILTER','INTERACTIVEPARITY_FILTER','PROVIDERAPIS_FILTER','PISHARP_TEST_PI160_NODE_MODULES','PISHARP_TEST_INSTALL_PI_RUNTIME','PISHARP_PI_RUNTIME_DIR')) {
+foreach($key in @('EXTPARITY_FILTER','CLIPARITY_FILTER','INTERACTIVEPARITY_FILTER','PROVIDERAPIS_FILTER','PISHARP_TEST_PI170_NODE_MODULES','PISHARP_TEST_INSTALL_PI_RUNTIME','PISHARP_PI_RUNTIME_DIR')) {
     $value=[Environment]::GetEnvironmentVariable($key)
     if($null -ne $value){$filters[$key]=$value}
 }

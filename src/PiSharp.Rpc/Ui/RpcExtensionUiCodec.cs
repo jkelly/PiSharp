@@ -42,7 +42,7 @@ internal static class RpcExtensionUiCodec
     }
 
     internal static JsonData Dialog(string id, ExtensionUiFeature method, string title, string? extra,
-        ImmutableArray<string> choices, ExtensionUiDialogOptions? timing, RpcExtensionUiOptions limits)
+        ImmutableArray<string> choices, ExtensionUiDialogOptions? timing, RpcExtensionUiOptions limits, bool nativePresentation = false)
     {
         Text(title, limits); if (extra is not null) Text(extra, limits);
         if (timing?.TimeoutMilliseconds is { } timeout && !double.IsFinite(timeout)) throw new ArgumentException("UI timeout must be finite.");
@@ -56,6 +56,8 @@ internal static class RpcExtensionUiCodec
             Header(writer, id, method switch { ExtensionUiFeature.Select => "select", ExtensionUiFeature.Confirm => "confirm",
                 ExtensionUiFeature.Input => "input", ExtensionUiFeature.Editor => "editor", _ => throw new ArgumentException("Invalid dialog.") });
             writer.WriteString("title", title);
+            // The embedded terminal consumes this field. External RPC follows upstream's unchanged wire shape.
+            if (nativePresentation && timing?.BlockedKind is { } kind) writer.WriteString("blockedKind", kind.ToString().ToLowerInvariant());
             if (method == ExtensionUiFeature.Select)
             { writer.WritePropertyName("options"); writer.WriteStartArray(); foreach (var choice in choices) writer.WriteStringValue(choice); writer.WriteEndArray(); }
             if (extra is not null) writer.WriteString(method switch { ExtensionUiFeature.Confirm => "message", ExtensionUiFeature.Input => "placeholder", _ => "prefill" }, extra);

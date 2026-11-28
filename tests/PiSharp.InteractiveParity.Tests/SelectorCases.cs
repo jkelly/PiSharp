@@ -534,11 +534,12 @@ internal static class SelectorCases
         }));
 
         // ---------------------------------------------------------------- first-time-setup.test.ts / first-time-setup-fork.test.ts
+        var official = new DistributionMetadata("@earendil-works/pi-coding-agent", "pi", ".pi");
         Func<string, string?> Env(params (string Key, string Value)[] values) => name => values.FirstOrDefault(v => v.Key == name).Value;
         yield return ("sel.first-time-setup.runs-when-experimental-default-dir-no-settings", Sync(() =>
         {
             using var dir = new TempDir();
-            Check(FirstTimeSetupComponent.ShouldRunFirstTimeSetup(Path.Combine(dir.Path, "settings.json"), Env(("PI_EXPERIMENTAL", "1"))), "runs");
+            Check(FirstTimeSetupComponent.ShouldRunFirstTimeSetup(Path.Combine(dir.Path, "settings.json"), Env(("PI_EXPERIMENTAL", "1")), official), "runs");
         }));
         yield return ("sel.first-time-setup.not-without-experimental", Sync(() =>
         {
@@ -560,60 +561,27 @@ internal static class SelectorCases
         yield return ("sel.first-time-setup.not-for-forked-package", Sync(() =>
         {
             using var dir = new TempDir();
-            Check(!FirstTimeSetupComponent.ShouldRunFirstTimeSetup(Path.Combine(dir.Path, "settings.json"), Env(("PI_EXPERIMENTAL", "1")),
-                FirstTimeSetupComponent.Distribution with { PackageName = "@example/pi-coding-agent" }), "fork");
+            Check(!FirstTimeSetupComponent.ShouldRunFirstTimeSetup(Path.Combine(dir.Path, "settings.json"), Env(("PI_EXPERIMENTAL", "1"))), "PiSharp is a separate distribution");
         }));
         yield return ("sel.first-time-setup.default-settings-path", Sync(() =>
         {
             using var dir = new TempDir();
-            Check(FirstTimeSetupComponent.ShouldRunFirstTimeSetup(null, Env(("PI_EXPERIMENTAL", "1")), home: dir.Path), "no ~/.pi/agent/settings.json");
+            Check(FirstTimeSetupComponent.ShouldRunFirstTimeSetup(null, Env(("PI_EXPERIMENTAL", "1")), distribution: official, home: dir.Path), "no ~/.pi/agent/settings.json");
             Directory.CreateDirectory(Path.Combine(dir.Path, ".pi", "agent"));
             File.WriteAllText(Path.Combine(dir.Path, ".pi", "agent", "settings.json"), "{}");
-            Check(!FirstTimeSetupComponent.ShouldRunFirstTimeSetup(null, Env(("PI_EXPERIMENTAL", "1")), home: dir.Path), "settings in the default agent dir");
+            Check(!FirstTimeSetupComponent.ShouldRunFirstTimeSetup(null, Env(("PI_EXPERIMENTAL", "1")), distribution: official, home: dir.Path), "settings in the default agent dir");
         }));
         yield return ("sel.first-time-setup.render-steps-and-submit", Sync(() =>
         {
-            var previews = new List<string>(); FirstTimeSetupResult? result = null;
-            var setup = new FirstTimeSetupComponent(new FirstTimeSetupOptions(previews.Add, r => result = r, () => { }));
-            Lines([
-                Rule(90), "",
-                " ██████",
-                " ██  ██",
-                " ████  ██",
-                " ██    ██", "",
-                " Welcome to pi, the minimal coding agent.", "",
-                " Pick a theme.", "",
-                " → System (matches your terminal colors)",
-                "   Dark",
-                "   Light", "",
-                " ↑↓ navigate  enter continue  escape/ctrl+c skip setup", "",
-                Rule(90),
-            ], setup.Render(90), "theme step");
-            setup.HandleInput("j");
-            setup.HandleInput("j");
-            setup.HandleInput("j");
-            Equal("dark,light", string.Join(",", previews), "previews only on change");
-            setup.HandleInput("\r");
-            Lines([
-                Rule(90), "",
-                " ██████",
-                " ██  ██",
-                " ████  ██",
-                " ██    ██", "",
-                " Welcome to pi, the minimal coding agent.", "",
-                " Opt-in to anonymous usage data sharing?",
-                " Opting in stores a tracking identifier in settings.json and enables anonymous",
-                " usage analytics. This helps us to better debug, reproduce, and resolve issues",
-                " and bugs within Pi. You can observe what is shared using /privacy and make",
-                " changes anytime in settings.json.", "",
-                " → Share anonymous usage data",
-                "   Don't share", "",
-                " ↑↓ navigate  enter finish  escape/ctrl+c skip setup", "",
-                Rule(90),
-            ], setup.Render(90), "analytics step");
+            FirstTimeSetupResult? result = null;
+            var setup = new FirstTimeSetupComponent(new FirstTimeSetupOptions(r => result = r, () => { }));
+            var initial = Joined(setup, 90);
+            Contains(initial, "Opt-in to anonymous usage data sharing?", "analytics on first screen");
+            Contains(initial, "→ Share anonymous usage data", "initial choice");
+            Contains(initial, "enter finish", "single step");
             setup.HandleInput("\u001b[B");
             setup.HandleInput("\n");
-            Equal("light/False", $"{result!.Theme}/{result.ShareAnalytics}", "result");
+            Check(result is { ShareAnalytics: false }, "opt-out result");
         }));
 
         // ---------------------------------------------------------------- extension-input.ts

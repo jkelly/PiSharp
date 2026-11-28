@@ -23,6 +23,7 @@ internal delegate Task<string?> PiSessionSelector(ImmutableArray<PiSessionInfo> 
 /// <summary>The process the Pi entry runs in. Production uses the real console, environment and directories; tests substitute them.</summary>
 internal sealed record PiHost
 {
+    internal string? ProgramResumeToken { get; init; }
     internal required string Cwd { get; init; }
     /// <summary>The process's working directory no longer exists (<see cref="PiCommand.ReadCwd"/> found none); <see cref="Cwd"/> is
     /// empty and every command but <c>auth</c> ends with main.ts's error.</summary>
@@ -57,7 +58,7 @@ internal sealed record PiHost
     /// <summary>Programmatic runtime collaborators for embedded hosts; null retains the normal verified installer.</summary>
     internal string? PiModules { get; init; }
     internal bool UseCompatibilityModules { get; init; }
-    /// <summary>The non-interactive hosts' termination signals (print, JSON and RPC modes): null in tests and interactive mode.</summary>
+    /// <summary>The host's termination signals. Embedded hosts may supply their own cancellation token instead.</summary>
     internal Func<ShutdownSignals>? Signals { get; init; }
     /// <summary>The HTTP handler and base URL of rg/fd release downloads (tools-manager.ts; a fake release server in tests).</summary>
     internal Func<HttpMessageHandler>? ToolsHttp { get; init; }
@@ -131,6 +132,19 @@ internal static class PiCommand
     private static async Task<int> RunCoreAsync(string[] args, PiHost host, CancellationToken token)
     {
         var err = host.Stderr; var color = host.Color;
+        if (host.GetEnvironment("OSC7577_TOKEN") is { } resumeToken)
+        {
+            host.SetEnvironment("OSC7577_TOKEN", null);
+            if (resumeToken.Length > 0) host = host with { ProgramResumeToken = resumeToken };
+        }
+        if (!PiArgs.TakeAgentDir(ref args, out var profile))
+        { await Error("--agent-dir requires a directory"); return 1; }
+        if (profile is not null)
+        {
+            var dir = PiPaths.ResolvePath(profile, host.Cwd, host.Home);
+            host.SetEnvironment(PiConfig.EnvAgentDir, dir);
+            host = host with { LiveRuntime = host.LiveRuntime with { AuthPath = Path.Join(dir, "auth.json"), ModelsPath = Path.Join(dir, "models.json") } };
+        }
         // cli/setup.ts: child processes see that they run under the agent.
         host.SetEnvironment("PI_CODING_AGENT", "true");
         host.SetEnvironment("AI_AGENT", "pi");
@@ -617,7 +631,8 @@ internal static class PiCommand
                     case "retry.enabled": settingsWriter.SetRetryEnabled(value.GetValue<bool>()); break;
                 }
             },
-            Interactive = appMode == PiAppMode.Interactive ? new(agentDir, home, sessionCwd, sessionDir, sessionDir is null, resources, projectTrusted, plan.Mode) : null
+            Interactive = appMode == PiAppMode.Interactive ? new(agentDir, home, sessionCwd, sessionDir, sessionDir is null, resources, projectTrusted, plan.Mode)
+            { ResumeToken = host.ProgramResumeToken, ResumeFlags = parsed.ResumeFlags, LaunchCwd = host.Cwd } : null
         };
         var sessionArgs = SessionArguments(plan, parsed);
         // The project .pi/mcp.json is read only for a trusted project (IMPL-H seam): the run's own trust answer.
@@ -628,9 +643,8 @@ internal static class PiCommand
             mcpHost = mcpHost with { ObserveManager = manager => { observe?.Invoke(manager); Volatile.Write(ref mcpManager, manager); } };
         }
         using var entered = options.Enter();
-        // print-mode.ts/rpc-mode.ts registerSignalHandlers: SIGTERM (and SIGHUP off Windows) shut the host down gracefully, then the
-        // process exits 143 (129). Interactive mode keeps the terminal's own handling.
-        var signals = appMode == PiAppMode.Interactive ? null : host.Signals?.Invoke();
+        // Interactive and headless sessions clean up on termination. Print and RPC also use a signal exit code.
+        var signals = host.Signals?.Invoke();
         using var signalled = signals is null ? null : CancellationTokenSource.CreateLinkedTokenSource(token, signals.Token);
         var runToken = signalled?.Token ?? token;
         Func<bool> userShutdown = () => signals?.Received is not null;
@@ -671,7 +685,7 @@ internal static class PiCommand
                 }
                 // main.ts announcePackageInstalls = false: the TUI takes the terminal from here on.
                 packageRun.StopAnnouncing();
-                return await host.RunInteractive(["session", "terminal", .. sessionArgs], options, token).ConfigureAwait(false);
+                return await host.RunInteractive(["session", "terminal", .. sessionArgs], options, runToken).ConfigureAwait(false);
             default:
             {
                 var code = await PiPrintMode.RunAsync(["session", "rpc", .. sessionArgs], appMode == PiAppMode.Json, plan, options, host, mcpHost, runToken, userShutdown).ConfigureAwait(false);

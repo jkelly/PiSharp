@@ -1,4 +1,4 @@
-// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/ai/src/utils/overflow.ts (isContextOverflow) over a pi-ai wire assistant
+// Pi fb0fe823539f6d04850f6e34748c01f01f212e1f (MIT): packages/ai/src/utils/overflow.ts (isContextOverflow) over a pi-ai wire assistant
 // message. PiSharp.CodingAgent's SessionRecoveryClassifier ports the same function over PiSharp.Contracts messages, but PiSharp.Durable does
 // not reference PiSharp.CodingAgent; this port uses its regex translation, and the test project compares the two on shared inputs.
 //
@@ -18,7 +18,7 @@ internal static class PiAiOverflow
     {
         @"prompt (?:is )?too long", // Anthropic and z.ai token overflow
         @"prompt exceeds max length", // z.ai CN endpoint token overflow
-        @"request_too_large", // Anthropic request byte-size overflow (HTTP 413)
+        @"(?:^|[^a-z0-9_])request_too_large(?:$|[^a-z0-9_])", // Anthropic request byte-size overflow (HTTP 413)
         @"input is too long for requested model", // Amazon Bedrock
         @"exceeds the context window", // OpenAI (Completions & Responses API)
         @"exceeds (?:the )?(?:model'?s )?maximum context length(?: of [\d,]+ tokens?|\s*\([\d,]+\))", // OpenAI-compatible proxies (LiteLLM)

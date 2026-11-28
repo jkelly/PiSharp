@@ -3,7 +3,7 @@ title: Settings
 description: Every settings.json key PiSharp reads, its type, default and effect.
 ---
 
-PiSharp reads Pi v1.5.0's `settings.json` keys, with Pi's defaults, plus three keys of its own. This page lists them all, grouped by area. Pi's [Settings](https://github.com/earendil-works/pi/blob/v1.5.0/packages/coding-agent/docs/settings.md) page describes the same keys.
+Published PiSharp {{PISHARP_VERSION}} reads Pi v1.6.0's `settings.json` keys, with Pi's defaults, plus three keys of its own. This page lists them all, grouped by area. Pi's [Settings](https://github.com/earendil-works/pi/blob/v1.6.0/packages/coding-agent/docs/settings.md) page describes the same keys.
 
 PiSharp ships Pi's settings schema unchanged. Add a `$schema` key so your editor can check the file:
 
@@ -126,7 +126,7 @@ See [Sessions](/docs/guides/sessions/) for compaction and branch summaries.
 | `lastChangelogVersion` | string | none | Written by PiSharp: the last version whose changelog you saw. |
 | `extensionChangelogVersions` | object | none | Written by PiSharp: the last changelog version you saw of each extension package. See [Packages](/docs/extensions/packages/#show-a-changelog). |
 | `hideThinkingBlock` | boolean | `false` | Hides thinking blocks. `Ctrl+T` toggles them. |
-| `showCacheMissNotices` | boolean | `false` | Shows prompt cache cost and provider recovery notices. |
+| `showCacheMissNotices` | boolean | `false` | Published 1.6.0.x switch for cache cost and recovery notices. See the 1.7.0 migration below. |
 | `externalEditor` | string | none | Command `Ctrl+G` opens. Wins over `VISUAL` and `EDITOR`. Without any of them PiSharp uses `notepad` on Windows and `nano` elsewhere. |
 | `editorPaddingX` | number | `0` | Horizontal padding of the editor, 0 to 3. |
 | `outputPad` | `0`, `1` | `1` | Horizontal padding of the transcript. |
@@ -143,12 +143,29 @@ See [Sessions](/docs/guides/sessions/) for compaction and branch summaries.
 | `terminal.showTerminalProgress` | boolean | `false` | Sends OSC 9;4 progress to the terminal while the agent works. |
 | `warnings.anthropicExtraUsage` | boolean | `true` | Warns once when an Anthropic subscription sign-in is in use, since third-party use is billed as extra usage. |
 
+### Transcript notices in the 1.7.0 candidate
+
+Set each notice independently in `settings.json` or open **Notices** in `/settings`. All four default to `false`.
+
+```json
+{
+  "notices": {
+    "cacheMisses": true,
+    "cacheWarming": false,
+    "compactionCosts": true,
+    "reasoningDrops": false
+  }
+}
+```
+
+When the candidate loads `showCacheMissNotices`, it uses the old value for each missing notice setting. Explicit per-notice values take precedence.
+
 ## Trust, telemetry and identity
 
 | Key | Type | Default | Effect |
 | --- | --- | --- | --- |
 | `defaultProjectTrust` | `ask`, `always`, `never` | `ask` | Global only. What happens in a project you haven't decided on. Print, JSON and RPC modes can't ask, so `ask` counts as no there. |
-| `enableInstallTelemetry` | boolean | `true` | Shown and saved by `/settings`, but it has no effect: PiSharp sends no install telemetry. |
+| `enableInstallTelemetry` | boolean | `true` | Legacy setting in 1.6.0.x. The 1.7.0 candidate removes the setting and install reporting. |
 | `enableAnalytics` | boolean | `false` | Pi's analytics opt-in. PiSharp ignores it. |
 | `trackingId` | string | none | Pi's analytics id. PiSharp ignores it and removes it from `/bug` reports. |
 | `deviceId` | string | none | Global only. A stable install id, created when a sign-in first needs one. Removed from `/bug` reports. |

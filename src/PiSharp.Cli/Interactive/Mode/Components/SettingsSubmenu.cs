@@ -62,9 +62,8 @@ internal sealed class SelectSubmenu : Container, IInputHandler
 
         // Hint
         AddChild(new Spacer(1));
-        var hint = submenuOptions?.Searchable == true
-            ? "  Type to filter · Enter to select · Esc to go back"
-            : "  Enter to select · Esc to go back";
+        var keysHint = $"{KeybindingHints.KeyText("tui.select.confirm")} to select · {KeybindingHints.KeyText("tui.select.cancel")} to go back";
+        var hint = submenuOptions?.Searchable == true ? $"  Type to filter · {keysHint}" : $"  {keysHint}";
         AddChild(new Text(theme.Fg("dim", hint), 0, 0));
     }
 

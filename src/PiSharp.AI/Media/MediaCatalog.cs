@@ -137,7 +137,7 @@ public static class MediaCatalog
         return new MediaModel(MediaKind.Image, model.Provider, model.Id, api)
         {
             Name = model.Name, BaseUrl = model.BaseUrl.Length == 0 ? null : model.BaseUrl, Headers = model.Headers, AcceptsImages = model.AcceptsImages,
-            OutputsText = !model.Output.IsDefault && model.Output.Contains("text"),
+            ImageCost = model.Cost, OutputsText = !model.Output.IsDefault && model.Output.Contains("text"),
         };
     }
 }

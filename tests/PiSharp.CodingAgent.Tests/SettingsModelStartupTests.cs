@@ -29,9 +29,9 @@ internal static class SettingsModelStartupTests
     {
         var settings = Capture("{\"defaultProvider\":\"openai\",\"defaultModel\":\"o3\"}");
         Equal("o3", new SettingsModelSelection(null, null, null).Resolve(settings).Model.Id);
-        Equal("gpt-4", new SettingsModelSelection(null, "gpt-4", null).Resolve(settings).Model.Id);
+        Equal("gpt-4.1", new SettingsModelSelection(null, "gpt-4.1", null).Resolve(settings).Model.Id);
         Equal("o3", new SettingsModelSelection("openai", null, "1024").Resolve(settings).Model.Id);
-        Equal("gpt-4", new SettingsModelSelection("openai", "gpt-4", null).Resolve(Capture("{\"defaultProvider\":7,\"defaultModel\":false}")).Model.Id);
+        Equal("gpt-4.1", new SettingsModelSelection("openai", "gpt-4.1", null).Resolve(Capture("{\"defaultProvider\":7,\"defaultModel\":false}")).Model.Id);
         try { _ = new SettingsModelSelection(null, null, null).Resolve(Capture("{\"defaultProvider\":\"openai\",\"defaultModel\":\"missing-model\"}")); }
         catch (LiveSessionException error) when (error.Code == "UnknownLiveModel") { return Task.CompletedTask; }
         throw new InvalidOperationException("Unknown model accepted.");
@@ -54,7 +54,7 @@ internal static class SettingsModelStartupTests
     private static async Task Wired()
     {
         using var fixture = new Fixture();
-        File.WriteAllText(fixture.User, "{\"defaultProvider\":\"openai\",\"defaultModel\":\"gpt-4\",\"defaultThinkingLevel\":\"high\"}");
+        File.WriteAllText(fixture.User, "{\"defaultProvider\":\"openai\",\"defaultModel\":\"gpt-4.1\",\"defaultThinkingLevel\":\"high\"}");
         File.WriteAllText(fixture.Project, "{\"defaultModel\":\"o3\",\"modelThinkingLevels\":{\"openai/o3\":\"off\"}}");
         await using var host = new Host(fixture, ["--user-settings", fixture.User, "--project-settings", fixture.Project]);
         var state = (await host.Response("state", "get_state")).Value.GetProperty("data");
@@ -68,10 +68,10 @@ internal static class SettingsModelStartupTests
     {
         using var fixture = new Fixture();
         File.WriteAllText(fixture.User, "{\"defaultProvider\":\"openai\",\"defaultModel\":\"o3\",\"defaultThinkingLevel\":\"low\"}");
-        // Pi 1.1.0 resolveCliModel: a bare "gpt-4" is ambiguous (azure, openai) when both are authenticated, so the provider is explicit.
-        await using var host = new Host(fixture, ["--user-settings", fixture.User, "--provider", "openai", "--model", "gpt-4", "--thinking", "high"]);
+        // Pi 1.1.0 resolveCliModel: a bare "gpt-4.1" is ambiguous (azure, openai) when both are authenticated, so the provider is explicit.
+        await using var host = new Host(fixture, ["--user-settings", fixture.User, "--provider", "openai", "--model", "gpt-4.1", "--thinking", "high"]);
         var state = (await host.Response("state", "get_state")).Value.GetProperty("data");
-        Equal("gpt-4", state.GetProperty("model").GetProperty("id").GetString());
+        Equal("gpt-4.1", state.GetProperty("model").GetProperty("id").GetString());
         Equal("off", state.GetProperty("thinkingLevel").GetString());
         Equal(0, await host.Finish()); Equal(0, fixture.Handler.Sends);
     }

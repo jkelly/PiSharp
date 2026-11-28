@@ -170,7 +170,9 @@ public sealed class TerminalTextEditorPasteController
         var value = text[start..end];
         if (value.Length == 0 || !history.IsEmpty && history[0] == value) return false;
         EnsureRevisionAvailable();
-        var next = history.Insert(0, value); var retained = retainedHistoryCharacters + value.Length;
+        var existing = history.IndexOf(value);
+        var next = (existing < 0 ? history : history.RemoveAt(existing)).Insert(0, value);
+        var retained = retainedHistoryCharacters + (existing < 0 ? value.Length : 0);
         while (next.Length > MaximumHistoryEntries || retained > MaximumRetainedHistoryCharacters)
         { retained -= next[^1].Length; next = next.RemoveAt(next.Length - 1); }
         history = next; retainedHistoryCharacters = retained; AdvanceRevision(); return true;

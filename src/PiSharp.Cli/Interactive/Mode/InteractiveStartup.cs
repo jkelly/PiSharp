@@ -7,6 +7,9 @@ namespace PiSharp.Cli.Interactive.Mode;
 internal sealed record InteractiveStartup(string AgentDir, string Home, string Cwd, string? SessionDir, bool UsesDefaultSessionDir,
     PiResources Resources, bool ProjectTrusted, string SessionMode)
 {
+    public string? ResumeToken { get; init; }
+    public IReadOnlyList<string> ResumeFlags { get; init; } = [];
+    public string? LaunchCwd { get; init; }
     private PiResources? currentResources;
 
     /// <summary>The latest discovered resources (updated by <c>/reload</c>; starts as <see cref="Resources"/>).</summary>

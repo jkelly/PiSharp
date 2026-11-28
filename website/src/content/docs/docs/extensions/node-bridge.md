@@ -3,10 +3,11 @@ title: TypeScript extensions
 description: Run Pi's TypeScript and JavaScript extensions in PiSharp through the Node bridge.
 ---
 
-PiSharp runs Pi's TypeScript and JavaScript extensions unchanged. It starts Node, loads each extension with Pi's own packages, and connects the extension to the C# session. Write extensions as Pi's [Extensions](https://github.com/earendil-works/pi/blob/v1.6.0/packages/coding-agent/docs/extensions.md) page describes.
+PiSharp runs Pi's TypeScript and JavaScript extensions unchanged. It starts Node, loads each extension with Pi's own packages, and connects the extension to the C# session. Write extensions as Pi's [Extensions](https://github.com/earendil-works/pi/blob/v1.7.0/packages/coding-agent/docs/extensions.md) page describes.
 
-:::note[PiSharp 1.6.0 runtime]
-PiSharp 1.6.0 installs exact Pi 1.6.0 packages into a separate `1.6.0-no-default-attribution-v1` cache, pins `undici` to 8.12.4 and regenerates the fallback modules from the pinned 1.6.0 source. `typebox` 1.3.27 and `jiti` 2.7.0 are unchanged. It preserves older caches and explicit extension identities. Three Pi 1.6.0 changes reach extensions: a component's `render()` returns a read-only array, so an extension that changes render output in place must copy it first; an exception thrown by a `pi.events` handler is reported as an extension error; and `pi.exec` reports 128 plus the signal number for a command ended by a signal. Validation retains explicit suite and platform limitations.
+:::note[1.7.0 source candidate]
+The published {{PISHARP_VERSION}} CLI uses Pi 1.6.0 packages. The runtime and cache paths below describe a checkout of the 1.7.0 candidate.
+PiSharp 1.7.0 installs exact Pi 1.7.0 packages into a separate `1.7.0-no-default-attribution-v1` cache, pins `undici` to 8.12.4 and regenerates the fallback modules from the pinned 1.7.0 source. `typebox` 1.3.27 and `jiti` 2.7.0 are unchanged. It preserves older caches and explicit extension identities. The SDK's default attribution remains disabled in the bridge.
 :::
 
 :::note[Earlier runtime changes in 1.5.2 and 1.5.0.1]
@@ -25,20 +26,20 @@ Project extensions load only when you trust the project. `--no-extensions` turns
 
 ## What you need
 
-- **Node.js 22.19 or later**, on your `PATH` or named by `PISHARP_NODE`, for the installed Pi 1.6.0 packages.
+- **Node.js 22.19 or later**, on your `PATH` or named by `PISHARP_NODE`, for the installed Pi 1.7.0 packages.
 - **npm**, the first time an extension loads (see below).
 
 PiSharp starts Node only when an extension needs it. Without extensions, or with only [C# extensions](/docs/extensions/build-an-extension/), Node isn't needed.
 
 ## Pi's own packages
 
-The first time a TypeScript extension loads, PiSharp installs Pi 1.6.0's npm packages (`@earendil-works/pi-coding-agent`, `pi-ai`, `pi-tui` and `pi-agent-core`, with `typebox` 1.3.27 and `jiti` 2.7.0) into `~/.pi/agent/pisharp/pi-runtime/1.6.0-no-default-attribution-v1`, using your npm. The Pi packages are pinned to exactly 1.6.0 and `undici` to 8.12.4. Every package's lockfile integrity is checked against the npm registry before installation is admitted. Extensions load through Pi's own `jiti` setup and share the installed packages' module identities. PiSharp clears the installed agent-core's default Pi attribution before extensions load; an extension's explicit request identity remains effective.
+The first time a TypeScript extension loads, PiSharp installs Pi 1.7.0's npm packages (`@earendil-works/pi-coding-agent`, `pi-ai`, `pi-tui` and `pi-agent-core`, with `typebox` 1.3.27 and `jiti` 2.7.0) into `~/.pi/agent/pisharp/pi-runtime/1.7.0-no-default-attribution-v1`, using your npm. The Pi packages are pinned to exactly 1.7.0 and `undici` to 8.12.4. Every package's lockfile integrity is checked against the npm registry before installation is admitted. Extensions load through Pi's own `jiti` setup and share the installed packages' module identities. PiSharp clears the installed agent-core's default Pi attribution before extensions load; an extension's explicit request identity remains effective.
 
 `PISHARP_PI_RUNTIME_DIR` selects the parent of the version and policy folder. Existing caches, including Pi 1.2.0 and 1.5.2 caches and earlier configured runtime directories, remain untouched for rollback. An unverified existing target is preserved and causes an explicit fallback.
 
-The Node child defaults `PI_TELEMETRY` to `0` so the installed SDK also defaults to no Pi attribution. An explicit environment value remains effective; the parent process environment is unchanged.
+The Node child defaults `PI_TELEMETRY` to `0` for compatibility with earlier bridge releases. Pi 1.7 removed install telemetry. Within the extension host, an explicit truthy value still enables the upstream SDK’s Pi attribution; it does not restore the removed install reporting.
 
-If the install can't run (offline, no npm, or a failed install), extensions still load against PiSharp's built-in copies of those modules, and PiSharp warns that they aren't running against the Pi 1.6.0 packages. The built-in copies don't support `.tsx` files or built-in tool factories with custom `operations`.
+If the install can't run (offline, no npm, or a failed install), extensions still load against PiSharp's built-in copies of those modules, and PiSharp warns that they aren't running against the Pi 1.7.0 packages. The built-in copies don't support `.tsx` files or built-in tool factories with custom `operations`.
 
 ## What works
 

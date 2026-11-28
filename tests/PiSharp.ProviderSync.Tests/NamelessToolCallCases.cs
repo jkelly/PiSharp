@@ -226,7 +226,7 @@ internal static partial class Program
         using (var handler = Capture())
         using (var provider = NativeProviderFactory.CreateResponses(responses, new("https://api.openai.com/v1/responses"), Key, new(false), null, handler))
             await Replay(new ChatClient(provider), responses, History(responses, ("call_1|fc_1", ""), ("|", "")), () => captured, "input",
-                """[{"type":"function_call","id":"fc_1","call_id":"call_1","name":"","arguments":"{}"},{"type":"function_call","call_id":"","name":"","arguments":"{}"},{"type":"function_call_output","call_id":"call_1","output":"Tool  not found"},{"type":"function_call_output","call_id":"","output":"Tool  not found"}]""",
+                """[{"type":"function_call","id":"fc_1","call_id":"call_1","name":"","arguments":"{}","status":"completed"},{"type":"function_call","call_id":"","name":"","arguments":"{}","status":"completed"},{"type":"function_call_output","call_id":"call_1","output":"Tool  not found"},{"type":"function_call_output","call_id":"","output":"Tool  not found"}]""",
                 "responses");
 
         captured = null;

@@ -24,7 +24,7 @@ internal sealed class UserBashHost(ShellCommandExecutor executor, string? comman
         var interception = Handlers.IsDefaultOrEmpty ? null : await UserBashInterceptors.EmitAsync(Handlers,
             new(request.Command, request.ExcludeFromContext ?? false, request.WorkingDirectory), cancellationToken).ConfigureAwait(false);
         if (interception?.Result is { } handled)
-            return new(handled.Output, handled.Cancelled ? null : handled.ExitCode, handled.Cancelled, handled.Truncated, handled.FullOutputPath);
+            return new(handled.Output, handled.Cancelled ? null : handled.ExitCode, handled.Cancelled, handled.Truncated, handled.FullOutputPath, handled.FullOutputError);
         var selected = interception?.Operations is { } operations ? executor.WithOperations(operations) : executor;
         // Source executeBash: the shellCommandPrefix setting applies to user commands too.
         var command = string.IsNullOrEmpty(commandPrefix) ? request.Command : commandPrefix + "\n" + request.Command;
@@ -32,7 +32,7 @@ internal sealed class UserBashHost(ShellCommandExecutor executor, string? comman
         {
             foreach (var delta in Deltas(chunk)) await progress(delta).ConfigureAwait(false);
         }, cancellationToken).ConfigureAwait(false);
-        return new(result.Output, result.ExitCode, result.Cancelled, result.Truncated, result.FullOutputPath);
+        return new(result.Output, result.ExitCode, result.Cancelled, result.Truncated, result.FullOutputPath, result.FullOutputError);
     }
 
     /// <summary>Session progress deltas are bounded; a larger sanitized chunk is split without separating a surrogate pair.</summary>

@@ -1,6 +1,6 @@
 // Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/test/harness-submit-in-commit.test.ts (added in 6a2825113 and
 // cc9c52310), ported in the Pi v1.5.0 sync (area admission): admission for hosts that must not start runs, WhenIdle.Reject, and
-// SubmitAsync(tx, draft) inside the caller's commit (#11149). describe("whenIdle reject") is harness.submit-in-commit.when-idle-reject.* and
+// AdmitAsync(tx, draft) inside the caller's commit (#11149). describe("whenIdle reject") is harness.submit-in-commit.when-idle-reject.* and
 // describe("submit inside the caller's commit") harness.submit-in-commit.inside-the-caller-s-commit.*, on ControlledStorage over
 // MemoryStorage and on MemoryStorage as upstream. Upstream's vitest.store.config.ts does not list the file, so it has no store pass.
 // Verbatim apart from the adaptations in ChatSupport.cs, HarnessSupport.cs and SessionSupport.cs, and these:
@@ -183,7 +183,7 @@ internal static class SubmitInCommitTests
             var draft = SubmissionDraft.Input("work", WhenBusy.Steer, "r1", whenIdle: WhenIdle.Reject);
             Equal(first.Id, (await root.SubmitAsync(draft, Context)).Id, "submit");
             // Deduplication runs before the idle rejection in the caller's commit too.
-            Equal(first.Id, await harness.CommitAsync(tx => root.SubmitAsync(tx, draft), Context), "submit in commit");
+            Equal(first.Id, await harness.CommitAsync(tx => root.AdmitAsync(tx, draft), Context), "submit in commit");
             await harness.CloseAsync(Context);
         });
 
@@ -230,7 +230,7 @@ internal static class SubmitInCommitTests
                 if (!(await tx.DocAsync(Live.LiveDoc, root.Id)).ContainsKey("run")) throw new InvalidOperationException("not working");
                 // The host's own document write may come before the admission.
                 var sent = await tx.DocAsync(Sent, root.Id);
-                var admitted = await root.SubmitAsync(tx, SubmissionDraft.Input("steer", WhenBusy.Steer));
+                var admitted = await root.AdmitAsync(tx, SubmissionDraft.Input("steer", WhenBusy.Steer));
                 sent.GetArray("ids").Add(admitted.ToJson());
                 // The host's own table write comes after it.
                 await tx.AppendEntryAsync(root.Id, new EntryDraft { Kind = "app.sent", Data = Obj(("submission", admitted.ToJson())) });
@@ -254,7 +254,7 @@ internal static class SubmitInCommitTests
             var commits = storage.CommitCount;
             await RejectsAsync(() => harness.CommitAsync<int>(async tx =>
             {
-                await root.SubmitAsync(tx, SubmissionDraft.Input("hi", requestId: "r1"));
+                await root.AdmitAsync(tx, SubmissionDraft.Input("hi", requestId: "r1"));
                 throw new InvalidOperationException("host check failed");
             }, Context), "host check failed", "failed");
             Equal(commits, storage.CommitCount, "commits");
@@ -275,7 +275,7 @@ internal static class SubmitInCommitTests
             {
                 await harness.CommitAsync(async tx =>
                 {
-                    await root.SubmitAsync(tx, SubmissionDraft.Input("hi", requestId: "r1"));
+                    await root.AdmitAsync(tx, SubmissionDraft.Input("hi", requestId: "r1"));
                     await tx.AppendEntryAsync(root.Id, new EntryDraft { Kind = "app.sent" });
                     return 0;
                 }, Context);
@@ -310,7 +310,7 @@ internal static class SubmitInCommitTests
             setup.Faux.SetResponses(FauxAssistantMessage([FauxText("answer")]));
             // No Resume(): the admission asks for progress itself.
             var (harness, root) = await OpenChat(new ControlledStorage(new MemoryStorage()), setup);
-            var id = await harness.CommitAsync(tx => root.SubmitAsync(tx, SubmissionDraft.Input("hi")), Context);
+            var id = await harness.CommitAsync(tx => root.AdmitAsync(tx, SubmissionDraft.Input("hi")), Context);
             MatchJson("""{"type":"input","status":"done"}""", (await SettledStatus(harness, id)).ToJson(), "settled");
             await harness.CloseAsync(Context);
         });
@@ -325,7 +325,7 @@ internal static class SubmitInCommitTests
             var first = await root.SubmitAsync(SubmissionDraft.Input("work"), Context);
             await hold.Reached.Task;
             var note = O("""{"role":"user","content":"a note the model sees","timestamp":1}""");
-            var id = await harness.CommitAsync(tx => root.SubmitAsync(tx, SubmissionDraft.Write(new EntryDraft { Kind = "test.note", Model = JsonValue.Array(note) })),
+            var id = await harness.CommitAsync(tx => root.AdmitAsync(tx, SubmissionDraft.Write(new EntryDraft { Kind = "test.note", Model = JsonValue.Array(note) })),
                 Context);
             Seq([id.Value], ItemIds(await InboxItems(harness, root.Id)), "inbox ids");
             hold.Release.Resolve();
@@ -339,9 +339,9 @@ internal static class SubmitInCommitTests
         {
             var (harness, root, storage, _) = await OpenBusy();
             var draft = SubmissionDraft.Input("steer", WhenBusy.Steer, "r1");
-            var first = await harness.CommitAsync(tx => root.SubmitAsync(tx, draft), Context);
+            var first = await harness.CommitAsync(tx => root.AdmitAsync(tx, draft), Context);
             var commits = storage.CommitCount;
-            var again = await harness.CommitAsync(tx => root.SubmitAsync(tx, draft), Context);
+            var again = await harness.CommitAsync(tx => root.AdmitAsync(tx, draft), Context);
             Equal(first, again, "again");
             Equal(commits, storage.CommitCount, "commits");
             await harness.CloseAsync(Context);
@@ -357,7 +357,7 @@ internal static class SubmitInCommitTests
             {
                 try
                 {
-                    await root.SubmitAsync(tx, SubmissionDraft.Input("hi", WhenBusy.Steer, whenIdle: WhenIdle.Reject));
+                    await root.AdmitAsync(tx, SubmissionDraft.Input("hi", WhenBusy.Steer, whenIdle: WhenIdle.Reject));
                     return "admitted";
                 }
                 catch (Exception error)
@@ -379,14 +379,14 @@ internal static class SubmitInCommitTests
             var afterAppend = await ThrowsAsync<ReadAfterWriteException>(() => harness.CommitAsync(async tx =>
             {
                 await tx.AppendEntryAsync(root.Id, new EntryDraft { Kind = "app.note" });
-                await root.SubmitAsync(tx, SubmissionDraft.Input("steer", WhenBusy.Steer));
+                await root.AdmitAsync(tx, SubmissionDraft.Input("steer", WhenBusy.Steer));
                 return 0;
             }, Context), "after append");
             Rejects(afterAppend, "submit(tx, draft) cannot read tables after the first table write", "after append message");
             await ThrowsAsync<ReadAfterWriteException>(() => harness.CommitAsync(async tx =>
             {
-                await root.SubmitAsync(tx, SubmissionDraft.Input("one", WhenBusy.Steer));
-                await root.SubmitAsync(tx, SubmissionDraft.Input("two", WhenBusy.Steer));
+                await root.AdmitAsync(tx, SubmissionDraft.Input("one", WhenBusy.Steer));
+                await root.AdmitAsync(tx, SubmissionDraft.Input("two", WhenBusy.Steer));
                 return 0;
             }, Context), "second");
             SameJson("[]", await InboxItems(harness, root.Id), "inbox");
@@ -395,7 +395,7 @@ internal static class SubmitInCommitTests
             await ThrowsAsync<ReadAfterWriteException>(() => idle.Harness.CommitAsync(async tx =>
             {
                 await tx.AppendEntryAsync(idle.Root.Id, new EntryDraft { Kind = "app.note" });
-                await idle.Root.SubmitAsync(tx, SubmissionDraft.Input("hi"));
+                await idle.Root.AdmitAsync(tx, SubmissionDraft.Input("hi"));
                 return 0;
             }, Context), "late");
             await idle.Harness.CloseAsync(Context);
@@ -414,13 +414,13 @@ internal static class SubmitInCommitTests
             await ThrowsAsync<ReadAfterWriteException>(() => harness.CommitAsync(async tx =>
             {
                 await tx.AppendEntryAsync(root.Id, new EntryDraft { Kind = "app.note" });
-                await root.SubmitAsync(tx, SubmissionDraft.Continue());
+                await root.AdmitAsync(tx, SubmissionDraft.Continue());
                 return 0;
             }, Context), "late");
 
             var id = await harness.CommitAsync(async tx =>
             {
-                var continued = await root.SubmitAsync(tx, SubmissionDraft.Continue());
+                var continued = await root.AdmitAsync(tx, SubmissionDraft.Continue());
                 await tx.AppendEntryAsync(root.Id, new EntryDraft { Kind = "app.note" });
                 return continued;
             }, Context);
@@ -432,9 +432,9 @@ internal static class SubmitInCommitTests
         yield return Case(inCommit + "rejects-a-busy-continue-and-steers-with-whenidle-inside-the-commit", async () =>
         {
             var (harness, root, _, _) = await OpenBusy();
-            await ThrowsAsync<ConversationBusyException>(() => harness.CommitAsync(tx => root.SubmitAsync(tx, SubmissionDraft.Continue()), Context), "busy");
+            await ThrowsAsync<ConversationBusyException>(() => harness.CommitAsync(tx => root.AdmitAsync(tx, SubmissionDraft.Continue()), Context), "busy");
             var steer = await harness.CommitAsync(
-                tx => root.SubmitAsync(tx, SubmissionDraft.Input("steer", WhenBusy.Steer, whenIdle: WhenIdle.Reject)), Context);
+                tx => root.AdmitAsync(tx, SubmissionDraft.Input("steer", WhenBusy.Steer, whenIdle: WhenIdle.Reject)), Context);
             Seq([steer.Value], ItemIds(await InboxItems(harness, root.Id)), "inbox ids");
             await harness.CloseAsync(Context);
         });
@@ -445,10 +445,10 @@ internal static class SubmitInCommitTests
             var a = await OpenChat(new ControlledStorage(new MemoryStorage()), Setup());
             var b = await OpenChat(new ControlledStorage(new MemoryStorage()), Setup());
             var draft = SubmissionDraft.Input("hi");
-            await RejectsAsync(() => b.Harness.CommitAsync(tx => a.Root.SubmitAsync(tx, draft), Context), "The transaction belongs to another Session", "foreign");
-            await RejectsAsync(() => a.Harness.CommitAsync(tx => a.Root.SubmitAsync(TxProxy.Wrap(tx, forwardAll: true), draft), Context),
+            await RejectsAsync(() => b.Harness.CommitAsync(tx => a.Root.AdmitAsync(tx, draft), Context), "The transaction belongs to another Session", "foreign");
+            await RejectsAsync(() => a.Harness.CommitAsync(tx => a.Root.AdmitAsync(TxProxy.Wrap(tx, forwardAll: true), draft), Context),
                 "The transaction belongs to another Session", "proxied");
-            await RejectsAsync(() => a.Harness.CommitAsync(tx => a.Root.SubmitAsync(TxProxy.Wrap(tx, forwardAll: false), draft), Context),
+            await RejectsAsync(() => a.Harness.CommitAsync(tx => a.Root.AdmitAsync(TxProxy.Wrap(tx, forwardAll: false), draft), Context),
                 "The transaction belongs to another Session", "plain");
             Equal<JsonValue?>(null, await RunOf(a.Harness, a.Root.Id), "run");
             await a.Harness.CloseAsync(Context);
@@ -467,7 +467,7 @@ internal static class SubmitInCommitTests
             await busy.Reached;
             var run = (await harness.InspectAsync(Context)).Tasks.First(task => task.Record.Kind == "pi.generation").Record;
             var id = await telemetry.StartSpanAsync("caller", caller => harness.CommitAsync(
-                tx => root.SubmitAsync(tx, SubmissionDraft.Input("steer", WhenBusy.Steer)), Context.WithTelemetry(caller)));
+                tx => root.AdmitAsync(tx, SubmissionDraft.Input("steer", WhenBusy.Steer)), Context.WithTelemetry(caller)));
             var spans = telemetry.GetSpans();
             var callerSpan = spans.First(span => span.Name == "caller");
             var submit = spans.First(span => span.Name == "pi.durable.submit" && Num(span, "submission.id") == id.Value);
@@ -487,7 +487,7 @@ internal static class SubmitInCommitTests
             setup.Faux.SetResponses(busy.Step);
             var (harness, root) = await OpenChat(new MemoryStorage(), setup, telemetry: telemetry);
             var id = await telemetry.StartSpanAsync("caller", caller =>
-                harness.CommitAsync(tx => root.SubmitAsync(tx, SubmissionDraft.Input("hi")), Context.WithTelemetry(caller)));
+                harness.CommitAsync(tx => root.AdmitAsync(tx, SubmissionDraft.Input("hi")), Context.WithTelemetry(caller)));
             await busy.Reached;
             var submit = telemetry.GetSpans().First(span => span.Name == "pi.durable.submit" && Num(span, "submission.id") == id.Value);
             var record = await (await harness.SubmissionAsync(id, Context))!.StatusAsync(Context);
@@ -504,7 +504,7 @@ internal static class SubmitInCommitTests
             var telemetry = new InMemoryTelemetryContext();
             var (harness, root) = await OpenChat(new MemoryStorage(), setup, telemetry: telemetry);
             var id = await telemetry.StartSpanAsync("caller", caller => harness.CommitAsync(
-                tx => root.SubmitAsync(tx, SubmissionDraft.Write(new EntryDraft { Kind = "app.note" })), Context.WithTelemetry(caller)));
+                tx => root.AdmitAsync(tx, SubmissionDraft.Write(new EntryDraft { Kind = "app.note" })), Context.WithTelemetry(caller)));
             var spans = telemetry.GetSpans();
             var callerSpan = spans.First(span => span.Name == "caller");
             var submit = spans.First(span => span.Name == "pi.durable.submit");
@@ -525,7 +525,7 @@ internal static class SubmitInCommitTests
             {
                 await RejectsAsync(() => harness.CommitAsync<int>(async tx =>
                 {
-                    await root.SubmitAsync(tx, SubmissionDraft.Write(new EntryDraft { Kind = "app.note" }));
+                    await root.AdmitAsync(tx, SubmissionDraft.Write(new EntryDraft { Kind = "app.note" }));
                     throw new InvalidOperationException("later");
                 }, Context.WithTelemetry(caller)), "later", "failed");
             });
@@ -556,7 +556,7 @@ internal static class SubmitInCommitTests
                     var handle = (await api.ConversationAsync(other!.Id, callContext))!;
                     var id = await api.CommitAsync(async tx =>
                     {
-                        var admitted = await handle.SubmitAsync(tx, SubmissionDraft.Input("from the tool"));
+                        var admitted = await handle.AdmitAsync(tx, SubmissionDraft.Input("from the tool"));
                         await tx.AppendEntryAsync(other!.Id, new EntryDraft { Kind = "app.delegated", Data = Obj(("submission", admitted.ToJson())) });
                         return admitted;
                     }, callContext);
@@ -605,7 +605,7 @@ internal static class SubmitInCommitTests
                         var handle = (await runtime.ConversationAsync(runtime.ConversationId, taskContext))!;
                         await runtime.CommitAsync(async (tx, _) =>
                         {
-                            var id = await handle.SubmitAsync(tx, SubmissionDraft.Input("from the task"));
+                            var id = await handle.AdmitAsync(tx, SubmissionDraft.Input("from the task"));
                             return (TaskState?)NextTaskState.Completed(id.ToJson());
                         }, taskContext);
                     },
@@ -661,12 +661,12 @@ internal static class SubmitInCommitTests
             await abortSeen.Task;
             var draft = SubmissionDraft.Input("late");
             await ThrowsAsync<Exception>(() => handle!.SubmitAsync(draft, Context), "submit once aborted");
-            await ThrowsAsync<Exception>(() => harness.CommitAsync(tx => handle!.SubmitAsync(tx, draft), Context), "submit in commit once aborted");
+            await ThrowsAsync<Exception>(() => harness.CommitAsync(tx => handle!.AdmitAsync(tx, draft), Context), "submit in commit once aborted");
             Equal<JsonValue?>(null, await RunOf(harness, other.Id), "run once aborted");
             release.Resolve();
             await aborting;
             await run.WaitAsync(Context);
-            await ThrowsAsync<Exception>(() => harness.CommitAsync(tx => handle!.SubmitAsync(tx, draft), Context), "submit in commit once ended");
+            await ThrowsAsync<Exception>(() => harness.CommitAsync(tx => handle!.AdmitAsync(tx, draft), Context), "submit in commit once ended");
             Equal<JsonValue?>(null, await RunOf(harness, other.Id), "run once ended");
             await harness.CloseAsync(Context);
         });

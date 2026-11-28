@@ -21,6 +21,9 @@
 #include <libproc.h>
 #else
 #include <pty.h>
+#include <dirent.h>
+#include <limits.h>
+#include <sys/syscall.h>
 #endif
 
 #define API __attribute__((visibility("default")))
@@ -117,11 +120,53 @@ API int pisharp_wait_exit(int pid, int *exit_code) {
     return 0;
 }
 API int pisharp_reap(int pid) { int result; do { result = waitpid(pid, NULL, 0); } while (result < 0 && errno == EINTR); return result < 0 ? errno : 0; }
+/* Pi fb0fe823539f6d04850f6e34748c01f01f212e1f (MIT): packages/env/daemon/src/sys/unix.rs.
+ * A job-control shell can put each background job into its own group. The
+ * unreaped leader reserves the session id until we've signalled its members. */
+static int kill_session_member(pid_t member, pid_t session) {
+    if (member <= 0 || member == session || getsid(member) != session) return 0;
+#if defined(__linux__) && defined(SYS_pidfd_open) && defined(SYS_pidfd_send_signal)
+    int fd = (int)syscall(SYS_pidfd_open, member, 0);
+    if (fd >= 0) {
+        int signalled = getsid(member) == session && syscall(SYS_pidfd_send_signal, fd, SIGKILL, NULL, 0) == 0;
+        close(fd);
+        return signalled;
+    }
+#endif
+    return getsid(member) == session && kill(member, SIGKILL) == 0;
+}
+
+static int kill_session_members(pid_t session) {
+    int signalled = 0;
+#if defined(__APPLE__)
+    int count = proc_listallpids(NULL, 0);
+    if (count <= 0 || count > INT32_MAX / (int)sizeof(pid_t) - 64) return 0;
+    int bytes = (count + 64) * (int)sizeof(pid_t);
+    pid_t *members = malloc((size_t)bytes);
+    if (!members) return 0;
+    count = proc_listallpids(members, bytes);
+    for (int i = 0; i < count; ++i) signalled |= kill_session_member(members[i], session);
+    free(members);
+#else
+    DIR *processes = opendir("/proc");
+    if (!processes) return 0;
+    struct dirent *entry;
+    while ((entry = readdir(processes))) {
+        char *end;
+        long pid = strtol(entry->d_name, &end, 10);
+        if (*end == '\0' && pid > 0 && pid <= INT_MAX) signalled |= kill_session_member((pid_t)pid, session);
+    }
+    closedir(processes);
+#endif
+    return signalled;
+}
+
 API int pisharp_kill_group(int pid) {
-    if (kill(-pid, SIGKILL) == 0) return 0;
-    int saved = errno;
-    if (kill(pid, SIGKILL) == 0 || errno == ESRCH) return 0;
-    return saved;
+    int error = 0;
+    if (kill(-pid, SIGKILL) < 0 && kill(pid, SIGKILL) < 0 && errno != ESRCH) error = errno;
+    /* A member may fork during enumeration. Bound passes when zombies remain visible. */
+    for (int attempt = 0; attempt < 8; ++attempt) if (!kill_session_members(pid)) break;
+    return error;
 }
 API int pisharp_poll(int fd, int writing) { struct pollfd item = { .fd = fd, .events = writing ? POLLOUT : POLLIN }; int result = poll(&item, 1, 100); return result < 0 ? -errno : result; }
 API int pisharp_read(int fd, void *buffer, int length) { ssize_t result = read(fd, buffer, (size_t)length); return result < 0 ? -errno : (int)result; }

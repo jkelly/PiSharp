@@ -1,5 +1,5 @@
-// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/coding-agent/src/modes/rpc/rpc-mode.ts and modes/print-mode.ts
-// (registerSignalHandlers: SIGTERM everywhere, SIGHUP except on Windows; dispose the runtime, then exit 143 or 129).
+// Pi fb0fe823539f6d04850f6e34748c01f01f212e1f (MIT): packages/coding-agent/src/modes/rpc/rpc-mode.ts and modes/print-mode.ts
+// (registerSignalHandlers: SIGTERM everywhere, SIGHUP on every platform; dispose the runtime, then exit 143 or 129).
 using System.Runtime.InteropServices;
 
 namespace PiSharp.Cli;
@@ -13,6 +13,15 @@ internal sealed class ShutdownSignals : IDisposable
     /// <summary>The process-wide registration, created on first use.</summary>
     internal static ShutdownSignals Process => ProcessSignals.Value;
 
+    // CTRL_CLOSE_EVENT terminates a Windows process when its handler returns. Keep the
+    // handler alive while the host restores the TUI and joins its shell processes.
+    private readonly TaskCompletionSource _hostFinished = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    internal static void ProcessFinished()
+    {
+        if (ProcessSignals.IsValueCreated) ProcessSignals.Value.HostFinished();
+    }
+    internal void HostFinished() => _hostFinished.TrySetResult();
+
     private readonly CancellationTokenSource _shutdown = new();
     private readonly List<PosixSignalRegistration> _registrations = [];
     private int _received;
@@ -24,7 +33,7 @@ internal sealed class ShutdownSignals : IDisposable
         _forceExit = forceExit ?? (register ? Environment.Exit : _ => { });
         if (!register) return;
         Add(PosixSignal.SIGTERM);
-        if (!OperatingSystem.IsWindows()) Add(PosixSignal.SIGHUP);
+        Add(PosixSignal.SIGHUP);
     }
 
     /// <summary>Cancelled when a registered signal arrives.</summary>
@@ -50,6 +59,12 @@ internal sealed class ShutdownSignals : IDisposable
         try { _shutdown.Cancel(); } catch (ObjectDisposedException) { } catch (AggregateException) { }
     }
 
+    internal void HandleConsoleClose(PosixSignal signal)
+    {
+        Signal(signal);
+        _hostFinished.Task.Wait(TimeSpan.FromSeconds(4));
+    }
+
     private void Add(PosixSignal signal)
     {
         try
@@ -57,7 +72,9 @@ internal sealed class ShutdownSignals : IDisposable
             _registrations.Add(PosixSignalRegistration.Create(signal, context =>
             {
                 // The host exits after its graceful shutdown, with the signal's exit code.
-                context.Cancel = true; Signal(context.Signal);
+                context.Cancel = true;
+                if (OperatingSystem.IsWindows()) HandleConsoleClose(context.Signal);
+                else Signal(context.Signal);
             }));
         }
         catch (Exception error) when (error is PlatformNotSupportedException or IOException) { }
@@ -65,6 +82,7 @@ internal sealed class ShutdownSignals : IDisposable
 
     public void Dispose()
     {
+        HostFinished();
         foreach (var registration in _registrations) registration.Dispose();
         _registrations.Clear(); _shutdown.Dispose();
     }

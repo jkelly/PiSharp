@@ -755,8 +755,18 @@ internal sealed partial class PiExtensionHost
         var ui = detached ?? UiOf(p);
         if (ui is null) return op == "confirm" ? false : null;
         string Text(int index) => args.GetArrayLength() > index && args[index].ValueKind == JsonValueKind.String ? args[index].GetString()! : "";
-        ExtensionUiDialogOptions? Options(int index) => args.GetArrayLength() > index && args[index].ValueKind == JsonValueKind.Object &&
-            args[index].TryGetProperty("timeout", out var timeout) && timeout.ValueKind == JsonValueKind.Number ? new(timeout.GetDouble()) : null;
+        ExtensionUiDialogOptions? Options(int index)
+        {
+            if (args.GetArrayLength() <= index || args[index].ValueKind != JsonValueKind.Object) return null;
+            var options = args[index];
+            double? timeout = options.TryGetProperty("timeout", out var ms) && ms.ValueKind == JsonValueKind.Number ? ms.GetDouble() : null;
+            var kind = options.TryGetProperty("blockedKind", out var value) && value.ValueKind == JsonValueKind.String ? value.GetString() : null;
+            return new(timeout) { BlockedKind = kind switch
+            {
+                "auth" => ExtensionDialogBlockedKind.Auth, "permission" => ExtensionDialogBlockedKind.Permission,
+                "question" => ExtensionDialogBlockedKind.Question, _ => null
+            } };
+        }
         switch (op)
         {
             case "select":

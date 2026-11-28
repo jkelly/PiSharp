@@ -12,7 +12,7 @@ internal static partial class Program
         {
             var expected = """
                 amazon-bedrock/us.anthropic.claude-opus-5-5
-                ant-ling/Ring-2.6-1T
+                ant-ling/Ling-3.1-flash
                 anthropic/claude-opus-5-5
                 openai/gpt-6.2-sol
                 azure/gpt-6.2-sol
@@ -30,7 +30,7 @@ internal static partial class Program
                 cerebras/gpt-oss-120b
                 zai/glm-5.3
                 zai-coding-cn/glm-5.3
-                mistral/devstral-medium-latest
+                mistral/mistral-medium-latest
                 minimax/MiniMax-M3
                 minimax-cn/MiniMax-M3
                 moonshotai/kimi-k2.7-code
@@ -43,8 +43,8 @@ internal static partial class Program
                 opencode-go/kimi-k3.1-pro
                 kimi-coding/kimi-for-coding
                 meta/muse-spark-1.3
-                cloudflare-workers-ai/@cf/moonshotai/kimi-k2.7-code
-                cloudflare-ai-gateway/workers-ai/@cf/moonshotai/kimi-k2.7-code
+                cloudflare-workers-ai/@cf/zai-org/glm-5.3
+                cloudflare-ai-gateway/workers-ai/@cf/zai-org/glm-5.3
                 qwen-token-plan/qwen3.8-max
                 qwen-token-plan-cn/qwen3.8-max
                 qwen-token-plan-individual/qwen3.8-max
@@ -58,7 +58,7 @@ internal static partial class Program
             var registry = ModelRegistry.Create(new());
             foreach (var (provider, id) in ModelResolver.DefaultModelPerProvider)
                 Check(registry.Find(provider, id) is not null, provider + " default is available");
-            Equal(1853, Enum.GetValues<CatalogModelType>().Sum(type => registry.GetAllOfType(type).Count), "complete released 1.6.0 entries");
+            Equal(1858, Enum.GetValues<CatalogModelType>().Sum(type => registry.GetAllOfType(type).Count), "complete released 1.7.0 entries");
             var exactAzure = LiveSessionSelection.Parse("azure", "gpt-6.1-sol", null);
             Equal(1050000d, exactAzure.Definition.Raw.Value.GetProperty("contextWindow").GetDouble(), "exact-identity path uses reviewed corrections");
             Equal("qwen3.8-max", LiveSessionSelection.Parse("qwen-token-plan-individual-cn", "qwen3.8-max", null).Model.Id, "exact-identity path admits new provider");
@@ -75,7 +75,7 @@ internal static partial class Program
             var registry = ModelRegistry.Create(new());
             var models = registry.GetAll().Where(m => m.Provider == "qwen-token-plan-individual-cn").OrderBy(m => m.Id, StringComparer.Ordinal).ToArray();
             Names(["deepseek-v4-flash-0731", "deepseek-v4-pro", "deepseek-v4-pro-0813", "deepseek-v4.1-flash", "deepseek-v4.1-flash-1017", "glm-5.2", "glm-5.3", "qwen3.6-flash", "qwen3.7-max",
-                "qwen3.7-plus", "qwen3.8-flash", "qwen3.8-max", "qwen4-max-preview"], models.Select(m => m.Id), "individual CN allowlist");
+                "qwen3.7-plus", "qwen3.8-flash", "qwen3.8-max", "qwen4-max"], models.Select(m => m.Id), "individual CN allowlist");
             // The Individual CN rows are the Team CN rows of the same release under another provider id. Until Pi 1.6.0 that release was the
             // historical shard; 1.6.0 moved the gateway and dropped the explicit developer-role flag on both, so the current Team CN rows are the source.
             var source = CurrentModelCatalog.Get("qwen-token-plan-cn")!;

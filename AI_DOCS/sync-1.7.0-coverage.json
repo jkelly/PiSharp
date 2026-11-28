@@ -1,0 +1,682 @@
+{
+  "schemaVersion": 1,
+  "sourceValidationOnly": true,
+  "scope": "File disposition in the frozen v1.6.0..v1.7.0 inventory. Runtime and upstream test files map to native behavior groups. Suite evidence applies to those groups, not one-to-one test equivalence or upstream test execution.",
+  "source": {
+    "tag": "v1.7.0",
+    "commit": "fb0fe823539f6d04850f6e34748c01f01f212e1f",
+    "tree": "12bd22b80a5e430b42054f55b5cf7885320950fb"
+  },
+  "inventory": {
+    "path": "compatibility/sync-1.7.0-files.json",
+    "sha256": "e9c4463b39ab5be4331ecd23a364dc92f30a67c90535a484268ab7a530c44ae3"
+  },
+  "ledger": {
+    "path": "AI_DOCS/sync-1.7.0-source-validation.json",
+    "sha256": "3a1f0e5daac76acb4d985b49819e6f7b07275bcd7c9ce902768249e6ef6fb70d"
+  },
+  "expectedCases": {
+    "path": "tools/CompatibilityReport/sync-1.7.0-expected-cases.json",
+    "sha256": "875cfb0519b31923d62564be6c6137a6a388732ccfe67f0d3b8c93ab13dc0802"
+  },
+  "complete": true,
+  "summary": {
+    "files": 1683,
+    "byStatus": {
+      "no-op": 1310,
+      "tested-with-limitations": 373
+    }
+  },
+  "groups": [
+    {
+      "id": "provider-catalog",
+      "suites": [
+        "Models"
+      ],
+      "nativePaths": [
+        "src/PiSharp.AI/Catalogs/Releases/1.7.0",
+        "src/PiSharp.ModelRuntime/Models"
+      ],
+      "limitation": "Embedded release shards and native discovery. Upstream catalog build scripts and live model availability are outside the offline comparison.",
+      "rowCount": 21,
+      "checks": [
+        {
+          "suite": "Models",
+          "reportSha256": "5920c24ffad3ae22a0f31f71db1d1243e07514622ac6d7571e46d479f470086b",
+          "expectedIds": [
+            "sync170.catalog.exact-current-package-resources",
+            "catalog-f09.default-map-exact-upstream"
+          ],
+          "expectedCount": 2,
+          "selectedExpected": 2,
+          "missingIds": [],
+          "failedOrSkipped": [],
+          "complete": true
+        }
+      ],
+      "complete": true
+    },
+    {
+      "id": "image-and-decision",
+      "suites": [
+        "Classifiers",
+        "Codemode"
+      ],
+      "nativePaths": [
+        "src/PiSharp.AI/ModelOperations",
+        "src/PiSharp.Contracts/ModelOperations"
+      ],
+      "limitation": "Native scripted model responses, request shapes and usage/pricing. Real provider accounts are outside this verification.",
+      "rowCount": 18,
+      "checks": [
+        {
+          "suite": "Classifiers",
+          "reportSha256": "b742a5b775087feb8d0bd28a754bc52876f640aef3aea66320aaeda1a50e2b1b",
+          "expectedIds": [
+            "sync170.pi-image.wire-retry-and-usage",
+            "sync170.pi-decision.validates-answers-and-preserves-billing",
+            "sync170.openrouter-image.options-native-error-and-usage"
+          ],
+          "expectedCount": 3,
+          "selectedExpected": 3,
+          "missingIds": [],
+          "failedOrSkipped": [],
+          "complete": true
+        },
+        {
+          "suite": "Codemode",
+          "reportSha256": "772d902dd72b0e745537ba77e7719b167ab140cd71ce2c26b03e683df1c7a3a8",
+          "expectedIds": [
+            "executor.models-bridge-usage-concurrency-and-errors"
+          ],
+          "expectedCount": 1,
+          "selectedExpected": 1,
+          "missingIds": [],
+          "failedOrSkipped": [],
+          "complete": true
+        }
+      ],
+      "complete": true
+    },
+    {
+      "id": "chat-providers",
+      "suites": [
+        "ProviderApis",
+        "ProviderSync",
+        "Compatibility"
+      ],
+      "nativePaths": [
+        "src/PiSharp.AI/Protocols",
+        "src/PiSharp.AI/Providers"
+      ],
+      "limitation": "Native HTTP fixtures and protocol projections. Provider infrastructure and every historical wire schedule have separate qualification.",
+      "rowCount": 55,
+      "checks": [
+        {
+          "suite": "ProviderApis",
+          "reportSha256": "3be23649f409304238033123e4cc4624faaf31a6cf7061543deb5f26af879638",
+          "expectedIds": [
+            "bedrock.adaptive-opus-gpt-oss-gpt-and-govcloud-request-fields",
+            "live.long-transcript-2000-messages-with-loadout-records-every-family"
+          ],
+          "expectedCount": 2,
+          "selectedExpected": 2,
+          "missingIds": [],
+          "failedOrSkipped": [],
+          "complete": true
+        },
+        {
+          "suite": "ProviderSync",
+          "reportSha256": "76aa8cfa8f1b75b398bbeedf9ab434e083ddb08d8439a38ed1e4a5e104df76e5",
+          "expectedIds": [
+            "errors.in-stream-error-texts-google-and-vertex",
+            "errors.in-stream-error-texts-completions-anthropic",
+            "sync150.google-gemini-4-and-later-thinking-level"
+          ],
+          "expectedCount": 3,
+          "selectedExpected": 3,
+          "missingIds": [],
+          "failedOrSkipped": [],
+          "complete": true
+        },
+        {
+          "suite": "Compatibility",
+          "reportSha256": "ba34170bbc5495971b397b9259df11d6fcd620db77b4048f2af2f2563adcfba3",
+          "expectedIds": [
+            "Completions 1.7 opaque reasoning and gateway finish metadata"
+          ],
+          "expectedCount": 1,
+          "selectedExpected": 1,
+          "missingIds": [],
+          "failedOrSkipped": [],
+          "complete": true
+        }
+      ],
+      "complete": true
+    },
+    {
+      "id": "stream-and-retry",
+      "suites": [
+        "ProviderSync",
+        "MistralConversations"
+      ],
+      "nativePaths": [
+        "src/PiSharp.AI/Protocols/ProviderShared",
+        "src/PiSharp.CodingAgent/Configuration/AgentRetryPolicy.cs"
+      ],
+      "limitation": "Scripted streaming, error and retry schedules. Historical Pi Messages framing differs from the current protocol.",
+      "rowCount": 11,
+      "checks": [
+        {
+          "suite": "ProviderSync",
+          "reportSha256": "76aa8cfa8f1b75b398bbeedf9ab434e083ddb08d8439a38ed1e4a5e104df76e5",
+          "expectedIds": [
+            "sync150.retry-gateway-service-unavailable-node-fetch-and-codex-disconnect",
+            "retry.google-unusable-delays-backoff-and-no-retry-statuses"
+          ],
+          "expectedCount": 2,
+          "selectedExpected": 2,
+          "missingIds": [],
+          "failedOrSkipped": [],
+          "complete": true
+        },
+        {
+          "suite": "MistralConversations",
+          "reportSha256": "3deee1ba258ace8cc631b61fb68b57d7cd7b35e6dd7ec8168980ae40ff2b6d5c",
+          "expectedIds": [
+            "mistral buffered framing matches fragmented reads and keeps frame limits",
+            "http-error-response-hook-before-body-and-source-truncation"
+          ],
+          "expectedCount": 2,
+          "selectedExpected": 2,
+          "missingIds": [],
+          "failedOrSkipped": [],
+          "complete": true
+        }
+      ],
+      "complete": true
+    },
+    {
+      "id": "model-runtime",
+      "suites": [
+        "Models"
+      ],
+      "nativePaths": [
+        "src/PiSharp.ModelRuntime",
+        "src/PiSharp.CodingAgent/Schemas/models.schema.json"
+      ],
+      "limitation": "Model selection, model metadata and account filtering use offline credentials and fixtures.",
+      "rowCount": 19,
+      "checks": [
+        {
+          "suite": "Models",
+          "reportSha256": "5920c24ffad3ae22a0f31f71db1d1243e07514622ac6d7571e46d479f470086b",
+          "expectedIds": [
+            "sync170.radius.discovers-and-restores-image-and-classifier",
+            "schemas.models-170-compatibility-and-pricing"
+          ],
+          "expectedCount": 2,
+          "selectedExpected": 2,
+          "missingIds": [],
+          "failedOrSkipped": [],
+          "complete": true
+        }
+      ],
+      "complete": true
+    },
+    {
+      "id": "extension-runtime",
+      "suites": [
+        "NodeRuntime",
+        "ExtensionParity"
+      ],
+      "nativePaths": [
+        "tools/NodeBridge/runtime-fixture-170",
+        "tools/NodeBridge/pi-host/virtual"
+      ],
+      "limitation": "Released extension ABI and native bridge behavior on supported Node versions. No claim of full upstream JavaScript package equivalence.",
+      "rowCount": 6,
+      "checks": [
+        {
+          "suite": "NodeRuntime",
+          "reportSha256": "a5b4eb87ff54d4091d5ebe781615759aa1736934ab62dbf90597136e300af4c6",
+          "expectedIds": [
+            "sameModels",
+            "sameTui"
+          ],
+          "expectedCount": 2,
+          "selectedExpected": 2,
+          "missingIds": [],
+          "failedOrSkipped": [],
+          "complete": true
+        },
+        {
+          "suite": "ExtensionParity",
+          "reportSha256": "51d387d2dd52941c84421d19be7468fa219ddbda4ad6e9fcc95ef91d57404f05",
+          "expectedIds": [
+            "provider.classifier-and-image-providers-registered-by-an-extension",
+            "sync150.bridge-stream-proxy-parses-tool-call-arguments-incrementally"
+          ],
+          "expectedCount": 2,
+          "selectedExpected": 2,
+          "missingIds": [],
+          "failedOrSkipped": [],
+          "complete": true
+        }
+      ],
+      "complete": true
+    },
+    {
+      "id": "interactive-cli",
+      "suites": [
+        "InteractiveParity"
+      ],
+      "nativePaths": [
+        "src/PiSharp.Cli/Interactive"
+      ],
+      "limitation": "Native rendered and scripted interactive sessions. Physical terminal, OS clipboard, and physical Windows console behavior are outside local verification.",
+      "rowCount": 34,
+      "checks": [
+        {
+          "suite": "InteractiveParity",
+          "reportSha256": "aab915cdea70145c6a886ee13adae37f2d8dfc9aa232d2b6adc5b1540c83bce4",
+          "expectedIds": [
+            "sync170.console-cancellation-restores-fullscreen-terminal",
+            "sync170.extension-dialog-blocked-kind-and-first-line-select",
+            "sync170.extension-dialog-blocked-kind-and-first-line-confirm",
+            "sync170.extension-dialog-blocked-kind-and-first-line-input",
+            "sync170.resume-registers-restricted-session-and-clears-on-quit",
+            "startup.status.project-trust-permission-and-clear",
+            "startup.status.input-cancellation-clears-terminal"
+          ],
+          "expectedCount": 7,
+          "selectedExpected": 7,
+          "missingIds": [],
+          "failedOrSkipped": [],
+          "complete": true
+        }
+      ],
+      "complete": true
+    },
+    {
+      "id": "cli-sessions",
+      "suites": [
+        "CliParity",
+        "SessionParity"
+      ],
+      "nativePaths": [
+        "src/PiSharp.Cli",
+        "src/PiSharp.CodingAgent",
+        "src/PiSharp.Sessions"
+      ],
+      "limitation": "Native CLI and session fixtures. Native NuGet tool updates use a different package manager from upstream npm.",
+      "rowCount": 49,
+      "checks": [
+        {
+          "suite": "CliParity",
+          "reportSha256": "f30324746aded480097c2442cc25ce8cbcd2144812adbb36ad58497ffc64057e",
+          "expectedIds": [
+            "sync170.agent-dir-last-wins-and-terminator-is-literal",
+            "sync170.resume-preserves-restrictions-and-excludes-secrets-and-prompts",
+            "sync170.transcript-notices-migrate-with-explicit-keys-taking-precedence"
+          ],
+          "expectedCount": 3,
+          "selectedExpected": 3,
+          "missingIds": [],
+          "failedOrSkipped": [],
+          "complete": true
+        },
+        {
+          "suite": "SessionParity",
+          "reportSha256": "5ceb3d777db19c977bec670ae3679a99bdb763518c54e11468cab3558138089f",
+          "expectedIds": [
+            "boundary.resume-restores-virtual-branch-selection"
+          ],
+          "expectedCount": 1,
+          "selectedExpected": 1,
+          "missingIds": [],
+          "failedOrSkipped": [],
+          "complete": true
+        }
+      ],
+      "complete": true
+    },
+    {
+      "id": "codemode",
+      "suites": [
+        "Codemode",
+        "ExtensionParity"
+      ],
+      "nativePaths": [
+        "src/PiSharp.Codemode",
+        "src/PiSharp.Cli/Extensions/NativeExtensionModelOperations.cs"
+      ],
+      "limitation": "Native codemode bridge calls and scripted model options. Provider credentials are outside this evidence.",
+      "rowCount": 2,
+      "checks": [
+        {
+          "suite": "Codemode",
+          "reportSha256": "772d902dd72b0e745537ba77e7719b167ab140cd71ce2c26b03e683df1c7a3a8",
+          "expectedIds": [
+            "executor.models-bridge-usage-concurrency-and-errors"
+          ],
+          "expectedCount": 1,
+          "selectedExpected": 1,
+          "missingIds": [],
+          "failedOrSkipped": [],
+          "complete": true
+        },
+        {
+          "suite": "ExtensionParity",
+          "reportSha256": "51d387d2dd52941c84421d19be7468fa219ddbda4ad6e9fcc95ef91d57404f05",
+          "expectedIds": [
+            "provider.classifier-and-image-providers-registered-by-an-extension",
+            "native.classifier-and-image-provider-reaches-node-extensions"
+          ],
+          "expectedCount": 2,
+          "selectedExpected": 2,
+          "missingIds": [],
+          "failedOrSkipped": [],
+          "complete": true
+        }
+      ],
+      "complete": true
+    },
+    {
+      "id": "shell-and-tools",
+      "suites": [
+        "CliSync",
+        "WireSync",
+        "InteractiveParity"
+      ],
+      "nativePaths": [
+        "src/PiSharp.Tools",
+        "src/PiSharp.CodingAgent/Execution/UserBash.cs"
+      ],
+      "limitation": "Native Bash, truncated output and tool dispatch tests; Windows physical console closure remains a platform check.",
+      "rowCount": 12,
+      "checks": [
+        {
+          "suite": "CliSync",
+          "reportSha256": "2dcc781050e41dbac72e5be1a311caffbc8e6f687f2b0465510647be78ed277a",
+          "expectedIds": [
+            "wire.rpc-bash.interactive-bang-commands-abort-and-bounded-deltas"
+          ],
+          "expectedCount": 1,
+          "selectedExpected": 1,
+          "missingIds": [],
+          "failedOrSkipped": [],
+          "complete": true
+        },
+        {
+          "suite": "WireSync",
+          "reportSha256": "d151fd05111cb6df9e1baca70cafba3b9839c4640266f95e217af38b6e08a68f",
+          "expectedIds": [
+            "wire.rpc-bash.excluded-abort-truncation-and-spill",
+            "tools.bash.output-schema-descriptions",
+            "tools.bash.spill-files-exclusive-and-owner-only"
+          ],
+          "expectedCount": 3,
+          "selectedExpected": 3,
+          "missingIds": [],
+          "failedOrSkipped": [],
+          "complete": true
+        },
+        {
+          "suite": "InteractiveParity",
+          "reportSha256": "aab915cdea70145c6a886ee13adae37f2d8dfc9aa232d2b6adc5b1540c83bce4",
+          "expectedIds": [
+            "tool.exec.bash-spill-failure-appears-once"
+          ],
+          "expectedCount": 1,
+          "selectedExpected": 1,
+          "missingIds": [],
+          "failedOrSkipped": [],
+          "complete": true
+        }
+      ],
+      "complete": true
+    },
+    {
+      "id": "mcp",
+      "suites": [
+        "McpSync",
+        "McpParity"
+      ],
+      "nativePaths": [
+        "src/PiSharp.Extensions.Runtime/Mcp",
+        "src/PiSharp.Cli/Mcp"
+      ],
+      "limitation": "Native JSON-RPC/SSE and result shape checks using supplied servers. Historical lifecycle stress controls have separate results.",
+      "rowCount": 12,
+      "checks": [
+        {
+          "suite": "McpSync",
+          "reportSha256": "b83f73aeddd8631e4e89afc0ca5d843275187631ada4493aedbaf78ae0640691",
+          "expectedIds": [
+            "sync170.public-model-content-and-result-schema"
+          ],
+          "expectedCount": 1,
+          "selectedExpected": 1,
+          "missingIds": [],
+          "failedOrSkipped": [],
+          "complete": true
+        },
+        {
+          "suite": "McpParity",
+          "reportSha256": "d9f0297836df8d70901976c7944d72d10b447cb65aaabc18287d9c8449c78830",
+          "expectedIds": [
+            "retry.tool-calls-are-not-retried-after-transient-errors"
+          ],
+          "expectedCount": 1,
+          "selectedExpected": 1,
+          "missingIds": [],
+          "failedOrSkipped": [],
+          "complete": true
+        }
+      ],
+      "complete": true
+    },
+    {
+      "id": "terminal-ui",
+      "suites": [
+        "Tui",
+        "InteractiveParity"
+      ],
+      "nativePaths": [
+        "src/PiSharp.Tui"
+      ],
+      "limitation": "Native terminal drivers, renderer and editor fixtures. Platform-specific emulator behaviors are tested through selected representative paths.",
+      "rowCount": 17,
+      "checks": [
+        {
+          "suite": "Tui",
+          "reportSha256": "f573430f30ee995f52261a487d5d046148eb61aa0b5b3f9b1bf2b47f6ef7776d",
+          "expectedIds": [
+            "sync170.program-resume.encodes-and-validates",
+            "sync170.input.large-paste-with-split-terminator",
+            "sync170.image.hyperlink-length-bound"
+          ],
+          "expectedCount": 3,
+          "selectedExpected": 3,
+          "missingIds": [],
+          "failedOrSkipped": [],
+          "complete": true
+        },
+        {
+          "suite": "InteractiveParity",
+          "reportSha256": "aab915cdea70145c6a886ee13adae37f2d8dfc9aa232d2b6adc5b1540c83bce4",
+          "expectedIds": [
+            "sync170.resume-registers-restricted-session-and-clears-on-quit"
+          ],
+          "expectedCount": 1,
+          "selectedExpected": 1,
+          "missingIds": [],
+          "failedOrSkipped": [],
+          "complete": true
+        }
+      ],
+      "complete": true
+    },
+    {
+      "id": "durable",
+      "suites": [
+        "Durable"
+      ],
+      "nativePaths": [
+        "src/PiSharp.Durable",
+        "src/PiSharp.Durable.Tools",
+        "src/PiSharp.Durable.Sqlite"
+      ],
+      "limitation": "Native tagged results, session admission and persistence. Historical storage adapters keep their original qualification; the upstream IndexedDB browser adapter is outside scope.",
+      "rowCount": 58,
+      "checks": [
+        {
+          "suite": "Durable",
+          "reportSha256": "ce02a16e9902a207db6f51c6ef08ec4ded5bb62f77a848e53d8a3c1acfcde836",
+          "expectedIds": [
+            "sync170.tagged-public-results",
+            "sync170.accumulates-optional-image-output-in-usage",
+            "chord.diff.sliding-windows-retain-shared-rows-in-both-directions"
+          ],
+          "expectedCount": 3,
+          "selectedExpected": 3,
+          "missingIds": [],
+          "failedOrSkipped": [],
+          "complete": true
+        }
+      ],
+      "complete": true
+    },
+    {
+      "id": "chord-consumers",
+      "suites": [
+        "Chord",
+        "Chord.Durable.Integration"
+      ],
+      "nativePaths": [
+        "src/PiSharp.Chord",
+        "src/PiSharp.Durable.Store"
+      ],
+      "limitation": "Storage, query argument admission, recovery and watch paths used by Durable. Standalone Chord v2 peers, new grant APIs, and query-performance parity are outside this candidate.",
+      "rowCount": 40,
+      "checks": [
+        {
+          "suite": "Chord",
+          "reportSha256": "f55a025292ede253b9c83963dedf263a1f32b42503f8960b11645e1d6597ba14",
+          "expectedIds": [
+            "contracts.declare.query-args-are-json-only",
+            "host.runtime.follow-failed-member-recovers-with-whole-value",
+            "registries.record.changed-version-cannot-return-an-older-versions-last-good-composition",
+            "store.outbox.switch-in-flight-orders-commits-and-persists",
+            "sync.files.head-recovers-after-crash-and-from-legacy-directory",
+            "sync.files.flush-failure-never-publishes",
+            "sync.files.sessions-write-independently",
+            "sync.session.lost-response-is-idempotent-and-refusal-preserves-outbox"
+          ],
+          "expectedCount": 8,
+          "selectedExpected": 8,
+          "missingIds": [],
+          "failedOrSkipped": [],
+          "complete": true
+        },
+        {
+          "suite": "Chord.Durable.Integration",
+          "reportSha256": "b721eee0e437c6ef30fed3811652c65a71a03008c1d33ec2d9b76f04b6123096",
+          "expectedIds": [
+            "real-host.store-publication.adopts-two-durable-views-in-one-batch"
+          ],
+          "expectedCount": 1,
+          "selectedExpected": 1,
+          "missingIds": [],
+          "failedOrSkipped": [],
+          "complete": true
+        }
+      ],
+      "complete": true
+    },
+    {
+      "id": "native-environment",
+      "suites": [
+        "Env.Terminal",
+        "Env.Process",
+        "Env.Adapter"
+      ],
+      "nativePaths": [
+        "src/PiSharp.Env",
+        "src/PiSharp.Env.Daemon"
+      ],
+      "limitation": "Local and scripted process/terminal lifecycles. Native Windows PTY creation, live SSH and independently packaged daemons are outside this source check.",
+      "rowCount": 6,
+      "checks": [
+        {
+          "suite": "Env.Terminal",
+          "reportSha256": "1c07d71a8348ee078b82bba2e98cbcbf34e6f8d818e7f6ebbd95cfe2bcfde256",
+          "expectedIds": [
+            "native-terminal-background-job-ends-on-exit",
+            "native-terminal-background-job-ends-on-close"
+          ],
+          "expectedCount": 2,
+          "selectedExpected": 2,
+          "missingIds": [],
+          "failedOrSkipped": [],
+          "complete": true
+        },
+        {
+          "suite": "Env.Process",
+          "reportSha256": "4dd56e57520a5ff43ef3dd5094503c00980ebd08b0a65d50c9bdb5cec4a8ed59",
+          "expectedIds": [
+            "blocked-stdin-write-remains-cancellable"
+          ],
+          "expectedCount": 1,
+          "selectedExpected": 1,
+          "missingIds": [],
+          "failedOrSkipped": [],
+          "complete": true
+        },
+        {
+          "suite": "Env.Adapter",
+          "reportSha256": "8f80c3e11765680a4a1b3207267102b4fcea2e486a425b19e10cffac9ab8b5c6",
+          "expectedIds": [
+            "real daemon actual Durable write/read/edit/bash tool differential trace"
+          ],
+          "expectedCount": 1,
+          "selectedExpected": 1,
+          "missingIds": [],
+          "failedOrSkipped": [],
+          "complete": true
+        }
+      ],
+      "complete": true
+    },
+    {
+      "id": "source-and-attribution",
+      "suites": [
+        "SourceLock"
+      ],
+      "nativePaths": [
+        "compatibility/target.lock.json",
+        "THIRD-PARTY-NOTICES.md"
+      ],
+      "limitation": "Immutable package manifest, license and file identities verified against upstream Git objects. This check concerns source provenance.",
+      "rowCount": 13,
+      "checks": [
+        {
+          "suite": "SourceLock",
+          "reportSha256": "82d127639c57ce3a01396d481d46dbccffc87b8bc179839f15483f01dd04ebd8",
+          "expectedIds": [
+            "the exact prior source lock and historical evidence remain preserved",
+            "the candidate lock covers every surviving changed path and package manifest",
+            "the complete inventory reproduces from local upstream Git objects"
+          ],
+          "expectedCount": 3,
+          "selectedExpected": 3,
+          "missingIds": [],
+          "failedOrSkipped": [],
+          "complete": true
+        }
+      ],
+      "complete": true
+    }
+  ]
+}

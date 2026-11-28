@@ -16,13 +16,13 @@ internal static partial class Program
         var modelsPath = Path.Combine(root, "copilot-models.json");
         Write(modelsPath, ("github-copilot", Provider("https://configured.invalid/copilot", "configured-copilot")));
         void Save(string allowed) => File.WriteAllText(authPath,
-            "{\"github-copilot\":{\"type\":\"oauth\",\"access\":\"stale\",\"refresh\":\"github-token\",\"expires\":1,\"availableModelIds\":[\"" + allowed + "\"]}}");
+            "{\"github-copilot\":{\"type\":\"oauth\",\"access\":\"stale\",\"refresh\":\"github-token\",\"expires\":1,\"availableModelIds\":[\"chat-only\"],\"availableClassifierModelIds\":[\"" + allowed + "\"]}}");
         Save("chat-only");
         const string freshToken = "tid=fake;proxy-ep=proxy.enterprise.test;";
         var expires = DateTimeOffset.UtcNow.AddHours(2).ToUnixTimeSeconds();
         var authHttp = new CopilotHttp(request => request.Url.EndsWith("/copilot_internal/v2/token", StringComparison.Ordinal)
             ? "{\"token\":\"" + freshToken + "\",\"expires_at\":" + expires.ToString(CultureInfo.InvariantCulture) + "}"
-            : "{\"data\":[{\"id\":\"microsoft-decision-1\",\"model_picker_enabled\":true}]}");
+            : "{\"data\":[{\"id\":\"microsoft-decision-1\",\"model_picker_enabled\":false,\"capabilities\":{\"type\":\"decisions\"}}]}");
         var registry = NativeExtensionModelOperations.CreateDefaultRegistry(Environment, authPath,
             createAuthHttp: () => new HttpClient(authHttp, disposeHandler: false), modelsPath: modelsPath);
         var model = Model(registry, "github-copilot", "microsoft-decision-1");

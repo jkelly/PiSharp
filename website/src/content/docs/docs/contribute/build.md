@@ -11,7 +11,7 @@ You build PiSharp from source to work on it, to run its tests, or to use a featu
 | --- | --- | --- |
 | .NET SDK | 10.0.401 exactly | Everything. [`global.json`](https://github.com/jkelly/PiSharp/blob/main/global.json) pins it with `"rollForward": "disable"` to match the deterministic offline contract. Run `./tools/bootstrap-sdk.ps1` (Windows/PowerShell) or `./tools/bootstrap-sdk.sh` (macOS/Linux) to install the exact pinned SDK locally under `.dotnet/` without touching your system SDKs. |
 | Git | Any recent | Cloning, and the test cases that run `git`. |
-| Node.js | 22.13 or later, with npm | The [Node bridge](/docs/extensions/node-bridge/) for Pi's TypeScript extensions, the `ExtensionParity` suite, and the Node tools under `tools/`. |
+| Node.js | 22.19 or later, with npm | The [Node bridge](/docs/extensions/node-bridge/) for Pi's TypeScript extensions, the `ExtensionParity` suite, and the Node tools under `tools/`. |
 | Node.js | 22 or later | The [website](/docs/contribute/website/). |
 | PowerShell | 7 | `tools/release/build-release-packages.ps1` and the other release scripts. |
 
@@ -24,7 +24,7 @@ git clone https://github.com/jkelly/PiSharp.git
 cd PiSharp
 ```
 
-`main` holds the latest work, including unreleased features. Each release has a tag, such as `v1.5.0`. Check out the tag to build exactly what shipped.
+`main` holds the latest work, including unreleased features. Check out `v1.6.0.2` to reproduce the published release. For the 1.7.0 source candidate, run the commands below from the checkout containing the 1.7.0 source update.
 
 ## Repository layout
 
@@ -64,7 +64,7 @@ Every project gets these settings from `Directory.Build.props`:
 
 | Setting | Value | Effect |
 | --- | --- | --- |
-| `VersionPrefix` | `1.6.0` | The version a build reports, unless you pass `-p:VersionPrefix`. A build of `main` reports it even when it holds unreleased features. |
+| `VersionPrefix` | `1.7.0` | The candidate version a build reports unless you pass `-p:VersionPrefix`. |
 | `TargetFramework` | `net10.0` | |
 | `Nullable`, `ImplicitUsings` | `enable` | |
 | `TreatWarningsAsErrors` | `true` | Any compiler warning fails the build. |
@@ -106,29 +106,24 @@ dotnet run --project src/PiSharp.Cli -- -p "Summarize this repository"
 dotnet run --project src/PiSharp.Cli -- durable
 ```
 
-Once the packages are in your cache, you can leave out `-p:RestoreSources`. The CLI built this way includes everything on `main`, including CLI features that are in no release yet. See [Command line](/docs/reference/cli/).
+Once the packages are in your cache, you can leave out `-p:RestoreSources`. The CLI runs the code in your current checkout. See [Command line](/docs/reference/cli/).
 
 `dotnet run` starts in Debug. Add `-c Release` for the build the packages use. The build copies `CHANGELOG.md` next to the executable, where What's New and `/changelog` read it.
 
 ## Install your build as a tool
 
-To run your build as `pisharp`, pack it the way a release does and install it from the output folder. The macOS CI job does exactly this.
+From the 1.7.0 candidate checkout, build a local prerelease package and install it in its own tool directory. PowerShell 7 and the pinned .NET SDK are required.
 
 ```powershell
-pwsh ./tools/release/build-release-packages.ps1 -Version {{PISHARP_VERSION}} -SourceCommit (git rev-parse HEAD)
+$commit = (git rev-parse HEAD).Trim()
+$version = "1.7.0-local.g$($commit.Substring(0, 7))"
+$packages = "artifacts/packages-$version"
+pwsh ./tools/release/build-release-packages.ps1 -Version $version -SourceCommit $commit -OutputDirectory $packages
+dotnet tool install PiSharp.Cli --tool-path "./artifacts/tools-$version" --source $packages --version $version
+& "./artifacts/tools-$version/pisharp" --version
 ```
 
-The script packs every library and the CLI into `artifacts/packages/`, and checks each package. It expects 29 packages there when it ends, so empty the folder before you run it again. The version's first three numbers must match the Pi baseline in `compatibility/target.lock.json` (`1.6.0` today), and `-SourceCommit` must be a full 40-character commit id. See [Releasing](/docs/contribute/releasing/#build-the-packages) for what it checks.
-
-Then install the tool from a folder outside the repository, because the repository's `NuGet.Config` would hide nuget.org, where the tool's dependencies come from:
-
-```powershell
-cd ..
-dotnet tool install PiSharp.Cli --tool-path ./pisharp-dev --add-source PiSharp/artifacts/packages --version {{PISHARP_VERSION}}
-./pisharp-dev/pisharp --version
-```
-
-A `--tool-path` install keeps your build apart from a `dotnet tool install -g PiSharp.Cli` from NuGet.
+The pack script checks 31 packages in the output directory: 29 libraries, the CLI and the project templates. The version's first three numbers must match the Pi tag in `compatibility/target.lock.json`. The local suffix identifies your source build and the separate tool path preserves your installed release. [Package checks](/docs/contribute/releasing/#build-the-packages)
 
 ## Reference the projects from your app
 

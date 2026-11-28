@@ -62,7 +62,7 @@ internal static class TransportRetryClassifier
                 return status is HttpStatusCode.RequestTimeout or HttpStatusCode.TooManyRequests
                     or HttpStatusCode.InternalServerError or HttpStatusCode.BadGateway
                     or HttpStatusCode.ServiceUnavailable or HttpStatusCode.GatewayTimeout
-                    or (HttpStatusCode)520 or (HttpStatusCode)524;
+                    or (HttpStatusCode)520 or (HttpStatusCode)524 or (HttpStatusCode)525;
             if (http.HttpRequestError is HttpRequestError.ConnectionError or HttpRequestError.NameResolutionError
                 or HttpRequestError.ResponseEnded or HttpRequestError.ProxyTunnelError
                 or HttpRequestError.HttpProtocolError)

@@ -1,3 +1,4 @@
+// Pi fb0fe823539f6d04850f6e34748c01f01f212e1f (MIT): packages/ai/src/api/openai-completions.ts and openai-completions-reasoning.ts.
 using System.Collections.Immutable;
 using System.Globalization;
 using System.Text.Json;
@@ -277,6 +278,7 @@ public sealed class CompletionsTranscriptProjector
         {
             var same = SameModel(body); var texts = new List<string>(); var thoughts = new List<(string Text, string? Signature)>();
             var calls = new JsonArray(); JsonNode? details = null; var legacyDetails = new JsonArray();
+            string? opaque = null, opaqueTextField = null;
             foreach (var part in Array(Content(body)))
             {
                 token.ThrowIfCancellationRequested();
@@ -287,7 +289,20 @@ public sealed class CompletionsTranscriptProjector
                         var thinking = String(part, "thinking"); var signature = Optional(part, "thinkingSignature");
                         // transformMessages drops thinking from another model instead of replaying it as text.
                         if (!same) break;
-                        if (details is null && signature is not null) details = ParseDetails(signature);
+                        if (details is null && signature is { Length: > 0 } && signature[0] == '[') details = ParseDetails(signature);
+                        if (signature is { Length: > 0 } && signature[0] == '{')
+                        {
+                            try
+                            {
+                                var data = JsonData.Parse(signature).Value;
+                                var field = data.TryGetProperty("field", out var wireField) && wireField.ValueKind == JsonValueKind.String ? wireField.GetString() : null;
+                                if ((!data.TryGetProperty("field", out _) || field is "reasoning_content" or "reasoning" or "reasoning_text") &&
+                                    data.TryGetProperty("reasoning_opaque", out var opaqueValue) && opaqueValue.ValueKind == JsonValueKind.String &&
+                                    opaqueValue.GetString() is { Length: > 0 } retained)
+                                { opaque = retained; opaqueTextField = field; }
+                            }
+                            catch (JsonException) { }
+                        }
                         if (thinking.Trim().Length != 0) thoughts.Add((thinking, signature)); break;
                     case "toolCall":
                         var id = Identity(part, "id"); var name = Identity(part, "name"); var arguments = part.GetProperty("arguments");
@@ -322,13 +337,14 @@ public sealed class CompletionsTranscriptProjector
             else
             {
                 if (texts.Count != 0) message["content"] = string.Concat(texts);
-                if (details is null && legacyDetails.Count == 0 && thoughts.Count != 0 && thoughts[0].Signature is { } field &&
+                if (details is null && legacyDetails.Count == 0 && thoughts.Count != 0 && (opaque is null ? thoughts[0].Signature : opaqueTextField) is { } field &&
                     field is "reasoning_content" or "reasoning" or "reasoning_text")
                     message[request.Model.Provider == "opencode-go" && field == "reasoning" ? "reasoning_content" : field] = string.Join("\n", thoughts.Select(item => item.Text));
             }
             if (calls.Count != 0) message["tool_calls"] = calls;
             if (details is not null) message["reasoning_details"] = details;
             else if (legacyDetails.Count != 0) message["reasoning_details"] = legacyDetails;
+            else if (opaque is not null) message["reasoning_opaque"] = opaque;
             if (options.RequiresReasoningContentOnAssistantMessages && options.Reasoning && !message.ContainsKey("reasoning_content")) message["reasoning_content"] = "";
             if (calls.Count == 0 && texts.Count == 0 && !(options.RequiresThinkingAsText && thoughts.Count != 0)) return false;
             _output.Add(message); return true;

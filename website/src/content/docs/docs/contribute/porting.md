@@ -3,7 +3,7 @@ title: How the port tracks Pi
 description: Baselines, syncs, decision records, integrity pins and compatibility reports.
 ---
 
-PiSharp is a port of a fixed Pi release, not of whatever Pi's `main` holds. Today the repository and the 1.5.0 release target Pi v1.5.0. This page shows where the repository records that baseline, how a sync to a new Pi release works, and where the decisions and intentional differences live. Most of these files are under [`compatibility/`](https://github.com/jkelly/PiSharp/tree/main/compatibility) and [`docs/`](https://github.com/jkelly/PiSharp/tree/main/docs). For how a Pi release maps to a PiSharp version, see [Versioning](/docs/versioning/).
+PiSharp 1.6.0.2 is the published release on Pi and Pi Durable 1.6.0. The 1.7.0 source candidate includes changes since that baseline, including the intervening upstream 1.6.1 changes. Check the upstream source lock for the code you are porting and the release record for the version available on NuGet. [Versioning](/docs/versioning/)
 
 ## The baseline lock
 
@@ -11,16 +11,16 @@ PiSharp is a port of a fixed Pi release, not of whatever Pi's `main` holds. Toda
 
 | Field | Holds |
 | --- | --- |
-| `source` | The tag (`v1.5.0`), commit (`f9a26365568127461c47a07a37dcb42c140a3ac5`), tree and acquisition date. |
+| `source` | The tag (`v1.7.0`), commit (`fb0fe823539f6d04850f6e34748c01f01f212e1f`), tree and acquisition date. |
 | `previousBaseline` | The v0.99.1 evidence lock, [`baseline.lock.json`](https://github.com/jkelly/PiSharp/blob/main/compatibility/baseline.lock.json), which the historical fixtures stay validated against. |
-| `previousTarget` | The previous target, Pi v1.2.0, preserved byte for byte as [`target.v1.2.0.lock.json`](https://github.com/jkelly/PiSharp/blob/main/compatibility/target.v1.2.0.lock.json). The v1.1.0 lock, [`target.v1.1.0.lock.json`](https://github.com/jkelly/PiSharp/blob/main/compatibility/target.v1.1.0.lock.json), is kept too. |
+| `previousTarget` | Pi v1.6.0, preserved in `compatibility/target.v1.6.0.lock.json`. Its hash identifies the original release lock. |
 | `packageVersions` | The versions of the upstream packages at that tag. |
 | `hashPolicy` | How rows are hashed: git blob bytes, with checkout bytes recorded separately, and a `git archive` tar of the commit. |
 | `referenceRuntime` | The Node.js version the reference runs used. |
 | `artifacts` | One row for the source archive and one for each upstream source file PiSharp tracks, with its hashes. |
 | `gaps` | Known gaps, carried forward from lock to lock. |
 
-The release scripts, the compatibility checker and this website read the lock. The website shows its tag as the baseline, and `build-release-packages.ps1` refuses a version whose first three numbers don't match it. [`docs/compatibility/baseline.md`](https://github.com/jkelly/PiSharp/blob/main/docs/compatibility/baseline.md) records what each re-freeze changed.
+The release scripts, the compatibility checker and this website read the lock. The website uses its tag for the source target and `compatibility/public-release.json` for the published baseline, and `build-release-packages.ps1` refuses a version whose first three numbers don't match it. [`docs/compatibility/baseline.md`](https://github.com/jkelly/PiSharp/blob/main/docs/compatibility/baseline.md) records what each re-freeze changed.
 
 ## Re-freeze the baseline
 
@@ -35,7 +35,18 @@ The tools are in [`tools/CompatibilityReport/`](https://github.com/jkelly/PiShar
 | `refresh-model-catalogs.mjs` | Copies the model catalog shards from a published `pi-ai` package and updates the pins that name it. |
 | `compare.mjs` | Compares an expected and an actual JSON file. |
 
-A re-freeze from v1.1.0 to v1.2.0 looks like this:
+To verify the 1.7.0 source update, run these from PiSharp with a clean upstream Pi checkout at v1.7.0 containing the v1.6.0 and v1.7.0 tags:
+
+```sh
+pi_checkout=../pi
+node tools/CompatibilityReport/verify-baseline.mjs --upstream "$pi_checkout"
+PI_UPSTREAM_V1_7_0="$pi_checkout" node --test tools/CompatibilityReport/sync-1.7.0-source.test.mjs
+node tools/DurablePortMap/sync-1.7.0.mjs "$pi_checkout" --check
+```
+
+The inventory lists 1,683 changed files, and the Durable overlay maps 70 changed paths in Durable and the Chord components it consumes. PiSharp's experimental Chord networking library retains its existing v1 peer protocol. Behavioral evidence and platform limits are recorded separately in `docs/decisions/0018-pi-1.7.0-sync.md`.
+
+The earlier v1.2.0 sync illustrates how a maintainer creates a new lock:
 
 ```sh
 node tools/CompatibilityReport/refreeze-baseline.mjs --upstream <pi checkout> --tag v1.2.0 \
@@ -139,7 +150,7 @@ Where PiSharp behaves differently from Pi on purpose, the difference is recorded
 
 ## The durable port map
 
-[`compatibility/durable-port-map.json`](https://github.com/jkelly/PiSharp/blob/main/compatibility/durable-port-map.json) maps every upstream pi-durable file to its PiSharp counterpart. It pins Pi v1.5.0 and records changes against Pi v1.2.0. Each of its 289 rows has the upstream path, blob id and line count, the PiSharp files, the phase, a `status` and an `upstreamChange`.
+[`compatibility/durable-port-map.json`](https://github.com/jkelly/PiSharp/blob/main/compatibility/durable-port-map.json) preserves the original v1.5.0 rows and points to the active candidate overlay under `currentImplementation.candidate`. Read `compatibility/durable-sync-1.7.0-overlay.json` for the 1.7.0 changes. The original map records changes against Pi v1.2.0. Each of its 289 rows has the upstream path, blob id and line count, the PiSharp files, the phase, a `status` and an `upstreamChange`.
 
 | Status | Meaning |
 | --- | --- |
@@ -152,7 +163,7 @@ Where PiSharp behaves differently from Pi on purpose, the difference is recorded
 `upstreamChange` is `added`, `modified`, `renamed` or `removed`. The map is built from git objects, and the durable workflow checks it on pushes and pull requests to `main`:
 
 ```sh
-node tools/DurablePortMap/build-port-map.mjs --upstream <pi repo with both commits> --check
+node tools/DurablePortMap/build-port-map.mjs --upstream "$pi_checkout" --map compatibility/durable-port-map.v1.5.0.json --check
 ```
 
 ## Two parity files

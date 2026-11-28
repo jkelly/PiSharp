@@ -1,3 +1,4 @@
+// Pi fb0fe823539f6d04850f6e34748c01f01f212e1f (MIT): packages/ai/src/models.ts and types.ts.
 // Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/ai/src/types.ts (BaseModel, ImageModel, ClassifierModel,
 // ModelCost) and packages/ai/src/models.ts (calculateCost).
 using System.Collections.Immutable;
@@ -15,6 +16,7 @@ public sealed record ModelCostTier(double InputTokensAbove, double Input, double
 /// <summary>types.ts <c>ModelCost</c>: binary64 rates per million tokens, as the catalog declares them.</summary>
 public sealed record ModelCost(double Input, double Output, double CacheRead, double CacheWrite, ImmutableArray<ModelCostTier> Tiers = default)
 {
+    public double? ImageOutput { get; init; }
     public static ModelCost Free { get; } = new(0, 0, 0, 0);
 
     /// <summary>Reads a catalog <c>cost</c> object. Throws <see cref="FormatException"/>.</summary>
@@ -34,13 +36,14 @@ public sealed record ModelCost(double Input, double Output, double CacheRead, do
                 tiers.Add(new(Rate(tier, "inputTokensAbove"), Rate(tier, "input"), Rate(tier, "output"), Rate(tier, "cacheRead"), Rate(tier, "cacheWrite")));
             }
         }
-        return new(Rate(cost, "input"), Rate(cost, "output"), Rate(cost, "cacheRead"), Rate(cost, "cacheWrite"), tiers.ToImmutable());
+        return new(Rate(cost, "input"), Rate(cost, "output"), Rate(cost, "cacheRead"), Rate(cost, "cacheWrite"), tiers.ToImmutable())
+        { ImageOutput = cost.TryGetProperty("imageOutput", out _) ? Rate(cost, "imageOutput") : null };
     }
 
     /// <summary>models.ts <c>calculateCost</c> for usage without 1h cache writes: the tier with the greatest threshold
     /// strictly below input + cacheRead + cacheWrite prices the whole request.</summary>
     public (double Input, double Output, double CacheRead, double CacheWrite, double Total) Calculate(double input, double output,
-        double cacheRead, double cacheWrite)
+        double cacheRead, double cacheWrite, double? imageOutput = null)
     {
         var inputTokens = input + cacheRead + cacheWrite;
         (double Input, double Output, double CacheRead, double CacheWrite) rates = (Input, Output, CacheRead, CacheWrite);
@@ -49,7 +52,8 @@ public sealed record ModelCost(double Input, double Output, double CacheRead, do
             if (inputTokens > tier.InputTokensAbove && tier.InputTokensAbove > matched)
             { rates = (tier.Input, tier.Output, tier.CacheRead, tier.CacheWrite); matched = tier.InputTokensAbove; }
         var inputCost = rates.Input / 1000000 * input;
-        var outputCost = rates.Output / 1000000 * output;
+        var imageTokens = ImageOutput.HasValue ? Math.Min(output, imageOutput ?? output) : 0;
+        var outputCost = (rates.Output * (output - imageTokens) + ImageOutput.GetValueOrDefault() * imageTokens) / 1000000;
         var readCost = rates.CacheRead / 1000000 * cacheRead;
         // Anthropic's 2x 1h write rate does not apply: classifier and image usage reports no 1h writes.
         var writeCost = (rates.CacheWrite * cacheWrite + rates.Input * 2 * 0) / 1000000;
@@ -95,6 +99,7 @@ public abstract record OperationModel(string Id, string Name, string Api, string
             ["input"] = new JsonArray([.. Input.Select(item => (JsonNode)item)]),
             ["cost"] = new JsonObject { ["input"] = Cost.Input, ["output"] = Cost.Output, ["cacheRead"] = Cost.CacheRead, ["cacheWrite"] = Cost.CacheWrite }
         };
+        if (Cost.ImageOutput is { } imageRate) node["cost"]!["imageOutput"] = imageRate;
         if (!Cost.Tiers.IsDefaultOrEmpty)
             node["cost"]!["tiers"] = new JsonArray([.. Cost.Tiers.Select(tier => (JsonNode)new JsonObject
             {

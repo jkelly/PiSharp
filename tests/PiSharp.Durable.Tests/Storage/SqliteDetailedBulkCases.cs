@@ -232,7 +232,7 @@ internal static partial class Program
             for (var index = 0; index < batches.Count; index++)
             {
                 lastSingle = await single.CommitAsync([batches[index]], (_, seq) => singleReceipts.Add($"{index}:{seq.Value}"), SqliteContext);
-                if (lastSingle.Refused is not null) break;
+                if (lastSingle.Kind == "refused") break;
             }
             Equal(acceptedCount, actual.Stored, $"seed {seed}: intended accepted prefix");
             Equal(reference.Stored, actual.Stored, $"seed {seed}: memory prefix");
@@ -240,6 +240,8 @@ internal static partial class Program
             {
                 // Upstream Memory resolves copies first and wraps its source error; SQLite checks
                 // same-batch sources before resolving copies and intentionally exposes that check.
+                Equal("refused", reference.Kind, "memory storage result tag");
+                Equal("refused", actual.Kind, "SQLite storage result tag");
                 Equal("Document copy 230 was rejected", reference.Refused?.Message, "memory copy refusal wrapper");
                 Equal("Fork source document 200 is changed in the copy batch", reference.Refused?.InnerException?.Message, "memory copy refusal cause");
                 Equal("Document copy 230 source is changed in the copy batch", actual.Refused?.Message, "SQLite copy refusal check");

@@ -8,7 +8,7 @@ description: Install PiSharp and run it.
 PiSharp's CLI is a .NET tool. It needs the [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0).
 
 ```powershell
-dotnet tool install -g PiSharp.Cli
+dotnet tool install -g PiSharp.Cli --version {{PISHARP_VERSION}}
 ```
 
 Then run it in your project folder:
@@ -31,11 +31,11 @@ If you already use Pi, PiSharp finds your sign-ins, settings, sessions and resou
 ### Update or uninstall
 
 ```powershell
-dotnet tool update -g PiSharp.Cli
-dotnet tool uninstall -g PiSharp.Cli
+dotnet tool update -g PiSharp.Cli --version {{PISHARP_VERSION}}
+pisharp --version
 ```
 
-The libraries are separate NuGet packages. See the [SDK](/sdk/).
+Run `dotnet tool uninstall -g PiSharp.Cli` to remove the CLI. The libraries are separate NuGet packages. See the [SDK](/sdk/).
 
 ## Build from source
 
@@ -46,6 +46,13 @@ git clone https://github.com/jkelly/PiSharp.git
 cd PiSharp
 dotnet build src/PiSharp.Cli/PiSharp.Cli.csproj -c Release -p:RestoreSources=https://api.nuget.org/v3/index.json -p:RestoreLockedMode=false
 dotnet src/PiSharp.Cli/bin/Release/net10.0/PiSharp.Cli.dll --help
+```
+
+When building a checkout of the **1.7.0 candidate**, you can check the profile option offline before using a provider. From the repository root, run:
+
+```sh
+dotnet src/PiSharp.Cli/bin/Release/net10.0/PiSharp.Cli.dll --version
+dotnet src/PiSharp.Cli/bin/Release/net10.0/PiSharp.Cli.dll --agent-dir ./test-profile --offline --no-session
 ```
 
 [Build from source](/docs/contribute/build/) covers the prerequisites, the restore settings, the samples and how to reference the projects from your own app. [Tests](/docs/contribute/testing/) lists the test suites and how to run them.

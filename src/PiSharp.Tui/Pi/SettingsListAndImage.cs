@@ -1,4 +1,4 @@
-// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/tui/src/components/settings-list.ts and components/image.ts.
+// Pi fb0fe823539f6d04850f6e34748c01f01f212e1f (MIT): packages/tui/src/components/settings-list.ts and components/image.ts.
 namespace PiSharp.Tui.Pi;
 
 /// <summary>A settings row: cycles through <see cref="Values"/> or opens a <see cref="Submenu"/>.</summary>
@@ -174,7 +174,11 @@ public sealed class SettingsList : IComponent, IInputHandler, IMouseHandler
     private void AddHint(List<string> lines, int width)
     {
         lines.Add("");
-        lines.Add(TextUtils.TruncateToWidth(theme.Hint(searchEnabled ? "  Type to search · Enter/Space to change · Esc to cancel" : "  Enter/Space to change · Esc to cancel"), width));
+        var bindings = KeybindingsManager.Global;
+        var confirm = string.Join('/', bindings.GetKeys("tui.select.confirm").Append("space"));
+        var cancel = string.Join('/', bindings.GetKeys("tui.select.cancel"));
+        var prefix = searchEnabled ? "  Type to search · " : "  ";
+        lines.Add(TextUtils.TruncateToWidth(theme.Hint($"{prefix}{confirm} to change · {cancel} to cancel"), width));
     }
 }
 

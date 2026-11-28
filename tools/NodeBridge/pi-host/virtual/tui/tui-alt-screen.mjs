@@ -1,4 +1,4 @@
-// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/tui/src/tui-alt-screen.ts.
+// Pi fb0fe823539f6d04850f6e34748c01f01f212e1f (MIT): packages/tui/src/tui-alt-screen.ts.
 // Ported to plain ESM for the PiSharp Node extension bridge (TypeScript types stripped mechanically; behaviour unchanged).
 import { AltScreenSearchComponent, AltScreenSearchIndex, getAltScreenSearchMatchKey } from "./alt-screen-search.mjs";
 import { AltScreenFlashContainer } from "./components/alt-screen-flash.mjs";
@@ -41,6 +41,14 @@ const TERMINAL_WORD_SELECTION_JOINERS = new Set([
     "."
 ]);
 const wordSegmenter = getWordSegmenter();
+const RIGHT_CLICK_PASTING_TERMINALS = new Set([
+    "vscode",
+    "tabby"
+]);
+function terminalPastesOnRightClick() {
+    const termProgram = process.env.TERM_PROGRAM?.toLowerCase();
+    return termProgram !== undefined && RIGHT_CLICK_PASTING_TERMINALS.has(termProgram);
+}
 export class TuiAltScreen extends TuiBase {
     mode = "fullscreen";
     [VIEWPORT_TUI] = true;
@@ -796,7 +804,7 @@ export class TuiAltScreen extends TuiBase {
         };
     }
     handleRightClickPaste(event) {
-        if (!this.onRightClickPaste || process.platform !== "win32" || process.env.TERM_PROGRAM?.toLowerCase() === "vscode" || event.release || event.button !== 2) {
+        if (!this.onRightClickPaste || process.platform !== "win32" || terminalPastesOnRightClick() || event.release || event.button !== 2) {
             return false;
         }
         try {

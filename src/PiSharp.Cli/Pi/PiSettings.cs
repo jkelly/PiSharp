@@ -127,6 +127,13 @@ internal sealed class PiSettings
         {
             settings["transport"] = useWebsockets ? "websocket" : "sse"; settings.Remove("websockets");
         }
+        if (settings["showCacheMissNotices"] is JsonValue legacy && legacy.TryGetValue<bool>(out var shown))
+        {
+            if (settings["notices"] is not JsonObject notices) settings["notices"] = notices = [];
+            foreach (var key in new[] { "cacheMisses", "cacheWarming", "compactionCosts", "reasoningDrops" })
+                if (!notices.ContainsKey(key)) notices[key] = shown;
+        }
+        settings.Remove("showCacheMissNotices");
         if (settings["skills"] is JsonObject skills)
         {
             if (skills["enableSkillCommands"] is { } enable && (!settings.ContainsKey("enableSkillCommands") || settings["enableSkillCommands"] is null))

@@ -49,7 +49,7 @@ public static class UsageTotalsCalculator
     {
         ArgumentNullException.ThrowIfNull(first); ArgumentNullException.ThrowIfNull(second);
         var extras = JsonFields.Empty;
-        foreach (var name in new[] { "cacheWrite1h", "reasoning" })
+        foreach (var name in new[] { "cacheWrite1h", "reasoning", "imageOutput" })
         {
             var (a, hasA) = Split(first, name); var (b, hasB) = Split(second, name);
             if (hasA || hasB) extras = extras.Set(name, JsonData.Parse(Number(a + b)));

@@ -111,7 +111,7 @@ internal static partial class Program
             var compat = raw["compat"]!.AsObject();
             foreach (var key in new[] { "forceAdaptiveThinking", "supportsMidConvoEffort", "supportsMidConvoSystemMessages", "supportsMidConvoToolChanges", "supportsStrictTools" })
                 Equal(true, compat[key]!.GetValue<bool>(), key);
-            Equal("{\"off\":null,\"xhigh\":\"xhigh\",\"max\":\"max\"}", raw["thinkingLevelMap"]!.ToJsonString(), "effort mapping");
+            Check(Same("""{"off":null,"xhigh":"xhigh","max":"max"}""", raw["thinkingLevelMap"]), "effort mapping");
             Equal("{\"short\":300,\"long\":3600}", raw["promptCache"]!.ToJsonString(), "cache retention");
             var limits = raw["inputLimits"]!;
             Equal(33_554_432, limits["maxRequestBytes"]!.GetValue<int>(), "request bytes");

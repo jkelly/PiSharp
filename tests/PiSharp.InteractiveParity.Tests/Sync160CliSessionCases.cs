@@ -33,13 +33,29 @@ internal static class Sync160CliSessionCases
             Equal("", output.ToString(), "nothing on stdout");
         }));
 
+        yield return ("sync170.resume-registers-restricted-session-and-clears-on-quit", async () =>
+        {
+            await using var pi = new InteractiveHarness("sync170-resume-flags");
+            pi.Vars["OSC7577_TOKEN"] = "test-resume-token";
+            // The host processes an initial prompt after startup has installed the input handlers.
+            pi.Start([.. Regular, "--no-approve", "--no-mcp", "--tool-policy", "explicit", "hello"]);
+            await pi.WaitFor("Hello from the fake model.");
+            Equal(0, await pi.Quit(), "exit");
+            var reports = pi.Terminal.RawOutput.Split("\u001b]7577;", StringSplitOptions.None).Skip(1)
+                .Select(value => value.Split("\u001b\\", StringSplitOptions.None)[0]).ToList();
+            Check(reports.Count >= 2 && reports[^1].Contains(":clear=1:"), "registered before clearing");
+            var args = reports.First(value => value.Contains(":argv=")).Split(":argv=")[1].Split(':')[0].Split(',')
+                .Select(value => System.Text.Encoding.UTF8.GetString(Convert.FromBase64String(value))).ToList();
+            Equal("pisharp", args[0], "resumes native executable");
+            Check(args.Contains("--no-approve") && args.Contains("--no-mcp") && args.Contains("--tool-policy") && args.Contains("explicit"), "restrictions retained");
+            Check(!reports.Any(report => report.Contains("test-resume-token")) && pi.Vars["OSC7577_TOKEN"] is null, "token removed, never reported");
+        });
+
         // #12237: the command is on its own line after the label, so a triple-click selects it.
         yield return ("sync160.exit.resume-command-is-on-its-own-line", async () =>
         {
             await using var pi = new InteractiveHarness("sync160-resume-line");
-            pi.Start(Regular);
-            await pi.WaitFor("escape interrupt");
-            await pi.Submit("hello there");
+            pi.Start([.. Regular, "hello there"]);
             await pi.WaitFor("Hello from the fake model.");
             Equal(0, await pi.Quit(), "exit code");
             var stdout = pi.Stdout.ToString();

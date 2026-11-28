@@ -1,3 +1,4 @@
+// Pi fb0fe823539f6d04850f6e34748c01f01f212e1f (MIT): packages/ai/src/api/openai-responses-shared.ts.
 using System.Collections.Immutable;
 using System.Globalization;
 using System.Text;
@@ -35,6 +36,7 @@ public sealed record ResponsesTranscriptProjectionOptions(
     /// this model with the level recorded on it (<c>providerThinkingLevel</c>) and one with this effort at the end. Null sends none.
     /// </summary>
     internal string? ConfigurationUpdateEffort { get; init; }
+    internal bool UseInitialEffortBaseline { get; init; }
 }
 
 public enum ResponsesProjectionFailure
@@ -100,8 +102,17 @@ public sealed class ResponsesTranscriptProjector
 
     // The request factory uses both projections with this profile before allocating its request.
     internal JsonData ProjectInput(ChatRequest request, CancellationToken cancellationToken)
+        => ProjectInput(request, cancellationToken, out _);
+
+    internal JsonData ProjectInput(ChatRequest request, CancellationToken cancellationToken, out string? initialEffort)
     {
-        try { return new Projection(request, _options, _allowed, _tools, cancellationToken).Run(); }
+        try
+        {
+            var projection = new Projection(request, _options, _allowed, _tools, cancellationToken);
+            var input = projection.Run();
+            initialEffort = projection.InitialEffort;
+            return input;
+        }
         catch (Exception error) when (error is JsonException or InvalidOperationException or KeyNotFoundException or FormatException or OverflowException)
         { throw Failure(ResponsesProjectionFailure.InvalidTranscript); }
     }
@@ -123,6 +134,19 @@ public sealed class ResponsesTranscriptProjector
         private readonly Dictionary<string, string> _idMap = new(StringComparer.Ordinal);
         private readonly HashSet<string> _callIds = new(StringComparer.Ordinal);
         private Dictionary<string, string> _grammarInputs = new(StringComparer.Ordinal);
+
+        public string? InitialEffort { get; private set; }
+        private string? previousEffort;
+
+        private bool NeedsEffortItem(string effort)
+        {
+            if (!options.UseInitialEffortBaseline) return true;
+            if (previousEffort == effort) return false;
+            previousEffort = effort;
+            if (InitialEffort is not null) return true;
+            InitialEffort = effort;
+            return false;
+        }
 
         public JsonData Run()
         {
@@ -243,7 +267,8 @@ public sealed class ResponsesTranscriptProjector
                     if (_output.Count == before) continue;
                     // Pi 1.5.0 convertResponsesMessages: an earlier reply of this model replays its recorded level before its items.
                     if (options.ConfigurationUpdateEffort is not null && SameModel(entry.Assistant!) &&
-                        entry.Assistant!.ExtraProperties?.TryGet("providerThinkingLevel", out var recorded) == true && recorded!.Value.ValueKind == JsonValueKind.String)
+                        entry.Assistant!.ExtraProperties?.TryGet("providerThinkingLevel", out var recorded) == true && recorded!.Value.ValueKind == JsonValueKind.String &&
+                        NeedsEffortItem(recorded.Value.GetString()!))
                     {
                         Add(ConfigurationUpdate(recorded.Value.GetString()!));
                         var update = _output[^1]; _output.RemoveAt(_output.Count - 1); _output.Insert(before, update);
@@ -256,7 +281,7 @@ public sealed class ResponsesTranscriptProjector
                 }
                 if (!leadingSystem) messageIndex++;
             }
-            if (options.ConfigurationUpdateEffort is { } effort) Add(ConfigurationUpdate(effort));
+            if (options.ConfigurationUpdateEffort is { } effort && NeedsEffortItem(effort)) Add(ConfigurationUpdate(effort));
             token.ThrowIfCancellationRequested();
             return JsonData.Parse(JsonUtf16.ToJsonString(_output, OutputJson.Encoder));
         }
@@ -447,6 +472,7 @@ public sealed class ResponsesTranscriptProjector
                         item = new JsonObject { ["type"] = "function_call", ["call_id"] = call, ["name"] = tool.Name, ["arguments"] = ArgumentString(tool.Arguments.Value) };
                         if (itemId is not null) item["id"] = itemId;
                     }
+                    item["status"] = "completed";
                     if (same && tool.ExtraProperties?.TryGet("namespace", out var ns) == true) item["namespace"] = JsonNode.Parse(ns!.ToString(), documentOptions: PiSharp.Contracts.JsonData.DocumentOptions);
                     Add(item);
                 }

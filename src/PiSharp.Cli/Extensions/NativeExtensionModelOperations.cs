@@ -46,7 +46,7 @@ public sealed class NativeExtensionModelOperations(ModelOperationsRegistry regis
                 DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()) { ErrorMessage = error };
         return await Registry.ClassifyAsync(classifier, context, new ClassifierOptions
         {
-            ApiKey = options?.ApiKey, Headers = options?.Headers ?? [], TimeoutMs = options?.TimeoutMs, MaxRetries = options?.MaxRetries,
+            ApiKey = options?.ApiKey, SessionId = options?.SessionId, Headers = options?.Headers ?? [], TimeoutMs = options?.TimeoutMs, MaxRetries = options?.MaxRetries,
             MaxRetryDelayMs = options?.MaxRetryDelayMs, Temperature = options?.Temperature
         }, cancellationToken).ConfigureAwait(false);
     }
@@ -61,8 +61,8 @@ public sealed class NativeExtensionModelOperations(ModelOperationsRegistry regis
                 DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()) { ErrorMessage = error };
         return await Registry.GenerateImagesAsync(image, context, new ImagesOptions
         {
-            ApiKey = options?.ApiKey, Headers = options?.Headers ?? [], TimeoutMs = options?.TimeoutMs, MaxRetries = options?.MaxRetries,
-            MaxRetryDelayMs = options?.MaxRetryDelayMs
+            ApiKey = options?.ApiKey, SessionId = options?.SessionId, Headers = options?.Headers ?? [], TimeoutMs = options?.TimeoutMs, MaxRetries = options?.MaxRetries,
+            MaxRetryDelayMs = options?.MaxRetryDelayMs, AspectRatio = options?.AspectRatio, Size = options?.Size
         }, cancellationToken).ConfigureAwait(false);
     }
 
@@ -104,12 +104,12 @@ public sealed class NativeExtensionModelOperations(ModelOperationsRegistry regis
     /// model objects already handed to extensions remain immutable request inputs, as in model-runtime.ts.</summary>
     internal static ModelOperationsRegistry CreateDefaultRegistry(Func<string, string?> readEnvironment, string? authPath,
         Func<HttpMessageInvoker>? createAuthHttp, TimeProvider? timeProvider, Func<bool>? llamaProvider, ModelRegistry models) =>
-        CreateDefaultRegistry(readEnvironment, authPath, createAuthHttp, timeProvider, null, llamaProvider, models.GetModelsJsonProviderConfig);
+        CreateDefaultRegistry(readEnvironment, authPath, createAuthHttp, timeProvider, null, llamaProvider, models.GetModelsJsonProviderConfig, () => models.RadiusCatalogSnapshot);
 
     private static ModelOperationsRegistry CreateDefaultRegistry(Func<string, string?> readEnvironment, string? authPath,
         Func<HttpMessageInvoker>? createAuthHttp, TimeProvider? timeProvider,
         IReadOnlyDictionary<string, IAdmittedOAuthRefresh>? oauthRefreshes, Func<bool>? llamaProvider,
-        Func<string, JsonObject?> providerConfig)
+        Func<string, JsonObject?> providerConfig, Func<ImmutableArray<RegistryModel>?>? radiusCatalog = null)
     {
         ArgumentNullException.ThrowIfNull(readEnvironment);
         var catalogs = new List<FrozenModelCatalog>();
@@ -143,13 +143,16 @@ public sealed class NativeExtensionModelOperations(ModelOperationsRegistry regis
                 {
                     if (!refreshes.Supports(request.Provider)) return null;
                     // checkProviderAuth: a stored OAuth credential is configured without being refreshed.
-                    if (request.Check) return new ProviderAuthResult(null)
+                    if (request.Check)
                     {
-                        IsOAuth = true,
-                        AvailableModelIds = request.Provider == "github-copilot"
-                            ? GitHubCopilotOAuth.AvailableModels(await store.ReadAsync(request.Provider, token).ConfigureAwait(false))?.ToImmutableHashSet(StringComparer.Ordinal)
-                            : null
-                    };
+                        var account = request.Provider == "github-copilot" ? await store.ReadAsync(request.Provider, token).ConfigureAwait(false) : null;
+                        return new ProviderAuthResult(null)
+                        {
+                            IsOAuth = true,
+                            AvailableModelIds = GitHubCopilotOAuth.AvailableModels(account)?.ToImmutableHashSet(StringComparer.Ordinal),
+                            AvailableClassifierModelIds = GitHubCopilotOAuth.AvailableModels(account, classifiers: true)?.ToImmutableHashSet(StringComparer.Ordinal)
+                        };
+                    }
                     OAuthCredentialSnapshot? credential;
                     try { credential = await lifecycle!.ResolveAsync(request.Provider, cancellationToken: token).ConfigureAwait(false); }
                     catch (OAuthLifecycleException error)
@@ -169,7 +172,8 @@ public sealed class NativeExtensionModelOperations(ModelOperationsRegistry regis
                         return new ProviderAuthResult(credential.Access)
                         {
                             IsOAuth = true, BaseUrl = ProviderHeaderPolicies.CopilotBaseUrl(credential.Access, enterprise),
-                            AvailableModelIds = GitHubCopilotOAuth.AvailableModels(credential)?.ToImmutableHashSet(StringComparer.Ordinal)
+                            AvailableModelIds = GitHubCopilotOAuth.AvailableModels(credential)?.ToImmutableHashSet(StringComparer.Ordinal),
+                            AvailableClassifierModelIds = GitHubCopilotOAuth.AvailableModels(credential, classifiers: true)?.ToImmutableHashSet(StringComparer.Ordinal)
                         };
                     }
                     return new ProviderAuthResult(credential.Access) { IsOAuth = true };
@@ -216,24 +220,40 @@ public sealed class NativeExtensionModelOperations(ModelOperationsRegistry regis
         })));
         return registry;
 
-        ModelOperationsProvider Configure(ModelOperationsProvider provider) => provider with
+        ModelOperationsProvider Configure(ModelOperationsProvider provider)
         {
-            ModelSource = () =>
+            var gate = new object();
+            ImmutableArray<OperationModel> lastModels = default, cached = default;
+            ImmutableArray<RegistryModel>? lastRadius = null;
+            JsonObject? lastConfig = null;
+            return provider with { ModelSource = Read };
+
+            ImmutableArray<OperationModel> Read()
             {
-                var originals = provider.CurrentModels;
-                var config = providerConfig(provider.Id);
-                if (config is null) return originals;
-                try
+                lock (gate)
                 {
-                    // Reuse the chat registry's exact layer: provider baseUrl applies to every type, classifier compat
-                    // merges shallowly, and models/modelOverrides only create or alter chat models.
-                    var source = originals.Select(model => RegistryModel.FromJson((JsonObject)JsonNode.Parse(model.ToJson().ToString())!)).ToArray();
-                    return [.. ModelProviderComposer.Compose(provider.Id, source, config)
-                        .Select(model => OperationModel.FromJson(JsonData.Parse(model.ToJsonString())))];
+                    var originals = provider.CurrentModels;
+                    var radius = provider.Id == "radius" ? radiusCatalog?.Invoke() : null;
+                    var config = providerConfig(provider.Id);
+                    if (!cached.IsDefault && originals == lastModels && radius == lastRadius && ReferenceEquals(config, lastConfig)) return cached;
+                    var result = originals;
+                    if (radius.HasValue || config is not null)
+                    {
+                        try
+                        {
+                            var source = radius ?? [.. originals.Select(model => RegistryModel.FromJson((JsonObject)JsonNode.Parse(model.ToJson().ToString())!))];
+                            result = [.. ModelProviderComposer.Compose(provider.Id, source, config)
+                                .Select(model => OperationModel.FromJson(JsonData.Parse(model.ToJsonString())))];
+                        }
+                        catch (InvalidOperationException) { } // Same invalid-provider fallback as ModelRegistry.Rebuild.
+                    }
+                    lastModels = originals;
+                    lastRadius = radius;
+                    lastConfig = config;
+                    return cached = result;
                 }
-                catch (InvalidOperationException) { return originals; } // Same invalid-provider fallback as ModelRegistry.Rebuild.
             }
-        };
+        }
     }
 
     /// <summary>models-error.ts <c>withCauseDetail</c>: the underlying reason joins the message unless it is already in it.</summary>

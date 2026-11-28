@@ -28,10 +28,11 @@ internal static partial class Program
     private sealed class FakeProvider : HttpMessageHandler
     {
         internal string? Body; internal HttpRequestMessage? Request;
+        internal HttpStatusCode Status = HttpStatusCode.OK;
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken token)
         {
             Request = request; Body = request.Content is null ? null : await request.Content.ReadAsStringAsync(token);
-            var response = new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(
+            var response = new HttpResponseMessage(Status) { Content = new StringContent(
                 "data: {\"type\":\"delta\",\"text\":\"a\"}\n\nevent: x\ndata: {\"type\":\"done\"}\n\ndata: [DONE]\n\n", Encoding.UTF8, "text/event-stream") };
             response.Headers.TryAddWithoutValidation("X-Request-Id", "req-1");
             return response;
@@ -77,6 +78,22 @@ internal static partial class Program
             """{"data":{"type":"done"},"type":"provider_stream_event","provider":"fixture","api":"openai-responses","model":"parity-events"}"""]),
             "provider_stream_event records: " + string.Join("\n", seen.Skip(2)));
         Check(text.StartsWith("data: {\"type\":\"delta\"", StringComparison.Ordinal) && text.EndsWith("data: [DONE]\n\n", StringComparison.Ordinal), "The SSE body was not passed through unchanged.");
+
+        seen.Clear();
+        provider.Status = HttpStatusCode.TooManyRequests;
+        using var rejected = await client.GetAsync("https://provider.invalid/v1/messages");
+        _ = await rejected.Content.ReadAsStringAsync();
+        Check(seen.Count == 1 && seen[0].Contains("\"status\":429", StringComparison.Ordinal) &&
+            seen[0].Contains("\"x-request-id\":\"req-1\"", StringComparison.Ordinal),
+            "An error response reports its status and headers; its error body emits no provider stream events.");
+        foreach (var api in new[] { "google-generative-ai", "google-vertex" })
+        {
+            seen.Clear();
+            using var google = new HttpClient(new ExtensionProviderHttpHandler(new FakeProvider { Status = HttpStatusCode.TooManyRequests },
+                f.Registry, f.Registry.CaptureSnapshot(), Model with { Api = api }, f.Report));
+            using var failed = await google.GetAsync("https://provider.invalid/v1/messages");
+            Equal("""{"type":"after_provider_response","status":429,"headers":{}}""", seen.Single(), "Google SDK error header shape");
+        }
     }
 
     private sealed class BedrockTime : TimeProvider { public override DateTimeOffset GetUtcNow() => new(2026, 10, 8, 12, 0, 0, TimeSpan.Zero); }

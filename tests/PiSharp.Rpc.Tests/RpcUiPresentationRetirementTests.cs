@@ -54,13 +54,14 @@ internal static class RpcUiPresentationRetirementTests
             await using var probe = await Task.Run(() => fixture.Ui.OpenScope(new Context(OwnerGeneration: 9)));
             Equal(7L, probe.Capabilities.ConnectionGeneration); Identity(presentation.Identity, Id(presentation.Request), 1);
         };
-        var answer = scope.ConfirmAsync("early answer", "value").AsTask();
+        var answer = scope.ConfirmAsync("early answer", "value", new() { BlockedKind = ExtensionDialogBlockedKind.Auth }).AsTask();
         await fixture.Output.FlushEntered.Task.WaitAsync(Deadline); var id = Id(fixture.Output.Written!);
         fixture.Reply(id, confirmed: false);
         Check(!answer.IsCompleted && observer.Retired.Count == 0, "An early response bypassed actual publication.");
         fixture.Output.FlushRelease.TrySetResult();
         var result = await answer.WaitAsync(Deadline); Equal(ExtensionUiOutcomeKind.Value, result.Kind); Equal(false, result.Value);
         Equal(1, observer.Published.Count); Equal(1, observer.Retired.Count);
+        Equal("auth", observer.Published[0].Request.Value.GetProperty("blockedKind").GetString());
         Equal(observer.Published[0].Identity, observer.Retired[0].Identity); Equal(ExtensionUiOutcomeKind.Value, observer.Retired[0].Outcome);
         Check(observer.Retired[0].PublicationSucceeded && observer.Retired[0].PresentationEntered, "Successful presentation exposure was lost.");
         fixture.Reply(id, confirmed: true); Equal(false, result.Value); Equal(1, observer.Retired.Count);

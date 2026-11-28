@@ -1,4 +1,6 @@
+// Pi fb0fe823539f6d04850f6e34748c01f01f212e1f (MIT): packages/env/src/remote-env.ts.
 using System.Collections.Immutable;
+using System.Text;
 using System.Text.Json.Nodes;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Env;
@@ -110,7 +112,9 @@ internal sealed class RemoteTextLineReader(RemoteHandle handle) : ITextLineReade
 {
     private readonly StreamDecoder decoder = new();
     private readonly SemaphoreSlim serial = new(1, 1);
-    private string buffered = "";
+    private readonly StringBuilder partialLine = new();
+    private string chunk = "";
+    private int cursor;
     private long offset;
     private bool ended;
     private bool closed;
@@ -124,17 +128,18 @@ internal sealed class RemoteTextLineReader(RemoteHandle handle) : ITextLineReade
             if (closed) throw new FileError(FileErrorCode.Invalid, "Text line reader is closed", handle.Path);
             while (true)
             {
-                var newline = buffered.IndexOf('\n');
+                var newline = chunk.IndexOf('\n', cursor);
                 if (newline >= 0)
                 {
-                    var text = buffered[..newline]; buffered = buffered[(newline + 1)..];
-                    return new TextLine(text, true);
+                    var line = TakeLine(newline);
+                    cursor = newline + 1;
+                    return new TextLine(line, true);
                 }
+                if (cursor < chunk.Length) partialLine.Append(chunk.AsSpan(cursor));
+                chunk = "";
+                cursor = 0;
                 if (ended)
-                {
-                    if (buffered.Length == 0) return Result<TextLine?, FileError>.Ok(null);
-                    var text = buffered; buffered = ""; return new TextLine(text, false);
-                }
+                    return partialLine.Length == 0 ? Result<TextLine?, FileError>.Ok(null) : new TextLine(TakeLine(0), false);
                 var request = new JsonObject { ["length"] = 64 * 1024 };
                 if (positional) request["offset"] = offset;
                 var bytes = (await handle.RequestAsync("pread", request).ConfigureAwait(false)).Payload;
@@ -142,18 +147,25 @@ internal sealed class RemoteTextLineReader(RemoteHandle handle) : ITextLineReade
                 // before reporting cancellation; the next call still receives the same complete next line.
                 if (positional) RemoteExecutionEnv.CheckCancellation(context, handle.Path);
                 offset += bytes.Length;
-                if (bytes.Length == 0) { buffered += decoder.Finish(); ended = true; }
-                else buffered += decoder.Decode(bytes);
+                if (bytes.Length == 0) { chunk = decoder.Finish(); ended = true; }
+                else chunk = decoder.Decode(bytes);
                 RemoteExecutionEnv.CheckCancellation(context, handle.Path);
             }
         }
         catch (Exception error) { return RemoteExecutionEnv.FileFailure(error, handle.Path); }
         finally { serial.Release(); }
     }
+    private string TakeLine(int end)
+    {
+        if (partialLine.Length == 0) return chunk[cursor..end];
+        var text = partialLine.Append(chunk.AsSpan(cursor, end - cursor)).ToString();
+        partialLine.Clear();
+        return text;
+    }
     public async Task CloseAsync(DurableContext context)
     {
         await serial.WaitAsync().ConfigureAwait(false);
-        try { closed = true; buffered = ""; await handle.CloseAsync().ConfigureAwait(false); }
+        try { closed = true; chunk = ""; partialLine.Clear(); await handle.CloseAsync().ConfigureAwait(false); }
         finally { serial.Release(); }
     }
 }

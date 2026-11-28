@@ -1,4 +1,4 @@
-// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/ai/src/api/openai-codex-responses.ts, api/openai-responses-shared.ts,
+// Pi fb0fe823539f6d04850f6e34748c01f01f212e1f (MIT): packages/ai/src/api/openai-codex-responses.ts, api/openai-responses-shared.ts,
 // api/simple-options.ts and utils/retry.ts.
 using System.Collections.Immutable;
 using System.Net;
@@ -111,46 +111,46 @@ internal static partial class Program
     }
 
     // #12269: changing the thinking level invalidated the prompt cache on GPT-6 models. Models with compat.supportsMidConvoEffort take
-    // level changes, switching to off included, as configuration_update input items under a fixed reasoning.effort.
+    // level changes, switching to off included, as configuration_update input items under the first selected reasoning.effort.
     private static async Task Sync160CodexConfigurationUpdates()
     {
-        const string managed = """{"supportsMidConvoEffort":true}""", fixedEffort = """{"effort":"medium","summary":"auto"}""";
+        const string managed = """{"supportsMidConvoEffort":true}""", initialEffort = """{"effort":"low","summary":"auto"}""";
         var (transport, http, model) = Sync160Codex(Sync160CodexRow("gpt-6.2-sol", managed));
         var first = await Sync160CodexTurn(transport, http, new(model, [Sync160User("Say hello", 1)], 2) { ThinkingLevel = "low" });
         var second = await Sync160CodexTurn(transport, http, new(model, [Sync160User("Say hello", 1), Sync160Reply(first.Message), Sync160User("Again", 3)], 4) { ThinkingLevel = "high" });
         Equal("low", Sync160Level(first.Message), "first providerThinkingLevel"); Equal("high", Sync160Level(second.Message), "second providerThinkingLevel");
-        Equal(fixedEffort, first.Body["reasoning"]!.ToJsonString(), "first reasoning"); Equal(fixedEffort, second.Body["reasoning"]!.ToJsonString(), "second reasoning");
-        Equal("user,configuration_update:low", Sync160Input(first.Body), "first input");
+        Equal(initialEffort, first.Body["reasoning"]!.ToJsonString(), "first reasoning"); Equal(initialEffort, second.Body["reasoning"]!.ToJsonString(), "second reasoning");
+        Equal("user", Sync160Input(first.Body), "first input");
         // The earlier reply replays its recorded level before its items; the new level ends the input.
-        Equal("user,configuration_update:low,assistant,user,configuration_update:high", Sync160Input(second.Body), "second input");
-        JsonEqual("""{"type":"configuration_update","reasoning":{"effort":"high"}}""", second.Body["input"]![4]!.ToJsonString(), "configuration_update item");
+        Equal("user,assistant,user,configuration_update:high", Sync160Input(second.Body), "second input");
+        JsonEqual("""{"type":"configuration_update","reasoning":{"effort":"high"}}""", second.Body["input"]![3]!.ToJsonString(), "configuration_update item");
         // The same level again changes nothing before the new turn: the cached prefix is the first request's input and its reply.
         var third = await Sync160CodexTurn(transport, http, new(model, [Sync160User("Say hello", 1), Sync160Reply(first.Message), Sync160User("Again", 3),
             Sync160Reply(second.Message), Sync160User("More", 5)], 6) { ThinkingLevel = "high" });
-        Equal("user,configuration_update:low,assistant,user,configuration_update:high,assistant,user,configuration_update:high", Sync160Input(third.Body), "third input");
+        Equal("user,assistant,user,configuration_update:high,assistant,user", Sync160Input(third.Body), "third input");
 
-        // The off level, an omitted reasoning option included, is sent as a configuration_update item with effort none.
+        // The off level, an omitted reasoning option included, selects the initial request effort "none".
         var off = Sync160Codex(Sync160CodexRow("gpt-6-sol", managed, """{"off":"none"}"""));
         foreach (var level in new[] { null, "off" })
         {
             var turn = await Sync160CodexTurn(off.Transport, off.Http, new(off.Model, [Sync160User("Say hello", 1)], 2) { ThinkingLevel = level });
             Equal("none", Sync160Level(turn.Message), "off providerThinkingLevel");
-            Equal(fixedEffort, turn.Body["reasoning"]!.ToJsonString(), "off reasoning");
-            Equal("user,configuration_update:none", Sync160Input(turn.Body), "off input");
+            Equal("""{"effort":"none","summary":"auto"}""", turn.Body["reasoning"]!.ToJsonString(), "off reasoning");
+            Equal("user", Sync160Input(turn.Body), "off input");
         }
         // The item carries the provider's effort of the level (thinkingLevelMap), and a model that cannot switch off sends neither an
         // item nor a reasoning field for an omitted level.
         var mapped = Sync160Codex(Sync160CodexRow("gpt-6.2-astra", managed, """{"off":null,"minimal":"low","xhigh":"xhigh"}"""));
         var minimal = await Sync160CodexTurn(mapped.Transport, mapped.Http, new(mapped.Model, [Sync160User("Say hello", 1)], 2) { ThinkingLevel = "minimal" });
-        Check(Sync160Level(minimal.Message) == "low" && Sync160Input(minimal.Body) == "user,configuration_update:low" && minimal.Body["reasoning"]!.ToJsonString() == fixedEffort, "mapped level: " + minimal.Body.ToJsonString());
+        Check(Sync160Level(minimal.Message) == "low" && Sync160Input(minimal.Body) == "user" && minimal.Body["reasoning"]!.ToJsonString() == initialEffort, "mapped level: " + minimal.Body.ToJsonString());
         var omitted = await Sync160CodexTurn(mapped.Transport, mapped.Http, new(mapped.Model, [Sync160User("Say hello", 1)], 2));
         Check(Sync160Level(omitted.Message) is null && Sync160Input(omitted.Body) == "user" && omitted.Body["reasoning"] is null, "no off level: " + omitted.Body.ToJsonString());
-        // max-thinking.test.ts: the max level is the last input item on a managed model, and reasoning.effort on any other.
+        // max-thinking.test.ts: a first-turn max level is the top-level reasoning.effort on either model.
         const string maxLevels = """{"xhigh":"xhigh","max":"max"}""";
         var managedMax = Sync160Codex(Sync160CodexRow("gpt-6.1-terra", managed, maxLevels));
         var max = managedMax.Transport.BuildBody(new(managedMax.Model, [Entry("""{"role":"system","content":"You are a helpful assistant.","timestamp":0}"""), Sync160User("Hello", 1)], 2) { ThinkingLevel = "max" });
-        JsonEqual("""{"type":"configuration_update","reasoning":{"effort":"max"}}""", max["input"]!.AsArray()[^1]!.ToJsonString(), "max as a configuration_update item");
-        Equal(fixedEffort, max["reasoning"]!.ToJsonString(), "max under the fixed effort");
+        Equal("developer,user", Sync160Input(max), "initial max needs no update item");
+        Equal("""{"effort":"max","summary":"auto"}""", max["reasoning"]!.ToJsonString(), "initial max effort");
         var directMax = Sync160Codex(Sync160CodexRow("gpt-5.6-sol", thinkingLevelMap: maxLevels));
         Equal("""{"effort":"max","summary":"auto"}""", directMax.Transport.BuildBody(new(directMax.Model, [Sync160User("Hello", 1)], 2) { ThinkingLevel = "max" })["reasoning"]!.ToJsonString(), "max as reasoning.effort");
 
@@ -167,7 +167,7 @@ internal static partial class Program
         }
         // A replayed reply of an unmanaged request, or of another model, contributes no item.
         var replayed = await Sync160CodexTurn(transport, http, new(model, [Sync160User("Say hello", 1), Sync160Reply(high.Message with { Model = "gpt-6.2-sol" }), Sync160User("Again", 3)], 4) { ThinkingLevel = "low" });
-        Equal("user,assistant,user,configuration_update:low", Sync160Input(replayed.Body), "a reply without a recorded level");
+        Equal("user,assistant,user", Sync160Input(replayed.Body), "a reply without a recorded level");
     }
 
     // The Codex provider ignored maxTokens; it is sent as max_output_tokens (at least 16) unless compat.supportsMaxOutputTokens is false.
@@ -222,9 +222,9 @@ internal static partial class Program
             }
             var sent = server.Frames.Select(frame => JsonNode.Parse(frame.Text)!).ToList();
             Equal(3, sent.Count, "one frame per turn");
-            Check(sent.All(body => body["reasoning"]!.ToJsonString() == """{"effort":"medium","summary":"auto"}"""), "a frame changed reasoning.effort");
+            Check(sent.All(body => body["reasoning"]!.ToJsonString() == """{"effort":"low","summary":"auto"}"""), "a frame changed reasoning.effort");
             Equal(",resp_1,resp_2", string.Join(",", sent.Select(body => (string?)body["previous_response_id"])), "previous_response_id");
-            Equal("user,configuration_update:low|user,configuration_update:high|user,configuration_update:high", string.Join("|", sent.Select(Sync160Input)), "input deltas");
+            Equal("user|user,configuration_update:high|user", string.Join("|", sent.Select(Sync160Input)), "input deltas");
             Check(OpenAICodexWebSockets.GetDebugStats(session) is { FullContextRequests: 1, DeltaRequests: 2, ConnectionsCreated: 1 }, "stats: " + OpenAICodexWebSockets.GetDebugStats(session));
             Equal(1, server.Upgrades.Count, "one connection"); Check(server.Posts.IsEmpty, "no SSE request");
         }

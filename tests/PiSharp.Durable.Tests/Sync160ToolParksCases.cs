@@ -356,11 +356,8 @@ internal static class ToolParkTests
         {
             var parks = new (string Name, ToolExecutionResult Returned)[]
             {
-                ("mixed", new ToolExecutionResult
-                {
-                    Park = new ToolPark { Sleep = new ToolParkSleep { Until = 1 }, Wait = new ToolParkWait { On = [], Policy = JoinPolicy.Any } },
-                }),
-                ("result", new ToolExecutionResult { Park = ToolPark.Sleeping(until: 1), Output = JsonArrayValue.Empty }),
+                ("unknown", new ToolPark { Kind = "other" }),
+                ("result", ToolPark.Sleeping(until: 1) with { Output = JsonArrayValue.Empty }),
                 ("empty", (ToolExecutionResult)ToolPark.Sleeping()),
                 ("unowned", (ToolExecutionResult)ToolPark.Waiting([new TaskId(1)], JoinPolicy.Any)),
             };
@@ -680,7 +677,7 @@ internal static class ToolParkTests
                             Execute = async (args, api, ctx) =>
                             {
                                 var returned = await inner.Execute(args, api, ctx);
-                                return own && returned.Park?.Sleep is { } sleep ? (ToolExecutionResult)new ToolPark { Sleep = sleep with { } } : returned;
+                                return own && returned is ToolPark { Kind: "sleep" } park ? park with { } : returned;
                             },
                         }),
                     ],
@@ -751,7 +748,7 @@ internal static class ToolParkTests
                         {
                             if (kept is { } earlier) return earlier;
                             var returned = await inner.Execute(args, api, ctx);
-                            if (returned.Park?.Sleep is not null) kept = returned;
+                            if (returned is ToolPark { Kind: "sleep" }) kept = returned;
                             return returned;
                         },
                     }),

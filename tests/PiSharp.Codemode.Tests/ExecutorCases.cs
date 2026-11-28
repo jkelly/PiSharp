@@ -52,6 +52,7 @@ internal static partial class Program
     private sealed class FakeModels : ICodemodeModelRuntime
     {
         public int Active, MaxActive, Classified;
+        public CodemodeImageOptions? ImageOptions;
         /// <summary>Whether every classify() call received the registry's entry with its headers.</summary>
         public bool ClassifiedWithHeaders = true;
         // models.json headers can carry credentials: scripts must never see them, but the model call still sends them.
@@ -70,6 +71,11 @@ internal static partial class Program
             Interlocked.Decrement(ref Active); Interlocked.Increment(ref Classified);
             return new("typesafe-system-one", "typesafe", "jev-latest", [new("ok", new ClassifierBoolAnswer(0.75))], ModelOperationStopReason.Stop, 1)
             { Usage = new(10, 0, 0, 0, 10, new(0.001m, 0, 0, 0, 0.001m)) };
+        }
+        public Task<AssistantImages> GenerateImagesAsync(JsonData model, ImagesContext context, CodemodeImageOptions? options, CancellationToken cancellationToken)
+        {
+            ImageOptions = options;
+            return GenerateImagesAsync(model, context, cancellationToken);
         }
         public Task<AssistantImages> GenerateImagesAsync(JsonData model, ImagesContext context, CancellationToken cancellationToken) =>
             Task.FromResult(new AssistantImages("openrouter-images", "openrouter", "flux", [new ImageContent(TinyPng, "image/png")], ModelOperationStopReason.Stop, 1));
@@ -232,6 +238,14 @@ internal static partial class Program
                     (await Error("await models.getModelOfType(\"classifier\", \"typesafe/jev-latest\");")).StartsWith("models.getModelOfType(type, provider, id) expects three strings, got (a string, a string)", StringComparison.Ordinal), "three strings");
                 var images = ResultText(await Execute("const model = await models.getModelOfType(\"image\", \"openrouter\", \"flux\");\nconst out = await models.generateImages(model, { input: [{ type: \"text\", text: \"a cat\" }] });\nreturn out.output.length;", host, models: true));
                 Check(images.Contains("Note: models.generateImages() returned 1 image that the script did not show.", StringComparison.Ordinal), images);
+                const string generate = "await models.generateImages({provider:'openrouter',id:'flux'}, {input:[{type:'text',text:'hi'}]}, ";
+                await Execute(generate + "{aspectRatio:' 16:9 ', size:'2K '});", host, models: true);
+                Equal(new CodemodeImageOptions("16:9", "2K"), models.ImageOptions, "trimmed image options delivered");
+                foreach (var (options, reason) in new[] { ("[]", "third argument"), ("{apiKey:'forbidden'}", "does not accept options.apiKey"),
+                    ("{size:null}", "options.size must be a non-empty string"), ("{aspectRatio:' '}", "options.aspectRatio must be a non-empty string") })
+                    Check((await Error(generate + options + ");")).Contains(reason, StringComparison.Ordinal), reason);
+                await Execute(generate + "{});", host, models: true);
+                Equal<CodemodeImageOptions?>(null, models.ImageOptions, "empty options are omitted");
                 Equal("\"undefined\"", ResultText(await Execute("return JSON.stringify(typeof models);", host)), "no models without the option");
             }),
             Case("tool.description-modes-and-inline-budget", () =>

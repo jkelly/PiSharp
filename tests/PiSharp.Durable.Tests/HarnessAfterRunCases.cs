@@ -291,7 +291,7 @@ internal static class AfterRunTests
                 })],
             }));
             // The task admits its result for the model in its own commit.
-            state.Admit = (handle, tx) => handle.SubmitAsync(tx, SubmissionDraft.Write(new EntryDraft
+            state.Admit = (handle, tx) => handle.AdmitAsync(tx, SubmissionDraft.Write(new EntryDraft
             {
                 Kind = "test.result",
                 Model = JsonValue.Array(Obj(("role", "user"), ("content", "tests passed"), ("timestamp", 1))),
@@ -791,7 +791,7 @@ internal static class AfterRunTests
                     },
                 })],
             }));
-            state.Admit = (handle, tx) => handle.SubmitAsync(tx, SubmissionDraft.Input("fix the tests", WhenBusy.FollowUp, "fix-1"));
+            state.Admit = (handle, tx) => handle.AdmitAsync(tx, SubmissionDraft.Input("fix the tests", WhenBusy.FollowUp, "fix-1"));
             setup.Faux.SetResponses(FauxAssistantMessage("done"), FauxAssistantMessage("fixed"));
             var (harness, root) = await OpenChat(memory(), setup);
             await (await root.SubmitAsync(SubmissionDraft.Input("go"), Context)).WaitAsync(Context);
@@ -820,7 +820,7 @@ internal static class AfterRunTests
             var user = KindOf(await AllEntries(root), "pi.user")[0];
             MatchJson($$"""{"reason":"turn_limit","first":{{user.Id.Value}}}""", Field(await LiveOf(harness, root.Id), "runFailure"), "runFailure");
             Asked(state);
-            await harness.CommitAsync(tx => root.SubmitAsync(tx, SubmissionDraft.Continue()), Context);
+            await harness.CommitAsync(tx => root.AdmitAsync(tx, SubmissionDraft.Continue()), Context);
             await root.WaitForIdleAsync(Context);
             var answer = KindOf(await AllEntries(root), "pi.assistant")[^1];
             Asked(state, Answered(user.Id, answer.Id));

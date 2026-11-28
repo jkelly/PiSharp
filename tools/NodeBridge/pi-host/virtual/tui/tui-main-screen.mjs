@@ -1,4 +1,4 @@
-// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/tui/src/tui-main-screen.ts.
+// Pi fb0fe823539f6d04850f6e34748c01f01f212e1f (MIT): packages/tui/src/tui-main-screen.ts.
 // Ported to plain ESM for the PiSharp Node extension bridge (TypeScript types stripped mechanically; behaviour unchanged).
 import * as fs from "node:fs";
 import * as os from "node:os";
@@ -396,9 +396,8 @@ export class TuiMainScreen extends TuiBase {
             const isImage = isImageLine(line);
             const imageReservedRows = isImage ? this.getKittyImageReservedRows(newLines, i, renderEnd) : 1;
             if (imageReservedRows > 1) {
-                const imageStartScreenRow = i - viewportTop;
-                if (imageStartScreenRow < 0 || imageStartScreenRow + imageReservedRows > height) {
-                    logRedraw(`kitty image pre-clear would scroll (${imageStartScreenRow} + ${imageReservedRows} > ${height})`);
+                if (imageReservedRows > height) {
+                    logRedraw(`kitty image taller than screen (${imageReservedRows} > ${height})`);
                     fullRender(true);
                     return;
                 }
@@ -424,10 +423,15 @@ export class TuiMainScreen extends TuiBase {
                     ...newLines.map((l, idx)=>`[${idx}] (w=${visibleWidth(l)}) ${l}`),
                     ""
                 ].join("\n");
-                fs.mkdirSync(path.dirname(crashLogPath), {
-                    recursive: true
-                });
-                fs.writeFileSync(crashLogPath, crashData);
+                let crashLogStatus = `Debug log written to: ${crashLogPath}`;
+                try {
+                    fs.mkdirSync(path.dirname(crashLogPath), {
+                        recursive: true
+                    });
+                    fs.writeFileSync(crashLogPath, crashData);
+                } catch (error) {
+                    crashLogStatus = `Could not write debug log to ${crashLogPath}: ${error instanceof Error ? error.message : String(error)}`;
+                }
                 this.stop();
                 const errorMsg = [
                     `Rendered line ${i} exceeds terminal width (${visibleWidth(line)} > ${width}).`,
@@ -435,7 +439,7 @@ export class TuiMainScreen extends TuiBase {
                     "This is likely caused by a custom TUI component not truncating its output.",
                     "Use visibleWidth() to measure and truncateToWidth() to truncate lines.",
                     "",
-                    `Debug log written to: ${crashLogPath}`
+                    crashLogStatus
                 ].join("\n");
                 throw new Error(errorMsg);
             }
