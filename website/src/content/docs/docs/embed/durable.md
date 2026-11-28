@@ -3,7 +3,7 @@ title: Durable library
 description: "Build crash-safe agents on PiSharp.Durable: the harness, storage, tools and tests."
 ---
 
-`PiSharp.Durable` is the library behind [`pisharp durable`](/docs/guides/durable/). It is a port of Pi's `pi-durable` v1.5.0 package: an agent harness that commits every model turn, streamed partial, tool call and queued message to storage before anything sees it. Open the same storage after a crash and the harness finishes what was running. This page shows how to build your own agent on it.
+`PiSharp.Durable` powers [`pisharp durable`](/docs/guides/durable/). It commits model turns, streamed partials, tool calls and queued messages to storage so a host can reopen a conversation after a crash. The published {{PISHARP_VERSION}} libraries follow Pi Durable 1.6.0.
 
 :::caution[Experimental]
 The durable libraries ship as experimental from PiSharp 1.2.0.1, the members marked "(from 1.2.0.2)" from 1.2.0.2, and those marked "(from 1.5.0)" from 1.5.0. Every public type carries `[Experimental("PISHARP_DURABLE001")]`, and the API may change or be removed in any release without notice. PiSharp 1.5.0 follows `pi-durable` v1.5.0 and breaks code and storage written for 1.2.0.x: see [Upgrading from 1.2.0.x](#upgrading-from-120x).
@@ -54,11 +54,20 @@ PiSharp 1.5.0 follows `pi-durable` v1.5.0, which changed the API and the stored 
 
 ## Migrating to the 1.7.0 API
 
-Use `conversation.AdmitAsync(tx, draft)` to admit a submission inside a transaction. Outside a transaction, continue using `SubmitAsync(draft, context)`.
+When moving an extension or host to the 1.7.0 source candidate, update transaction-scoped submissions. Replace `conversation.SubmitAsync(tx, draft)` with `conversation.AdmitAsync(tx, draft)`. It returns the submission ID. Outside a transaction, continue to use `conversation.SubmitAsync(draft, context)` to get an `ISubmission` that you can wait on.
 
-A parked tool returns a `ToolPark` with `Kind` set to `"sleep"` or `"wait"`. Read its `Checkpoint` and wait or sleep fields directly. The `Sleeping` and `Waiting` factories construct the corresponding variants. In a wrapper, return the base tool's original park object so the harness can recognize it.
+Read the public result’s `Kind` to decide which fields to consume. For example, a signal with kind `value` can carry JSON null. An expired signal has kind `expired`.
 
-Signal states distinguish a delivered value (including JSON null) from an expired key through `Kind`. Wraps, yield and compaction decisions, and storage commit results expose their discriminants through `Kind` as well. Stored signal memos retain their existing format.
+| Result | Kind values |
+| --- | --- |
+| Tool park | `sleep`, `wait` |
+| Extension wrapper | `tool`, `section` |
+| Yield hook decision | `continue`, `tasks` |
+| Compaction decision | `decline`, `summary` |
+| Signal state | `value`, `expired` |
+| Storage commit result | `stored`, `refused` |
+
+Use `ToolPark.Sleeping` and `ToolPark.Waiting` to construct parks. A tool wrapper that receives a park should return that same object. Stored signal memos retain their existing format.
 
 ## New in 1.6.0
 
@@ -842,7 +851,7 @@ The [model contracts](https://github.com/jkelly/PiSharp/blob/main/src/PiSharp.Du
 
 ## Registries from Chord
 
-`RegistryReader.Create` in `PiSharp.Durable.Store` from 1.5.0.1 adapts a registry composed by the real Chord v2 host, so a harness follows extensions contributed by plugins. [Examples 35–37](/docs/embed/durable-store/) now exercise host load, shared storage, followed views and registry contributions. The adapter is published as experimental.
+`RegistryReader.Create` in `PiSharp.Durable.Store` from 1.5.0.1 adapts a registry composed by the second-generation PiSharp Chord host, so a harness follows extensions contributed by plugins. [Examples 35–37](/docs/embed/durable-store/) now exercise host load, shared storage, followed views and registry contributions. The adapter is published as experimental.
 
 ## Samples
 

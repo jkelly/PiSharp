@@ -1,6 +1,6 @@
 import type { APIRoute } from 'astro';
 import { getCollection } from 'astro:content';
-import { versions, links } from '../data/site';
+import { versions, links, hasSourceCandidate } from '../data/site';
 import { packages } from '../data/packages';
 import { allSamples, sampleStats } from '../data/samples';
 
@@ -12,6 +12,7 @@ export const GET: APIRoute = async ({ site }) => {
 		`# PiSharp — Complete Documentation (${versions.pisharp})`,
 		``,
 		`> Independent native .NET 10 / C# port of the Pi coding agent (Pi v${versions.baseline} baseline).`,
+		...(hasSourceCandidate ? [`> Unreleased source preview for Pi and Pi Durable ${versions.target}. Preview changes: ${base}/changelog/#v${versions.target}. Build instructions: ${base}/docs/quickstart/#build-from-source.`] : []),
 		`> Source: ${links.github} | Docs: ${base}/docs/ | Samples: ${base}/samples/`,
 		``,
 		`## Published Packages (${packages.length} at ${versions.pisharp})`,

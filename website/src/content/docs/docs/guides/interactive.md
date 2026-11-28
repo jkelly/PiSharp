@@ -3,7 +3,11 @@ title: Interactive mode
 description: The terminal UI, slash commands, key bindings and themes.
 ---
 
-`pisharp` opens Pi's terminal UI on Windows, Linux and macOS. It works as Pi's [terminal UI](https://github.com/earendil-works/pi/blob/v1.5.0/packages/coding-agent/docs/tui.md) does: the same editor, key bindings, selectors, footer, fullscreen and regular modes, inline images, Mermaid diagrams and syntax highlighting.
+Run `pisharp` on Windows, Linux or macOS to open the terminal UI. Choose fullscreen or regular mode and use the editor, selectors and slash commands in either. PiSharp {{PISHARP_VERSION}} includes the Apple Silicon startup fix.
+
+## Terminal session resume in the 1.7.0 candidate
+
+Terminals that support OSC 7577 can reopen a saved session after a terminal restart. PiSharp supplies a resume command that carries the selected profile and the original tool and resource restrictions. For a manually resumed session, use the same profile and run `--resume` to choose the session.
 
 ## Prompts, steering and shell commands
 

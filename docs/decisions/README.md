@@ -21,6 +21,7 @@ The owner's decisions that set PiSharp's scope, targets and designs, newest last
 | [0015](0015-pi-1.6.0-sync.md) | Pi v1.6.0 and Pi Durable 1.6.0 sync, released in 1.6.0 | `main` |
 | [0016](0016-transport-retry-classification.md) | Internal transport retry classification alongside sanitized error messages (effective in 1.6.0.1) | `main` |
 | [0017](0017-experimental-graduation-tier1.md) | Tier-1 `[Experimental]` API graduation (effective in 1.6.0.1) | `main` |
+| [0018](0018-pi-1.7.0-sync.md) | Pi and Pi Durable 1.7.0 source candidate, including the Chord peer compatibility decision | `sync/pi-1.7.0` |
 
 Technical notes kept beside the numbered records:
 - [ecmascript-json-boundary.md](ecmascript-json-boundary.md): the explicit boundary between PiSharp's native JSON values and JavaScript's parsed JSON.

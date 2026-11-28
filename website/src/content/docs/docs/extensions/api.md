@@ -298,7 +298,7 @@ The contexts `pisharp` passes also implement these interfaces. Each works only w
 | `EditorAsync(title, prefill, token)` | `ExtensionUiOutcome<string>`: multi-line text |
 | `PublishAsync(notification, token)` | `ExtensionUiOutcome<ExtensionUiPublication>` |
 
-`ExtensionUiDialogOptions(TimeoutMilliseconds)` sets a timeout for `Select`, `Confirm` and `Input`. `0` turns the timer off.
+`ExtensionUiDialogOptions(TimeoutMilliseconds)` sets a timeout for `Select`, `Confirm` and `Input`. `0` turns the timer off. In the 1.7.0 source candidate, set `BlockedKind` to `Auth`, `Permission` or `Question` to tell a compatible terminal why the dialog needs attention. TypeScript extensions pass `blockedKind: "auth"`, `"permission"` or `"question"` in the dialog options.
 
 `Mode` is `Tui` in the terminal UI, `Rpc` in RPC mode, and `Print` (with no features) in print and JSON modes. The features are `Select`, `Confirm`, `Input`, `Editor`, `Notify`, `Status`, `TextWidget`, `Title`, `EditorText` and `CustomTerminalComponent`. RPC mode offers all but `CustomTerminalComponent`.
 

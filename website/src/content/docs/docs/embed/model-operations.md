@@ -41,9 +41,15 @@ Every `OperationModel` has `Id`, `Name`, `Api`, `Provider`, `BaseUrl`, `Input` (
 
 `ModelCost` holds the rates per million tokens (`Input`, `Output`, `CacheRead`, `CacheWrite`) and optional `Tiers`. When a request's input, cache reads and cache writes together exceed a tier's `InputTokensAbove`, the highest such tier prices the whole request. `ModelCost.Free` is all zeros.
 
+## Image and decision models in the 1.7.0 candidate
+
+The source candidate adds `pi-image` and `pi-decision` for compatible endpoints. Radius can discover these models from its configured endpoint. When calling an image model, `ImagesOptions.AspectRatio` and `ImagesOptions.Size` request dimensions supported by the provider. Codemode accepts the same options as a third argument to `models.generateImages`.
+
+Image and classifier usage can include reasoning tokens. Image output tokens, when reported, are a subset of output tokens. Count them once when calculating totals.
+
 ## Built-in APIs
 
-`model.Api` picks the implementation. PiSharp ports Pi's five built-in APIs:
+`model.Api` picks the implementation. The published {{PISHARP_VERSION}} library supports the five APIs below.
 
 | API id | Class | Request | Images in | Temperature |
 | --- | --- | --- | --- | --- |
@@ -316,7 +322,7 @@ registry.SetProvider(new ModelOperationsProvider("local", "Local rules")
 
 ### Call an API directly
 
-`ModelOperationApis` dispatches on `model.Api` without a registry or auth lookup, as Pi's `generateImages()` does. Pass the key in the options. It holds the five built-in APIs, and `RegisterClassifierApi` and `RegisterImagesApi` add yours. Unlike the registry, `ClassifyAsync` and `GenerateImagesAsync` here throw `InvalidOperationException` when no API is registered for the model's API.
+`ModelOperationApis` dispatches on `model.Api` without a registry or auth lookup, as Pi's `generateImages()` does. Pass the key in the options. It holds the built-in APIs, and `RegisterClassifierApi` and `RegisterImagesApi` add yours. Unlike the registry, `ClassifyAsync` and `GenerateImagesAsync` here throw `InvalidOperationException` when no API is registered for the model's API.
 
 ```csharp
 var result = await ModelOperationApis.ClassifyAsync(jev, context,

@@ -1007,8 +1007,8 @@
       "originalSha256": "61fc46b52a04f5941302c9dd327c6dc3e83e451e1a050e9d1949e15d7b31b77b"
     },
     {
-      "currentSha256": "bcb7b3dbc9aa5301d2ff80219083188cee79d89ecc72796f241dc838da06f7e6",
-      "currentBytes": 3840,
+      "currentSha256": "04958ab4b126269418c1b9928ab6e4dbd335e016b3d680778222a366bea5e19e",
+      "currentBytes": 3686,
       "originalBytes": 1648,
       "path": "CONTRIBUTING.md",
       "originalSha256": "2551376cd09efe8406c1558c4e98f334f34756d1fa900e8e30a5a5dcf400421c"
@@ -1042,8 +1042,8 @@
       "originalSha256": "95932e0d9b7d1f8448b2af884adc83db7b5c1e88615cc6cc1da76e6506b696ab"
     },
     {
-      "currentSha256": "865d5177c0e050c00cc0dcfd5c7876ec3aa995e3225b5f97ebcb1f6261c764e2",
-      "currentBytes": 5799,
+      "currentSha256": "f605e7c350d1ba74348323fef0bac7615005ac70b204b11b0bb98469262ae3c5",
+      "currentBytes": 6005,
       "originalBytes": 48032,
       "path": "docs/architecture.md",
       "originalSha256": "d1441f7b2ecc7921e47dad68050d4c495047164aeb1e60d04c38f8e1c0eb6699"
@@ -5872,8 +5872,8 @@
       "originalSha256": "0f5f73cc466a7aa3c8939d483b171da02d34d7fff0518ab80964f1311c92e6a9"
     },
     {
-      "currentSha256": "1e25081b010abacb6bdee5d26721cf689da7ed4a0ed193611ed96547a9a3975c",
-      "currentBytes": 10588,
+      "currentSha256": "f4de794718b7df333573eac650b99b45666ac1fde367f6d428b8cffaa62fbe54",
+      "currentBytes": 10619,
       "originalBytes": 3622,
       "path": "README.md",
       "originalSha256": "1b053b228b07ff43b8ba7d37d19e4ea3a1d6214731dfa4a1f2ef6f3240f292df"

@@ -67,7 +67,7 @@ The globals are `tools`, `text()`, `image()`, `console`, `exit()`, `store()` and
 
 `models` lists the model catalog and runs classifier and image models with the session's credentials: `models.classify()` answers typed questions about JSON state, and `models.generateImages()` makes images. Chat models are listed but can't be run from scripts. As in Pi, the listed models leave out `headers`, which can hold credentials; the calls still send them. At most four such calls run at once per script; more wait for a slot. Their cost counts toward the session. See [Classifier and image models](/docs/guides/providers/#classifier-and-image-models).
 
-To request image dimensions, pass a third argument such as `{ aspectRatio: "16:9", size: "2K" }` to `models.generateImages(model, context, options)`. The provider determines which values the selected model supports.
+In the **1.7.0 candidate**, to request image dimensions, pass a third argument such as `{ aspectRatio: "16:9", size: "2K" }` to `models.generateImages(model, context, options)`. The provider determines which values the selected model supports.
 
 ## MCP tools
 

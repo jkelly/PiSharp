@@ -46,11 +46,11 @@ function readTarget() {
 function readPublished() {
 	try {
 		const release = readJson('../compatibility/public-release.json');
-		if (release.publication?.nugetPackagesPublished) return { version: String(release.version), tag: String(release.upstream.tag) };
+		if (release.publication?.nugetPackagesPublished) return { version: String(release.version), tag: String(release.upstream.tag), commit: String(release.upstream.commit) };
 		const previous = (release.previousReleases ?? []).filter((entry: { nugetPackagesPublished?: boolean }) => entry.nugetPackagesPublished).at(-1);
-		if (previous) return { version: String(previous.version), tag: String(previous.upstreamTag) };
+		if (previous) return { version: String(previous.version), tag: String(previous.upstreamTag), commit: String(previous.upstreamCommit) };
 	} catch {}
-	return { version: '0.99.1', tag: 'v0.99.1' };
+	return { version: '0.99.1', tag: 'v0.99.1', commit: '' };
 }
 
 const target = readTarget();
@@ -61,14 +61,14 @@ export const versions = {
 	pisharp: published.version,
 	/** The Pi release the published PiSharp version matches. */
 	baseline: published.tag.replace(/^v/, ''),
-	baselineCommit: target.tag === published.tag ? target.commit : '',
+	baselineCommit: published.commit,
 	baselineUrl: `${target.repository}/releases/tag/${published.tag}`,
 	/** The Pi release the port is currently being synced to. */
 	target: target.tag.replace(/^v/, ''),
 	targetCommit: target.commit,
 	targetUrl: `${target.repository}/tree/${target.commit}`,
 	/** Update by hand when Pi ships a new release. */
-	latestPi: '1.6.0',
+	latestPi: '1.7.0',
 };
 
-export const inSync = versions.baseline === versions.latestPi;
+export const hasSourceCandidate = versions.target !== versions.baseline;

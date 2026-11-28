@@ -36,12 +36,12 @@ const labelTone = (label: string) => (label.toLowerCase() === 'experimental' ? '
 						<div class="entry-head">
 							<h2>{entry.data.version}</h2>
 							<span class="ps-chip">{entry.data.kind === 'sync' ? 'Pi sync' : 'C# patch'}</span>
-							{entry.data.status === 'in-progress' && <span class="ps-chip" data-tone="partial">In progress</span>}
+							{entry.data.status === 'in-progress' && <span class="ps-chip" data-tone="partial">Unreleased</span>}
 							{entry.data.labels.map((l) => <span class="ps-chip" data-tone={labelTone(l)}>{l}</span>)}
 							{entry.data.date && <span class="date">{dateFormat.format(entry.data.date)}</span>}
 						</div>
 						<p class="ps-muted baseline">
-							{entry.data.kind === 'patch' ? `Baseline unchanged: Pi ${entry.data.baseline}.` : `Matches Pi ${entry.data.baseline}.`}
+							{entry.data.status === 'in-progress' ? `Targets Pi and Pi Durable ${entry.data.baseline}.` : `Based on Pi ${entry.data.baseline}.`}
 							{entry.data.status === 'released' && <> <a href={`${links.releases}/tag/v${entry.data.version}`}>GitHub release</a></>}
 							{entry.data.kind === 'sync' && <>{entry.data.status === 'released' ? ', ' : ' '}<a href={links.piChangelog}>Pi's release notes</a></>}
 						</p>

@@ -3,7 +3,7 @@ title: Providers and models
 description: Sign in, choose a model, and add your own endpoints.
 ---
 
-PiSharp has every provider and chat API that Pi v1.5.0 has, with Pi's model catalogs. Pi's [Providers](https://github.com/earendil-works/pi/blob/v1.5.0/packages/coding-agent/docs/providers.md) and [Models](https://github.com/earendil-works/pi/blob/v1.5.0/packages/coding-agent/docs/models.md) pages apply.
+The published {{PISHARP_VERSION}} CLI uses the Pi 1.6.0 model catalog. The 1.7.0 source candidate embeds 43 provider catalogs containing 1,701 chat models, 74 image models and 83 classifiers. Provider credentials and account entitlements determine which models you can use. In the candidate, Ant Ling defaults to `Ling-3.1-flash`, Mistral to `mistral-medium-latest`, and Cloudflare Workers AI to `@cf/zai-org/glm-5.3`. Radius can discover image and decision models from its configured endpoint. See [Model operations](/docs/embed/model-operations/).
 
 ## Sign in
 
@@ -148,8 +148,8 @@ The earlier 1.5.0 release gave the WebSocket 15 seconds to open. PiSharp 1.5.0.1
 
 ## Differences from Pi
 
-- Chat requests carry Pi's detailed user agent, `pi/1.5.0 (<platform>; dotnet/<version>; <arch>)`, with the runtime naming .NET where Pi names Node. Bedrock sends `pi/1.5.0` as the whole user agent, since PiSharp has no AWS SDK user agent to append it to.
-- PiSharp sends no attribution headers. Pi attributes OpenRouter, NVIDIA NIM and OpenCode requests to pi (`https://pi.dev`) while install telemetry is on; PiSharp never does. OpenCode requests with a session carry `x-opencode-client: pisharp`, where Pi sends `x-opencode-client: pi` only while attribution is on.
+- The detailed user agent includes the tracked Pi version, platform, .NET runtime and architecture. Bedrock uses the shorter `pi/<version>` form.
+- PiSharp omits default provider attribution. Embedding hosts can supply an explicit client identity. OpenCode session requests carry `x-opencode-client: pisharp`.
 - PiSharp's zstd frames are valid zstd but not byte for byte what Node's zstd writes.
 - The earlier 1.5.0 release used built-in classifier catalogs only. PiSharp 1.5.0.1 propagates provider overrides, including `baseUrl` and `compat`, and adds Copilot System One routing.
 

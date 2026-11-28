@@ -5,7 +5,8 @@ description: Run Pi's TypeScript and JavaScript extensions in PiSharp through th
 
 PiSharp runs Pi's TypeScript and JavaScript extensions unchanged. It starts Node, loads each extension with Pi's own packages, and connects the extension to the C# session. Write extensions as Pi's [Extensions](https://github.com/earendil-works/pi/blob/v1.7.0/packages/coding-agent/docs/extensions.md) page describes.
 
-:::note[PiSharp 1.7.0 runtime]
+:::note[1.7.0 source candidate]
+The published {{PISHARP_VERSION}} CLI uses Pi 1.6.0 packages. The runtime and cache paths below describe a checkout of the 1.7.0 candidate.
 PiSharp 1.7.0 installs exact Pi 1.7.0 packages into a separate `1.7.0-no-default-attribution-v1` cache, pins `undici` to 8.12.4 and regenerates the fallback modules from the pinned 1.7.0 source. `typebox` 1.3.27 and `jiti` 2.7.0 are unchanged. It preserves older caches and explicit extension identities. The SDK's default attribution remains disabled in the bridge.
 :::
 

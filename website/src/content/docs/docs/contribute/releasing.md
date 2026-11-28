@@ -16,7 +16,7 @@ PiSharp's version is the Pi version it matches, and a fourth number marks a C#-o
 The release scripts enforce this:
 
 - The version must match `^[0-9]+\.[0-9]+\.[0-9]+(\.[0-9]+)?(-[0-9A-Za-z.-]+)?$`.
-- Its first three numbers must equal the tag in `compatibility/target.lock.json` (`v1.6.0` today). A sync to a new Pi release therefore comes before its release. See [How the port tracks Pi](/docs/contribute/porting/).
+- Its first three numbers must equal the tag in `compatibility/target.lock.json` (`v1.7.0` on the candidate checkout). A sync to a new Pi release therefore comes before its release. See [How the port tracks Pi](/docs/contribute/porting/).
 - A version with a `-` suffix becomes a GitHub prerelease.
 
 Every assembly gets the release version, except `PiSharp.ExtensionHost`, which keeps assembly version `1.0.0.0`.
@@ -40,7 +40,11 @@ Releases are prepared on a `release/<version>` branch, such as `release/1.5.0`, 
 
 A separate commit then re-seals the derivative integrity table, because `Directory.Build.props`, `README.md`, `THIRD-PARTY-NOTICES.md` and other files above are pinned there. See [Derivative integrity pins](/docs/contribute/porting/#derivative-integrity-pins).
 
-### Published release: 1.6.0.1
+### Published release 1.6.0.2
+
+The 1.6.0.2 patch fixes interactive startup on Apple Silicon and uses the same Pi and Pi Durable 1.6.0 baseline as 1.6.0.1. The tagged workflow published the 31 packages from commit `fce4394aa5ea58d2bf933930d0ff1149fe5519aa`. [Release and assets](https://github.com/jkelly/PiSharp/releases/tag/v1.6.0.2) · [Tagged workflow](https://github.com/jkelly/PiSharp/actions/runs/46075103812)
+
+### Earlier release: 1.6.0.1
 
 Release **1.6.0.1** is a C#-only patch on the Pi v1.6.0 and Pi Durable 1.6.0 baseline, publishing 29 libraries, the CLI tool, and `PiSharp.Templates` (31 packages). Tag [`v1.6.0.1`](https://github.com/jkelly/PiSharp/releases/tag/v1.6.0.1) identifies source `1a74a207b30613444d5f8ef884957e7580860539`. The [publication record](https://github.com/jkelly/PiSharp/blob/main/AI_DOCS/release-1.6.0.1-publication-results.md) records exact-tag validation (run `45198502548`) and official NuGet verification (run `45207181360`).
 
@@ -79,7 +83,7 @@ The package list is written out in several places. A new library needs all of th
 
 | File | Change |
 | --- | --- |
-| [`tools/release/build-release-packages.ps1`](https://github.com/jkelly/PiSharp/blob/main/tools/release/build-release-packages.ps1) | Add it to `$libraries`, in dependency order. The script packs exactly this list plus the CLI. |
+| [`tools/release/build-release-packages.ps1`](https://github.com/jkelly/PiSharp/blob/main/tools/release/build-release-packages.ps1) | Add it to `$libraries`, in dependency order. The script packs this list, the CLI and the project templates. |
 | [`tools/release/PiSharp.NativeSdk.targets`](https://github.com/jkelly/PiSharp/blob/main/tools/release/PiSharp.NativeSdk.targets) | Add it to the `PiSharpNativeSdkPackage` condition, and give it a `Description`. |
 | [`tools/release/native-sdk-package.ps1`](https://github.com/jkelly/PiSharp/blob/main/tools/release/native-sdk-package.ps1) | Add it to the allowed package ids, its PiSharp dependencies to `$siblings`, its third-party pins to `$external`, and any license files it must carry. |
 | [`website/src/data/packages.ts`](https://github.com/jkelly/PiSharp/blob/main/website/src/data/packages.ts) | List it on the [SDK page](/sdk/). |
@@ -89,11 +93,11 @@ The package list is written out in several places. A new library needs all of th
 
 ## Dry run
 
-Run the release workflow by hand from the Actions tab to build and check a version without publishing anything. Set `version` explicitly to the intended version; `1.6.0.1` is the latest published version. It takes three inputs:
+Run the release workflow by hand from the Actions tab to build and check a version without publishing anything. Set `version` to match the source target of the selected branch. The 1.7.0 candidate uses the following defaults. It takes three inputs:
 
 | Input | Default | Effect |
 | --- | --- | --- |
-| `version` | `1.6.0.1` | The version to build and validate. |
+| `version` | `1.7.0` | The version to build and validate. |
 | `skip_tests` | `false` | Skip the 23 release-list suites in a dry run. Core and Durable validation still run. |
 | `include_standalone` | `false` | Also build self-contained standalone archives (`win-x64`, `linux-x64`, `osx-arm64`) and Homebrew/Scoop/Winget manifests. |
 
@@ -103,11 +107,11 @@ You can also build the packages locally. See [Install your build as a tool](/doc
 
 ## Tag and publish
 
-Once the release branch is merged, tag the merge commit and push the tag:
+After approval and merge, set `release_tag` to the new version tag and `qualified_commit` to the verified commit SHA. Then publish the tag:
 
 ```sh
-git tag v1.6.0 <qualified merge commit>
-git push origin v1.6.0
+git tag "$release_tag" "$qualified_commit"
+git push origin "refs/tags/$release_tag"
 ```
 
 ## The release workflow
@@ -129,7 +133,7 @@ The build/package validation is also required. The package inventory (29 package
 
 The build job runs on Ubuntu with the SDK from `global.json` and Node.js 22. It takes the version from the tag, without the `v`, and then:
 
-1. Runs the 23 offline release suites with `dotnet run`: the 20 suites the macOS workflow runs, plus `Durable`, `DurableCli` and `CustomAgents`. A tag push always runs them. See [Tests](/docs/contribute/testing/#release-suites).
+1. Runs the 23 offline release suites with `dotnet run`: the 19 suites in the macOS release matrix, plus `Extensions.AI`, `Durable`, `DurableCli` and `CustomAgents`. A tag push always runs them. See [Tests](/docs/contribute/testing/#release-suites).
 2. Runs `build-release-packages.ps1` with the version and the commit. See [Build the packages](#build-the-packages).
 3. Smoke-tests `PiSharp.Templates` via `tools/ci/test-templates.ps1` (installs the packed template package into an isolated hive, scaffolds, builds, and runs all three templates against the local packages).
 4. Checks the CLI tool's durable payload: the durable and SQLite assemblies and their license files must be in the package, the `e_sqlite3` native library for `win-x64`, `linux-x64`, `linux-musl-x64` and `osx-arm64` must match the SQLitePCLRaw package byte for byte, no native `.pdb` files may be present, and the archive must stay within the 80 MiB budget.

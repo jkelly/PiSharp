@@ -20,9 +20,12 @@ C#-only fixes that don't change the Pi baseline add a fourth number.
 | `1.5.0.1` | Patch on Pi 1.5.0: reviewed gap corrections, Chord/hosting, Durable.Store, remote environments and evaluation tooling |
 | `1.5.2` | Synced to Pi 1.5.2, including 1.5.1; source, hosted and package validation retain explicit limitations |
 | `1.6.0` | Synced to Pi 1.6.0 and Pi Durable 1.6.0; source, hosted and package validation retain explicit limitations |
+| `1.6.0.1` | C# patch adding the Microsoft.Extensions.AI adapter and project templates |
+| `1.6.0.2` | Published patch fixing interactive startup on Apple Silicon |
+| `1.7.0` | Unreleased source candidate targeting Pi and Pi Durable 1.7.0 |
 
 Bumping the third number instead (`0.99.2`) would claim to match a Pi release that PiSharp doesn't match. NuGet and .NET both order four-part versions correctly, so `0.99.1.2` sorts after `0.99.1` and before `1.1.0`.
 
 The [changelog](/changelog/) labels each release as either a **Pi sync** or a **C# patch**. [Releasing](/docs/contribute/releasing/) describes how a release is prepared and published.
 
-The current published release is **1.6.0**, on Pi **1.6.0** and Pi Durable **1.6.0**. A source build reports `VersionPrefix` from `Directory.Build.props`. Features on `main` that are in no release yet are marked **Unreleased** or **candidate**; a source version bump alone is not a release or completed parity claim. Future candidate changelogs remain excluded from released RSS until publication is verified. See the [1.6.0 release notes](https://github.com/jkelly/PiSharp/blob/main/docs/release-notes/1.6.0.md), [1.5.2 release notes](https://github.com/jkelly/PiSharp/blob/main/docs/release-notes/1.5.2.md) and [earlier 1.5.0.1 updates](/docs/guides/gap-updates/).
+NuGet carries **{{PISHARP_VERSION}}**. A source checkout reports its build version with `--version`. The 1.7.0 candidate incorporates upstream changes from 1.6.1 and 1.7.0. Candidate entries appear in the [changelog](/changelog/) and enter the release RSS feed after publication.

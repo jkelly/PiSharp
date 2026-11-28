@@ -34,7 +34,7 @@ description: How PiSharp's append-only JSONL session trees differ from commit-fi
 | `MemoryStorage` | `PiSharp.Durable` | No | Fast unit tests and ephemeral in-memory demos. |
 | `JsonlStorage` | `PiSharp.Durable` | Yes (folder per session) | Human-inspectable append-only durable logs on disk (1.5.2 adds read-only recovery). |
 | `SqliteStorage` | `PiSharp.Durable.Sqlite` | Yes (single `.sqlite` WAL file) | Recommended default for local durable agents, `AgentTeam`, and single-node services. |
-| `StoreStorage` | `PiSharp.Durable.Store` | Yes (shared Chord v2 store) | Apps already hosting `PiSharp.Chord` that want Chord tables, plugins and Durable sessions sharing one owner, sequence and archive. |
+| `StoreStorage` | `PiSharp.Durable.Store` | Yes (shared Chord store) | Apps already hosting `PiSharp.Chord` that want Chord tables, plugins and Durable sessions sharing one owner, sequence and archive. |
 | SQL Server (`PiSharp.Durable.MSSQL`) | Source-only (not on NuGet) | Yes | Multi-instance SQL Server experiments built from source. |
 
 ## What happens to an interrupted tool call?
