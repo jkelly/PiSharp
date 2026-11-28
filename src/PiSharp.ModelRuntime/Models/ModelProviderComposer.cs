@@ -73,7 +73,7 @@ internal static class ModelProviderComposer
         {
             var current = Get(json, "cost") as JsonObject;
             var next = new JsonObject();
-            foreach (var field in new[] { "input", "output", "cacheRead", "cacheWrite", "tiers" })
+            foreach (var field in new[] { "input", "output", "cacheRead", "cacheWrite", "imageOutput", "tiers" })
                 if ((Get(cost, field) ?? Get(current, field)) is { } value) next[field] = value.DeepClone();
             json["cost"] = next;
         }

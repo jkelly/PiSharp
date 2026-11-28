@@ -1,14 +1,15 @@
 // Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/core/extensions/loader.ts (getAliases, loadExtensionModule),
 // packages/coding-agent/src/core/extensions/jiti-loader.ts and packages/coding-agent/src/main.ts (setThemeJsonValidator, initTheme).
 //
-// The real Pi packages: PiSharp installs the exact Pi 1.6.0 packages into the agent dir (PiNodeRuntime) and names their node_modules
+// The real Pi packages: PiSharp installs the exact Pi 1.7.0 packages into the agent dir (PiNodeRuntime) and names their node_modules
 // here. Extensions are then loaded as upstream's unbundled Node build loads them: jiti from Pi's own dependencies, created for the
 // installed coding agent's loader.js, `moduleCache: false`, and getAliases (the coding agent's dist index, pi-agent-core, pi-tui, the
-// pi-ai compat/oauth/providers entries, typebox, and the @mariozechner/* and @sinclair/typebox names). Pi 1.6.0's getAliases also
+// pi-ai compat/oauth/providers entries, typebox, and the @mariozechner/* and @sinclair/typebox names). Pi 1.7.0's getAliases also
 // resolves the pi-ai root and compat entry to the coding agent's pi-ai extension view (dist/core/extensions/pi-ai-extension-view.js)
 // and adds pi-ai/models; an installed Pi that predates the view keeps its compat entry, and one without pi-ai/models gets no alias.
 import fs from 'node:fs';
 import path from 'node:path';
+import module from 'node:module';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 function entryOf(packageDir, condition = 'import') {
@@ -20,10 +21,26 @@ function entryOf(packageDir, condition = 'import') {
 
 /** The installed Pi: jiti, the aliases, and the coding agent's theme module (one instance shared through globalThis, as in Pi). */
 export async function loadPiModules(nodeModules, themeName) {
-  // The installed SDK derives its own request identity from install-telemetry settings. Disable that default in this Node
-  // child as well; an explicitly configured environment value remains the user's choice.
+  // Preserve the bridge attribution preference in this child process.
   process.env.PI_TELEMETRY ??= '0';
   const codingAgent = path.join(nodeModules, '@earendil-works', 'pi-coding-agent');
+  // Pi 1.7 removed the SDK's attribution opt-out. Cache an adapter for this one installed ESM
+  // module before the SDK imports it, preserving upstream identity fields and explicit opt-in.
+  const identityUrl = import.meta.resolve(pathToFileURL(path.join(codingAgent, 'dist', 'core', 'client-identity.js')).href);
+  if (fs.existsSync(fileURLToPath(identityUrl))) {
+    const hook = module.registerHooks({
+      load(url, context, nextLoad) {
+        if (url !== identityUrl) return nextLoad(url, context);
+        return { format: 'module', shortCircuit: true, source: `
+          import { getClientIdentity as upstreamIdentity } from ${JSON.stringify(identityUrl + '?pisharp-upstream')};
+          export function getClientIdentity(...args) {
+            const identity = upstreamIdentity(...args);
+            return /^(1|true|yes)$/i.test(process.env.PI_TELEMETRY ?? '') ? identity : { ...identity, attribution: null };
+          }` };
+      },
+    });
+    try { await import(identityUrl); } finally { hook.deregister(); }
+  }
   const loaderFile = path.join(codingAgent, 'dist', 'core', 'extensions', 'loader.js');
   const loaderUrl = pathToFileURL(loaderFile).href;
   // jiti-loader.ts: `export { createJiti } from "jiti"`, resolved from the coding agent's own dependencies.

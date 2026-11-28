@@ -3,6 +3,7 @@
 // the in-process RPC host (RpcSessionClient); live host objects come from InteractiveStartup.Host where the protocol has no command.
 using System.Text.Json.Nodes;
 using PiSharp.Cli.Interactive.Mode.Components;
+using PiSharp.Cli.Pi;
 using PiSharp.Cli.Interactive.Mode.Utilities;
 using PiSharp.Tui.Pi;
 using static PiSharp.Cli.Interactive.Mode.ThemeGlobals;
@@ -335,6 +336,7 @@ internal sealed partial class InteractiveMode
         ui.Start();
         isInitialized = true;
         programStatus.Report();
+        ReportProgramResume();
 
         themeController.ApplyFromSettings();
         await themeController.WaitForTerminalColors();
@@ -546,7 +548,6 @@ internal sealed partial class InteractiveMode
         if (lastVersion is null)
         {
             settings.SetLastChangelogVersion(version);
-            context.ReportInstallTelemetry(version, settings);
             return null;
         }
         if (!Changelog.TryParseVersion(lastVersion, out _))
@@ -558,7 +559,6 @@ internal sealed partial class InteractiveMode
         if (newEntries.Count > 0)
         {
             settings.SetLastChangelogVersion(version);
-            context.ReportInstallTelemetry(version, settings);
             return string.Join("\n\n", newEntries);
         }
         return null;
@@ -716,6 +716,7 @@ internal sealed partial class InteractiveMode
         isShuttingDown = true;
         themeController.DisableAutoSync();
         try { await ui.Terminal.DrainInputAsync(1000); } catch { }
+        if (!fromSignal) ReportProgramResume(clear: true);
         Stop();
         onInputCallback?.Invoke(null!);
         context.RequestExit(fromSignal);
@@ -747,13 +748,40 @@ internal sealed partial class InteractiveMode
     }
 
     /// <summary>The resume command printed after an interactive quit (formatResumeCommand).</summary>
-    public string? FormatResumeCommand()
+    public string? FormatResumeCommand() =>
+        GetResumeArgs() is { } args ? string.Join(" ", args.Select(QuoteIfNeeded)) : null;
+
+    private List<string>? GetResumeArgs()
     {
-        if (state.SessionFile is not { } sessionFile || !File.Exists(sessionFile)) return null;
-        var args = new List<string> { AppName };
-        if (!context.Startup.UsesDefaultSessionDir && context.Startup.SessionDir is { } dir) args.AddRange(["--session-dir", QuoteIfNeeded(dir)]);
-        args.AddRange(["--session", state.SessionId ?? ""]);
-        return string.Join(" ", args);
+        var startup = context.Startup;
+        var file = startup.Host.CurrentSession is { } live ? live.SessionFile : state.SessionFile;
+        if (state.SessionId is not { Length: > 0 } id || file is null || !File.Exists(file)) return null;
+        var args = new List<string> { PiConfig.DisplayName };
+        var agentDir = PiPaths.ResolvePath(startup.AgentDir, startup.LaunchCwd ?? startup.Cwd, startup.Home);
+        if (!PiPaths.PathsEqual(agentDir, Path.Combine(startup.Home, ".pi", "agent"))) args.AddRange(["--agent-dir", agentDir]);
+        var sessionDir = Path.GetDirectoryName(Path.GetFullPath(file))!;
+        if (!PiPaths.PathsEqual(sessionDir, PiSessions.DefaultSessionDirectoryPath(Cwd, agentDir))) args.AddRange(["--session-dir", sessionDir]);
+        args.AddRange(["--session", id]);
+        return args;
+    }
+
+    private string? reportedResumeCommand;
+
+    private void ReportProgramResume(bool force = false, bool clear = false)
+    {
+        var startup = context.Startup;
+        if (startup.ResumeToken is not { Length: > 0 } token) return;
+        var args = clear ? null : GetResumeArgs();
+        if (args is not null && startup.ResumeFlags.Count > 0 &&
+            !PiPaths.PathsEqual(Cwd, startup.LaunchCwd ?? startup.Cwd)) args = null;
+        args?.AddRange(startup.ResumeFlags);
+        var command = args is null ? null : new ProgramResumeCommand(args, Cwd);
+        var key = command is null ? null : System.Text.Json.JsonSerializer.Serialize(command);
+        if (key == reportedResumeCommand && (!force || key is null)) return;
+        reportedResumeCommand = key;
+        var sender = new ProgramResumeSender(token, Environment.ProcessId, DateTimeOffset.UtcNow.ToUnixTimeSeconds());
+        ui.Terminal.Write((command is null ? null : ProgramResume.FormatProgramResume(command, sender)) ??
+            ProgramResume.FormatProgramResumeClear(sender));
     }
 
     internal static string QuoteIfNeeded(string value)

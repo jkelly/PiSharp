@@ -1,4 +1,4 @@
-// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/chord/src/delta/diff.ts. Identity is JavaScript's: containers compare by
+// Pi fb0fe823539f6d04850f6e34748c01f01f212e1f (MIT): packages/chord/src/delta/diff.ts. Identity is JavaScript's: containers compare by
 // reference, scalars by value, so structurally shared revisions diff narrowly and reconstructed ones fall back to semantic alignment.
 using System.Collections.Immutable;
 
@@ -323,12 +323,44 @@ public static class DeltaDiff
     {
         if (ReferenceEquals(before, after) || JsonValue.DeepEquals(before, after)) return;
         if (before.Count == after.Count && before.Count > 1 && !JsonIdentity.Same(before[0], after[0]) &&
-            !JsonIdentity.Same(before[^1], after[^1]) && Permutation(before, after) is { } order)
+            !JsonIdentity.Same(before[^1], after[^1]))
         {
-            batch.Emit(new MoveOp(path, [.. order]));
-            return;
+            if (Shifted(before, after, path, batch)) return;
+            if (Permutation(before, after) is { } order)
+            {
+                batch.Emit(new MoveOp(path, [.. order]));
+                return;
+            }
         }
         DiffArrayRegion(before, after, path, batch, 0, before.Count, 0, after.Count, 0);
+    }
+
+    // Detect sliding windows by identity before building the permutation and region-diff indexes.
+    private static bool Shifted(JsonArrayValue before, JsonArrayValue after, ImmutableArray<PathSegment> path, Batch batch)
+    {
+        var length = before.Count;
+        var down = after.Items.IndexOf(before[0], 1, length - 1, JsonIdentity.Comparer);
+        if (down > 0 && before.Items.IndexOf(after[0], length - down, down, JsonIdentity.Comparer) < 0 && SameRun(0, down, length - down))
+        {
+            batch.Emit(new SpliceOp(path, 0, 0, after.Items[..down]));
+            batch.Emit(new SpliceOp(path, length, down, []));
+            return true;
+        }
+        var up = before.Items.IndexOf(after[0], 1, length - 1, JsonIdentity.Comparer);
+        if (up > 0 && before.Items.IndexOf(after[^1], 0, up, JsonIdentity.Comparer) < 0 && SameRun(up, 0, length - up))
+        {
+            batch.Emit(new SpliceOp(path, 0, up, []));
+            batch.Emit(new SpliceOp(path, length - up, 0, after.Items[(length - up)..]));
+            return true;
+        }
+        return false;
+
+        bool SameRun(int from, int to, int count)
+        {
+            for (var offset = 0; offset < count; offset++)
+                if (!JsonIdentity.Strict(before[from + offset], after[to + offset])) return false;
+            return true;
+        }
     }
 
     private static void DiffObject(JsonObjectValue before, JsonObjectValue after, ImmutableArray<PathSegment> path, Batch batch)

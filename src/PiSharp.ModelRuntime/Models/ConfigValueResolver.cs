@@ -151,6 +151,7 @@ internal sealed class ConfigValueResolver
     }
 
     /// <summary>Source clearConfigValueCache.</summary>
+    internal void ClearCacheEntry(string config) => commandCache.TryRemove(config, out _);
     internal void ClearCache() => commandCache.Clear();
 
     /// <summary>

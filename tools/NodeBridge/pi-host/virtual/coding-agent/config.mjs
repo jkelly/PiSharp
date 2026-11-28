@@ -1,4 +1,4 @@
-// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/coding-agent/src/config.ts.
+// Pi fb0fe823539f6d04850f6e34748c01f01f212e1f (MIT): packages/coding-agent/src/config.ts.
 // Ported to plain ESM for the PiSharp Node extension bridge (TypeScript types stripped mechanically; behaviour unchanged except for the marked PiSharp adaptations).
 import { accessSync, constants, existsSync, readFileSync, realpathSync } from "fs";
 import { createRequire } from "module";
@@ -6,7 +6,7 @@ import { homedir } from "os";
 import { basename, dirname, join, resolve, sep, win32 } from "path";
 import { fileURLToPath } from "url";
 import { spawnProcessSync } from "./utils/child-process.mjs";
-import { normalizePath } from "./utils/paths.mjs";
+import { normalizePath, pathsEqual } from "./utils/paths.mjs";
 import { stripBom } from "./utils/text.mjs";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -474,7 +474,7 @@ export function detectInstallChange(packageJsonPath = startupPackageJsonPath) {
 }
 let pkg = {
     name: "@earendil-works/pi-coding-agent",
-    version: "1.6.0"
+    version: "1.7.0"
 };
 let startupPackageJsonPath;
 startupPackageJsonPath = undefined;
@@ -499,6 +499,12 @@ export function getAgentDir() {
     if (envDir) {
         return expandTildePath(envDir);
     }
+    return getHomeAgentDir();
+}
+export function usesDefaultAgentDir() {
+    return pathsEqual(getAgentDir(), getHomeAgentDir());
+}
+function getHomeAgentDir() {
     return join(homedir(), CONFIG_DIR_NAME, "agent");
 }
 export function getCustomThemesDir() {

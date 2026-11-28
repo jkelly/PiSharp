@@ -1,3 +1,4 @@
+// Pi fb0fe823539f6d04850f6e34748c01f01f212e1f (MIT): packages/ai/src/auth/oauth/github-copilot.ts.
 // Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/ai/src/auth/oauth/github-copilot.ts (device-code login for github.com
 // or a GitHub Enterprise domain, Copilot token exchange, model catalog and policy enabling, refresh and toAuth's per-credential base
 // URL) and providers/github-copilot.ts (filterModels by availableModelIds).
@@ -76,18 +77,19 @@ public sealed class GitHubCopilotOAuth(HttpMessageInvoker http, Func<string, boo
             return new(OAuthFlows.DevicePollStatus.Failed, Message: "Invalid device token response");
         }, interval, expiresIn, true, cancellationToken, _time).ConfigureAwait(false);
         var credential = await CopilotTokenAsync(githubToken, enterprise, cancellationToken).ConfigureAwait(false);
-        var (available, policy) = await FetchModelsAsync(credential.Access, enterprise, cancellationToken, 2, TimeSpan.FromSeconds(5)).ConfigureAwait(false);
+        var (available, policy, classifiers) = await FetchModelsAsync(credential.Access, enterprise, cancellationToken, 2, TimeSpan.FromSeconds(5)).ConfigureAwait(false);
         var enabled = new List<string>();
         if (policy.Count > 0)
         {
             interaction.Notify(new(AuthEventKind.Progress) { Message = "Enabling models..." });
             enabled = await EnableModelsAsync(credential.Access, policy, enterprise, cancellationToken).ConfigureAwait(false);
         }
-        return WithModels(credential, available.Concat(enabled).Distinct(StringComparer.Ordinal).ToList());
+        return WithModels(credential, available.Concat(enabled).Distinct(StringComparer.Ordinal).ToList(), classifiers);
     }
 
-    private static OAuthCredentialSnapshot WithModels(OAuthCredentialSnapshot credential, List<string> ids) => new(credential.Access, credential.Refresh,
-        credential.ExpiresUnixMilliseconds, credential.ProviderData, new Dictionary<string, JsonData> { ["availableModelIds"] = JsonData.Parse(JsonSerializer.Serialize(ids)) });
+    private static OAuthCredentialSnapshot WithModels(OAuthCredentialSnapshot credential, List<string> ids, List<string> classifiers) => new(credential.Access, credential.Refresh,
+        credential.ExpiresUnixMilliseconds, credential.ProviderData, new Dictionary<string, JsonData> { ["availableModelIds"] = JsonData.Parse(JsonSerializer.Serialize(ids)),
+            ["availableClassifierModelIds"] = JsonData.Parse(JsonSerializer.Serialize(classifiers)) });
 
     /// <summary>refreshGitHubCopilotAccessToken: the GitHub token (stored as refresh) traded for a Copilot token; expires 5 min early.</summary>
     private async Task<OAuthCredentialSnapshot> CopilotTokenAsync(string githubToken, string? enterprise, CancellationToken token)
@@ -108,8 +110,8 @@ public sealed class GitHubCopilotOAuth(HttpMessageInvoker http, Func<string, boo
         ArgumentNullException.ThrowIfNull(current);
         var enterprise = EnterpriseDomain(current);
         var credential = await CopilotTokenAsync(current.Refresh, enterprise, cancellationToken).ConfigureAwait(false);
-        var (available, _) = await FetchModelsAsync(credential.Access, enterprise, cancellationToken, 0, TimeSpan.Zero).ConfigureAwait(false);
-        return WithModels(credential, available);
+        var (available, _, classifiers) = await FetchModelsAsync(credential.Access, enterprise, cancellationToken, 0, TimeSpan.Zero).ConfigureAwait(false);
+        return WithModels(credential, available, classifiers);
     }
 
     private static string? EnterpriseDomain(OAuthCredentialSnapshot credential) =>
@@ -120,12 +122,12 @@ public sealed class GitHubCopilotOAuth(HttpMessageInvoker http, Func<string, boo
         new(credential.Access, BaseUrl: ProviderHeaderPolicies.CopilotBaseUrl(credential.Access, EnterpriseDomain(credential)));
 
     /// <summary>providers/github-copilot.ts filterModels: an OAuth credential's availableModelIds restrict the catalog.</summary>
-    public static IReadOnlySet<string>? AvailableModels(OAuthCredentialSnapshot? credential) =>
-        credential is not null && credential.ProviderJson.TryGetValue("availableModelIds", out var ids) && ids.Value.ValueKind == JsonValueKind.Array &&
+    public static IReadOnlySet<string>? AvailableModels(OAuthCredentialSnapshot? credential, bool classifiers = false) =>
+        credential is not null && credential.ProviderJson.TryGetValue(classifiers ? "availableClassifierModelIds" : "availableModelIds", out var ids) && ids.Value.ValueKind == JsonValueKind.Array &&
         ids.Value.EnumerateArray().All(id => id.ValueKind == JsonValueKind.String)
             ? ids.Value.EnumerateArray().Select(id => id.GetString()!).ToHashSet(StringComparer.Ordinal) : null;
 
-    private async Task<(List<string> Available, List<string> Policy)> FetchModelsAsync(string copilotToken, string? enterprise, CancellationToken token,
+    private async Task<(List<string> Available, List<string> Policy, List<string> Classifiers)> FetchModelsAsync(string copilotToken, string? enterprise, CancellationToken token,
         int maxRetries, TimeSpan maxElapsed)
     {
         var baseUrl = ProviderHeaderPolicies.CopilotBaseUrl(copilotToken, enterprise);
@@ -136,19 +138,20 @@ public sealed class GitHubCopilotOAuth(HttpMessageInvoker http, Func<string, boo
         var response = await FetchWithRateLimitRetryAsync(HttpMethod.Get, baseUrl + "/models", null, headers, token, maxRetries, maxElapsed).ConfigureAwait(false);
         if (!response.Ok) throw new InvalidOperationException($"{response.Status} {response.StatusText}: {response.Body}");
         if (JsonNode.Parse(response.Body)?["data"] is not JsonArray data) throw new InvalidOperationException("Invalid Copilot models response");
-        var models = new List<(string Id, bool Picker, string? Policy)>();
+        var models = new List<(string Id, bool Picker, string? Policy, bool Decision)>();
         foreach (var item in data.OfType<JsonObject>())
         {
             if (item["id"] is not JsonValue idValue || !idValue.TryGetValue<string>(out var id)) continue;
             if (item["capabilities"]?["supports"]?["tool_calls"] is JsonValue tools && tools.GetValueKind() == JsonValueKind.False) continue;
-            models.Add((id, item["model_picker_enabled"]?.GetValueKind() == JsonValueKind.True, (item["policy"] as JsonObject)?["state"] is JsonValue state && state.TryGetValue<string>(out var policyState) ? policyState : null));
+            models.Add((id, item["model_picker_enabled"]?.GetValueKind() == JsonValueKind.True, (item["policy"] as JsonObject)?["state"] is JsonValue state && state.TryGetValue<string>(out var policyState) ? policyState : null,
+                (item["capabilities"] as JsonObject)?["type"] is JsonValue type && type.TryGetValue<string>(out var kind) && kind == "decisions"));
         }
         var picker = models.Where(model => model.Picker && model.Policy != "disabled").Select(model => model.Id).ToList();
         var usePolicyFallback = allowPolicyFallback && picker.Count == 0;
         var available = picker.Count > 0 || !allowPolicyFallback ? picker : models.Where(model => model.Policy == "enabled").Select(model => model.Id).ToList();
         var policyIds = models.Where(model => model.Policy == "unconfigured" && (isCatalogModel?.Invoke(model.Id) ?? false) && (model.Picker || usePolicyFallback))
             .Select(model => model.Id).ToList();
-        return (available, policyIds);
+        return (available, policyIds, models.Where(model => model.Decision && model.Policy != "disabled").Select(model => model.Id).ToList());
     }
 
     /// <summary>enableGitHubCopilotModels: best-effort policy updates; exhausted rate limiting stops the batch.</summary>

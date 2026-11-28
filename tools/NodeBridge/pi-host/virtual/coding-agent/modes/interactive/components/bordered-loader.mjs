@@ -1,4 +1,4 @@
-// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/coding-agent/src/modes/interactive/components/bordered-loader.ts.
+// Pi fb0fe823539f6d04850f6e34748c01f01f212e1f (MIT): packages/coding-agent/src/modes/interactive/components/bordered-loader.ts.
 // Ported to plain ESM for the PiSharp Node extension bridge (TypeScript types stripped mechanically; behaviour unchanged).
 import { CancellableLoader, Container, Loader, Spacer, Text } from "../../../../pi-tui.mjs";
 import { DynamicBorder } from "./dynamic-border.mjs";

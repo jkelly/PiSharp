@@ -1,4 +1,4 @@
-// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/tui/src/tui-main-screen.ts.
+// Pi fb0fe823539f6d04850f6e34748c01f01f212e1f (MIT): packages/tui/src/tui-main-screen.ts.
 using System.Globalization;
 using System.Text;
 
@@ -273,9 +273,8 @@ public sealed class TuiMainScreen : TuiBase
             var reserved = isImage ? ReservedRows(newLines, i, renderEnd) : 1;
             if (reserved > 1)
             {
-                var startScreenRow = i - viewportTop;
-                if (startScreenRow < 0 || startScreenRow + reserved > height)
-                { LogRedraw($"kitty image pre-clear would scroll ({startScreenRow} + {reserved} > {height})"); FullRender(true); return; }
+                if (reserved > height)
+                { LogRedraw($"kitty image taller than screen ({reserved} > {height})"); FullRender(true); return; }
                 writer.Append("\u001b[2K");
                 for (var row = 1; row < reserved; row++) writer.Append("\r\n\u001b[2K");
                 writer.Append($"\u001b[{reserved - 1}A"); writer.Append(line); writer.Append($"\u001b[{reserved - 1}B");
@@ -285,17 +284,18 @@ public sealed class TuiMainScreen : TuiBase
             if (!isImage && TextUtils.VisibleWidth(line) > width)
             {
                 var crashLog = Path.Join(LogDirectory ?? Path.GetTempPath(), "pi-tui-crash.log");
+                var logStatus = $"Debug log written to: {crashLog}";
                 try
                 {
                     Directory.CreateDirectory(Path.GetDirectoryName(crashLog)!);
                     File.WriteAllText(crashLog, string.Join('\n', new[] { $"Crash at {DateTime.UtcNow:O}", $"Terminal width: {width}", $"Line {i} visible width: {TextUtils.VisibleWidth(line)}", "", "=== All rendered lines ===" }
                         .Concat(newLines.Select((l, index) => $"[{index}] (w={TextUtils.VisibleWidth(l)}) {l}")).Append("")));
                 }
-                catch { }
+                catch (Exception error) { logStatus = $"Could not write debug log to {crashLog}: {error.Message}"; }
                 Stop();
                 throw new InvalidOperationException(string.Join('\n', $"Rendered line {i} exceeds terminal width ({TextUtils.VisibleWidth(line)} > {width}).", "",
                     "This is likely caused by a custom TUI component not truncating its output.", "Use visibleWidth() to measure and truncateToWidth() to truncate lines.", "",
-                    $"Debug log written to: {crashLog}"));
+                    logStatus));
             }
             writer.Append(line);
         }

@@ -1,4 +1,4 @@
-// Pi d86654abb8862e201933517d6f1fce9f88dd117f (MIT): api/azure-openai-responses.ts.
+// Pi fb0fe823539f6d04850f6e34748c01f01f212e1f (MIT): packages/ai/src/api/azure-openai-responses.ts.
 using System.Collections.Immutable;
 using System.Runtime.CompilerServices;
 using System.Runtime.ExceptionServices;
@@ -62,7 +62,6 @@ public sealed class AzureResponsesTransport : IChatTransport
                 var response = await _client.SendAsync(ownedRequest, HttpCompletionOption.ResponseHeadersRead, token).ConfigureAwait(false);
                 owner = new(response, _framing); // Ownership transfers before cancellation or any callback.
                 token.ThrowIfCancellationRequested();
-                if (!response.IsSuccessStatusCode) throw new AzureHttpFailure(await ReadErrorAsync(owner, (int)response.StatusCode, token).ConfigureAwait(false));
                 if (_options.Hooks.OnResponse is { } inspect)
                     await owner.InspectAsync(async (borrowed, ct) =>
                     {
@@ -77,6 +76,7 @@ public sealed class AzureResponsesTransport : IChatTransport
                         await Callback(() => inspect(new((int)borrowed.StatusCode, headers.ToImmutable()), _factory.Model, ct), ct).ConfigureAwait(false);
                     }, token).ConfigureAwait(false);
                 token.ThrowIfCancellationRequested();
+                if (!response.IsSuccessStatusCode) throw new AzureHttpFailure(await ReadErrorAsync(owner, (int)response.StatusCode, token).ConfigureAwait(false));
                 var transferred = owner!;
                 mapped = new ResponsesTextToolTransport((_, ct) => ReadDtosAsync(transferred, ct), _options.StreamOptions)
                     .StreamAsync(request, token).GetAsyncEnumerator(token);

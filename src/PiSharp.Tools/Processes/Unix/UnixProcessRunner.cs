@@ -53,7 +53,7 @@ public sealed class UnixProcessRunner : ISeparatedProcessRunner
         var complete = true;
         long shellExitedAt = -1, shellExitAtTimeout = -1;
         var stop = new TaskCompletionSource<ProcessRunStatus>(TaskCreationOptions.RunContinuationsAsynchronously);
-        var output = new ShellOutputAccumulator(request.SpillPath, capture?.OutputOptions(_options) ?? _options, _storage);
+        var output = new ShellOutputAccumulator(request.SpillPath, capture?.OutputOptions(_options) ?? _options, _storage, request.AllowSpillFailure);
         IUnixProcessLease? lease = null;
         ITimer? timer = null;
         var cleaned = false;

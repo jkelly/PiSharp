@@ -363,7 +363,7 @@ The device commands exit with 0 on success, 1 when they fail, 2 on a usage error
 | | 1 | An error: bad options, a failed start, a failed export. |
 | | 130 | Cancelled with `Ctrl+C`. |
 | Print, JSON and RPC modes | 143 | Ended by SIGTERM. |
-| | 129 | Ended by SIGHUP (not on Windows). |
+| | 129 | Print or RPC mode ended by SIGHUP (on Windows, a console close). |
 | Print mode | 1 | The last answer stopped with an error or was aborted (the error goes to stderr), or it hit the output token limit (`Response was truncated: the model reached its output token limit.`). |
 | `auth check` | 0, 1, 2 | Ready, not ready, invalid or error. |
 | `mcp list` | 1 | A server failed. |

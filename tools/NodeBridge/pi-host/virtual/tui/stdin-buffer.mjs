@@ -1,4 +1,4 @@
-// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/tui/src/stdin-buffer.ts.
+// Pi fb0fe823539f6d04850f6e34748c01f01f212e1f (MIT): packages/tui/src/stdin-buffer.ts.
 // Ported to plain ESM for the PiSharp Node extension bridge (TypeScript types stripped mechanically; behaviour unchanged).
 /**
  * StdinBuffer buffers input and emits complete sequences.
@@ -185,6 +185,7 @@ export class StdinBuffer extends EventEmitter {
     escapeTimeoutMs;
     pasteMode = false;
     pasteBuffer = "";
+    pasteTail = "";
     pendingKittyPrintableCodepoint;
     constructor(options = {}){
         super();
@@ -213,14 +214,18 @@ export class StdinBuffer extends EventEmitter {
         }
         this.buffer += str;
         if (this.pasteMode) {
+            const searched = this.pasteTail + this.buffer;
+            const found = searched.indexOf(BRACKETED_PASTE_END);
+            const endIndex = found === -1 ? -1 : this.pasteBuffer.length - this.pasteTail.length + found;
             this.pasteBuffer += this.buffer;
+            this.pasteTail = searched.slice(1 - BRACKETED_PASTE_END.length);
             this.buffer = "";
-            const endIndex = this.pasteBuffer.indexOf(BRACKETED_PASTE_END);
             if (endIndex !== -1) {
                 const pastedContent = this.pasteBuffer.slice(0, endIndex);
                 const remaining = this.pasteBuffer.slice(endIndex + BRACKETED_PASTE_END.length);
                 this.pasteMode = false;
                 this.pasteBuffer = "";
+                this.pasteTail = "";
                 this.pendingKittyPrintableCodepoint = undefined;
                 this.emit("paste", pastedContent);
                 if (remaining.length > 0) {
@@ -242,6 +247,7 @@ export class StdinBuffer extends EventEmitter {
             this.buffer = this.buffer.slice(startIndex + BRACKETED_PASTE_START.length);
             this.pasteMode = true;
             this.pasteBuffer = this.buffer;
+            this.pasteTail = this.buffer.slice(1 - BRACKETED_PASTE_END.length);
             this.buffer = "";
             const endIndex = this.pasteBuffer.indexOf(BRACKETED_PASTE_END);
             if (endIndex !== -1) {
@@ -249,6 +255,7 @@ export class StdinBuffer extends EventEmitter {
                 const remaining = this.pasteBuffer.slice(endIndex + BRACKETED_PASTE_END.length);
                 this.pasteMode = false;
                 this.pasteBuffer = "";
+                this.pasteTail = "";
                 this.pendingKittyPrintableCodepoint = undefined;
                 this.emit("paste", pastedContent);
                 if (remaining.length > 0) {
@@ -310,6 +317,7 @@ export class StdinBuffer extends EventEmitter {
         this.buffer = "";
         this.pasteMode = false;
         this.pasteBuffer = "";
+        this.pasteTail = "";
         this.pendingKittyPrintableCodepoint = undefined;
     }
     getBuffer() {

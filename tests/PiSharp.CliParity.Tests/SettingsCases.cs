@@ -35,6 +35,14 @@ internal static partial class Program
             var kept = PiSettings.Migrate(JsonNode.Parse("""{"queueMode":"all","steeringMode":"one-at-a-time","websockets":false,"transport":"sse","skills":{"customDirectories":[]},"retry":{"maxDelayMs":1,"provider":{"maxRetryDelayMs":7}}}""")!.AsObject());
             Equal("""{"queueMode":"all","steeringMode":"one-at-a-time","websockets":false,"transport":"sse","retry":{"provider":{"maxRetryDelayMs":7}}}""", PiJson.Stringify(kept), "existing values win");
         })),
+        ("sync170.transcript-notices-migrate-with-explicit-keys-taking-precedence", Sync(() =>
+        {
+            var settings = PiSettings.Migrate(JsonNode.Parse("""{"showCacheMissNotices":true,"notices":{"cacheWarming":false}}""")!.AsObject());
+            Check(!settings.ContainsKey("showCacheMissNotices") && settings["notices"]!.AsObject().Count == 4, "migrated four keys");
+            foreach (var key in new[] { "cacheMisses", "compactionCosts", "reasoningDrops" })
+                Equal(true, settings["notices"]![key]!.GetValue<bool>(), key);
+            Equal(false, settings["notices"]!["cacheWarming"]!.GetValue<bool>(), "explicit value wins");
+        })),
         ("settings.invalid-file-diagnostic-and-entry-warning", async () =>
         {
             using var sandbox = new Sandbox("settings-invalid");

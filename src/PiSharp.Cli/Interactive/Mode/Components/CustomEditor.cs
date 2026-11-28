@@ -133,6 +133,12 @@ internal sealed class CustomEditor : Editor
             return;
         }
 
+        if (ActionHandlers.TryGetValue("app.message.followUp", out var followUp) && keybindings.Matches(data, "app.message.followUp"))
+        {
+            if (ConfirmAutocomplete() != AutocompleteConfirmation.Applied) followUp();
+            return;
+        }
+
         // Check all other app actions
         foreach (var (action, handler) in ActionHandlers.ToList())
         {

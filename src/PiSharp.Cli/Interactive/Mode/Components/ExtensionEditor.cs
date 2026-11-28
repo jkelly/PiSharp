@@ -82,7 +82,7 @@ internal sealed class ExtensionEditorComponent : Container, IFocusable, IInputHa
 
         // Add hint
         var hint =
-            KeybindingHints.KeyHint("tui.select.confirm", "submit") + "  " +
+            KeybindingHints.KeyHint("tui.input.submit", "submit") + "  " +
             KeybindingHints.KeyHint("tui.input.newLine", "newline") + "  " +
             KeybindingHints.KeyHint("tui.select.cancel", "cancel") +
             $"  {KeybindingHints.KeyHint("app.editor.external", "external editor")}";

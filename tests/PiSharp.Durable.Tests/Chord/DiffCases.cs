@@ -50,6 +50,15 @@ internal static partial class Program
             var (a, b, c, d) = (J("{\"id\":\"a\"}"), J("{\"id\":\"b\"}"), J("{\"id\":\"c\"}"), J("{\"id\":\"d\"}"));
             ExpectDiff(WithValues(a, b, c), WithValues(b, c, d), "[[\"p\",[\"values\"],0,1,[]],[\"p\",[\"values\"],2,0,[{\"id\":\"d\"}]]]");
         }),
+        Case("chord.diff.sliding-windows-retain-shared-rows-in-both-directions", () =>
+        {
+            var rows = Enumerable.Range(0, 50).Select(id => Obj(("id", id))).ToArray();
+            JsonValue[] added = [Obj(("id", 100)), Obj(("id", 101))];
+            ExpectDiff(WithValues(rows), WithValues([.. added, .. rows[..48]]),
+                JsonValue.Array(Splice("values", 0, 0, added), Splice("values", 50, 2)));
+            ExpectDiff(WithValues(rows), WithValues([.. rows[2..], .. added]),
+                JsonValue.Array(Splice("values", 0, 2), Splice("values", 48, 0, added)));
+        }),
         Case("chord.diff.emits-a-permutation-for-a-pure-reorder", () =>
         {
             var (a, b, c) = (J("{\"id\":\"a\"}"), J("{\"id\":\"b\"}"), J("{\"id\":\"c\"}"));

@@ -33,6 +33,12 @@ public sealed class ReleasedModelCatalog
         "sha512-2tWPSnV3qzfiDIY3aWluBag3vC++Vs+VsXt/UquSU5onPMohPih72FUhIhaqmDdMYubOgB3Byl9uF4Vk40JLvQ==",
         "71375843feaa116c7d928e74e0500a22cc267e12bfb6869efb92dfd39acf7fee", 1_794_312_337_628);
 
+    /// <summary>The catalog shipped with Pi 1.6.0.</summary>
+    public static ReleasedModelCatalog Pi160 { get; } = new("1.6.0", "faac585884ae2c013a6b1400f3e9e77f10b34bac",
+        "d68312ec574bc959cb7fee26da4f4876d067aed9bbbe76e876359e60d2294747",
+        "sha512-9hL+eygFDEiFp//cydeUfmFsKmEqpmvsNPb10Y1W8+m5K9O+sx1hMStfu6nukrBD5sl6mP4RykCYBBNEgsVLfw==",
+        "cc46553f3f008788e667600a873d3d83a4df8fe46c67b06c65b16fd828450e8b", 1_795_171_729_496);
+
     /// <summary>The release <see cref="CurrentModelCatalog"/> serves.</summary>
     public static ReleasedModelCatalog Current => CurrentModelCatalog.Release;
 

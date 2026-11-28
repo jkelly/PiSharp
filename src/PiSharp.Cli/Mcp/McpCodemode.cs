@@ -11,6 +11,7 @@ using PiSharp.CodingAgent;
 using PiSharp.Contracts;
 using PiSharp.Contracts.ModelOperations;
 using PiSharp.Extensions;
+using PiSharp.Extensions.Facade.Context;
 
 namespace PiSharp.Cli.Mcp;
 
@@ -136,6 +137,11 @@ internal static class McpCodemode
         public Task<ClassifierResult> ClassifyAsync(JsonData model, ClassifierContext context, CancellationToken cancellationToken) =>
             operations.ClassifyAsync(model, context, null, cancellationToken);
         public Task<AssistantImages> GenerateImagesAsync(JsonData model, ImagesContext context, CancellationToken cancellationToken) =>
-            operations.GenerateImagesAsync(model, context, null, cancellationToken);
+            GenerateImagesAsync(model, context, null, cancellationToken);
+        public Task<AssistantImages> GenerateImagesAsync(JsonData model, ImagesContext context, CodemodeImageOptions? options, CancellationToken cancellationToken) =>
+            operations.GenerateImagesAsync(model, context, options is null ? null : new ExtensionModelRequestOptions
+            {
+                AspectRatio = options.AspectRatio, Size = options.Size
+            }, cancellationToken);
     }
 }

@@ -38,6 +38,38 @@ internal static partial class Program
             await host.CloseAsync(ChordContext.Background);
             Equal(2, detached, "both attachments closed once");
         }),
+        Case("host.runtime.follow-failed-member-recovers-with-whole-value", async () =>
+        {
+            var context = ChordContext.Background;
+            var type = Contract.Local("host.follow.recover", new() { Version = 1, Params = new(), Members = new() { ["value"] = Int() } });
+            IFollowObserver? sender = null;
+            await using var host = Hosts.Create(new() { OnError = _ => { } });
+            await host.LoadAsync([new("follow", Facet.Define((facet, _) => facet.Serve(type, (_, _, self) =>
+                new(new Dictionary<string, object?> { ["value"] = self.Follow((observer, _) =>
+                {
+                    sender = observer;
+                    observer.Advance(new WatchFailedCall<JsonNode?>(new Exception("temporary")), context);
+                    observer.Advance(new WatchValueCall<JsonNode?>(1, []), context);
+                    return Task.FromResult<FollowAttachment?>(new(0, () => { }));
+                }) }))))], context);
+            using var reference = await host.GetAsync(type, new(), context);
+            var member = reference.Member("value");
+            Equal(1, member.Value!.GetValue<int>(), "last call before attach took effect");
+            var failure = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var recovery = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var watch = await member.WatchAsync(context);
+            watch.Start((call, _) =>
+            {
+                if (call is WatchFailedCall<JsonNode?>) failure.TrySetResult();
+                if (call is WatchValueCall<JsonNode?> change) recovery.TrySetResult(change.Ops is [PiSharp.Chord.Delta.ReplaceOp]);
+                return Task.CompletedTask;
+            });
+            sender!.Advance(new WatchFailedCall<JsonNode?>(new Exception("member failed")), context);
+            await failure.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            Equal("live", reference.State.Value.Kind, "object stays live");
+            sender.Advance(new WatchValueCall<JsonNode?>(1, []), context);
+            Check(await recovery.Task.WaitAsync(TimeSpan.FromSeconds(5)), "equal value is still a whole replacement");
+        }),
         Case("host.runtime.follow-late-attachment-is-detached-after-close", async () =>
         {
             var type = Contract.Local("host.attach", new() { Version = 1, Params = new(), Members = new() { ["value"] = Int() } });

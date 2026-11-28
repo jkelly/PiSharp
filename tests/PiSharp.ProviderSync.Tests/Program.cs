@@ -324,7 +324,7 @@ internal static partial class Program
             return new AzureResponsesRequestFactory(model, new AzureResponsesOptions(metadata, new(false))).ProjectPayload(new(model, [new("assistant", PiWireJson.WriteMessage(foreign)),
                 Entry("""{"role":"toolResult","toolCallId":"call-prev|fc_prev","toolName":"inspect","content":[{"type":"text","text":"done"}],"isError":false,"timestamp":3}""")], 1)).ToString();
         }
-        const string template = """{"model":"azure-model","input":[{"type":"function_call","call_id":"CALL","name":"inspect","arguments":"{\"x\":1}"ITEM},{"type":"function_call_output","call_id":"CALL","output":"done"}],"stream":true,"store":false}""";
+        const string template = """{"model":"azure-model","input":[{"type":"function_call","call_id":"CALL","name":"inspect","arguments":"{\"x\":1}"ITEM,"status":"completed"},{"type":"function_call_output","call_id":"CALL","output":"done"}],"stream":true,"store":false}""";
         BodyEqual(template.Replace("CALL", "call-prev", StringComparison.Ordinal).Replace("ITEM", ",\"id\":\"fc_n1cvm3dhq11\"", StringComparison.Ordinal), Body("azure"));
         BodyEqual(template.Replace("CALL", "call-prev_fc_prev", StringComparison.Ordinal).Replace("ITEM", "", StringComparison.Ordinal), Body("azure-openai-responses"));
         return Task.CompletedTask;
@@ -453,7 +453,7 @@ internal static partial class Program
             "Our servers are currently busy. Please wait.",
             "Selected model is at capacity. Please try a different model.",
             "The pending stream has been canceled (caused by: ERR_HTTP2_STREAM_CANCEL)",
-            "Provider stopped with: error (server error)",
+            "Provider stopped with: error",
             // Pi 1.2.0 (#10842): gateway wording with an article is transient too, next to OpenRouter's "Provider returned error".
             "The upstream provider returned an error",
             "Provider returned error",
@@ -461,7 +461,7 @@ internal static partial class Program
         })
             Check(AgentRetryPolicy.IsRetryableError(StopReason.Error, message), "Not retried: " + message);
         // Permanent limits still win, unrelated text and non-errors stay terminal, and the pre-1.1.0 Mistral text was not retryable.
-        foreach (var (reason, message) in new[] { (StopReason.Error, "server_busy: insufficient_quota"), (StopReason.Error, "Provider stopped with: error"),
+        foreach (var (reason, message) in new[] { (StopReason.Error, "server_busy: insufficient_quota"), (StopReason.Error, "Provider stopped with: policy"),
             (StopReason.Error, "Invalid request body"), (StopReason.Stop, "server_busy"),
             // The 1.2.0 pattern admits only an optional "an" between "returned" and "error".
             (StopReason.Error, "The provider returned another error") })
@@ -484,7 +484,7 @@ internal static partial class Program
     {
         var model = new ModelDescriptor("mistral-fixture", "mistral-conversations", "mistral");
         var endpoint = new Uri("https://api.mistral.ai/");
-        foreach (var (finish, expected, retryable) in new[] { ("error", "Provider stopped with: error (server error)", true), ("content_filter", "Provider stopped with: content_filter", false) })
+        foreach (var (finish, expected, retryable) in new[] { ("error", "Provider stopped with: error", true), ("content_filter", "Provider stopped with: content_filter", false) })
         {
             using var handler = new Handler(_ => Task.FromResult(Sse("{\"id\":\"m\",\"choices\":[{\"delta\":{\"content\":\"partial\"},\"finish_reason\":\"" + finish + "\"}]}")));
             using var provider = NativeProviderFactory.CreateMistral(model, endpoint, Key, new MistralTextOptions(endpoint, true, new(0, 0, 0, 0), "offline-fixture"), handler);
@@ -742,10 +742,10 @@ internal static partial class Program
             ([GrammarSystem, User("go", 1), new("assistant", PiWireJson.WriteMessage(streamed!)), Result("call_s|ctc_s", "codemode", "hi", 3)], Frames(Completed)),
             ([GrammarSystem, User("go", 1), Calls("openai", "openai-responses", "gpt-5-other", 2, ("call_g1|ctc_g1", "codemode", """{"code":"print(1)"}""")),
                 Result("call_g1|ctc_g1", "codemode", "1", 3), User("next", 4)], Frames(Completed)));
-        BodyEqual(GrammarBody("""{"type":"custom_tool_call","id":"ctc_s","call_id":"call_s","name":"codemode","input":"print(\"hi\")\n"},{"type":"custom_tool_call_output","call_id":"call_s","output":"hi"}""",
+        BodyEqual(GrammarBody("""{"type":"custom_tool_call","id":"ctc_s","call_id":"call_s","name":"codemode","input":"print(\"hi\")\n","status":"completed"},{"type":"custom_tool_call_output","call_id":"call_s","output":"hi"}""",
             CustomTool + "," + ReadFunction), bodies[0]);
         // Same provider and api, different model: the id is dropped to avoid reasoning-item pairing validation.
-        BodyEqual(GrammarBody("""{"type":"custom_tool_call","call_id":"call_g1","name":"codemode","input":"print(1)"},{"type":"custom_tool_call_output","call_id":"call_g1","output":"1"},{"role":"user","content":[{"type":"input_text","text":"next"}]}""",
+        BodyEqual(GrammarBody("""{"type":"custom_tool_call","call_id":"call_g1","name":"codemode","input":"print(1)","status":"completed"},{"type":"custom_tool_call_output","call_id":"call_g1","output":"1"},{"role":"user","content":[{"type":"input_text","text":"next"}]}""",
             CustomTool + "," + ReadFunction), bodies[1]);
     }
 
@@ -757,9 +757,9 @@ internal static partial class Program
             Calls("radius", "openai-responses", "gpt-5-fixture", 2, ("call_g2|ctc_g2", "codemode", """{"code":"print(2)"}"""), ("call_r2|fc_r2", "read", """{"path":"a.txt"}""")),
             Result("call_g2|ctc_g2", "codemode", "2", 3), Result("call_r2|fc_r2", "read", "A", 4), User("again", 5),
             Calls("anthropic", "anthropic-messages", "claude-haiku-5-5", 6, ("toolu_01", "codemode", """{"code":"print(3)"}""")), Result("toolu_01", "codemode", "3", 7), User("done", 8)], Frames(Completed)));
-        BodyEqual(GrammarBody("""{"type":"custom_tool_call","call_id":"call_g2","name":"codemode","input":"print(2)"},{"type":"function_call","call_id":"call_r2","name":"read","arguments":"{\"path\":\"a.txt\"}","id":"fc_axkwo3n4q33o"},""" +
+        BodyEqual(GrammarBody("""{"type":"custom_tool_call","call_id":"call_g2","name":"codemode","input":"print(2)","status":"completed"},{"type":"function_call","call_id":"call_r2","name":"read","arguments":"{\"path\":\"a.txt\"}","id":"fc_axkwo3n4q33o","status":"completed"},""" +
             """{"type":"custom_tool_call_output","call_id":"call_g2","output":"2"},{"type":"function_call_output","call_id":"call_r2","output":"A"},{"role":"user","content":[{"type":"input_text","text":"again"}]},""" +
-            """{"type":"custom_tool_call","call_id":"toolu_01","name":"codemode","input":"print(3)"},{"type":"custom_tool_call_output","call_id":"toolu_01","output":"3"},{"role":"user","content":[{"type":"input_text","text":"done"}]}""",
+            """{"type":"custom_tool_call","call_id":"toolu_01","name":"codemode","input":"print(3)","status":"completed"},{"type":"custom_tool_call_output","call_id":"toolu_01","output":"3"},{"role":"user","content":[{"type":"input_text","text":"done"}]}""",
             CustomTool + "," + ReadFunction), bodies[0]);
     }
 
@@ -771,15 +771,15 @@ internal static partial class Program
             Calls("openai", "openai-responses", "gpt-5-fixture", 6, ("call_g4|fc_g4", "codemode", """{"code":"print(5)"}""")), Result("call_g4|fc_g4", "codemode", "5", 7), User("end", 8)];
         // Grammar call then function call in one turn keep ctc_ and fc_; an fc_ id recorded while grammar was unsupported is dropped.
         var (grammar, _) = await GrammarExchange(true, (messages, Frames(Completed)));
-        BodyEqual(GrammarBody("""{"type":"custom_tool_call","id":"ctc_g3","call_id":"call_g3","name":"codemode","input":"print(4)"},{"type":"function_call","call_id":"call_r3","name":"read","arguments":"{\"path\":\"b.txt\"}","id":"fc_r3"},""" +
+        BodyEqual(GrammarBody("""{"type":"custom_tool_call","id":"ctc_g3","call_id":"call_g3","name":"codemode","input":"print(4)","status":"completed"},{"type":"function_call","call_id":"call_r3","name":"read","arguments":"{\"path\":\"b.txt\"}","id":"fc_r3","status":"completed"},""" +
             """{"type":"custom_tool_call_output","call_id":"call_g3","output":"4"},{"type":"function_call_output","call_id":"call_r3","output":"B"},{"role":"user","content":[{"type":"input_text","text":"more"}]},""" +
-            """{"type":"custom_tool_call","call_id":"call_g4","name":"codemode","input":"print(5)"},{"type":"custom_tool_call_output","call_id":"call_g4","output":"5"},{"role":"user","content":[{"type":"input_text","text":"end"}]}""",
+            """{"type":"custom_tool_call","call_id":"call_g4","name":"codemode","input":"print(5)","status":"completed"},{"type":"custom_tool_call_output","call_id":"call_g4","output":"5"},{"role":"user","content":[{"type":"input_text","text":"end"}]}""",
             CustomTool + "," + ReadFunction), grammar[0]);
         // Without grammar support the same history replays as function calls: ctc_g3 is dropped and fc_g4 is kept.
         var (plain, _) = await GrammarExchange(false, (messages, Frames(Completed)));
-        BodyEqual(GrammarBody("""{"type":"function_call","call_id":"call_g3","name":"codemode","arguments":"{\"code\":\"print(4)\"}"},{"type":"function_call","call_id":"call_r3","name":"read","arguments":"{\"path\":\"b.txt\"}","id":"fc_r3"},""" +
+        BodyEqual(GrammarBody("""{"type":"function_call","call_id":"call_g3","name":"codemode","arguments":"{\"code\":\"print(4)\"}","status":"completed"},{"type":"function_call","call_id":"call_r3","name":"read","arguments":"{\"path\":\"b.txt\"}","id":"fc_r3","status":"completed"},""" +
             """{"type":"function_call_output","call_id":"call_g3","output":"4"},{"type":"function_call_output","call_id":"call_r3","output":"B"},{"role":"user","content":[{"type":"input_text","text":"more"}]},""" +
-            """{"type":"function_call","call_id":"call_g4","name":"codemode","arguments":"{\"code\":\"print(5)\"}","id":"fc_g4"},{"type":"function_call_output","call_id":"call_g4","output":"5"},{"role":"user","content":[{"type":"input_text","text":"end"}]}""",
+            """{"type":"function_call","call_id":"call_g4","name":"codemode","arguments":"{\"code\":\"print(5)\"}","id":"fc_g4","status":"completed"},{"type":"function_call_output","call_id":"call_g4","output":"5"},{"role":"user","content":[{"type":"input_text","text":"end"}]}""",
             CodemodeFunction + "," + ReadFunction), plain[0]);
     }
 

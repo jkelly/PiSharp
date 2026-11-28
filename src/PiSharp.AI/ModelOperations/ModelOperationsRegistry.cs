@@ -1,3 +1,4 @@
+// Pi fb0fe823539f6d04850f6e34748c01f01f212e1f (MIT): packages/ai/src/providers/github-copilot.ts and radius.ts.
 // Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/ai/src/models.ts (Models.classify, Models.generateImages,
 // applyAuth, typed model reads, getAvailableOfType, createProvider classifier/image dispatch), utils/model-operations.ts,
 // images.ts, images-api-registry.ts, providers/images/register-builtins.ts, providers/openai.ts, providers/openrouter.ts,
@@ -42,6 +43,7 @@ public sealed record ProviderAuthResult(string? ApiKey)
     /// <summary>Model ids allowed by a subscription credential, when supplied by the provider. Null means unrestricted;
     /// an empty set allows none. GitHub Copilot applies this to chat and classifier models alike.</summary>
     public ImmutableHashSet<string>? AvailableModelIds { get; init; }
+    public ImmutableHashSet<string>? AvailableClassifierModelIds { get; init; }
     public override string ToString() => "ProviderAuthResult [redacted]";
 }
 
@@ -72,12 +74,13 @@ public sealed record ModelOperationsProvider(string Id, string Name)
 public static class ModelOperationApis
 {
     private static readonly ConcurrentDictionary<string, IImagesApi> ImagesApis = new(StringComparer.Ordinal)
-    { [OpenRouterImages.ApiId] = OpenRouterImages.Instance };
+    { [OpenRouterImages.ApiId] = OpenRouterImages.Instance, [PiImages.ApiId] = PiImages.Instance };
     private static readonly ConcurrentDictionary<string, IClassifierApi> ClassifierApis = new(StringComparer.Ordinal)
     {
         [OpenAIDecisionsClassifier.ApiId] = OpenAIDecisionsClassifier.Instance,
         [TypeSafeSystemOneClassifier.ApiId] = TypeSafeSystemOneClassifier.Instance,
         [CloudflareWorkersAISystemOneClassifier.ApiId] = CloudflareWorkersAISystemOneClassifier.Instance,
+        [PiDecision.ApiId] = PiDecision.Instance,
         [LlamaCppClassifier.ApiId] = LlamaCppClassifier.Instance
     };
 
@@ -111,7 +114,7 @@ public static class ModelOperationApis
 public static class BuiltinModelOperationProviders
 {
     public static ImmutableArray<string> ProviderIds { get; } =
-        ["openai", "openrouter", "typesafe", "cloudflare-workers-ai", "opencode", "vercel-ai-gateway", "github-copilot"];
+        ["openai", "openrouter", "typesafe", "cloudflare-workers-ai", "opencode", "vercel-ai-gateway", "github-copilot", "radius"];
 
     /// <summary>The provider definition with <paramref name="models"/>. A provider without classifier or image APIs lists
     /// its models only.</summary>
@@ -129,6 +132,11 @@ public static class BuiltinModelOperationProviders
                 // Sign in with ChatGPT tokens only reach the Responses API; the Decisions API rejects them.
                 FilterAllModels = (all, auth) => auth.IsOAuth ? [.. all.Where(model => model.Type != ModelType.Classifier)] : all
             },
+            "radius" => new ModelOperationsProvider("radius", "Radius")
+            {
+                Models = list, Classifiers = One(PiDecision.Instance),
+                Images = ImmutableDictionary<string, IImagesApi>.Empty.Add(PiImages.ApiId, PiImages.Instance)
+            },
             "openrouter" => new ModelOperationsProvider("openrouter", "OpenRouter")
             {
                 Models = list, Classifiers = One(TypeSafeSystemOneClassifier.Instance),
@@ -137,9 +145,9 @@ public static class BuiltinModelOperationProviders
             "typesafe" => new ModelOperationsProvider("typesafe", "TypeSafe") { Models = list, Classifiers = One(TypeSafeSystemOneClassifier.Instance) },
             "github-copilot" => new ModelOperationsProvider("github-copilot", "GitHub Copilot")
             {
-                Models = list, Classifiers = One(CopilotSystemOneClassifier.Instance),
-                FilterAllModels = (all, auth) => auth.IsOAuth && auth.AvailableModelIds is { } allowed
-                    ? [.. all.Where(model => allowed.Contains(model.Id))] : all
+                Models = list, Classifiers = One(CopilotSystemOneClassifier.Instance).Add(OpenAIDecisionsClassifier.ApiId, CopilotSystemOneClassifier.Decisions),
+                FilterAllModels = (all, auth) => auth.IsOAuth ? [.. all.Where(model =>
+                    (model.Type == ModelType.Classifier ? auth.AvailableClassifierModelIds : auth.AvailableModelIds)?.Contains(model.Id) != false)] : all
             },
             "cloudflare-workers-ai" => new ModelOperationsProvider("cloudflare-workers-ai", "Cloudflare Workers AI")
             {

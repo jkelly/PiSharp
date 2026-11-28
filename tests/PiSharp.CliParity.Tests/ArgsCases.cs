@@ -27,6 +27,20 @@ internal static partial class Program
             Check(options.Print && options.Provider == "openai" && options.Messages.SequenceEqual(["Say hi."]), "options after -p are not prompts");
             Check(P("-p", "@file.md").FileArgs.SequenceEqual(["file.md"]) && P("-p", "@file.md").Messages.Count == 0, "@file after -p stays a file");
         })),
+        ("sync170.agent-dir-last-wins-and-terminator-is-literal", Sync(() =>
+        {
+            string[] args = ["--agent-dir", "one", "--no-mcp", "--agent-dir", "~/two", "--", "--agent-dir", "msg"];
+            Check(PiArgs.TakeAgentDir(ref args, out var directory), "usable agent dir");
+            Equal("~/two", directory, "last value wins");
+            Names(["--no-mcp", "--", "--agent-dir", "msg"], args, "remaining argv");
+            args = ["--agent-dir"];
+            Check(!PiArgs.TakeAgentDir(ref args, out _), "a missing directory is an error");
+        })),
+        ("sync170.resume-preserves-restrictions-and-excludes-secrets-and-prompts", Sync(() =>
+        {
+            var args = P("--api-key", "secret", "--no-approve", "-t", "read", "--tool-policy", "explicit", "--skill", "./one", "--", "-ne");
+            Names(["--no-approve", "-t", "read", "--tool-policy", "explicit", "--skill", "./one"], args.ResumeFlags, "terminal command");
+        })),
         ("args.continue-resume", Sync(() =>
         {
             Check(P("--continue").Continue && P("-c").Continue, "--continue/-c");

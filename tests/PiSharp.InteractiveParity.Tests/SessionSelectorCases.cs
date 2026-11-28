@@ -434,7 +434,7 @@ internal static class SessionSelectorCases
                 options: new SessionSelectorOptions { SetTimeout = (_, _) => new Disposable() });
             var lines = Strip(selector.Render(100));
             Equal("Failed to load sessions: disk gone", lines[4].TrimEnd(), "status");
-            Equal("  No sessions in current folder. Press Tab to view all.", lines[9].TrimEnd(), "empty list");
+            Equal("  No sessions in current folder. Press tab to view all.", lines[9].TrimEnd(), "empty list");
         }));
 
         // ---- session-selector-rename.test.ts ----------------------------------------------------------------------------------
@@ -551,7 +551,7 @@ internal static class SessionSelectorCases
                 [">", "", Row("› Release prep", "12 3h")]), selector.Render(100), "named");
             var empty = Selector(Fixed([S("a")]));
             empty.HandleInput("\u000e");
-            Equal("  No named sessions in current folder. Press ctrl+n to show all, or Tab to view all.", Strip(empty.Render(100))[9].TrimEnd(), "named empty current");
+            Equal("  No named sessions in current folder. Press ctrl+n to show all, or tab to view all.", Strip(empty.Render(100))[9].TrimEnd(), "named empty current");
             var emptyAll = Selector(Fixed([]), Fixed([S("a")]));
             emptyAll.HandleInput("\t");
             emptyAll.HandleInput("\u000e");
@@ -567,7 +567,7 @@ internal static class SessionSelectorCases
             Equal(12, lines.Count, "one match");
             var none = Selector(Fixed(Three()));
             foreach (var ch in "zzz") none.HandleInput(ch.ToString());
-            Equal("  No sessions in current folder. Press Tab to view all.", Strip(none.Render(100))[9].TrimEnd(), "no match");
+            Equal("  No sessions in current folder. Press tab to view all.", Strip(none.Render(100))[9].TrimEnd(), "no match");
         }));
         yield return ("ses.render.selection-path-and-current", Sync(() =>
         {

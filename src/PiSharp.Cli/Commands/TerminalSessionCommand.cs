@@ -345,8 +345,14 @@ public static class TerminalSessionCommand
             var request = presentation.Request.Value;
             if (request.TryGetProperty("method", out var method) && method.GetString() is "select" or "confirm" or "input" or "editor")
                 await view.ReportProgramStatusAsync(() => reporter.SetBlocked(Source(presentation.Identity), new(
-                    method.GetString() == "confirm" ? Tui.Rendering.TerminalProgramBlockedKind.Permission : Tui.Rendering.TerminalProgramBlockedKind.Question,
-                    request.TryGetProperty("title", out var title) && title.ValueKind == JsonValueKind.String ? title.GetString()! : "")), token).ConfigureAwait(false);
+                    (request.TryGetProperty("blockedKind", out var kind) ? kind.GetString() : null) switch
+                    {
+                        "auth" => Tui.Rendering.TerminalProgramBlockedKind.Auth,
+                        "permission" => Tui.Rendering.TerminalProgramBlockedKind.Permission,
+                        "question" => Tui.Rendering.TerminalProgramBlockedKind.Question,
+                        _ => method.GetString() == "confirm" ? Tui.Rendering.TerminalProgramBlockedKind.Permission : Tui.Rendering.TerminalProgramBlockedKind.Question
+                    },
+                    request.TryGetProperty("title", out var title) && title.ValueKind == JsonValueKind.String ? title.GetString()!.Split(["\r\n", "\n"], 2, StringSplitOptions.None)[0] : "")), token).ConfigureAwait(false);
         }
         public async ValueTask RetiredAsync(RpcExtensionUiRetirement retirement, CancellationToken token)
         {

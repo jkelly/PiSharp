@@ -109,7 +109,7 @@ internal static class HookTaskTests
                 var handle = (await runtime.ConversationAsync(runtime.ConversationId, ctx))!;
                 await runtime.CommitAsync(async (tx, _) =>
                 {
-                    if (plan.Steer is { } steer) await handle.SubmitAsync(tx, SubmissionDraft.Input(steer, WhenBusy.Steer));
+                    if (plan.Steer is { } steer) await handle.AdmitAsync(tx, SubmissionDraft.Input(steer, WhenBusy.Steer));
                     return (TaskState?)Completed(plan.Result);
                 }, ctx);
             },

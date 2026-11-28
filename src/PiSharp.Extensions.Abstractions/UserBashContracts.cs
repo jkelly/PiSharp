@@ -9,7 +9,10 @@ public sealed record ExtensionUserBashEvent(string Command, bool ExcludeFromCont
 
 /// <summary>Source BashResult: a command that already ran elsewhere. A cancelled result has no exit code.</summary>
 public sealed record ExtensionUserBashResult(string Output, int? ExitCode, bool Cancelled = false, bool Truncated = false,
-    string? FullOutputPath = null);
+    string? FullOutputPath = null)
+{
+    public string? FullOutputError { get; init; }
+}
 
 /// <summary>Raw output chunk from extension-provided shell operations, awaited before the next chunk.</summary>
 public delegate ValueTask ExtensionShellOutputCallback(ReadOnlyMemory<byte> chunk);

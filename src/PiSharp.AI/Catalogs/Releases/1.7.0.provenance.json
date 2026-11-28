@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "package": "@earendil-works/pi-ai",
+  "version": "1.7.0",
+  "sourceCommit": "fb0fe823539f6d04850f6e34748c01f01f212e1f",
+  "tarball": {
+    "url": "https://registry.npmjs.org/@earendil-works/pi-ai/-/pi-ai-1.7.0.tgz",
+    "integrity": "sha512-iKryMlUYniwWbU7YU0uS7W0+cGd9c6oJ6PzRLOn8j4+1njG4c+BQq1cNawctx/npDqGeOx8ME7Gkgl6K6arPuw==",
+    "sha256": "d0dd546e7c7c1dfdab6582be8a177ed1184cc857b6a876d3ef576a1cc8088a12"
+  },
+  "manifestSha256": "d9c5aa7766128bc032ebd68e055760530bdf5b3ef56af445c01cc6ab0ba3fce3",
+  "providerCount": 43,
+  "generatedAt": "2026-11-27T16:40:10.684Z",
+  "entries": {
+    "chat": 1701,
+    "image": 74,
+    "classifier": 83
+  },
+  "previousRelease": {
+    "version": "1.6.0",
+    "providersAdded": 0,
+    "providersRemoved": 0,
+    "entriesAdded": 111,
+    "entriesRemoved": 106,
+    "entriesChanged": 316
+  },
+  "verification": "The package passed npm SHA-512 integrity verification. All embedded provider shard digests match the archived manifest."
+}

@@ -166,6 +166,18 @@ internal static class GoogleCases
         Equal(false, schema.GetProperty("additionalProperties").GetBoolean()); Equal(2, schema.GetProperty("required").GetArrayLength());
         Equal("null", schema.GetProperty("properties").GetProperty("optional").GetProperty("anyOf")[1].GetProperty("type").GetString());
         Equal("VALIDATED", config.GetProperty("toolConfig").GetProperty("functionCallingConfig").GetProperty("mode").GetString());
+        foreach (var id in new[] { "vendor-gemini-4-neon", "custom-model" })
+        {
+            var options = new GoogleGenerativeAIOptions(Catalog(id).Models[0].Raw, Key);
+            if (id == "custom-model")
+            {
+                var custom = System.Text.Json.Nodes.JsonNode.Parse(options.ModelMetadata.ToString())!.AsObject();
+                custom["compat"] = new System.Text.Json.Nodes.JsonObject { ["supportsStrictMode"] = true };
+                options = options with { ModelMetadata = JsonData.Parse(custom.ToJsonString()) };
+            }
+            var projected = GoogleRequestProjector.Project(request with { Model = Model with { Id = id } }, options).Value;
+            Equal("VALIDATED", projected.GetProperty("config").GetProperty("toolConfig").GetProperty("functionCallingConfig").GetProperty("mode").GetString());
+        }
         var unsupported = new TranscriptEntry("system", JsonData.Parse(strictDeclaration.ToString().Replace("\"type\":\"object\",\"properties\"", "\"$ref\":\"#/owned\",\"type\":\"object\",\"properties\"", StringComparison.Ordinal)));
         var sends = 0;
         using var handler = new Handler((_, _) => { sends++; return Task.FromResult(Response(new OwnedBody(Wire(TextChunk)))); });
@@ -274,7 +286,7 @@ internal static class GoogleCases
             ("{bad}", "Expected property name or '}' in JSON at position 1 (line 1 column 2)"),
             ("""{"candidates":[{"content":{"parts":{}},"finishReason":"STOP"}]}""", "candidate.content.parts is not iterable"),
             ("""{"candidates":[{"content":{"parts":[null]},"finishReason":"STOP"}]}""", "Cannot read properties of null (reading 'text')"),
-            ("""{"candidates":{}}""", "Google stream ended without a finish reason") })
+            ("""{"candidates":{}}""", "Google stream ended without a finish reason after receiving 1 chunk") })
         {
             var failed = await Complete(Wire(chunk)); Check(failed.Failure is not null && failed.Message.StopReason == StopReason.Error, "Invalid chunk accepted: " + chunk);
             Equal(error, Error(failed));

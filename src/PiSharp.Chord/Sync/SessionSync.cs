@@ -1,4 +1,4 @@
-// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/chord/src/sync/client.ts.
+// Pi fb0fe823539f6d04850f6e34748c01f01f212e1f (MIT): packages/chord/src/sync/client.ts.
 using System.Runtime.CompilerServices;
 using System.Text.Json.Nodes;
 using PiSharp.Chord.Data;
@@ -6,12 +6,13 @@ using PiSharp.Chord.Store;
 
 namespace PiSharp.Chord.Sync;
 
-public sealed record SyncState(long? SyncedHead, long? Pulling = null);
+public sealed record SyncState(long? SyncedHead = null, long? Pulling = null);
 
 public interface ISyncStateStore
 {
     Task<SyncState?> GetAsync(string sessionId, ChordContext context);
     Task SetAsync(string sessionId, SyncState state, ChordContext context);
+    Task DeleteAsync(string sessionId, ChordContext context);
 }
 
 public sealed class OutboxUnavailableError(string message) : Exception(message);
@@ -25,7 +26,8 @@ public abstract record UploadResult
     public sealed record Idle : UploadResult;
     public sealed record Diverged(long At) : UploadResult;
     public sealed record Behind(long Head, long SyncedHead) : UploadResult;
-    public sealed record StaleEpoch(long At, long Epoch) : UploadResult;
+    public sealed record RemoteEmpty(long At) : UploadResult;
+    public sealed record Refused(RefusalReason Reason) : UploadResult;
 }
 
 public abstract record LocalCopy
@@ -44,7 +46,6 @@ public sealed record UploadOptions
     public required ISessionSyncUploader Store { get; init; }
     public required ISyncStateStore State { get; init; }
     public required ChordContext Context { get; init; }
-    public long? Epoch { get; init; }
 }
 
 public sealed record PullOptions
@@ -129,7 +130,7 @@ public static class SessionSync
             try
             {
                 result = await remote.PutBatchAsync(sessionId, after, to, device, body, context,
-                    new PutBatchOptions(archive, options.Epoch)).ConfigureAwait(false);
+                    new PutBatchOptions(archive)).ConfigureAwait(false);
             }
             finally
             {
@@ -138,7 +139,8 @@ public static class SessionSync
             }
             switch (result)
             {
-                case PutBatchResult.StaleEpoch stale: return new UploadResult.StaleEpoch(after, stale.Epoch);
+                case PutBatchResult.Refused refused: return new UploadResult.Refused(refused.Reason);
+                case PutBatchResult.NotHead { Head: SyncRemote.LogStart }: return new UploadResult.RemoteEmpty(after);
                 case PutBatchResult.NotHead: return new UploadResult.Diverged(after);
                 case PutBatchResult.Exists existing when existing.Device != device: return new UploadResult.Diverged(after);
             }
@@ -400,6 +402,11 @@ public static class SessionSync
     {
         private SyncState? state;
         public Task<SyncState?> GetAsync(string sessionId, ChordContext context) => Task.FromResult(state);
+        public Task DeleteAsync(string sessionId, ChordContext context)
+        {
+            state = null;
+            return Task.CompletedTask;
+        }
         public Task SetAsync(string sessionId, SyncState value, ChordContext context)
         {
             state = value;

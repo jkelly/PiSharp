@@ -35,7 +35,11 @@ public sealed class ExtensionUiOutcome<T>
 }
 
 /// <summary>Milliseconds preserve the source optional numeric field; zero disables its timer. Editor has no source timeout field.</summary>
-public sealed record ExtensionUiDialogOptions(double? TimeoutMilliseconds = null);
+public sealed record ExtensionUiDialogOptions(double? TimeoutMilliseconds = null)
+{
+    public ExtensionDialogBlockedKind? BlockedKind { get; init; }
+}
+public enum ExtensionDialogBlockedKind { Permission, Question, Auth }
 public abstract record ExtensionUiNotification;
 public sealed record ExtensionUiNotify(string Message, ExtensionUiNotifyKind? Kind = null) : ExtensionUiNotification;
 public sealed record ExtensionUiStatus(string Key, string? Text) : ExtensionUiNotification;

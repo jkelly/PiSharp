@@ -42,7 +42,7 @@ public sealed class MediaRegistry
     private readonly ConcurrentDictionary<string, IImagesApi> images = new(StringComparer.Ordinal)
     {
         [OpenAIImages.ApiId] = OpenAIImages.Instance, [GoogleImages.ApiId] = GoogleImages.Instance,
-        [OpenRouterImages.ApiId] = OpenRouterImages.Instance, [OpenRouterImageApi.ApiId] = OpenRouterImageApi.Instance,
+        [PiImages.ApiId] = PiImages.Instance, [OpenRouterImages.ApiId] = OpenRouterImages.Instance, [OpenRouterImageApi.ApiId] = OpenRouterImageApi.Instance,
     };
     private readonly ConcurrentDictionary<string, IVideosApi> videos = new(StringComparer.Ordinal)
     { [GoogleVideos.ApiId] = GoogleVideos.Instance, [OpenRouterVideos.ApiId] = OpenRouterVideos.Instance };
@@ -191,7 +191,7 @@ public sealed class MediaRegistry
             {
                 ApiKey = endpoint.ApiKey, Headers = endpoint.Headers, Http = resolved.Http, TimeProvider = resolved.TimeProvider,
                 TimeoutMs = resolved.TimeoutMs, MaxRetries = resolved.MaxRetries, MaxRetryDelayMs = resolved.MaxRetryDelayMs,
-                Metadata = parameters?.ToJson(),
+                AspectRatio = parameters?.AspectRatio, Size = parameters?.Resolution ?? parameters?.Size, Metadata = parameters?.ToJson(),
             };
             // The endpoint already carries the model headers.
             var imageModel = model.ToImageModel(endpoint.BaseUrl) with { Headers = [] };

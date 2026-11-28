@@ -219,15 +219,18 @@ internal static class LlamaCases
                 Login = new PiSharp.Cli.Authentication.ProviderLoginHost(new PiSharp.Cli.Authentication.AuthJsonCredentialStore(Path.Combine(harness.AgentDir, "auth.json")),
                     () => new HttpClient()) { ReadEnvironment = harness.Vars.GetValueOrDefault }
             });
-            pi.Type("/login llama.cpp");
-            await Task.Delay(300);
-            pi.Type(Enter);
-            await Task.Delay(300);
-            pi.Type(Enter);
-            await pi.WaitFor("llama.cpp server URL");
+            await pi.Submit("/login llama.cpp");
+            try { await pi.WaitFor("llama.cpp server URL", 2_000); }
+            catch (TimeoutException)
+            {
+                // Enter accepted the provider suggestion. Submit the completed command.
+                Check(pi.Terminal.Text.Contains("/login llama.cpp", StringComparison.Ordinal), "completed login command");
+                pi.Type(Enter);
+                await pi.WaitFor("llama.cpp server URL");
+            }
             Contains(pi.Terminal.Text, "http://127.0.0.1:9931", "default URL placeholder"); // Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (#12001)
             pi.Type(router.Server.Url);
-            await Task.Delay(100);
+            await pi.WaitFor(router.Server.Url);
             pi.Type(Enter);
             await pi.WaitFor("API key (optional)");
             pi.Type(Enter);

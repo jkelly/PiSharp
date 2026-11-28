@@ -53,6 +53,7 @@ internal sealed class ModelRegistry
     private readonly Dictionary<string, Dictionary<string, Registered>> virtualModels = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, string?> authChecks = new(StringComparer.Ordinal);
     private ImmutableArray<RegistryModel>? radiusDynamic;
+    internal ImmutableArray<RegistryModel>? RadiusCatalogSnapshot => radiusDynamic;
     private ModelsJsonConfig config;
     private List<Composed> providers = [];
     private readonly List<string> maintainedErrors = [];
@@ -225,18 +226,7 @@ internal sealed class ModelRegistry
                 }
                 catch (Exception error) when (error is not OperationCanceledException || !cancellationToken.IsCancellationRequested) { errors[layer.ProviderId] = error; }
             }
-            if (providers is null || providers.Contains("radius"))
-            {
-                // radius.ts refreshModels: a stored gateway catalog replaces the shipped baseline. The gateway fetch belongs to the Radius
-                // login (IMPL-A1) and is not performed here.
-                try
-                {
-                    if (await store.ReadAsync("radius", cancellationToken).ConfigureAwait(false) is { } stored)
-                        radiusDynamic = [.. stored.Models.OfType<JsonObject>().Where(KnownType).Where(model => JsonTree.String(model, "provider") == "radius")
-                            .Select(RegistryModel.FromJson)];
-                }
-                catch (Exception error) when (error is not OperationCanceledException) { errors["radius"] = error; }
-            }
+
         }
         else
         {
@@ -246,6 +236,32 @@ internal sealed class ModelRegistry
                 try { await RefreshLayerAsync(layer, null, allowNetwork, null, cancellationToken).ConfigureAwait(false); }
                 catch (Exception error) when (error is not OperationCanceledException || !cancellationToken.IsCancellationRequested) { errors[layer.ProviderId] = error; }
             }
+        }
+        if (providers is null || providers.Contains("radius"))
+        {
+            try
+            {
+                if (store is not null && await store.ReadAsync("radius", cancellationToken).ConfigureAwait(false) is { } restored)
+                    radiusDynamic = [.. restored.Models.OfType<JsonObject>().Where(KnownType)
+                        .Where(model => JsonTree.String(model, "provider") == "radius").Select(RegistryModel.FromJson)];
+                else if (Stored("radius")?.GatewayConfig is { } legacy && RadiusCatalog.Parse(JsonNode.Parse(legacy.ToString()), chatOnly: true) is { Count: > 0 } cached)
+                {
+                    if (store is not null)
+                        await store.WriteAsync("radius", new(cached, CheckedAt: (options.Now?.Invoke() ?? DateTimeOffset.UtcNow).ToUnixTimeMilliseconds()), cancellationToken).ConfigureAwait(false);
+                    radiusDynamic = [.. cached.OfType<JsonObject>().Select(RegistryModel.FromJson)];
+                }
+                if (allowNetwork && await RefreshKeyAsync("radius", cancellationToken).ConfigureAwait(false) is { Length: > 0 } key)
+                {
+                    using var client = options.CreateCatalogClient?.Invoke() ?? new HttpClient();
+                    var catalog = await RadiusCatalog.FetchAsync(client, key, cancellationToken).ConfigureAwait(false);
+                    var models = catalog.OfType<JsonObject>().Select(RegistryModel.FromJson).ToImmutableArray();
+                    if (store is not null)
+                        await store.WriteAsync("radius", new(catalog, CheckedAt: (options.Now?.Invoke() ?? DateTimeOffset.UtcNow).ToUnixTimeMilliseconds()), cancellationToken).ConfigureAwait(false);
+                    cancellationToken.ThrowIfCancellationRequested();
+                    radiusDynamic = models;
+                }
+            }
+            catch (Exception error) when (error is not OperationCanceledException || !cancellationToken.IsCancellationRequested) { errors["radius"] = error; }
         }
         Rebuild();
         return errors;
@@ -396,7 +412,7 @@ internal sealed class ModelRegistry
     /// <summary>Source getProviderAuthStatus.</summary>
     internal ProviderAuthStatus GetProviderAuthStatus(string provider)
     {
-        if (options.StoredCredentials.ContainsKey(provider)) return new(true, "stored");
+        if (options.StoredCredentials.ContainsKey(provider)) return new(HasConfiguredAuth(provider), "stored");
         if (ModelProviderComposer.ConfiguredRequestAuthStatus(ProviderConfig(provider), Values) is { } configured) return configured;
         return CheckAuth(provider) is { } source ? new(true, "environment", source) : new(false);
     }

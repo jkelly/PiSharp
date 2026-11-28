@@ -56,6 +56,12 @@ internal static partial class Program
         // in Node 22): messages, system, inferenceConfig, toolConfig, additionalModelRequestFields, requestMetadata; role, content;
         // toolUseId, name, input; toolUseId, content, status; name, inputSchema, description, strict; tools, toolChoice.
         JsonEqual("""{"messages":[{"role":"user","content":[{"text":"Hi"},{"image":{"format":"png","source":{"bytes":"AAEC"}}}]},{"role":"assistant","content":[{"reasoningContent":{"reasoningText":{"text":"Let me think","signature":"sig-1"}}},{"text":"Calling a tool"},{"toolUse":{"toolUseId":"toolu_1","name":"read","input":{"path":"a.txt"}}}]},{"role":"user","content":[{"toolResult":{"toolUseId":"toolu_1","content":[{"text":"file body"},{"image":{"format":"jpeg","source":{"bytes":"AAEC"}}}],"status":"success"}}]},{"role":"user","content":[{"text":"Next"},{"cachePoint":{"type":"default"}}]}],"system":[{"text":"You are helpful.\n\nSection one\n\nSection B"},{"cachePoint":{"type":"default"}}],"inferenceConfig":{"maxTokens":64000},"toolConfig":{"tools":[{"toolSpec":{"name":"read","inputSchema":{"json":{"type":"object","properties":{"path":{"type":"string"},"limit":{"anyOf":[{"type":"number"},{"type":"null"}]}},"required":["path","limit"],"additionalProperties":false}},"description":"Read a file","strict":true}}]},"additionalModelRequestFields":{"thinking":{"type":"enabled","budget_tokens":8192,"display":"summarized"},"anthropic_beta":["interleaved-thinking-2025-05-14"]}}""", body, "claude budget request");
+        var noReplay = Bedrock(SonnetRow.Replace("\"supportsStrictMode\":true", "\"supportsStrictMode\":true,\"supportsReasoningReplay\":false", StringComparison.Ordinal));
+        using var withoutReplay = await noReplay.Transport.CreateRequestAsync(new(noReplay.Model, ClaudeTranscript(), 10));
+        using var json = JsonDocument.Parse(await withoutReplay.Content!.ReadAsStringAsync());
+        var assistant = json.RootElement.GetProperty("messages")[1].GetProperty("content");
+        Check(assistant.EnumerateArray().All(part => !part.TryGetProperty("reasoningContent", out _)), "disabled prior reasoning");
+        Check(assistant.EnumerateArray().Any(part => part.TryGetProperty("toolUse", out _)), "tool calls survived reasoning suppression");
         // SigV4 headers over the exact body; the date and payload hash travel as x-amz-* headers.
         var bytes = Encoding.UTF8.GetBytes(body);
         var hash = Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(bytes));
@@ -111,6 +117,15 @@ internal static partial class Program
             await BodyFor(GptRow, "minimal"), "gpt minimal mapped");
         JsonEqual("""{"messages":[{"role":"user","content":[{"text":"Hi"},{"cachePoint":{"type":"default"}}]}],"inferenceConfig":{"maxTokens":64000}}""",
             await BodyFor(SonnetRow, "off"), "thinking off");
+        var kimi = System.Text.Json.Nodes.JsonNode.Parse(GptOssRow)!.AsObject();
+        kimi["id"] = "moonshot.kimi-k3.1";
+        kimi["name"] = "Kimi K3.1";
+        kimi["thinkingLevelMap"] = System.Text.Json.Nodes.JsonNode.Parse("""{"off":"none","high":"high"}""");
+        foreach (var (level, effort) in new[] { ("off", "none"), ("high", "high") })
+        {
+            using var body = JsonDocument.Parse(await BodyFor(kimi.ToJsonString(), level));
+            Equal(effort, body.RootElement.GetProperty("additionalModelRequestFields").GetProperty("reasoning_effort").GetString(), "Kimi " + level);
+        }
         var levels = Bedrock(SonnetRow).Transport.GetSupportedThinkingLevels(new("anthropic.claude-sonnet-4-5-20250929-v1:0", "bedrock-converse-stream", "amazon-bedrock"));
         Equal("off,minimal,low,medium,high", string.Join(",", levels), "sonnet levels");
     }

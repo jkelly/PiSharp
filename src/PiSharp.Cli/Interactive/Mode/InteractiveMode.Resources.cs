@@ -179,7 +179,7 @@ internal sealed partial class InteractiveMode
         }
         if (triggers.Count > 0) provider = new TriggerCharactersProvider(provider, [.. triggers.Distinct(StringComparer.Ordinal)]);
         autocompleteProvider = provider;
-        defaultEditor.SetAutocompleteProvider(provider);
+        defaultEditor.SetAutocompleteProvider(provider, refreshInput: true);
         if (!ReferenceEquals(editor, defaultEditor)) editor.SetAutocompleteProvider(provider);
     }
 

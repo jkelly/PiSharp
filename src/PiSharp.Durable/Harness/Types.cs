@@ -1,4 +1,4 @@
-// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/src/harness/types.ts. The openable Harness (P6) and the task runtime (P7)
+// Pi fb0fe823539f6d04850f6e34748c01f01f212e1f (MIT): packages/durable/src/harness/types.ts. The openable Harness (P6) and the task runtime (P7)
 // are complete; submissions and the generation hooks are final (P8); tools are final (P9); views are final (P10); compaction and the task
 // graph are final (P11). v1.2.0: input entries (area i), documentRetentionMs and onReport's contract (area b), and tool task v2 (area a):
 // ToolExecutionResult.Output and StructuredOutput, NestedToolExecutionResult, IToolExecutionApi.RetainedOutput and ExecuteToolAsync,
@@ -31,7 +31,7 @@
 // Pi v1.5.0 sync (area tool-tasks, 87eff524f, 1c6928b30): ToolHooks.AfterTool runs on every result a tool task writes, the Harness's own error
 // results included, and its doc says which (#11043).
 // Pi v1.5.0 sync (area admission): SubmissionDraft.Continue, a run on the context as it is (fb524dd2e, #11043), and IConversationHandle's
-// SubmitAsync takes any draft, as IConversation's does; WhenIdle.Reject on input (6a2825113, #11149); and SubmitAsync(tx, draft) on both,
+// SubmitAsync takes any draft, as IConversation's does; WhenIdle.Reject on input (6a2825113, #11149); and AdmitAsync(tx, draft) on both,
 // admission inside the caller's commit (cc9c52310, #11149). settings.afterFailedRun's doc names nothing_to_answer.
 // Pi v1.5.0 sync (area live-turns, f6a9db1d8, #11043): AgentChange.MaxTurns and Agent.MaxTurns, the per-conversation turn limit (AgentState
 // maxTurns), and settings.afterFailedRun's doc names turn_limit.
@@ -43,10 +43,9 @@
 // landed, so it cites v1.5.0.
 //
 // Pi v1.6.0 sync (faac585884ae2c013a6b1400f3e9e77f10b34bac): signals, parks, gates and hook tasks.
-// - Upstream's `execute()` returns `ToolExecutionResult | ToolPark`. C# has no union types, so a park is carried by the result itself:
-//   ToolExecutionResult.Park (ToolPark, with Sleep or Wait), and a ToolPark converts implicitly to a result, so `return ToolPark.Sleeping(...)`
-//   works in a tool. ToolExecute's signature is unchanged; a park that also sets a result field, or both Sleep and Wait, is refused at
-//   run time (`invalid_park`), which is where upstream's parkError checks the shape too. ToolRegistration.Cancel is upstream's `cancel`.
+// - Upstream's `execute()` returns `ToolExecutionResult | ToolPark`. In v1.7.0 a ToolPark derives from ToolExecutionResult and carries
+//   the flat sleep or wait tag. An unknown tag or a park that also sets a result field is refused at run time (`invalid_park`).
+//   ToolRegistration.Cancel is upstream's `cancel`.
 // - IToolExecutionApi: Wake, Checkpoint, ReadSignalAsync, CreateTaskAsync with a key (its own overload; upstream adds `key` to the
 //   options), and StartToolAsync, upstream's `executeTool(..., { wait: false })`, returning a NestedToolCall.
 // - IHookApi: ReadSignalAsync and Now (ITaskRuntime inherits both). ToolHooks.BeforeTool's decision may carry a GateSleep.
@@ -293,7 +292,7 @@ public sealed record ToolControl
 /// <see cref="StructuredOutput"/> for programs that call the tool (<see cref="IToolExecutionApi.ExecuteToolAsync"/> callers, code mode
 /// scripts), and <see cref="Details"/> for UIs.
 /// </summary>
-public sealed record ToolExecutionResult
+public record ToolExecutionResult
 {
     /// <summary>For the model: pi-ai tool result content (wire JSON); null: the retained running output.</summary>
     public JsonArrayValue? Output { get; init; }
@@ -313,59 +312,28 @@ public sealed record ToolExecutionResult
     public JsonObjectValue? Usage { get; init; }
     /// <summary>Post-tools controls.</summary>
     public ToolControl? Control { get; init; }
-    /// <summary>
-    /// Set instead of every result field to park the call (upstream's <c>ToolPark</c> return of <c>execute()</c>, Pi v1.6.0): the call holds
-    /// no invocation meanwhile and <c>Execute</c> runs again once woken. A result that sets it with any other field is an invalid park.
-    /// </summary>
-    public ToolPark? Park { get; init; }
 }
 
-/// <summary>What a parked call sleeps for (upstream <c>ToolPark["sleep"]</c>): <see cref="Until"/>, <see cref="Signals"/>, or both.</summary>
-public sealed record ToolParkSleep
+/// <summary>A flat tagged park returned in place of a tool result. Its checkpoint survives the wake.</summary>
+public sealed record ToolPark : ToolExecutionResult
 {
-    /// <summary>What <see cref="IToolExecutionApi.Checkpoint"/> holds in the run after the wake; null: nothing.</summary>
+    /// <summary>The wire tag, either <c>sleep</c> or <c>wait</c>. The harness rejects other tags.</summary>
+    public required string Kind { get; init; }
+    /// <summary>The state returned on re-entry after a wake.</summary>
     public JsonValue? Checkpoint { get; init; }
-    /// <summary>A time on the Harness clock, in milliseconds.</summary>
+    /// <summary>A sleep deadline on the harness clock.</summary>
     public double? Until { get; init; }
-    /// <summary>The signal keys to wait for.</summary>
     public ImmutableArray<SignalKey>? Signals { get; init; }
-}
+    public ImmutableArray<TaskId> On { get; init; }
+    public JoinPolicy? Policy { get; init; }
 
-/// <summary>What a parked call waits on (upstream <c>ToolPark["wait"]</c>): tasks the call's task owns.</summary>
-public sealed record ToolParkWait
-{
-    /// <summary>What <see cref="IToolExecutionApi.Checkpoint"/> holds in the run after the wake; null: nothing.</summary>
-    public JsonValue? Checkpoint { get; init; }
-    /// <summary>Tasks the call's task owns: child tasks it created, or nested calls it started.</summary>
-    public required ImmutableArray<TaskId> On { get; init; }
-    /// <summary>The join policy.</summary>
-    public required JoinPolicy Policy { get; init; }
-}
-
-/// <summary>
-/// What <c>Execute</c> returns instead of a result to park the call (upstream <c>ToolPark</c>, spec suspendable §4): <see cref="Sleep"/>
-/// until a time, for signals, or both; or <see cref="Wait"/> for tasks the call's task owns. Exactly one of the two. The call holds no
-/// invocation meanwhile, then runs <c>Execute</c> again with the same arguments, <see cref="IToolExecutionApi.Wake"/> saying why, and
-/// <see cref="IToolExecutionApi.Checkpoint"/> set to the park's checkpoint. Converts implicitly to a <see cref="ToolExecutionResult"/>
-/// carrying it (<see cref="ToolExecutionResult.Park"/>). Compared by reference where the Harness tells a base tool's park from a wrapper's.
-/// </summary>
-public sealed record ToolPark
-{
-    /// <summary>Sleep until a time, for signals, or both.</summary>
-    public ToolParkSleep? Sleep { get; init; }
-    /// <summary>Wait for tasks the call's task owns.</summary>
-    public ToolParkWait? Wait { get; init; }
-
-    /// <summary><c>{ sleep: { checkpoint?, until?, signals? } }</c>.</summary>
+    /// <summary>Sleep until a deadline, delivery of a signal, or both.</summary>
     public static ToolPark Sleeping(double? until = null, IEnumerable<SignalKey>? signals = null, JsonValue? checkpoint = null) =>
-        new() { Sleep = new ToolParkSleep { Checkpoint = checkpoint, Until = until, Signals = signals is null ? null : [.. signals] } };
+        new() { Kind = "sleep", Checkpoint = checkpoint, Until = until, Signals = signals is null ? null : [.. signals] };
 
-    /// <summary><c>{ wait: { checkpoint?, on, policy } }</c>.</summary>
+    /// <summary>Wait for owned tasks according to the join policy.</summary>
     public static ToolPark Waiting(IEnumerable<TaskId> on, JoinPolicy policy, JsonValue? checkpoint = null) =>
-        new() { Wait = new ToolParkWait { Checkpoint = checkpoint, On = [.. on ?? throw new ArgumentNullException(nameof(on))], Policy = policy } };
-
-    /// <summary>The result that carries <paramref name="park"/>, as <c>Execute</c> returns it.</summary>
-    public static implicit operator ToolExecutionResult(ToolPark park) => new() { Park = park ?? throw new ArgumentNullException(nameof(park)) };
+        new() { Kind = "wait", Checkpoint = checkpoint, On = [.. on ?? throw new ArgumentNullException(nameof(on))], Policy = policy };
 }
 
 /// <summary>A nested call started without waiting for it (upstream <c>NestedToolCall</c>; <see cref="IToolExecutionApi.StartToolAsync"/>).</summary>
@@ -379,7 +347,7 @@ public sealed class NestedToolCall
         this.result = result;
     }
 
-    /// <summary>The nested call's tool task, for a park's <see cref="ToolParkWait.On"/>.</summary>
+    /// <summary>The nested call's tool task, for a park's <see cref="ToolPark.On"/>.</summary>
     public TaskId TaskId { get; }
 
     /// <summary>The stored result once the nested call is terminal; otherwise waits for it.</summary>
@@ -593,7 +561,7 @@ public interface IToolExecutionApi : IDocumentObserver, IDocumentReader
 }
 
 /// <summary>Runs a tool with its validated arguments. Returns a result, or a park (<see cref="ToolPark"/>, carried by
-/// <see cref="ToolExecutionResult.Park"/>): the call then runs <c>Execute</c> again once woken.</summary>
+/// <see cref="ToolPark"/>): the call then runs <c>Execute</c> again once woken.</summary>
 public delegate Task<ToolExecutionResult> ToolExecute(JsonValue arguments, IToolExecutionApi api, DurableContext context);
 
 /// <summary>Cleans up the external work of a call that parked (upstream <c>cancel</c>).</summary>
@@ -695,15 +663,23 @@ public sealed record HookRegistration(string Task, object Handlers);
 public abstract record Wrap
 {
     private protected Wrap() { }
+    /// <summary>The target of the wrapper, <c>tool</c> or <c>section</c>.</summary>
+    public abstract string Kind { get; }
 }
 
 /// <summary>Wraps the tool named <paramref name="Tool"/> (upstream <c>wrapTool</c>). Wrappers never park: one passes its api to its base
 /// unchanged or through a <see cref="DelegatingToolExecutionApi"/> and returns the base's park unchanged; a park of its own ends the call
 /// <c>invalid_park</c>.</summary>
-public sealed record ToolWrap(string Tool, Func<ToolRegistration, ToolRegistration> Apply) : Wrap;
+public sealed record ToolWrap(string Tool, Func<ToolRegistration, ToolRegistration> Apply) : Wrap
+{
+    public override string Kind => "tool";
+}
 
 /// <summary>Wraps the section <paramref name="Section"/> (upstream <c>wrapSection</c>).</summary>
-public sealed record SectionWrap(string Section, Func<PromptSection, PromptSection> Apply) : Wrap;
+public sealed record SectionWrap(string Section, Func<PromptSection, PromptSection> Apply) : Wrap
+{
+    public override string Kind => "section";
+}
 
 /// <summary>A named group of tools for code mode: the extension that brings the tools declares it (upstream <c>ToolNamespace</c>, Pi
 /// v1.6.0). <paramref name="Description"/> is one line, shown in the <c>codemode</c> prompt section; <paramref name="Instructions"/> is the
@@ -1334,9 +1310,9 @@ public interface IConversationHandle
     ConversationId Id { get; }
     /// <summary>Admits a submission; the returned submission's operations are bound to the invocation too.</summary>
     Task<ISubmission> SubmitAsync(SubmissionDraft submission, DurableContext context);
-    /// <summary><see cref="IConversation.SubmitAsync(ITx, SubmissionDraft)"/> inside a commit of the task or tool (<c>runtime.CommitAsync()</c>,
+    /// <summary><see cref="IConversation.AdmitAsync(ITx, SubmissionDraft)"/> inside a commit of the task or tool (<c>runtime.CommitAsync()</c>,
     /// <c>api.CommitAsync()</c>), or any commit of the Harness; rejects once the invocation is aborted or ended.</summary>
-    Task<SubmissionId> SubmitAsync(ITx tx, SubmissionDraft submission);
+    Task<SubmissionId> AdmitAsync(ITx tx, SubmissionDraft submission);
     /// <summary><c>Conversation.AbortAsync()</c>: withdraw queued inputs, abort the ordinary ownership scope, and wait until it is idle.</summary>
     Task AbortAsync(DurableContext context, ConversationAbortOptions? options = null);
     /// <summary>Resolves when the conversation's ordinary ownership scope has no live non-background task.</summary>
@@ -1398,7 +1374,7 @@ public interface IConversation
     /// they wait for the commit holding the line. Its <c>pi.durable.submit</c> span covers the admission only, so its <c>result</c> is
     /// provisional. Throws for a transaction of another Session.
     /// </summary>
-    Task<SubmissionId> SubmitAsync(ITx tx, SubmissionDraft submission);
+    Task<SubmissionId> AdmitAsync(ITx tx, SubmissionDraft submission);
     /// <summary>Admits a write of a <c>pi.reset</c> entry that starts a new context, carrying <paramref name="handoff"/> as a user message
     /// when given.</summary>
     Task ResetAsync(string? handoff, DurableContext context);
@@ -1663,7 +1639,7 @@ public enum RunSummaryReason
 /// <param name="Input">Its input.</param>
 public sealed record HookTask(DurableTask Task, JsonValue Input);
 
-/// <summary>What a <see cref="GenerationHooks.OnYield"/> hook returns (upstream <c>{ continue } | { tasks }</c>): a continuation, or the tasks
+/// <summary>What a <see cref="GenerationHooks.OnYield"/> hook returns (upstream kinds <c>continue</c> and <c>tasks</c>): a continuation, or the tasks
 /// that decide whether the answer stands. A user input (pi-ai <c>UserMessage["content"]</c>, wire JSON) converts implicitly to its
 /// continuation.</summary>
 public sealed record OnYieldResult
@@ -1674,6 +1650,8 @@ public sealed record OnYieldResult
     public static OnYieldResult Continue(JsonValue input) => new(input ?? throw new ArgumentNullException(nameof(input)), null);
     /// <summary><c>{ tasks }</c>: run <paramref name="tasks"/> as the generation's children; they decide whether the answer stands.</summary>
     public static OnYieldResult Tasks(IReadOnlyList<HookTask> tasks) => new(null, tasks ?? throw new ArgumentNullException(nameof(tasks)));
+
+    public string Kind => HookTasks is null ? "continue" : "tasks";
 
     /// <summary>The continuation; null for tasks.</summary>
     public JsonValue? Continuation { get; }
@@ -1758,7 +1736,7 @@ public sealed record CompactionRequest
     public string? Instructions { get; init; }
 }
 
-/// <summary>What <see cref="CompactionHooks.BeforeCompact"/> decides (upstream <c>{decline: true} | {summary}</c>).</summary>
+/// <summary>What <see cref="CompactionHooks.BeforeCompact"/> decides (upstream kinds <c>decline</c> and <c>summary</c>).</summary>
 public sealed record CompactionDecision
 {
     private CompactionDecision(bool decline, string? summary)
@@ -1766,6 +1744,8 @@ public sealed record CompactionDecision
         Decline = decline;
         Summary = summary;
     }
+
+    public string Kind => Decline ? "decline" : "summary";
 
     /// <summary>Whether the compaction completes without a summary.</summary>
     public bool Decline { get; }

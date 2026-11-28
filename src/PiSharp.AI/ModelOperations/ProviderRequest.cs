@@ -253,7 +253,7 @@ internal static partial class ProviderRequest
     /// them (lower-cased names in sorted order, repeated values joined with ", ").</summary>
     internal static async Task<(ProviderResponseInfo Response, string Body)> PostAsync(HttpMessageInvoker http, Uri url,
         ImmutableArray<KeyValuePair<string, string>> headers, string body, ModelRequestOptions? options, CancellationToken signal,
-        Func<Exception, Exception>? mapTransportFailure = null, string? timeoutMessage = null)
+        Func<Exception, Exception>? mapTransportFailure = null, string? timeoutMessage = null, OperationModel? model = null)
     {
         using var timeout = options?.TimeoutMs is { } milliseconds
             ? new CancellationTokenSource(TimeSpan.FromMilliseconds(Math.Max(0, milliseconds)), options.TimeProvider) : null;
@@ -269,8 +269,10 @@ internal static partial class ProviderRequest
                 if (!request.Headers.TryAddWithoutValidation(name, value)) request.Content.Headers.TryAddWithoutValidation(name, value);
             }
             using var response = await http.SendAsync(request, token).ConfigureAwait(false);
-            var text = await response.Content.ReadAsStringAsync(token).ConfigureAwait(false);
             var info = new ProviderResponseInfo((int)response.StatusCode, ResponseHeaders(response));
+            if (model is not null && options?.OnResponse is { } observe)
+                await observe(info, model, signal).ConfigureAwait(false);
+            var text = await response.Content.ReadAsStringAsync(token).ConfigureAwait(false);
             return (info, text);
         }
         catch (Exception error) when (timeout?.IsCancellationRequested == true && !signal.IsCancellationRequested && error is OperationCanceledException)

@@ -57,7 +57,7 @@ internal sealed partial class NativeExtensionActivation
             new(userBashEvent.Command, userBashEvent.ExcludeFromContext, userBashEvent.WorkingDirectory), report, token, lifetime).ConfigureAwait(false);
         if (patch is null) return null;
         if (patch.Result is { } result)
-            return new() { Result = new(result.Output, result.Cancelled ? null : result.ExitCode, result.Cancelled, result.Truncated, result.FullOutputPath) };
+            return new() { Result = new(result.Output, result.Cancelled ? null : result.ExitCode, result.Cancelled, result.Truncated, result.FullOutputPath) { FullOutputError = result.FullOutputError } };
         return new() { Operations = new ShellOperations(patch.Operations!) };
     };
 

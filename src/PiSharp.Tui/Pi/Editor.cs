@@ -1,4 +1,4 @@
-// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/tui/src/components/editor.ts and packages/tui/src/editor-component.ts.
+// Pi fb0fe823539f6d04850f6e34748c01f01f212e1f (MIT): packages/tui/src/components/editor.ts and packages/tui/src/editor-component.ts.
 using System.Globalization;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -22,6 +22,7 @@ public interface IEditorComponent : IComponent, IInputHandler
 }
 
 public sealed record EditorTheme(Func<string, string> BorderColor, SelectListTheme SelectList);
+public enum AutocompleteConfirmation { None, Applied, Submit }
 public sealed record EditorOptions(int PaddingX = 0, int AutocompleteMaxVisible = 5);
 public readonly record struct TextChunk(string Text, int StartIndex, int EndIndex);
 /// <summary>A grapheme (or merged paste marker) and its UTF-16 index.</summary>
@@ -209,14 +210,20 @@ public partial class Editor : IEditorComponent, IFocusable, IMouseHandler
         var next = Math.Max(3, Math.Min(20, maxVisible));
         if (autocompleteMaxVisible != next) { autocompleteMaxVisible = next; Tui.RequestRender(); }
     }
-    public void SetAutocompleteProvider(IAutocompleteProvider provider)
+    public void SetAutocompleteProvider(IAutocompleteProvider provider) => SetAutocompleteProvider(provider, refreshInput: false);
+
+    // The CLI finishes discovering command sources after the startup editor already accepts input.
+    public void SetAutocompleteProvider(IAutocompleteProvider provider, bool refreshInput)
     {
+        var refresh = refreshInput && (autocompleteProvider is null || autocompleteState is not null ||
+            autocompleteAbort is not null || autocompleteDebounce is not null);
         CancelAutocomplete();
         autocompleteProvider = provider;
         var next = new List<string> { "@", "#" };
         foreach (var character in provider.TriggerCharacters)
             if (character.Length == 1 && character != "/" && !TextUtils.IsWhitespaceChar(character) && !next.Contains(character)) next.Add(character);
         triggerCharacters = next;
+        if (refresh && !IsEditorEmpty) RetriggerAutocomplete();
     }
     private bool MatchesTriggerPattern(string text) => AutocompleteTokens.MatchesTrigger(text, triggerCharacters);
     private bool MatchesDebouncePattern(string text)
@@ -229,7 +236,8 @@ public partial class Editor : IEditorComponent, IFocusable, IMouseHandler
     public void AddToHistory(string text)
     {
         var trimmed = TextUtils.JsTrim(text);
-        if (trimmed.Length == 0 || history.Count > 0 && history[0] == trimmed) return;
+        if (trimmed.Length == 0) return;
+        history.Remove(trimmed);
         history.Insert(0, trimmed);
         if (history.Count > 100) history.RemoveAt(history.Count - 1);
     }
@@ -404,29 +412,10 @@ public partial class Editor : IEditorComponent, IFocusable, IMouseHandler
                 kb.Matches(data, "tui.select.pageDown")) { autocompleteList.HandleInput(data); return; }
             if (kb.Matches(data, "tui.input.tab"))
             {
-                if (autocompleteList.GetSelectedItem() is { } selected && autocompleteProvider is not null)
-                {
-                    PushUndoSnapshot(); lastAction = null;
-                    ApplyCompletionResult(autocompleteProvider.ApplyCompletion(state.Lines, state.CursorLine, state.CursorCol, new(selected.Value, selected.Label, selected.Description), autocompletePrefix));
-                    CancelAutocomplete();
-                    OnChange?.Invoke(GetText());
-                }
+                if (ApplySelectedCompletion()) OnChange?.Invoke(GetText());
                 return;
             }
-            if (kb.Matches(data, "tui.select.confirm"))
-            {
-                if (autocompleteList.GetSelectedItem() is { } selected && autocompleteProvider is not null)
-                {
-                    // Enter runs a slash command only from the command-name menu. Path and argument menus can also have a "/"
-                    // prefix ("look at /tmp/fi", "/open /tm"), so the prefix alone does not identify the menu. Read the context
-                    // before applying the completion: the completed "/model " already contains a space.
-                    var submitsCommand = autocompletePrefix.StartsWith('/') && IsInSlashCommandNameContext(state.Lines[state.CursorLine][..state.CursorCol]);
-                    PushUndoSnapshot(); lastAction = null;
-                    ApplyCompletionResult(autocompleteProvider.ApplyCompletion(state.Lines, state.CursorLine, state.CursorCol, new(selected.Value, selected.Label, selected.Description), autocompletePrefix));
-                    if (submitsCommand) CancelAutocomplete();
-                    else { CancelAutocomplete(); OnChange?.Invoke(GetText()); return; }
-                }
-            }
+            if (kb.Matches(data, "tui.select.confirm") && ConfirmAutocomplete() == AutocompleteConfirmation.Applied) return;
         }
         if (kb.Matches(data, "tui.input.tab") && autocompleteState is null) { HandleTabCompletion(); return; }
         if (kb.Matches(data, "tui.editor.deleteToLineEnd")) { DeleteToEndOfLine(); return; }
@@ -479,6 +468,26 @@ public partial class Editor : IEditorComponent, IFocusable, IMouseHandler
         if (Keys.Matches(data, "shift+space")) { InsertCharacter(" "); return; }
         if (Keys.DecodePrintableKey(data) is { } printable) { InsertCharacter(printable); return; }
         if (data.Length > 0 && data[0] >= 32) InsertCharacter(data);
+    }
+
+    protected AutocompleteConfirmation ConfirmAutocomplete()
+    {
+        var submitsCommand = autocompletePrefix.StartsWith('/') && IsInSlashCommandNameContext(state.Lines[state.CursorLine][..state.CursorCol]);
+        if (!ApplySelectedCompletion()) return AutocompleteConfirmation.None;
+        if (submitsCommand) return AutocompleteConfirmation.Submit;
+        OnChange?.Invoke(GetText());
+        return AutocompleteConfirmation.Applied;
+    }
+
+    private bool ApplySelectedCompletion()
+    {
+        if (autocompleteState is null || autocompleteList?.GetSelectedItem() is not { } selected || autocompleteProvider is null) return false;
+        PushUndoSnapshot();
+        lastAction = null;
+        ApplyCompletionResult(autocompleteProvider.ApplyCompletion(state.Lines, state.CursorLine, state.CursorCol,
+            new(selected.Value, selected.Label, selected.Description), autocompletePrefix));
+        CancelAutocomplete();
+        return true;
     }
 
     private void ApplyCompletionResult(CompletionResult result)

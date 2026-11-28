@@ -1,3 +1,4 @@
+// Pi fb0fe823539f6d04850f6e34748c01f01f212e1f (MIT): packages/chord/src/store/store.ts (v1.7.0 updates).
 // Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/chord/src/store/store.ts
 //
 // The store (slice 6a §2, §3, slice 6b §1): opened over a backend, one commit queue that serializes only the commit step (the seal fence's
@@ -36,6 +37,9 @@ public interface IStore : IAsyncDisposable
     /// <summary>The outbox the sync layer reads; null without one.</summary>
     Outbox? Outbox { get; }
 
+    /// <summary>Switches outbox recording in the commit queue. Cancellation ends the caller's wait.</summary>
+    Task SetOutboxAsync(bool on, ChordContext context);
+
     /// <summary>Calls <paramref name="listener"/> with the new <c>LastSeq</c> after commits are durable (a commit, a series, an applied
     /// batch): on a turn of its own, never inside a commit, once for however many commits it covers. A listener that throws is removed and
     /// its error handed to <paramref name="onError"/>, never to the commit. Commits a listener makes are announced like any other.
@@ -62,7 +66,7 @@ public static partial class Tables
 {
     /// <summary>Opens a store over <paramref name="backend"/>: the store's schema migrations, the UTF-8 check, the metadata read once, the
     /// outbox switched when asked. A failure closes the backend and fails (rule 12; upstream <c>openStore</c>).</summary>
-    public static async Task<IStore> OpenStoreAsync(Backend backend, ChordContext context, StoreOptions? options = null)
+    public static async Task<ChordStore> OpenStoreAsync(Backend backend, ChordContext context, StoreOptions? options = null)
     {
         ArgumentNullException.ThrowIfNull(backend);
         ArgumentNullException.ThrowIfNull(context);
@@ -140,7 +144,10 @@ public interface ISeriesCommit
 }
 
 /// <summary>What a series stored: how many of its commits, and why the next one was refused, if one was (upstream <c>SeriesResult</c>).</summary>
-public sealed record SeriesResult(int Stored, Exception? Refused = null);
+public sealed record SeriesResult(int Stored, Exception? Refused = null)
+{
+    public string Kind => Refused is null ? "stored" : "refused";
+}
 
 /// <summary>What the open host gives the store: its <c>storage_failed</c> listener and its batch, in which adapters publish (§1.3; upstream
 /// <c>Attachment</c>).</summary>
@@ -193,7 +200,7 @@ public sealed class ChordStore : IStore, IChordStore
         lastSeq = meta.LastSeq;
         committedNextId = meta.NextId;
         Ids = new IdAllocator(meta.NextId);
-        Outbox = meta.Outbox == 1 ? new Outbox(this, meta.OutboxFloor) : null;
+        outbox = meta.Outbox == 1 ? new Outbox(this, meta.OutboxFloor) : null;
     }
 
     /// <summary>Where a store stands: open, stopped by a backend error, or closed.</summary>
@@ -203,7 +210,26 @@ public sealed class ChordStore : IStore, IChordStore
     public long LastSeq => Interlocked.Read(ref lastSeq);
 
     /// <inheritdoc/>
-    public Outbox? Outbox { get; }
+    public Outbox? Outbox => Volatile.Read(ref outbox);
+    private Outbox? outbox;
+
+    public async Task SetOutboxAsync(bool on, ChordContext context)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        AssertUsable();
+        var turn = Enqueue(async () =>
+        {
+            AssertUsable();
+            if (on == (Outbox is not null)) return true;
+            var floor = on ? LastSeq : 0;
+            try { await StoreInternal.WriteOutboxSettingAsync(db, on, floor).ConfigureAwait(false); }
+            catch (Exception error) { throw Fail(error); }
+            Volatile.Write(ref outbox, on ? new Outbox(this, floor) : null);
+            return true;
+        });
+        if (context.AbortSignal is { } signal) await StoreInternal.AwaitWithContext(turn, signal).ConfigureAwait(false);
+        else await turn.ConfigureAwait(false);
+    }
 
     /// <summary>The allocator's value as the last commit persisted it.</summary>
     public long NextId => Interlocked.Read(ref committedNextId);
@@ -1205,14 +1231,17 @@ internal static partial class StoreInternal
     {
         if (outbox is not { } on || on == (meta.Outbox == 1)) return meta;
         var floor = on ? meta.LastSeq : 0;
-        await db.TransactionAsync(async executor =>
+        await WriteOutboxSettingAsync(db, on, floor).ConfigureAwait(false);
+        return meta with { Outbox = on ? 1 : 0, OutboxFloor = floor };
+    }
+
+    internal static Task WriteOutboxSettingAsync(ISqliteDatabase db, bool on, long floor) =>
+        db.TransactionAsync(async executor =>
         {
             await executor.RunAsync($"UPDATE {StoreTables.Meta} SET outbox = ?, outbox_floor = ? WHERE singleton = 1", on ? 1L : 0L, floor).ConfigureAwait(false);
             if (!on) await executor.RunAsync($"DELETE FROM {StoreTables.Outbox}").ConfigureAwait(false);
             return true;
-        }).ConfigureAwait(false);
-        return meta with { Outbox = on ? 1 : 0, OutboxFloor = floor };
-    }
+        });
 
     /// <summary>Runs <paramref name="run"/> once <paramref name="before"/> settled, never inline: a promise's <c>then</c>.</summary>
     internal static async Task After(Task before, Func<Task> run)

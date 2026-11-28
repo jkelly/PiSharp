@@ -1,3 +1,4 @@
+// Pi fb0fe823539f6d04850f6e34748c01f01f212e1f (MIT): packages/chord/src/store/query.ts (v1.7.0 updates).
 // Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/chord/src/store/query.ts
 //
 // Queries (decision "Query runner"; slice 6a §6, rule 17; slice 14 §5, §6): Tables.Query(table).Where(...).OrderBy(...) as immutable data
@@ -250,10 +251,10 @@ internal static partial class StoreInternal
         }
         // Wire input: every field is checked below.
         var fields = ChordJson.AsObject(decoded) ?? new JsonObject();
-        var hasColumns = fields.TryGetPropertyValue("o", out var columns);
-        if (ChordJson.AsString(fields["t"]) != sqlName || ChordJson.AsString(fields["d"]) != Name(order.Direction) || !hasColumns ||
-            !ChordJson.IsJsonValue(columns) || ChordJson.Stringify(columns) != ChordJson.Stringify(Strings(order.Columns)))
+        if (ChordJson.AsString(fields["t"]) != sqlName || ChordJson.AsString(fields["d"]) != Name(order.Direction) ||
+            ChordJson.AsArray(fields["o"]) is not { } columns || columns.Count != order.Columns.Count)
             throw Refuse();
+        for (var i = 0; i < columns.Count; i++) if (ChordJson.AsString(columns[i]) != order.Columns[i]) throw Refuse();
         if (ChordJson.AsArray(fields["v"]) is not { } values || values.Count != order.Columns.Count) throw Refuse();
         // Order columns are non-opt str or int (checked when the query was built).
         return [.. order.Columns.Select((name, index) => CheckScalar(column(name)!.Type, values[index], $"{table.Name}: cursor").Value)];

@@ -1,4 +1,4 @@
-// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/tui/src/terminal-image.ts and packages/tui/src/terminal-colors.ts.
+// Pi fb0fe823539f6d04850f6e34748c01f01f212e1f (MIT): packages/tui/src/terminal-image.ts and packages/tui/src/terminal-colors.ts.
 using System.Buffers.Binary;
 using System.Diagnostics;
 using System.Globalization;
@@ -147,7 +147,7 @@ public static partial class TerminalImage
     [System.Diagnostics.CodeAnalysis.Experimental("PISHARP_TUI001")]
     public static string StripImageSequences(string line) => ITerm2Sequence().Replace(KittySequence().Replace(line, ""), "");
 
-    public static int AllocateImageId() => Random.Shared.Next(1, int.MaxValue);
+    public static int AllocateImageId() => (int)Random.Shared.NextInt64(1, (long)int.MaxValue + 1);
 
     public static string EncodeKitty(string base64, int? columns = null, int? rows = null, int? imageId = null, bool? moveCursor = null)
     {
@@ -383,7 +383,7 @@ public static partial class TerminalImage
     }
 
     /// <summary>Wraps text in an OSC 8 hyperlink.</summary>
-    public static string Hyperlink(string text, string url) => "\u001b]8;;" + url + "\u001b\\" + text + "\u001b]8;;\u001b\\";
+    public static string Hyperlink(string text, string url) => url.Length > 8192 ? text : "\u001b]8;;" + url + "\u001b\\" + text + "\u001b]8;;\u001b\\";
 
     private static string ShortenImagePath(string filename)
     {

@@ -19,6 +19,7 @@ public sealed record ProcessRequest(string Executable, ImmutableArray<string> Ar
     double? TimeoutSeconds = null)
 {
     /// <summary>MCP process launch only: a command line tail used as is instead of the quoted <see cref="Arguments"/>.</summary>
+    internal bool AllowSpillFailure { get; init; }
     public string? VerbatimArguments { get; init; }
     /// <summary>Bytes written to the child's standard input before it is closed (source commandTransport "stdin"). Null
     /// gives the child an empty standard input.</summary>
@@ -37,8 +38,12 @@ public sealed record ProcessRunnerOptions(int MaximumRawBytes = 64 * 1024 * 1024
     int StructuredMaxBytes = 1024 * 1024, int ReadChunkBytes = 8192,
     int QueueChunks = 8, int PostExitIdleMilliseconds = 100);
 
+[method: System.Text.Json.Serialization.JsonConstructor]
 public sealed record ProcessOutputSnapshot(string Content, ToolOutputTruncationResult Truncation,
-    int RawBytes, int LastLineBytes, string? FullOutputPath);
+    int RawBytes, int LastLineBytes, string? FullOutputPath)
+{
+    public string? FullOutputError { get; init; }
+}
 public sealed record ProcessStructuredOutput(string Content, bool Truncated);
 public sealed record ProcessShellExit(int ExitCode, double AfterSeconds);
 public sealed record ProcessRunResult(ProcessRunStatus Status, int? ExitCode, int? ProcessId,
@@ -81,6 +86,12 @@ public interface IProcessOutputStorage
 public sealed class LocalProcessOutputStorage : IProcessOutputStorage
 {
     public ValueTask<Stream> CreateNewAsync(string absolutePath) => ValueTask.FromResult<Stream>(new FileStream(absolutePath, Options()));
+
+    internal static void RemoveIncomplete(string path)
+    {
+        try { File.Delete(path); }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException) { }
+    }
 
     internal static FileStreamOptions Options()
     {
@@ -171,7 +182,7 @@ public sealed class NativeProcessRunner : ISeparatedProcessRunner
         var diagnostics = new List<ProcessDiagnostic>();
         var diagnosticGate = new object();
         var stop = new TaskCompletionSource<ProcessRunStatus>(TaskCreationOptions.RunContinuationsAsynchronously);
-        var output = new ShellOutputAccumulator(request.SpillPath, capture?.OutputOptions(_options) ?? _options, _storage);
+        var output = new ShellOutputAccumulator(request.SpillPath, capture?.OutputOptions(_options) ?? _options, _storage, request.AllowSpillFailure);
         var captureComplete = true;
         long shellExitedAt = -1, shellExitAtTimeout = -1;
         // Acquire the trusted timer before creating an OS process. It stays disarmed during launch.

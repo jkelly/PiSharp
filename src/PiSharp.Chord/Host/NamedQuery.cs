@@ -1,3 +1,4 @@
+// Pi fb0fe823539f6d04850f6e34748c01f01f212e1f (MIT): packages/chord/src/host/named-query.ts (v1.7.0 updates).
 // Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/chord/src/host/named-query.ts
 //
 // Named queries (slice 14 §3.1): what self.Queries(table, options, builders) returns, one OwnQuery per name, and what a reference shows for
@@ -110,6 +111,7 @@ internal sealed class OwnQuery : NamedQueryHandle
     internal LiveTarget Target(JsonNode? given, ChordContext context)
     {
         var query = Build(given, context);
+        if (!ChordJson.IsJsonValue(given)) throw DataInternal.Invalid("args", "A query's arguments must be JSON");
         return new LiveTarget(new QuerySpec(query, Handle.Sql.Table, projection, Handle), (stored, decoding) => Decode(query, stored, decoding));
     }
 

@@ -121,7 +121,7 @@ internal static class SettingsLoginFooterCases
             // minimal is mapped to null (unsupported), xhigh is mapped, max is not: off, low, medium, high, xhigh.
             Lines(["Thinking Level for m [faux]", "", "Step 2/2 · Select default thinking level for this model", "",
                 "→   off       No reasoning", "    low       Light reasoning (~2k tokens)", "    medium    Moderate reasoning (~8k tokens)",
-                "    high      Deep reasoning (~16k tokens)", "    xhigh     Extra-high reasoning (~32k tokens)", "", "  Enter to select · Esc to go back"],
+                "    high      Deep reasoning (~16k tokens)", "    xhigh     Extra-high reasoning (~32k tokens)", "", "  enter to select · escape/ctrl+c to go back"],
                 list.Render(80), "level step");
             list.HandleInput(Down); list.HandleInput(Down); list.HandleInput(Enter);
             Equal("set faux/m medium", changes[^1], "override set");
@@ -160,7 +160,7 @@ internal static class SettingsLoginFooterCases
             Activate("output-padding");      // 0 -> 1
             Activate("warnings");
             Lines(["→ Anthropic extra usage  true", "", "  Warn when Anthropic subscription auth may use paid extra usage", "",
-                "  Enter/Space to change · Esc to cancel"], list.Render(80), "warnings submenu");
+                "  enter/space to change · escape/ctrl+c to cancel"], list.Render(80), "warnings submenu");
             list.HandleInput(Enter);
             list.HandleInput(Escape);
             Equal("http 30000|quiet False|trust ask|pad 1|warn False", string.Join("|", events), "callbacks");
@@ -186,7 +186,7 @@ internal static class SettingsLoginFooterCases
             list.HandleInput(Enter);
             Lines(["Automatic Theme", "", "Choose themes for terminal light and dark appearance.", "Light/dark detection requires terminal support.", "",
                 "→ Light theme  dark", "  Dark theme   dark", "  Apply        save and go back", "  Change mode  switch to single theme", "",
-                "  Theme to use in automatic mode when the terminal is light", "", "  Enter/Space to change · Esc to cancel"], list.Render(80), "automatic menu");
+                "  Theme to use in automatic mode when the terminal is light", "", "  enter/space to change · escape/ctrl+c to cancel"], list.Render(80), "automatic menu");
             list.HandleInput(Enter);            // light theme picker
             list.HandleInput(Down);             // light
             list.HandleInput(Enter);
@@ -224,8 +224,8 @@ internal static class SettingsLoginFooterCases
                 Row(true, "Auto-compact", "true"), Row(false, "Auto-resize images", "true"), Row(false, "Block images", "false"),
                 Row(false, "Skill commands", "true"), Row(false, "Show hardware cursor", "false"), Row(false, "Editor padding", "1"),
                 Row(false, "Output padding", "1"), Row(false, "Autocomplete max items", "7"), Row(false, "Clear on shrink", "false"),
-                Row(false, "Terminal progress", "true"), "  (1/33)", "", "  Automatically compact context when it gets too large", "",
-                "  Type to search · Enter/Space to change · Esc to cancel", new string('─', 100)], selector.Render(100), "settings selector");
+                Row(false, "Terminal progress", "true"), "  (1/32)", "", "  Automatically compact context when it gets too large", "",
+                "  Type to search · enter/space to change · escape/ctrl+c to cancel", new string('─', 100)], selector.Render(100), "settings selector");
             // Scrolled to the end: the last ten rows, theme selected.
             var list = selector.GetSettingsList();
             list.SelectItem("theme");
@@ -233,7 +233,7 @@ internal static class SettingsLoginFooterCases
             // start = min(31 - 10 / 2, 32 - 10) = 22: rows 22 (double-escape action) to 31 (theme).
             Equal(Row(false, "Double-escape action", "tree"), lines[2].TrimEnd(), "first visible row at the end");
             Equal(Row(true, "Theme", "dark"), lines[11].TrimEnd(), "theme row");
-            Equal("  (33/33)", lines[12], "position");
+            Equal("  (32/32)", lines[12], "position");
         }));
 
         yield return ("set.settings.stepped-submenu-back-and-cancel", Sync(() =>
@@ -248,7 +248,7 @@ internal static class SettingsLoginFooterCases
             };
             var menu = new SteppedSubmenu(steps, ctx => completed.Add(ctx["a"] + ctx["b"]), () => cancelled++);
             menu.HandleInput(Down); menu.HandleInput(Enter);
-            Lines(["Second after 2", "", "Step 2/2 · Pick b for 2", "", "→ ex", "", "  Enter to select · Esc to go back"], menu.Render(60), "second step");
+            Lines(["Second after 2", "", "Step 2/2 · Pick b for 2", "", "→ ex", "", "  enter to select · escape/ctrl+c to go back"], menu.Render(60), "second step");
             menu.HandleInput(Escape);
             Contains(string.Join("\n", Strip(menu.Render(60))), "Step 1/2 · Pick a", "back to first step");
             menu.HandleInput(Enter); menu.HandleInput(Enter);
@@ -256,7 +256,7 @@ internal static class SettingsLoginFooterCases
             Equal(1, cancelled, "closes after the last step without loop");
             var search = new SelectSubmenu("T", "", [new("a", "alpha"), new("b", "beta")], "", _ => { }, () => { }, null, new SelectSubmenuOptions(Searchable: true));
             search.HandleInput("b"); search.HandleInput("e");
-            Lines(["T", "", "> be", "", "→ beta", "", "  Type to filter · Enter to select · Esc to go back"], search.Render(60), "searchable submenu filtered");
+            Lines(["T", "", "> be", "", "→ beta", "", "  Type to filter · enter to select · escape/ctrl+c to go", "back"], search.Render(60), "searchable submenu filtered");
         }));
 
         // ---- footer-width.test.ts ----
@@ -735,7 +735,7 @@ internal static class SettingsLoginFooterCases
             var closed = 0; var renders = 0;
             var selector = new ConfigSelectorComponent(resolved, settings, cwd, agentDir, () => closed++, () => { }, () => renders++, 30, homeDir: dir.Path);
             Lines(["", new string('─', 80), "",
-                "Global Resources" + new string(' ', 80 - 16 - 42) + "tab switch mode · space toggle · esc close", "~/.pi/agent/settings.json", "",
+                "Global Resources" + new string(' ', 12) + "tab switch mode · space toggle · escape/ctrl+c close", "~/.pi/agent/settings.json", "",
                 ">", "",
                 "  npm:tools (user)", "    Extensions", ">     [x] tools/index.ts", "    Skills", "      [ ] review",
                 "  User (~/agent/)", "    Extensions", "      [x] local.ts", "    Prompts", "      [x] fix.md",
@@ -769,7 +769,7 @@ internal static class SettingsLoginFooterCases
             var list = (IInputHandler)selector.GetResourceList();
             list.HandleInput("\t");
             var lines = Strip(selector.Render(80));
-            Equal("Project Local Resources" + new string(' ', 80 - 23 - 53) + "tab switch mode · space cycle inherit/+/- · esc close", lines[3].TrimEnd(), "project header");
+            Equal("Project Local Resources tab switch mode · space cycle inherit/+/- · escape/ctrl+", lines[3].TrimEnd(), "project header");
             Equal(".pi/settings.json · inherited global resources are dimmed", lines[4].TrimEnd(), "project scope hint");
             Equal("  npm:tools (user) · inherited global", lines[8].TrimEnd(), "inherited group");
             Equal(">     [x] tools/index.ts  inherited global", lines[10].TrimEnd(), "inherited item");

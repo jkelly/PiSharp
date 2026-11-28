@@ -8,31 +8,23 @@ using static PiSharp.Cli.Interactive.Mode.ThemeGlobals;
 namespace PiSharp.Cli.Interactive.Mode.Components;
 
 /// <summary>Source FirstTimeSetupResult.</summary>
-internal sealed record FirstTimeSetupResult(string Theme, bool ShareAnalytics);
+internal sealed record FirstTimeSetupResult(bool ShareAnalytics);
 
 /// <summary>Source FirstTimeSetupOptions.</summary>
-internal sealed record FirstTimeSetupOptions(Action<string> OnThemePreview, Action<FirstTimeSetupResult> OnSubmit, Action OnCancel);
+internal sealed record FirstTimeSetupOptions(Action<FirstTimeSetupResult> OnSubmit, Action OnCancel);
 
 /// <summary>Source DistributionMetadata (startup-ui.ts).</summary>
 internal sealed record DistributionMetadata(string PackageName, string AppName, string ConfigDirName);
 
-/// <summary>First-time setup dialog: theme choice and analytics opt-in.</summary>
+/// <summary>First-time setup dialog: analytics opt-in.</summary>
 internal sealed class FirstTimeSetupComponent : Container, IInputHandler
 {
     private const string OfficialPackageName = "@earendil-works/pi-coding-agent";
     private const string OfficialAppName = "pi";
     private const string OfficialConfigDirName = ".pi";
 
-    /// <summary>The distribution identity PiSharp reports: it shares Pi's agent directory, file and variable names
-    /// (<see cref="PiConfig.AppName"/>, <see cref="PiConfig.ConfigDirName"/>) and so counts as the official distribution.</summary>
-    public static DistributionMetadata Distribution { get; } = new(OfficialPackageName, PiConfig.AppName, PiConfig.ConfigDirName);
-
-    private static readonly (string Value, string Label)[] ThemeOptions =
-    [
-        (Themes.SystemThemeName, "System (matches your terminal colors)"),
-        ("dark", "Dark"),
-        ("light", "Light"),
-    ];
+    // The upstream analytics dialog belongs only to the official npm distribution.
+    public static DistributionMetadata Distribution { get; } = new("PiSharp.Cli", PiConfig.DisplayName, PiConfig.ConfigDirName);
 
     private static readonly (bool Value, string Label)[] AnalyticsOptions =
     [
@@ -40,17 +32,12 @@ internal sealed class FirstTimeSetupComponent : Container, IInputHandler
         (false, "Don't share"),
     ];
 
-    private static readonly string[] SetupLogoLines = ["██████", "██  ██", "████  ██", "██    ██"];
-
-    private bool analyticsStep;
-    private int themeIndex;
     private int analyticsIndex;
     private readonly FirstTimeSetupOptions options;
 
     public FirstTimeSetupComponent(FirstTimeSetupOptions options)
     {
         this.options = options;
-        themeIndex = 0;
         Update();
     }
 
@@ -67,30 +54,21 @@ internal sealed class FirstTimeSetupComponent : Container, IInputHandler
         Clear();
         AddChild(new DynamicBorder());
         AddChild(new Spacer(1));
-        AddChild(new Text(theme.Fg("accent", string.Join("\n", SetupLogoLines)), 1, 0));
+        AddChild(new Text(PiLogo.SupportsPiLogo() ? string.Join("\n", PiLogo.PiLogoLines()) : PiLogo.PiWordmark(), 1, 0));
         AddChild(new Spacer(1));
         AddChild(new Text(theme.Fg("accent", theme.Bold($"Welcome to {PiConfig.AppName}, the minimal coding agent.")), 1, 0));
         AddChild(new Spacer(1));
 
-        if (!analyticsStep)
-        {
-            AddChild(new Text(theme.Fg("text", "Pick a theme."), 1, 0));
-            AddChild(new Spacer(1));
-            AddOptionList(ThemeOptions.Select(option => option.Label).ToList(), themeIndex);
-        }
-        else
-        {
-            AddChild(new Text(theme.Fg("text", "Opt-in to anonymous usage data sharing?"), 1, 0));
-            AddChild(new Text(theme.Fg("muted",
-                "Opting in stores a tracking identifier in settings.json and enables anonymous\nusage analytics. This helps us to better debug, reproduce, and resolve issues\nand bugs within Pi. You can observe what is shared using /privacy and make\nchanges anytime in settings.json."), 1, 0));
-            AddChild(new Spacer(1));
-            AddOptionList(AnalyticsOptions.Select(option => option.Label).ToList(), analyticsIndex);
-        }
+        AddChild(new Text(theme.Fg("text", "Opt-in to anonymous usage data sharing?"), 1, 0));
+        AddChild(new Text(theme.Fg("muted",
+            "Opting in stores a tracking identifier in settings.json and enables anonymous\nusage analytics. This helps us to better debug, reproduce, and resolve issues\nand bugs within Pi. You can observe what is shared using /privacy and make\nchanges anytime in settings.json."), 1, 0));
+        AddChild(new Spacer(1));
+        AddOptionList(AnalyticsOptions.Select(option => option.Label).ToList(), analyticsIndex);
 
         AddChild(new Spacer(1));
         AddChild(new Text(
             KeybindingHints.RawKeyHint("↑↓", "navigate") + "  " +
-            KeybindingHints.KeyHint("tui.select.confirm", !analyticsStep ? "continue" : "finish") + "  " +
+            KeybindingHints.KeyHint("tui.select.confirm", "finish") + "  " +
             KeybindingHints.KeyHint("tui.select.cancel", "skip setup"), 1, 0));
         AddChild(new Spacer(1));
         AddChild(new DynamicBorder());
@@ -109,19 +87,7 @@ internal sealed class FirstTimeSetupComponent : Container, IInputHandler
 
     private void MoveSelection(int delta)
     {
-        if (!analyticsStep)
-        {
-            var next = Math.Max(0, Math.Min(ThemeOptions.Length - 1, themeIndex + delta));
-            if (next != themeIndex)
-            {
-                themeIndex = next;
-                options.OnThemePreview(ThemeOptions[themeIndex].Value);
-            }
-        }
-        else
-        {
-            analyticsIndex = Math.Max(0, Math.Min(AnalyticsOptions.Length - 1, analyticsIndex + delta));
-        }
+        analyticsIndex = Math.Max(0, Math.Min(AnalyticsOptions.Length - 1, analyticsIndex + delta));
         Update();
     }
 
@@ -132,15 +98,7 @@ internal sealed class FirstTimeSetupComponent : Container, IInputHandler
         else if (kb.Matches(keyData, "tui.select.down") || keyData == "j") MoveSelection(1);
         else if (kb.Matches(keyData, "tui.select.confirm") || keyData == "\n")
         {
-            if (!analyticsStep)
-            {
-                analyticsStep = true;
-                Update();
-            }
-            else
-            {
-                options.OnSubmit(new FirstTimeSetupResult(ThemeOptions[themeIndex].Value, AnalyticsOptions[analyticsIndex].Value));
-            }
+            options.OnSubmit(new(AnalyticsOptions[analyticsIndex].Value));
         }
         else if (kb.Matches(keyData, "tui.select.cancel"))
         {

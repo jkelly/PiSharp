@@ -1,3 +1,4 @@
+// Pi fb0fe823539f6d04850f6e34748c01f01f212e1f (MIT): packages/chord/src/sync/batch.ts (v1.7.0 updates).
 // Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/chord/src/sync/{batch,lines}.ts.
 using System.Runtime.CompilerServices;
 using System.Text;
@@ -120,7 +121,7 @@ public static class SyncCodec
         [EnumeratorCancellation] CancellationToken cancellationToken)
     {
         var decoder = new UTF8Encoding(false, true).GetDecoder();
-        var rest = "";
+        var rest = new StringBuilder();
         long number = 0;
         var started = false;
         string Decode(ReadOnlySpan<byte> chunk, bool flush)
@@ -141,16 +142,18 @@ public static class SyncCodec
         }
         await foreach (var chunk in chunks.WithCancellation(cancellationToken).ConfigureAwait(false))
         {
-            rest += Decode(chunk.Span, false);
+            var chunkText = Decode(chunk.Span, false);
             var start = 0;
-            for (var end = rest.IndexOf('\n'); end >= 0; end = rest.IndexOf('\n', start))
+            for (var end = chunkText.IndexOf('\n'); end >= 0; end = chunkText.IndexOf('\n', start))
             {
-                yield return (rest[start..end], ++number);
+                var text = rest.Append(chunkText, start, end - start).ToString();
+                rest.Clear();
+                yield return (text, ++number);
                 start = end + 1;
             }
-            rest = rest[start..];
+            rest.Append(chunkText, start, chunkText.Length - start);
         }
-        rest += Decode([], true);
+        rest.Append(Decode([], true));
         if (rest.Length > 0) throw new LogFormatError($"The body ends inside log line {number + 1}");
     }
 }

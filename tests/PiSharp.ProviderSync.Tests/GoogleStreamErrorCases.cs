@@ -65,12 +65,12 @@ internal static partial class Program
         static string Text(string text, string? finish = null) => "data: {\"candidates\":[{\"content\":{\"parts\":[{\"text\":\"" + text + "\"}]}" +
             (finish is null ? "" : ",\"finishReason\":\"" + finish + "\"") + "}]}\n\n";
         static string Error(int code, string status, string message) => "{\"error\":{\"code\":" + code + ",\"message\":\"" + message + "\",\"status\":\"" + status + "\"}}";
-        const string Eof = "\u0000stream ended without a finish reason";
+        const string Eof = "\u0000stream ended without a finish reason after receiving ";
         var cases = new (string Name, string[] Segments, string? Expected, string Content)[]
         {
             // A data frame's error member is dropped by generateContentResponseFromMldev; the stream just never finishes.
-            ("sse-error-frame", ["data: " + Error(500, "INTERNAL", "boom") + "\n\n"], Eof, ""),
-            ("sse-error-frame-after-text", [Text("hi"), "data: " + Error(500, "INTERNAL", "boom") + "\n\n"], Eof, "hi"),
+            ("sse-error-frame", ["data: " + Error(500, "INTERNAL", "boom") + "\n\n"], Eof + "1 chunk", ""),
+            ("sse-error-frame-after-text", [Text("hi"), "data: " + Error(500, "INTERNAL", "boom") + "\n\n"], Eof + "2 chunks", "hi"),
             // A whole read chunk that parses as an object with error.code in [400, 600) throws ApiError.
             ("raw-json-error-chunk", [Error(503, "UNAVAILABLE", "overloaded")],
                 "got status: UNAVAILABLE. {\"error\":{\"code\":503,\"message\":\"overloaded\",\"status\":\"UNAVAILABLE\"}}", ""),
@@ -98,11 +98,13 @@ internal static partial class Program
             ("data-empty", ["data: \n\n"], "Unexpected end of JSON input", ""),
             ("data-done-marker", [Text("hi", "STOP"), "data: [DONE]\n\n"], "Unexpected token 'D', \"[DONE]\" is not valid JSON", "hi"),
             // Values that are not objects carry no response fields.
-            ("data-null", ["data: null\n\n"], Eof, ""),
-            ("data-array", ["data: [1]\n\n"], Eof, ""),
-            ("data-string", ["data: \"s\"\n\n"], Eof, ""),
-            ("no-finish", [Text("hi")], Eof, "hi"),
-            ("empty-body", [""], Eof, ""),
+            ("data-null", ["data: null\n\n"], Eof + "1 chunk", ""),
+            ("data-array", ["data: [1]\n\n"], Eof + "1 chunk", ""),
+            ("data-string", ["data: \"s\"\n\n"], Eof + "1 chunk", ""),
+            ("no-finish", [Text("hi")], Eof + "1 chunk", "hi"),
+            ("empty-body", [""], Eof + "0 chunks", ""),
+            ("blocked-prompt", ["data: " + """{"promptFeedback":{"blockReason":"SAFETY","safetyRatings":[{"category":"HARM","probability":"HIGH"}]}}""" + "\n\n"],
+                "\u0000prompt blocked: SAFETY. Safety rating: HARM (HIGH)", ""),
             // Completed streams: blank remainder, comment events and CRLF delimiters.
             ("trailing-whitespace-only", [Text("hi", "STOP"), "  \n"], null, "hi"),
             ("comment-frame", [": keepalive\n\n", Text("hi", "STOP")], null, "hi"),

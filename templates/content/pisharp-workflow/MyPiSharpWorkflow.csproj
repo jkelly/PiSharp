@@ -8,7 +8,7 @@
     <NoWarn>$(NoWarn);PISHARP_DURABLE001;PISHARP_AGENTS001</NoWarn>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="PiSharp.CustomAgents" Version="1.6.0.1" />
-    <PackageReference Include="PiSharp.Durable.Sqlite" Version="1.6.0.1" />
+    <PackageReference Include="PiSharp.CustomAgents" Version="1.7.0" />
+    <PackageReference Include="PiSharp.Durable.Sqlite" Version="1.7.0" />
   </ItemGroup>
 </Project>

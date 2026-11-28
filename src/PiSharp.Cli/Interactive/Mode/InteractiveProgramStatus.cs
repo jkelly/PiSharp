@@ -1,10 +1,14 @@
-// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): coding-agent/src/modes/interactive/program-status-reporter.ts.
+// Pi fb0fe823539f6d04850f6e34748c01f01f212e1f (MIT): coding-agent/src/modes/interactive/program-status-reporter.ts.
 using System.Text.Json.Nodes;
 using PiSharp.Tui.Pi;
 
 namespace PiSharp.Cli.Interactive.Mode;
 
-internal sealed record BlockedStatus(ProgramBlockedKind Kind, string Message);
+internal sealed record BlockedStatus(ProgramBlockedKind Kind, string Message)
+{
+    public static BlockedStatus ForDialog(ProgramBlockedKind kind, string title) =>
+        new(kind, title.Split(["\r\n", "\n"], 2, StringSplitOptions.None)[0]);
+}
 
 /// <summary>Reports interactive-mode state to the terminal (OSC 7501): working during runs and compaction, blocked while a dialog
 /// waits, then done, error or idle once the run settles. Messages are limited to the session name, dialog titles and the first

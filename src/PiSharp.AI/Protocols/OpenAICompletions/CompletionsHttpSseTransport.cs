@@ -200,6 +200,11 @@ public sealed class CompletionsHttpSseTransport : IChatTransport
                 try
                 {
                     _token.ThrowIfCancellationRequested();
+                    if (response is not null && owner._options.Hooks?.OnResponse is not null)
+                    {
+                        try { await owner.ObserveResponseAsync(response, request.Model, _token).ConfigureAwait(false); }
+                        catch { LastFailureNonTransport = true; throw; }
+                    }
                     if (options is null || retryIndex >= options.MaxRetries || !CompletionsRetryPolicy.Retryable(options, status,
                         response is null ? null : CompletionsRetryPolicy.Header(response, "x-should-retry", owner._options.MaximumResponseHeaderCharacters)))
                     {

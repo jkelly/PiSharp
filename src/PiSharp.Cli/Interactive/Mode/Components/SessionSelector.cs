@@ -333,7 +333,7 @@ internal sealed class SessionList : IComponent, IFocusable, IInputHandler
                 var toggleKey = KeybindingHints.KeyText("app.session.toggleNamedFilter");
                 emptyMessage = showCwd
                     ? $"  No named sessions found. Press {toggleKey} to show all."
-                    : $"  No named sessions in current folder. Press {toggleKey} to show all, or Tab to view all.";
+                    : $"  No named sessions in current folder. Press {toggleKey} to show all, or {KeybindingHints.KeyText("tui.input.tab")} to view all.";
             }
             else if (showCwd)
             {
@@ -343,7 +343,7 @@ internal sealed class SessionList : IComponent, IFocusable, IInputHandler
             else
             {
                 // "Current folder" scope - hint to try "all"
-                emptyMessage = "  No sessions in current folder. Press Tab to view all.";
+                emptyMessage = $"  No sessions in current folder. Press {KeybindingHints.KeyText("tui.input.tab")} to view all.";
             }
             lines.Add(theme.Fg("muted", TextUtils.TruncateToWidth(emptyMessage, width, "…")));
             return lines;
@@ -950,7 +950,7 @@ internal sealed class SessionSelectorComponent : Container, IComponent, IFocusab
         panel.AddChild(new Spacer(1));
         panel.AddChild(renameInput);
         panel.AddChild(new Spacer(1));
-        panel.AddChild(new Text(theme.Fg("muted", $"{KeybindingHints.KeyText("tui.select.confirm")} to save · {KeybindingHints.KeyText("tui.select.cancel")} to cancel"), 1, 0));
+        panel.AddChild(new Text(theme.Fg("muted", $"{KeybindingHints.KeyText("tui.input.submit")} to save · {KeybindingHints.KeyText("tui.select.cancel")} to cancel"), 1, 0));
 
         BuildBaseLayout(panel, showHeader: false);
         requestRender();

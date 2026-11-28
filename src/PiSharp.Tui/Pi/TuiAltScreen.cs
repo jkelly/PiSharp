@@ -1,4 +1,4 @@
-// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/tui/src/tui-alt-screen.ts.
+// Pi fb0fe823539f6d04850f6e34748c01f01f212e1f (MIT): packages/tui/src/tui-alt-screen.ts.
 using System.Diagnostics;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -523,7 +523,7 @@ public sealed partial class TuiAltScreen : TuiBase, IViewportTui
 
     private bool HandleRightClickPaste(SgrMouseEvent mouseEvent)
     {
-        if (onRightClickPaste is null || !OperatingSystem.IsWindows() || (env("TERM_PROGRAM") ?? "").Equals("vscode", StringComparison.OrdinalIgnoreCase) ||
+        if (onRightClickPaste is null || !OperatingSystem.IsWindows() || env("TERM_PROGRAM")?.ToLowerInvariant() is "vscode" or "tabby" ||
             mouseEvent.Release || mouseEvent.Button != 2) return false;
         try { onRightClickPaste(); } catch { }
         return true;

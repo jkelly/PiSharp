@@ -1,4 +1,4 @@
-// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/src/harness/harness.ts. The Harness extends the Session kernel, as
+// Pi fb0fe823539f6d04850f6e34748c01f01f212e1f (MIT): packages/durable/src/harness/harness.ts. The Harness extends the Session kernel, as
 // upstream's HarnessImpl extends SessionImpl. Every component reads and writes through the Session's Storage guard; safeReport, safeNow,
 // documentRetentionMs, report, assertUsable and the open failure's close are v1.2.0's, as the later areas below changed them. Upstream's
 // SCHEDULER_INDEX_SIZES and SCHEDULER_IDLE_STATE symbol getters, for tests, are the internal SchedulerIndexSizes and SchedulerIdleState
@@ -489,7 +489,7 @@ internal sealed class ConversationImpl(ConversationId id, DurableHarness harness
 
     public Task<ISubmission> SubmitAsync(SubmissionDraft submission, DurableContext context) => harness.Submissions.SubmitAsync(Id, submission, context);
 
-    public Task<SubmissionId> SubmitAsync(ITx tx, SubmissionDraft submission) => harness.Submissions.AdmitAsync(tx, Id, submission);
+    public Task<SubmissionId> AdmitAsync(ITx tx, SubmissionDraft submission) => harness.Submissions.AdmitAsync(tx, Id, submission);
 
     /// <summary>Admits a write of a <c>pi.reset</c> entry with <c>head: "self"</c>, carrying <paramref name="handoff"/> as a user message when
     /// given; a busy conversation places it at its next boundary.</summary>
@@ -587,7 +587,7 @@ internal sealed class BoundConversation(ConversationId id, InvocationBinding bin
     }
 
     /// <summary>Admits a submission inside the caller's commit; rejects once the invocation is aborted or ended.</summary>
-    public Task<SubmissionId> SubmitAsync(ITx tx, SubmissionDraft submission)
+    public Task<SubmissionId> AdmitAsync(ITx tx, SubmissionDraft submission)
     {
         try
         {

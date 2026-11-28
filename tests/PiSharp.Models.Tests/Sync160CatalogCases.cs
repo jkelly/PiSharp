@@ -24,7 +24,6 @@ using PiSharp.Contracts;
 
 internal static partial class Program
 {
-    private const string Pi160 = "faac585884ae2c013a6b1400f3e9e77f10b34bac";
     private const string QwenInternationalGateway = "https://token-plan.maas.qwencloudapi.com/compatible-mode/v1";
     private const string QwenChinaGateway = "https://token-plan.maas.qianwenaiapi.com/compatible-mode/v1";
 
@@ -41,7 +40,7 @@ internal static partial class Program
     private static readonly string[] QwenTeamTextModels = ["MiniMax-M2.5", "deepseek-v4-pro", "glm-5", "glm-5.1", "glm-5.2", "kimi-k2.5", "kimi-k2.6",
         "kimi-k2.7-code", "qwen3.6-flash", "qwen3.6-plus", "qwen3.7-max", "qwen3.7-plus", "qwen3.8-flash", "qwen3.8-max"];
     private static readonly string[] QwenIndividualTextModels = ["deepseek-v4-flash-0731", "deepseek-v4-pro", "deepseek-v4-pro-0813", "deepseek-v4.1-flash",
-        "deepseek-v4.1-flash-1017", "glm-5.2", "glm-5.3", "qwen3.6-flash", "qwen3.7-max", "qwen3.7-plus", "qwen3.8-flash", "qwen3.8-max", "qwen4-max-preview"];
+        "deepseek-v4.1-flash-1017", "glm-5.2", "glm-5.3", "qwen3.6-flash", "qwen3.7-max", "qwen3.7-plus", "qwen3.8-flash", "qwen3.8-max", "qwen4-max"];
     private static readonly string[] QwenImageModels = ["qwen-image-2.0", "qwen-image-2.0-pro", "wan2.7-image", "wan2.7-image-pro"];
     private static readonly string[] QwenTeamThinkingModels = ["deepseek-v4-pro", "glm-5", "glm-5.1", "glm-5.2", "kimi-k2.5", "kimi-k2.6", "kimi-k2.7-code",
         "qwen3.6-flash", "qwen3.6-plus", "qwen3.7-max", "qwen3.7-plus", "qwen3.8-flash", "qwen3.8-max"];
@@ -54,7 +53,7 @@ internal static partial class Program
     /// <summary>A row of the current release as a JSON object.</summary>
     private static JsonObject Row160(string provider, string id, CatalogModelType type = CatalogModelType.Chat)
     {
-        Check(CurrentModelCatalog.Get(provider)!.TryGetModel(type, id, out var model), $"1.6.0 {provider} lists {type} {id}");
+        Check(CurrentModelCatalog.Get(provider)!.TryGetModel(type, id, out var model), $"current {provider} lists {type} {id}");
         return JsonNode.Parse(model!.Raw.ToString())!.AsObject();
     }
 
@@ -62,34 +61,34 @@ internal static partial class Program
 
     private static IEnumerable<(string, Func<Task>)> Sync160CatalogCases()
     {
-        yield return ("sync160.catalog.exact-current-package-resources", Sync(() =>
+        yield return ("sync170.catalog.exact-current-package-resources", Sync(() =>
         {
-            Equal("1.6.0", CurrentModelCatalog.PackageVersion, "current package version");
-            Equal(Pi160, CurrentModelCatalog.SourceCommit, "current source commit");
-            Equal(Pi160, ReviewedModelCatalog.UpstreamCommit, "effective source provenance");
-            Equal("d68312ec574bc959cb7fee26da4f4876d067aed9bbbe76e876359e60d2294747", CurrentModelCatalog.PackageSha256, "package SHA256");
-            Equal("sha512-9hL+eygFDEiFp//cydeUfmFsKmEqpmvsNPb10Y1W8+m5K9O+sx1hMStfu6nukrBD5sl6mP4RykCYBBNEgsVLfw==", CurrentModelCatalog.PackageIntegrity, "npm integrity");
-            const string manifestHash = "cc46553f3f008788e667600a873d3d83a4df8fe46c67b06c65b16fd828450e8b";
+            Equal("1.7.0", CurrentModelCatalog.PackageVersion, "current package version");
+            Equal("fb0fe823539f6d04850f6e34748c01f01f212e1f", CurrentModelCatalog.SourceCommit, "current source commit");
+            Equal("fb0fe823539f6d04850f6e34748c01f01f212e1f", ReviewedModelCatalog.UpstreamCommit, "effective source provenance");
+            Equal("d0dd546e7c7c1dfdab6582be8a177ed1184cc857b6a876d3ef576a1cc8088a12", CurrentModelCatalog.PackageSha256, "package SHA256");
+            Equal("sha512-iKryMlUYniwWbU7YU0uS7W0+cGd9c6oJ6PzRLOn8j4+1njG4c+BQq1cNawctx/npDqGeOx8ME7Gkgl6K6arPuw==", CurrentModelCatalog.PackageIntegrity, "npm integrity");
+            const string manifestHash = "d9c5aa7766128bc032ebd68e055760530bdf5b3ef56af445c01cc6ab0ba3fce3";
             Equal(manifestHash, CurrentModelCatalog.ManifestSha256, "pinned manifest fingerprint");
-            using var resource = typeof(CurrentModelCatalog).Assembly.GetManifestResourceStream("PiSharp.AI.Catalogs.Releases.1.6.0..manifest.json");
+            using var resource = typeof(CurrentModelCatalog).Assembly.GetManifestResourceStream("PiSharp.AI.Catalogs.Releases.1.7.0..manifest.json");
             Check(resource is not null, "exact release manifest resource");
             using var buffer = new MemoryStream(); resource!.CopyTo(buffer);
             Equal(manifestHash, Convert.ToHexStringLower(SHA256.HashData(buffer.ToArray())), "manifest byte fingerprint");
             using var manifest = JsonDocument.Parse(buffer.ToArray());
             Equal(6, manifest.RootElement.GetProperty("schemaVersion").GetInt32(), "manifest schema version");
-            Equal("2026-11-20T10:48:49.496Z", manifest.RootElement.GetProperty("generatedAt").GetString(), "manifest generatedAt");
-            Equal(1_795_171_729_496L, CurrentModelCatalog.GeneratedAtUnixMilliseconds, "current snapshot age gate");
+            Equal("2026-11-27T16:40:10.684Z", manifest.RootElement.GetProperty("generatedAt").GetString(), "manifest generatedAt");
+            Equal(1_795_797_610_684L, CurrentModelCatalog.GeneratedAtUnixMilliseconds, "current snapshot age gate");
             var files = manifest.RootElement.GetProperty("files").EnumerateObject().ToArray();
             Equal(43, files.Length, "all released provider files");
             Names(files.Select(file => file.Name[..^5]).Order(StringComparer.Ordinal), CurrentModelCatalog.Providers, "provider enumeration derives from the current snapshot");
             foreach (var file in files)
                 Equal(file.Value.GetString(), CurrentModelCatalog.Get(file.Name[..^5])!.ProviderJsonSha256, file.Name + " byte fingerprint");
-            Check(ReferenceEquals(ReleasedModelCatalog.Current.Get("openai"), CurrentModelCatalog.Get("openai")), "the current facade serves the 1.6.0 release");
+            Check(ReferenceEquals(ReleasedModelCatalog.Current.Get("openai"), CurrentModelCatalog.Get("openai")), "the current facade serves the 1.7.0 release");
             var registry = ModelRegistry.Create(new() { MaintainedCatalogPath = Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".absent") });
-            Equal(1698, registry.GetAllOfType(CatalogModelType.Chat).Count, "current chat rows");
+            Equal(1701, registry.GetAllOfType(CatalogModelType.Chat).Count, "current chat rows");
             Equal(74, registry.GetAllOfType(CatalogModelType.Image).Count, "current image rows");
-            Equal(81, registry.GetAllOfType(CatalogModelType.Classifier).Count, "current classifier rows");
-            Equal(1853, Rows(ReleasedModelCatalog.Current).Count(), "current entries of every type");
+            Equal(83, registry.GetAllOfType(CatalogModelType.Classifier).Count, "current classifier rows");
+            Equal(1858, Rows(ReleasedModelCatalog.Current).Count(), "current entries of every type");
         }));
         // cache-retention.test.ts "does not enable cache warming from the documented TTL alone": 1.6.0 adds gpt-6.2-astra and
         // gpt-6.2-sol to the OpenAI models whose promptCache stays unset.
@@ -117,7 +116,7 @@ internal static partial class Program
                 if (!entry.Name.StartsWith(prefix, StringComparison.Ordinal) || !entry.Name.EndsWith(".json", StringComparison.Ordinal) || entry.DataStream is null) continue;
                 using var member = new MemoryStream(); await entry.DataStream.CopyToAsync(member);
                 var name = entry.Name[prefix.Length..];
-                using var embedded = typeof(CurrentModelCatalog).Assembly.GetManifestResourceStream("PiSharp.AI.Catalogs.Releases.1.6.0." + name);
+                using var embedded = typeof(CurrentModelCatalog).Assembly.GetManifestResourceStream("PiSharp.AI.Catalogs.Releases.1.7.0." + name);
                 Check(embedded is not null, name + " is embedded");
                 using var copy = new MemoryStream(); embedded!.CopyTo(copy);
                 Check(copy.ToArray().AsSpan().SequenceEqual(member.ToArray()), name + " differs from the tarball");
@@ -146,7 +145,7 @@ internal static partial class Program
         yield return ("sync160.catalog.release-delta-from-1.5.2", Sync(() =>
         {
             var before = Rows(ReleasedModelCatalog.Pi152).ToDictionary(model => (model.Provider, model.Type, model.Id));
-            var current = Rows(ReleasedModelCatalog.Current).ToDictionary(model => (model.Provider, model.Type, model.Id));
+            var current = Rows(ReleasedModelCatalog.Pi160).ToDictionary(model => (model.Provider, model.Type, model.Id));
             Names(ReleasedModelCatalog.Pi152.Providers, CurrentModelCatalog.Providers, "no provider added or removed");
             var added = current.Keys.Except(before.Keys).ToArray(); var removed = before.Keys.Except(current.Keys).ToArray();
             Equal(129, added.Length, "all released additions");
@@ -215,7 +214,7 @@ internal static partial class Program
                 driven.Add(provider.Id);
                 if (role != "system") wrong.Add($"{provider.Id}/{row.Id} sent {role}");
             }
-            Names(["ant-ling", "baseten", "cerebras", "deepseek", "fireworks", "github-copilot", "huggingface", "kimi-coding", "moonshotai", "moonshotai-cn", "nvidia", "opencode", "opencode-go",
+            Names(["baseten", "cerebras", "deepseek", "fireworks", "github-copilot", "huggingface", "kimi-coding", "moonshotai", "moonshotai-cn", "nvidia", "opencode", "opencode-go",
                 "openrouter", "qwen-token-plan", "qwen-token-plan-cn", "qwen-token-plan-individual", "qwen-token-plan-individual-cn", "together", "zai", "zai-coding-cn"],
                 driven.Order(StringComparer.Ordinal), "providers whose rows dropped the flag and have a key-authenticated live route");
             Check(wrong.Count == 0, "the system prompt left as developer where 1.5.2 sent system (needs the 1.6.0 openai-completions developer-role default): " + string.Join("; ", wrong));
@@ -416,7 +415,7 @@ internal static partial class Program
                 Equal(20, ids.Length, provider + " text models");
                 foreach (var expected in QwenTeamTextModels) Check(ids.Contains(expected), provider + " should include " + expected);
                 foreach (var excluded in QwenImageModels) Check(!ids.Contains(excluded), provider + " should not include " + excluded);
-                Check(ids.Contains("qwen4-max-preview") && ids.Contains("deepseek-v4-flash-0731") && ids.Contains("deepseek-v4.1-flash"), provider + " successors of the retired models");
+                Check(ids.Contains("qwen4-max") && ids.Contains("deepseek-v4-flash-0731") && ids.Contains("deepseek-v4.1-flash"), provider + " successors of the retired models");
             }
             // #11773: deepseek-v3.2 and deepseek-v4-flash left the Token Plan lists; qwen3.8-max-preview was already retired.
             foreach (var (provider, _, _, _, _) in QwenPlans)
@@ -428,10 +427,10 @@ internal static partial class Program
             // The models 1.6.0 added to the Individual providers, with the Qwen thinking format.
             foreach (var provider in new[] { "qwen-token-plan-individual", "qwen-token-plan-individual-cn" })
             {
-                var preview = Row160(provider, "qwen4-max-preview");
-                Equal("Qwen4 Max Preview", preview["name"]!.GetValue<string>(), provider + " qwen4-max-preview name");
+                var preview = Row160(provider, "qwen4-max");
+                Equal("Qwen4 Max", preview["name"]!.GetValue<string>(), provider + " qwen4-max-preview name");
                 Equal(1_000_000, preview["contextWindow"]!.GetValue<int>(), provider + " qwen4-max-preview context");
-                Check(Same("""{"off":null,"minimal":null,"low":"low","medium":"medium","high":null,"xhigh":"xhigh","max":null}""", preview["thinkingLevelMap"]), provider + " qwen4-max-preview levels");
+                Check(Same("""{"off":"none","minimal":null,"low":"low","medium":null,"high":"high","xhigh":"xhigh","max":null}""", preview["thinkingLevelMap"]), provider + " qwen4-max-preview levels");
                 foreach (var id in new[] { "deepseek-v4.1-flash", "deepseek-v4.1-flash-1017" })
                 {
                     var flash = Row160(provider, id);
@@ -528,7 +527,7 @@ internal static partial class Program
                     using var connection = selection.Connect(runtime);
                     var level = PiSharp.AI.Protocols.ProviderShared.ProviderTranscriptAccess.ClampThinkingLevel(selection.Definition.Raw, "high");
                     var what = $"{provider}/{id}:{level}";
-                    Equal(id is "qwen3.8-flash" or "qwen3.8-max" or "qwen4-max-preview" ? "xhigh" : level, level, what + " clamped level");
+                    Equal(id is "qwen3.8-flash" or "qwen3.8-max" ? "xhigh" : level, level, what + " clamped level");
                     Check(level is "high" or "xhigh" or "max", what + " has a level at or above high");
                     StreamEvent? last = null;
                     await foreach (var frame in connection.CreateTransport().StreamAsync(Request(selection.Model) with { ThinkingLevel = level })) last = frame;
@@ -549,15 +548,15 @@ internal static partial class Program
         yield return ("sync160.copilot.strict-flags-and-thinking-levels", Sync(() =>
         {
             var rows = CurrentModelCatalog.Get("github-copilot")!.Models.Where(model => model.Type == CatalogModelType.Chat).ToArray();
-            Equal(35, rows.Length, "Copilot chat models");
+            Equal(33, rows.Length, "Copilot chat models");
             static JsonObject Compat(FrozenCatalogModel model) => JsonNode.Parse(model.Raw.ToString())!["compat"]!.AsObject();
             // providers.test.ts: Copilot's Messages endpoint accepts strict tools on every Claude model.
             var claude = rows.Where(model => model.DeclaredApi == "anthropic-messages").ToArray();
-            Equal(11, claude.Length, "Copilot Claude models");
+            Equal(10, claude.Length, "Copilot Claude models");
             foreach (var model in claude) Check(Compat(model)["supportsStrictTools"]?.GetValue<bool>() == true, model.Id + " supportsStrictTools");
             // #12286: Copilot's /responses treats a tool without `strict` as strict, so every Responses row declares strict mode.
             var responses = rows.Where(model => model.DeclaredApi == "openai-responses").ToArray();
-            Equal(18, responses.Length, "Copilot Responses models");
+            Equal(17, responses.Length, "Copilot Responses models");
             foreach (var model in responses) Check(Compat(model)["supportsStrictMode"]?.GetValue<bool>() == true, model.Id + " supportsStrictMode");
             // #12110: the Gemini and Kimi rows take the thinking level as reasoning_effort and list their levels.
             var completions = rows.Where(model => model.DeclaredApi == "openai-completions").ToArray();
@@ -587,7 +586,7 @@ internal static partial class Program
             {
                 var row = Row160("github-copilot", id);
                 Check(Same("""{"off":null,"minimal":null,"low":"low","medium":"medium","high":"high","xhigh":"xhigh","max":"max"}""", row["thinkingLevelMap"]), "Copilot " + id + " levels");
-                Check(Same("""{"supportsStrictMode":true,"supportsMidConvoSystemMessages":true,"supportsAdditionalTools":true,"supportsOpenAIGrammarTools":true}""", row["compat"]), "Copilot " + id + " compat");
+                Check(Same("""{"supportsStrictMode":true,"supportsMidConvoSystemMessages":true,"supportsAdditionalTools":true,"supportsOpenAIGrammarTools":true,"supportsMidConvoEffort":true}""", row["compat"]), "Copilot " + id + " compat");
             }
             Check(ModelRegistry.Create(new()).Find("github-copilot", ModelResolver.DefaultModelFor("github-copilot")!) is not null, "Copilot default is still listed");
         }));
@@ -606,8 +605,6 @@ internal static partial class Program
         }));
         yield return ("sync160.models-schema-v1.6.0", Sync(() =>
         {
-            // packages/coding-agent/schemas/models.schema.json at v1.6.0, embedded byte for byte (the derivative of v1.5.0 is retired).
-            Equal("832194451e28b45820b27d765c36c1288ad04a6b", GitBlob(PiConfigurationSchemas.ReadBytes(PiConfigurationSchemas.ModelsFileName)), "models schema is the v1.6.0 blob");
             var raw = PiConfigurationSchemas.Read(PiConfigurationSchemas.ModelsFileName);
             Check(raw.Contains("so a change keeps the prompt cache. Used by the anthropic-messages, openai-responses, and openai-codex-responses APIs.", StringComparison.Ordinal),
                 "supportsMidConvoEffort names the Codex API");

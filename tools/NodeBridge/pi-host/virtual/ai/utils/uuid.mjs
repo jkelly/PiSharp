@@ -1,4 +1,4 @@
-// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/ai/src/utils/uuid.ts.
+// Pi fb0fe823539f6d04850f6e34748c01f01f212e1f (MIT): packages/ai/src/utils/uuid.ts.
 // Ported to plain ESM for the PiSharp Node extension bridge (TypeScript types stripped mechanically; behaviour unchanged).
 const MAX_UUID_V7_TIMESTAMP = 0xffffffffffff;
 const MAX_SEQUENCE = (1n << 41n) - 1n;

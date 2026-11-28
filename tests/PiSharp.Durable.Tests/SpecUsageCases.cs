@@ -230,7 +230,7 @@ internal static class SpecUsage
                     {
                         // Admitted in this commit, before its table writes; placed when the run ends, in queue order with other input.
                         if (!result.Passed)
-                            await handle.SubmitAsync(tx, SubmissionDraft.Input($"Tests failed:\n{result.Output}", whenBusy: WhenBusy.FollowUp));
+                            await handle.AdmitAsync(tx, SubmissionDraft.Input($"Tests failed:\n{result.Output}", whenBusy: WhenBusy.FollowUp));
                         await tx.AppendEntryAsync(runtime.ConversationId, new EntryDraft
                         {
                             Kind = "app.tests",

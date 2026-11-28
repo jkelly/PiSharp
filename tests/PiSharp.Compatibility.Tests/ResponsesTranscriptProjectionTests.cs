@@ -46,7 +46,7 @@ static class ResponsesTranscriptProjectionTests
                 SupportsMidConversationSystemMessages: item.GetProperty("options").GetProperty("supportsMidConvoSystemMessages").GetBoolean(),
                 AllowedToolCallProviders: item.GetProperty("allowedToolCallProviders").EnumerateArray().Select(value => value.GetString()!).ToImmutableHashSet(StringComparer.Ordinal));
             var projector = new ResponsesTranscriptProjector(options); var actual = projector.Project(request);
-            var (expectedInput, removed) = WithoutForeignThinking(id, oracle.GetProperty("requestInput"));
+            var (expectedInput, removed) = ApplyReplayDeltas(id, oracle.GetProperty("requestInput"));
             Assert(Same(expectedInput, actual.Value), $"Captured request array differs: {id}");
             Equal(counts[index], actual.Value.GetArrayLength());
             Assert(Same(actual.Value, projector.Project(request).Value), "Projection is not deterministic.");
@@ -74,7 +74,7 @@ static class ResponsesTranscriptProjectionTests
             var call = actual.Value.EnumerateArray().Single(value => value.TryGetProperty("type", out var type) && type.GetString() == "function_call");
             using var reordered = JsonDocument.Parse("{\"arguments\":\"{\\\"keep\\\":null,\\\"path\\\":\\\"changed\\\"}\"}");
             Assert(!Same(call.GetProperty("arguments"), reordered.RootElement.GetProperty("arguments")), "Opaque argument string was normalized.");
-            results.Add(new JsonObject { ["caseId"] = id, ["status"] = removed is null ? "matched" : "matched-capture-with-authored-pi-1.5.0-delta", ["requestInput"] = JsonNode.Parse(actual.ToString()),
+            results.Add(new JsonObject { ["caseId"] = id, ["status"] = removed is null ? "matched-capture-with-authored-pi-1.7.0-delta" : "matched-capture-with-authored-pi-1.5.0-and-1.7.0-deltas", ["requestInput"] = JsonNode.Parse(actual.ToString()),
                 ["sourceUndefinedPointers"] = JsonNode.Parse(oracle.GetProperty("undefinedProjectionProperties").GetRawText()), ["inputUnchanged"] = true });
         }
         using var one = JsonDocument.Parse("{\"a\":1,\"b\":null}"); using var reorderedKeys = JsonDocument.Parse("{\"b\":null,\"a\":1}"); using var decimalScale = JsonDocument.Parse("{\"a\":1.0,\"b\":null}");
@@ -88,10 +88,12 @@ static class ResponsesTranscriptProjectionTests
     // Pi 1.5.0 transformMessages drops every thinking block from another model; the v0.99.1 capture still turns the foreign model's
     // readable thinking into an assistant text message. The foreign case expects the capture without that message, the next text
     // renumbered (textBlockIndex 0 gives msg_pi_1, not msg_pi_1_1): an authored delta from the Pi 1.5.0 source, not a capture.
-    internal static (JsonElement Expected, int? Removed) WithoutForeignThinking(string caseId, JsonElement captured)
+    internal static (JsonElement Expected, int? Removed) ApplyReplayDeltas(string caseId, JsonElement captured)
     {
-        if (caseId != "foreign-provider-system-fold") return (captured, null);
         var items = JsonNode.Parse(captured.GetRawText())!.AsArray();
+        foreach (var item in items.OfType<JsonObject>().Where(item => (string?)item["type"] == "function_call"))
+            item["status"] = "completed"; // Pi 1.7.0 replays completed calls after a reconnect.
+        if (caseId != "foreign-provider-system-fold") return (JsonSerializer.SerializeToElement(items), null);
         var reasoning = items.OfType<JsonObject>().Single(item => item["content"] is JsonArray { Count: 1 } parts &&
             parts[0]?["text"]?.GetValue<string>() == "Visible foreign reasoning π");
         var removed = items.IndexOf(reasoning); items.RemoveAt(removed);

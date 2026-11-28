@@ -1,11 +1,11 @@
-// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/durable/src/signals.ts. Signals: typed JSON values delivered to a live task
+// Pi fb0fe823539f6d04850f6e34748c01f01f212e1f (MIT): packages/durable/src/signals.ts. Signals: typed JSON values delivered to a live task
 // from outside, kept in its memos until a wake uses them.
 //
 // Mappings: upstream types a token by its value (SignalToken<T>, SignalKey<T>, a phantom type); values here are JsonValue, so tokens and
 // keys are not generic. A schema is a JSON Schema object (JsonObjectValue), compiled with pi-schema (PiSharp.Contracts.Schema) as a tool's
 // structured output schema is; upstream's WeakMap of token internals is the token's own internal fields, and its "was not built by
 // defineSignal()" check has no counterpart, as only DefineSignal builds a token. A value is immutable strict JSON, so upstream's isJsonValue
-// trust-boundary check of delivered and migrated values has nothing to reject beyond the schema. SignalState is one record with Value or
+// trust-boundary check of delivered and migrated values has nothing to reject beyond the schema. SignalState is one tagged record with Value or
 // Expired. The memo of a key is upstream's JSON: {version, value, consumed?: true} or {expired: true}, under `pi.signal.<name>/<key>`.
 using System.Collections.Immutable;
 using PiSharp.Contracts.Schema;
@@ -88,13 +88,17 @@ public sealed record SignalState
 {
     private SignalState(JsonValue? value, bool expired) { Value = value; Expired = expired; }
 
-    /// <summary><c>{value}</c>.</summary>
+    /// <summary><c>{kind: "value", value}</c>.</summary>
     public static SignalState Of(JsonValue value) => new(value ?? throw new ArgumentNullException(nameof(value)), false);
-    /// <summary><c>{expired: true}</c>.</summary>
+    /// <summary><c>{kind: "expired"}</c>.</summary>
     public static SignalState ExpiredKey { get; } = new(null, true);
 
     /// <summary>The value delivered under the key, migrated to the token's version; null when the key expired.</summary>
     public JsonValue? Value { get; }
+    /// <summary>The upstream discriminant; a delivered JSON null is a value.</summary>
+    public string Kind => Expired ? "expired" : "value";
+    /// <summary>The public signal state. Persisted signal memos use their original storage format.</summary>
+    public JsonObjectValue ToJson() => new RecordJson.Writer().Add("kind", Kind).Add("value", Value).Build();
     /// <summary>Whether the key expired: its sleep's deadline came before a value.</summary>
     public bool Expired { get; }
 }
@@ -241,7 +245,7 @@ public static class Signals
         if (string.IsNullOrEmpty(key) || value is null || !token.Check(value)) return (SignalResult.Invalid, null);
         var name = MemoName(token.Name, key);
         if (MemoOf(record.Memos, name) is { } stored)
-            return (stored.ContainsKey("expired") ? SignalResult.Closed : SignalResult.Duplicate, null);
+            return (Expired(stored) ? SignalResult.Closed : SignalResult.Duplicate, null);
         if (state is SleepingTaskState { Until: { } until, Signals: { } listed } && until <= now &&
             listed.Any(each => each.Signal == token.Name && each.Key == key))
             return (SignalResult.Closed, WithMemo(record, name, ExpiredMemo));
@@ -259,7 +263,7 @@ public static class Signals
         ArgumentNullException.ThrowIfNull(token);
         ArgumentNullException.ThrowIfNull(key);
         if (MemoOf(memos, MemoName(token.Name, key)) is not { } stored) return null;
-        if (stored.ContainsKey("expired")) return SignalState.ExpiredKey;
+        if (Expired(stored)) return SignalState.ExpiredKey;
         var version = (int)((JsonNumberValue)stored["version"]).Value;
         var value = stored["value"];
         if (version == token.Version) return SignalState.Of(value);
@@ -281,7 +285,7 @@ public static class Signals
         foreach (var (signal, key) in state.Signals ?? [])
         {
             if (MemoOf(memos, MemoName(signal, key)) is not { } stored) continue;
-            if (stored.ContainsKey("expired"))
+            if (Expired(stored))
                 throw new InvalidOperationException($"Task {task} cannot sleep on signal {signal} key {key}: it expired");
             if (Consumed(stored))
                 throw new InvalidOperationException($"Task {task} cannot sleep on signal {signal} key {key}: it already woke a wait");
@@ -321,11 +325,13 @@ public static class Signals
     private static SignalKey? ReadyKey(SleepingTaskState state, JsonObjectValue? memos)
     {
         foreach (var listed in state.Signals ?? [])
-            if (MemoOf(memos, MemoName(listed.Signal, listed.Key)) is { } stored && !stored.ContainsKey("expired") && !Consumed(stored)) return listed;
+            if (MemoOf(memos, MemoName(listed.Signal, listed.Key)) is { } stored && !Expired(stored) && !Consumed(stored)) return listed;
         return null;
     }
 
     private static JsonObjectValue ExpiredMemo { get; } = JsonValue.Object([KeyValuePair.Create("expired", (JsonValue)true)]);
+
+    private static bool Expired(JsonObjectValue memo) => memo.TryGetValue("expired", out var expired) && expired is JsonBooleanValue { Value: true };
 
     private static bool Consumed(JsonObjectValue memo) => memo.TryGetValue("consumed", out var consumed) && consumed is JsonBooleanValue { Value: true };
 

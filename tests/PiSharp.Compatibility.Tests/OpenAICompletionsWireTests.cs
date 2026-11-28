@@ -9,6 +9,7 @@ internal static class OpenAICompletionsWireTests
     public static (string Name, Func<Task> Run)[] Cases() =>
     [
         ("Completions authored interleaved text thinking indexed tools exact finals reducer and ChatRun", CompletedInterleaving),
+        ("Completions 1.7 opaque reasoning and gateway finish metadata", Sync170Reasoning),
         ("Completions source stop aliases EOF compatibility and cache usage precedence", StopAndUsage),
         ("Completions parseStreamingJson finals and unsupported partial identities without authority", StrictAndUnsupported),
         ("Completions raw DTO depth Unicode count and logical payload bounds", LimitsAndAdmission),
@@ -26,6 +27,28 @@ internal static class OpenAICompletionsWireTests
 
     private static ChatRequest Request(string provider = "fixture-provider") =>
         new(new("requested-model", "openai-completions", provider), [], 123);
+
+    private static async Task Sync170Reasoning()
+    {
+        var frames = await Collect([
+            """{"choices":[{"delta":{"reasoning_opaque":"first"}}]}""",
+            """{"choices":[{"delta":{"reasoning_text":"plan","reasoning_opaque":"last","content":"answer"}}]}""",
+            Finish("stop")], provider: "github-copilot");
+        var final = Terminal(frames);
+        Equal(StopReason.Stop, final.Reason);
+        var thought = (ThinkingContent)final.Message.Content[0];
+        Equal("plan", thought.Thinking);
+        var replay = JsonData.Parse(Property(thought.ExtraProperties, "thinkingSignature")).Value;
+        Equal("reasoning_text", replay.GetProperty("field").GetString());
+        Equal("last", replay.GetProperty("reasoning_opaque").GetString());
+
+        const string nativeStop = """{"choices":[{"delta":{},"finish_reason":"stop","native_finish_reason":"MALFORMED_RESPONSE"}]}""";
+        var empty = Terminal(await Collect([nativeStop], provider: "openrouter"));
+        Equal(StopReason.Error, empty.Reason);
+        Equal("stop.MALFORMED_RESPONSE", Property(empty.Message.ExtraProperties, "rawStopReason"));
+        Equal("OpenRouter returned an empty response (native_finish_reason: MALFORMED_RESPONSE)", Property(empty.Message.ExtraProperties, "errorMessage"));
+        Equal(StopReason.Stop, Terminal(await Collect([Text("answer"), nativeStop], provider: "openrouter")).Reason);
+    }
 
     private static async Task CompletedInterleaving()
     {

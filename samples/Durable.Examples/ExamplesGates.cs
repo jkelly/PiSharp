@@ -301,7 +301,7 @@ public static partial class Examples
                     {
                         if (chosen == "stop") return (TaskState?)NextTaskState.Completed(new AfterToolsDecision(Terminate: true).ToJson());
                         // A steer in the task's terminal commit: the round's boundary places it before the next request.
-                        await handle.SubmitAsync(tx, SubmissionDraft.Input("The person says: go on.", WhenBusy.Steer));
+                        await handle.AdmitAsync(tx, SubmissionDraft.Input("The person says: go on.", WhenBusy.Steer));
                         return NextTaskState.Completed(JsonValue.Null);
                     }, ctx);
                 },

@@ -57,13 +57,16 @@ internal static partial class MermaidTransformer
         {
             if (!IsMermaid(token)) return token.Raw;
             var art = LovelyRenderer.Render(token.Text);
-            if (art is null || art.Width > context.AvailableWidth) return token.Raw;
+            if (art is null) return token.Raw;
+            string WithWarning(string warning) => $"{token.Raw}\n{CodeSpan(themed is null ? warning : themed.Fg("warning", warning))}  \n";
             if (!context.IsStreaming && art.Warnings.Count > 0)
             {
                 var suffix = art.Warnings.Count > 1 ? $" (+{art.Warnings.Count - 1} more)" : "";
                 var warning = $"Mermaid diagram not rendered: {art.Warnings[0]}{suffix}";
-                return $"{token.Raw}\n{CodeSpan(themed is null ? warning : themed.Fg("warning", warning))}  \n";
+                return WithWarning(warning);
             }
+            if (art.Width > context.AvailableWidth)
+                return context.IsStreaming ? token.Raw : WithWarning($"Mermaid diagram not rendered: needs {art.Width} columns, {context.AvailableWidth} available");
             var lines = themed is null ? art.Plain : ThemedLines(art, themed);
             // Markdown hard breaks keep every diagram row on its own line.
             return string.Join("  \n", lines.Select(CodeSpan)) + "\n";

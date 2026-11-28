@@ -307,6 +307,7 @@ internal sealed partial class InteractiveMode
         }, () =>
         {
             ui.Start();
+            ReportProgramResume(force: true);
             ui.RequestRender(force: true);
         });
     }
@@ -435,6 +436,7 @@ internal sealed partial class InteractiveMode
         finally
         {
             ui.Start();
+            ReportProgramResume(force: true);
             ui.RequestRender(force: true);
         }
     }
@@ -767,7 +769,8 @@ internal sealed partial class InteractiveMode
 | Key | Action |
 |-----|--------|
 | `{K("tui.input.tab")}` | Path completion / accept autocomplete |
-| `{K("app.interrupt")}` | Cancel autocomplete / abort streaming |
+| `{K("tui.select.cancel")}` | Cancel autocomplete |
+| `{K("app.interrupt")}` | Abort streaming |
 | `{K("app.clear")}` | Clear editor (first) / exit (second) |
 | `{K("app.exit")}` | Exit (when editor is empty) |
 | `{K("app.suspend")}` | Suspend to background |
@@ -893,7 +896,7 @@ internal sealed partial class InteractiveMode
             if (bashComponent is not null && data is JsonObject result)
             {
                 bashComponent.SetComplete(result["exitCode"] is JsonValue code && code.TryGetValue<int>(out var exit) ? exit : null, B(result["cancelled"]),
-                    B(result["truncated"]) ? TruncatedOutput(S(result["output"])) : null, S(result["fullOutputPath"]));
+                    B(result["truncated"]) ? TruncatedOutput(S(result["output"])) : null, S(result["fullOutputPath"]), S(result["fullOutputError"]));
             }
         }
         catch (Exception error)

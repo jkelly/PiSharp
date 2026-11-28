@@ -1,3 +1,4 @@
+// Pi fb0fe823539f6d04850f6e34748c01f01f212e1f (MIT): packages/chord/src/context/index.ts (v1.7.0 updates).
 // Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/chord/src/next/store/export.ts
 //
 // store.Export(ctx) (slice 6a §13, rule 26): the store's state after its lastSeq as archive parts, read page by page with plain reads while
@@ -195,8 +196,19 @@ internal static partial class StoreInternal
 
     /// <summary><paramref name="task"/>, or a cancellation once <paramref name="signal"/> aborts (upstream <c>awaitWithContext</c>, which the
     /// store's export and import use): an aborted signal fails at once, even for a settled task.</summary>
-    internal static Task<T> AwaitWithContext<T>(Task<T> task, CancellationToken signal) =>
-        signal.IsCancellationRequested ? Task.FromCanceled<T>(signal) : task.WaitAsync(signal);
+    internal static async Task<T> AwaitWithContext<T>(Task<T> task, CancellationToken signal)
+    {
+        try
+        {
+            signal.ThrowIfCancellationRequested();
+            return await task.WaitAsync(signal).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (signal.IsCancellationRequested)
+        {
+            ChordContext.ObserveAbandoned(task);
+            throw;
+        }
+    }
 
     /// <summary>The error of a use of an aborted export: <c>aborted</c>, the token's cancellation as the cause (upstream <c>aborted</c>, whose
     /// cause is the signal's reason).</summary>

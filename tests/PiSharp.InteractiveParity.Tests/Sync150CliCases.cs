@@ -922,6 +922,34 @@ internal static class Sync150CliCases
             }
         });
 
+        // v1.7.0 (fb0fe823): a TypeScript extension can override the blocked reason on each dialog;
+        // terminal status identifies the dialog by the first line, while the screen retains its full title.
+        foreach (var (method, kind) in new[] { ("select", "auth"), ("confirm", "question"), ("input", "permission") })
+        {
+            yield return ("sync170.extension-dialog-blocked-kind-and-first-line-" + method, async () =>
+            {
+                await using var pi = new InteractiveHarness("sync170-dialog-status");
+                pi.Vars["PI_PROGRAM_STATUS"] = "1";
+                var extension = pi.Write("prompts.mjs", """
+                    export default pi => pi.registerCommand("ask", {
+                        handler: async (method, ctx) => {
+                            const title = "First line\r\nSecond line";
+                            if (method === "select") return await ctx.ui.select(title, ["Local"], { blockedKind: "auth" });
+                            if (method === "confirm") return await ctx.ui.confirm(title, "Continue?", { blockedKind: "question" });
+                            return await ctx.ui.input(title, "", { blockedKind: "permission" });
+                        }
+                    });
+                    """);
+                pi.Start("--provider", "anthropic", "--model", "claude-sonnet-4-5", "-e", extension);
+                await pi.WaitFor("escape interrupt");
+                await pi.Submit("/ask " + method);
+                await WaitStatus(pi, Blocked(kind, "First line"));
+                pi.Type("\x1b");
+                await pi.WaitUntil(_ => !LastStatus(pi).Contains("state=blocked", StringComparison.Ordinal), "dialog closes");
+                Equal(0, await pi.Quit(), "exit code");
+            });
+        }
+
         // interactive-mode.ts pushExtensionDialog/removeExtensionDialog/showTopExtensionDialog (1.4.0): a new dialog hides the visible
         // one, closing the visible one shows the previous one again, a dialog opened from inside another works, aborting a hidden
         // dialog settles it, and the blocked program status follows the visible dialog.

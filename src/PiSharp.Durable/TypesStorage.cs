@@ -1,4 +1,4 @@
-// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/src/types.ts (scans, cursors, document addressing, storage writes
+// Pi fb0fe823539f6d04850f6e34748c01f01f212e1f (MIT): packages/durable/src/types.ts (scans, cursors, document addressing, storage writes
 // and the Storage interface; split from Types.cs). Spec §10 is the normative contract.
 // Pi v1.5.0 sync (area storage-batches): Storage.commit(batches, receive, context) and CommitResult, the optional publishing scope, and
 // mintId's narrowed contract.
@@ -281,7 +281,10 @@ public sealed record DocumentRetireWrite(DocumentId Id) : StorageWrite
 /// one was refused, if one was.</summary>
 /// <param name="Stored">How many of the batches, from the first, are durable.</param>
 /// <param name="Refused">Why the batch after them was refused (upstream <c>refused</c>), or null when none was.</param>
-public sealed record CommitResult(int Stored, Exception? Refused = null);
+public sealed record CommitResult(int Stored, Exception? Refused = null)
+{
+    public string Kind => Refused is null ? "stored" : "refused";
+}
 
 /// <summary>
 /// Atomic persistence boundary for Session records (upstream <c>Storage</c>, spec §10).

@@ -127,7 +127,7 @@ internal static class InteractiveModeHost
             if (completed == run && run.IsFaulted) throw run.Exception!.InnerException ?? run.Exception;
             if (exitRequested.Task.IsCompleted) exitCode = await exitRequested.Task;
             runCancellation.Cancel();
-            resumeCommand = await loop.InvokeAsync(mode.FormatResumeCommand);
+            if (!token.IsCancellationRequested) resumeCommand = await loop.InvokeAsync(mode.FormatResumeCommand);
         }
         catch (Exception error)
         {
@@ -138,7 +138,10 @@ internal static class InteractiveModeHost
         }
         finally
         {
-            if (mode is not null)
+            // On a signal the terminal may already have gone away. Let extension session_shutdown
+            // and process cleanup finish before attempting the terminal restore.
+            var signalExit = token.IsCancellationRequested;
+            if (!signalExit && mode is not null)
                 try { await loop.InvokeAsync(() => mode.Stop()); } catch { }
             Interlocked.Exchange(ref userQuit, 1);
             connection.CompleteInput();
@@ -155,6 +158,8 @@ internal static class InteractiveModeHost
                 catch (Exception) { exitCode = exitCode == 0 ? 1 : exitCode; }
             }
             try { await connection.DisposeAsync(); } catch { }
+            if (signalExit && mode is not null)
+                try { await loop.InvokeAsync(() => mode.Stop()); } catch { }
             loop.Stop();
         }
         foreach (var line in consoleLines) await stdout.WriteLineAsync(line);

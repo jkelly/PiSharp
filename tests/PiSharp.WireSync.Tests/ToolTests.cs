@@ -62,7 +62,7 @@ internal static class ToolTests
     }
 
     private static void BashSchema() => Equal(
-        """{"type":"object","properties":{"output":{"type":"string","description":"Combined stdout and stderr, possibly truncated"},"truncated":{"type":"boolean"},"full_output_path":{"type":"string","description":"Full output, when truncated"},"exit_code":{"type":"number"},"wall_time_seconds":{"type":"number"}},"required":["output","truncated","exit_code","wall_time_seconds"]}""",
+        """{"type":"object","properties":{"output":{"type":"string","description":"Combined stdout and stderr, possibly truncated"},"truncated":{"type":"boolean"},"full_output_path":{"type":"string","description":"Full output, when truncated"},"full_output_error":{"type":"string","description":"Why the full output could not be saved, when truncated and saving failed"},"exit_code":{"type":"number"},"wall_time_seconds":{"type":"number"}},"required":["output","truncated","exit_code","wall_time_seconds"]}""",
         BashTool.OutputSchema.ToString());
 
     private static async Task Spill()

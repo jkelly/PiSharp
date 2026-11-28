@@ -220,10 +220,10 @@ internal static partial class Program
             var selection = await request.ResolveAsync(null, custom ?? runtime, diagnostics, false, CancellationToken.None);
             return (selection, diagnostics.ToString());
         }
-        // gpt-4 exists for azure and openai; only openai is authenticated.
-        Equal("openai/gpt-4", (await Select(new(null, "gpt-4", null))).Selection.Model.Provider + "/gpt-4", "sole authenticated provider");
-        var ambiguous = await ThrowsAsync<LiveSessionException>(() => Select(new(null, "gpt-4", null), new LiveSessionRuntime(Env(), () => endpoint)), "ambiguous");
-        Equal("Model \"gpt-4\" is ambiguous across providers: azure/gpt-4, openai/gpt-4. No matching provider is authenticated. Use --provider or provider/model.", ambiguous.Message, "ambiguous");
+        // gpt-4o-2024-11-20 exists for azure and openai; only openai is authenticated.
+        Equal("openai/gpt-4o-2024-11-20", (await Select(new(null, "gpt-4o-2024-11-20", null))).Selection.Model.Provider + "/gpt-4o-2024-11-20", "sole authenticated provider");
+        var ambiguous = await ThrowsAsync<LiveSessionException>(() => Select(new(null, "gpt-4o-2024-11-20", null), new LiveSessionRuntime(Env(), () => endpoint)), "ambiguous");
+        Equal("Model \"gpt-4o-2024-11-20\" is ambiguous across providers: azure/gpt-4o-2024-11-20, openai/gpt-4o-2024-11-20. No matching provider is authenticated. Use --provider or provider/model.", ambiguous.Message, "ambiguous");
         var thinking = await Select(new(null, "groq/gpt-oss-120b:high", null));
         Check(thinking.Selection.Model.Id == "openai/gpt-oss-120b" && thinking.Selection.PatternThinkingLevel == "high", "fuzzy id with :high");
         var explicitThinking = await Select(new(null, "groq/gpt-oss-120b:high", null) { CliThinking = "low" });
@@ -244,7 +244,7 @@ internal static partial class Program
         Check(endpoint.Snapshot()[^1].Body!.Contains("\"my-deployment\"", StringComparison.Ordinal), "azure custom id sent: " + endpoint.Snapshot()[^1].Body);
         var unknown = await ThrowsAsync<LiveSessionException>(() => Select(new(null, "no-such-model-anywhere", null)), "unknown");
         Check(unknown.Code == "UnknownLiveModel" && unknown.Message == "Model \"no-such-model-anywhere\" not found. Use --list-models to see available models.", unknown.Message);
-        Equal("LiveOutputLimit", (await ThrowsAsync<LiveSessionException>(() => Select(new("openai", "gpt-4-turbo", "8192")), "limit")).Code, "output limit");
+        Equal("LiveOutputLimit", (await ThrowsAsync<LiveSessionException>(() => Select(new("huggingface", "meta-llama/Llama-3.1-70B-Instruct", "8192")), "limit")).Code, "output limit");
     }
 
     private static async Task LiveScoped()

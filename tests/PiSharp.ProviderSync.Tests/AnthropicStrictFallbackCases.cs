@@ -92,15 +92,21 @@ internal static partial class Program
     }
 
     // Each strict-limit rejection is retried once with preferred tools non-strict and their original schema; required and ordinary tools
-    // are resent unchanged; onPayload sees both payloads (stream forced on), onResponse only the accepted response.
+    // are resent unchanged; onPayload sees both payloads (stream forced on), onResponse sees each status in send order.
     private static async Task AnthropicStrictFallbackRetries()
     {
         foreach (var rejection in StrictLimitErrors)
         foreach (var hooked in new[] { false, true })
         {
             var endpoint = new StrictEndpoint(attempt => attempt == 1 ? StrictRejection(rejection) : StrictSuccess());
-            var payloadCalls = 0; var responseCalls = 0;
-            var hooks = !hooked ? null : new AnthropicMessagesHooks(OnResponse: (_, _, _) => { responseCalls++; return Task.CompletedTask; })
+            var payloadCalls = 0; var statuses = new List<int>();
+            var hooks = !hooked ? null : new AnthropicMessagesHooks(OnResponse: (response, _, _) =>
+            {
+                statuses.Add(response.Status);
+                if (response.Status == 400) Check(response.Headers["content-type"].StartsWith("application/json", StringComparison.Ordinal),
+                    "Rejected response headers must be observable before the strict fallback.");
+                return Task.CompletedTask;
+            })
             {
                 OnPayload = (payload, _, _) =>
                 {
@@ -114,7 +120,7 @@ internal static partial class Program
             Equal(StopReason.Stop, message.StopReason);
             Check(events[0] is StreamStarted && events[^1] is StreamDone && events.Count == 2, "Unexpected events: " + string.Join(",", events.Select(item => item.GetType().Name)));
             Equal(2, endpoint.Payloads.Count);
-            if (hooked) { Equal(2, payloadCalls); Equal(1, responseCalls); }
+            if (hooked) { Equal(2, payloadCalls); Check(statuses.SequenceEqual([400, 200]), "Both the rejected and accepted responses reach onResponse."); }
             var first = StrictTools(endpoint.Payloads[0]); var second = StrictTools(endpoint.Payloads[1]);
             Equal("true", Strictness(first[0])); Equal(StrictLookupSchema, first[0]!["input_schema"]!.ToJsonString());
             Equal(null, Strictness(second[0])); Equal(PlainLookupSchema, second[0]!["input_schema"]!.ToJsonString());

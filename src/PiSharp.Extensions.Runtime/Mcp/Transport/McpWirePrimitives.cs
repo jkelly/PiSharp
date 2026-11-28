@@ -17,6 +17,15 @@ internal static class McpWireJson
     internal static JsonData Json(object value) => JsonData.Parse(JsonSerializer.Serialize(value));
     internal static bool Id(JsonElement value) => value.ValueKind == JsonValueKind.String || value.ValueKind == JsonValueKind.Number && value.TryGetDouble(out var number) && double.IsFinite(number);
     internal static string Key(JsonElement value) => value.ValueKind == JsonValueKind.String ? "s:" + value.GetString() : "n:" + value.GetDouble().ToString("R", System.Globalization.CultureInfo.InvariantCulture);
+    // Some servers echo our numeric IDs as decimal strings. Server-originated IDs retain their wire type.
+    internal static string OwnRequestKey(JsonElement value)
+    {
+        if (value.ValueKind == JsonValueKind.String && value.GetString() is { Length: > 0 } id &&
+            (id.Length == 1 || id[0] != '0') && id.All(char.IsAsciiDigit))
+            return "n:" + id;
+        return Key(value);
+    }
+
     internal static JsonData Validate(JsonData message)
     {
         var value = message.Value;

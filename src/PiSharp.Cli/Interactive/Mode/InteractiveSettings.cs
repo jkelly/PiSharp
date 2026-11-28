@@ -238,8 +238,8 @@ internal sealed class InteractiveSettings
     public void SetCacheWarmingMode(string mode) => Set("cacheWarming", mode);
     public bool HideThinkingBlock => Bool(Get("hideThinkingBlock")) ?? false;
     public void SetHideThinkingBlock(bool hide) => Set("hideThinkingBlock", hide);
-    public bool ShowCacheMissNotices => Bool(Get("showCacheMissNotices")) ?? false;
-    public void SetShowCacheMissNotices(bool show) => Set("showCacheMissNotices", show);
+    public bool Notice(string key) => Bool(Get("notices", key)) ?? false;
+    public void SetNotice(string key, bool shown) => SetNested("notices", key, shown);
     public string ExternalEditorCommand
     {
         get
@@ -257,8 +257,6 @@ internal sealed class InteractiveSettings
     public void SetDefaultProjectTrust(string value) => Set("defaultProjectTrust", value);
     public bool CollapseChangelog => Bool(Get("collapseChangelog")) ?? false;
     public void SetCollapseChangelog(bool collapse) => Set("collapseChangelog", collapse);
-    public bool EnableInstallTelemetry => Bool(Get("enableInstallTelemetry")) ?? true;
-    public void SetEnableInstallTelemetry(bool enabled) => Set("enableInstallTelemetry", enabled);
     public string GetOrCreateDeviceId()
     {
         if (Str(global["deviceId"]) is { Length: > 0 } id) return id;

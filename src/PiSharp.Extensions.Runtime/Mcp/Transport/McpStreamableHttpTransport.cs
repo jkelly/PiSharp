@@ -218,7 +218,7 @@ public sealed class McpStreamableHttpTransport : IMcpWireTransport
                 var message = McpWireJson.Validate(JsonData.Parse(data.ToString()));
                 await receiver.Receive(message).ConfigureAwait(false);
                 var value = message.Value;
-                if (responseId is not null && !value.TryGetProperty("method", out _) && value.TryGetProperty("id", out var id) && McpWireJson.Key(id) == responseId) cursor.Answered = true;
+                if (responseId is not null && !value.TryGetProperty("method", out _) && value.TryGetProperty("id", out var id) && McpWireJson.OwnRequestKey(id) == responseId) cursor.Answered = true;
             }
             data.Clear(); eventName = null; hasData = false; dataBytes = 0;
         }

@@ -6,8 +6,8 @@
     <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="PiSharp.Agent" Version="1.6.0.1" />
-    <PackageReference Include="PiSharp.AI" Version="1.6.0.1" />
-    <PackageReference Include="PiSharp.Contracts" Version="1.6.0.1" />
+    <PackageReference Include="PiSharp.Agent" Version="1.7.0" />
+    <PackageReference Include="PiSharp.AI" Version="1.7.0" />
+    <PackageReference Include="PiSharp.Contracts" Version="1.7.0" />
   </ItemGroup>
 </Project>

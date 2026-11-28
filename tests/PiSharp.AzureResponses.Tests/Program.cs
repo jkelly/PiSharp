@@ -188,7 +188,7 @@ internal static class Program
             [new ToolCallContent("call-prev|fc_prev", "inspect", JsonData.Parse("{\"x\":1}"))], TokenUsage.Zero, StopReason.ToolUse);
         var request = new ChatRequest(Model, [new("assistant", PiWireJson.WriteMessage(assistant)),
             new("toolResult", JsonData.Parse("""{"role":"toolResult","toolCallId":"call-prev|fc_prev","toolName":"inspect","content":[{"type":"text","text":"done"}],"isError":false,"timestamp":3}"""))]);
-        BodyEqual("""{"model":"catalog-model","input":[{"type":"function_call","call_id":"call-prev","name":"inspect","arguments":"{\"x\":1}","id":"fc_prev"},{"type":"function_call_output","call_id":"call-prev","output":"done"}],"stream":true,"store":false}""",
+        BodyEqual("""{"model":"catalog-model","input":[{"type":"function_call","call_id":"call-prev","name":"inspect","arguments":"{\"x\":1}","id":"fc_prev","status":"completed"},{"type":"function_call_output","call_id":"call-prev","output":"done"}],"stream":true,"store":false}""",
             Factory().ProjectPayload(request).ToString());
         var openAiModel = Model with { Api = "openai-responses", Provider = "openai" };
         var openAiFactory = new ResponsesKeyAuthRequestFactory(new("https://openai.invalid/v1/responses"), openAiModel, new(false));
@@ -205,7 +205,7 @@ internal static class Program
             [new ToolCallContent("call-prev|fc_prev", "inspect", JsonData.Parse("{\"x\":1}"))], TokenUsage.Zero, StopReason.ToolUse);
         ChatRequest Replay(ModelDescriptor model) => new(model, [new("assistant", PiWireJson.WriteMessage(foreign)),
             new("toolResult", JsonData.Parse("""{"role":"toolResult","toolCallId":"call-prev|fc_prev","toolName":"inspect","content":[{"type":"text","text":"done"}],"isError":false,"timestamp":3}"""))]);
-        string Body(string callId, string item = "") => """{"model":"catalog-model","input":[{"type":"function_call","call_id":"CALL","name":"inspect","arguments":"{\"x\":1}"ITEM},{"type":"function_call_output","call_id":"CALL","output":"done"}],"stream":true,"store":false}"""
+        string Body(string callId, string item = "") => """{"model":"catalog-model","input":[{"type":"function_call","call_id":"CALL","name":"inspect","arguments":"{\"x\":1}"ITEM,"status":"completed"},{"type":"function_call_output","call_id":"CALL","output":"done"}],"stream":true,"store":false}"""
             .Replace("CALL", callId, StringComparison.Ordinal).Replace("ITEM", item, StringComparison.Ordinal);
         // "azure" pairs the call id with a hashed foreign item id: "fc_" + shortHash("fc_prev") (buildForeignResponsesItemId).
         BodyEqual(Body("call-prev", ",\"id\":\"fc_n1cvm3dhq11\""), Factory().ProjectPayload(Replay(Model)).ToString());
@@ -355,7 +355,12 @@ internal static class Program
         })
         {
             var body = new Body(wire); using var handler = new Handler(body, HttpStatusCode.Forbidden); using var client = new HttpClient(handler);
-            var events = await Drain(Transport(client).StreamAsync(Request())); Equal(1, events.Count); Equal(expected, Error(events));
+            var observed = new List<int>();
+            var options = Options() with { Hooks = new(OnResponse: (info, _, _) => {
+                observed.Add(info.Status); return ValueTask.CompletedTask;
+            }) };
+            var events = await Drain(Transport(client, options).StreamAsync(Request())); Equal(1, events.Count); Equal(expected, Error(events));
+            Check(observed.SequenceEqual([403]), "rejected response metadata must reach the hook once");
             Check(events[0] is StreamError && handler.ContentDisposed && body.Disposed && handler.SendCalls == 1, "HTTP rejection ownership/retry differs."); await RequestDisposed(handler.Requests.Single());
         }
         var longText = new string('x', 4100); var longBody = new Body(JsonSerializer.Serialize(new { error = new { message = longText } }));

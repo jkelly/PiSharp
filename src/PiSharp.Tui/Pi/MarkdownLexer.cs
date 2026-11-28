@@ -459,7 +459,7 @@ public static partial class MarkdownLexer
         if (closingIndex < 0)
         {
             var pending = source[opening.Length..];
-            if (opening.StartsWith('\\') || PendingMath().IsMatch(pending)) return new() { Type = "latex", Raw = source, Text = pending, Pending = true };
+            if (opening.StartsWith('\\') || (pending.Length > 0 && !char.IsAsciiDigit(pending[0]) && !pending.Contains('\n') && PendingMath().IsMatch(pending))) return new() { Type = "latex", Raw = source, Text = pending, Pending = true };
             return null;
         }
         var text = source[opening.Length..closingIndex];

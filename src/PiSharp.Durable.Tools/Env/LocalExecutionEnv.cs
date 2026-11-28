@@ -2,7 +2,7 @@
 // streamed output, spill, cancellation, timeout and cleanup; the FileSystem half is LocalFileSystem, which this class extends).
 // Intentional differences, each following PiSharp's coding-agent bash tool:
 // - Shell discovery is PiSharp.Tools' ShellDiscovery (upstream getShellConfig): the configured shell path, then on Windows Git Bash under
-//   ProgramFiles and ProgramFiles(x86) and bash.exe on PATH, on Unix /bin/bash, bash on PATH, then sh. Unlike upstream's `where bash.exe`,
+//   ProgramFiles and ProgramFiles(x86), Git for Windows identified by git.exe on PATH, then bash.exe on PATH, on Unix /bin/bash, bash on PATH, then sh. Unlike upstream's `where bash.exe`,
 //   the working directory is not searched, so a workspace file cannot shadow the shell; there is no PowerShell or cmd fallback, as upstream
 //   has none ("No bash shell found" is shell_unavailable, with upstream's text).
 // - A command's processes live in a private job (Windows) or process group (Linux, macOS), see LocalProcess. Abort, timeout and cleanup

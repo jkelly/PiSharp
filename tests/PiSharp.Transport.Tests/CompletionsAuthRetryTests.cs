@@ -62,8 +62,8 @@ internal static class CompletionsAuthRetryTests
             if (row.Directive is not null) fixture.ResponseHeaders["x-should-retry"] = row.Directive;
             var result = await fixture.Complete();
             Check(fixture.Handler.Sends == row.Sends && fixture.PayloadCalls == 1 && fixture.FactoryCalls == 1 &&
-                fixture.ResponseCalls == (row.Success ? 1 : 0) && result.Message.StopReason == (row.Success ? StopReason.Stop : StopReason.Error),
-                "Actual source HTTP retry/accepted callback policy changed.");
+                fixture.ResponseStatuses.SequenceEqual(row.Statuses) && result.Message.StopReason == (row.Success ? StopReason.Stop : StopReason.Error),
+                "Expected an onResponse for each HTTP attempt in order.");
             Check(fixture.Decisions.Count == row.Sends - 1 && fixture.Decisions.Select(value => value.RetryIndex).SequenceEqual(Enumerable.Range(0, row.Sends - 1)), "Native retry provenance is missing or fabricated.");
             Check(fixture.Handler.Requests.All(request => Header(request, "x-stainless-retry-count") == (callerRetry ? "42" : "0")), "Native outer index replaced fresh SDK retry-count zero/caller override.");
             Check(fixture.Handler.Bodies.Distinct(StringComparer.Ordinal).Count() == 1 && fixture.Handler.Requests.Distinct(ReferenceEqualityComparer.Instance).Count() == row.Sends &&
@@ -193,7 +193,15 @@ internal static class CompletionsAuthRetryTests
             while (!(await run.NextAsync()).Done) { }
             var source = await run.SourceResult; var native = await run.CanonicalCompletion;
             Check(source.Snapshot.Raw.Value.GetProperty("value").GetProperty("stopReason").GetString() == "stop" && native.Message.StopReason == StopReason.Stop &&
-                fixture.Handler.Sends == 3 && fixture.FactoryCalls == 1 && fixture.PayloadCalls == 1 && fixture.ResponseCalls == 1, "Actual source startup did not honor preparation retry ownership."); Closed(fixture);
+                fixture.Handler.Sends == 3 && fixture.FactoryCalls == 1 && fixture.PayloadCalls == 1 && fixture.ResponseStatuses.SequenceEqual([429, 500, 200]), "Actual source startup did not honor preparation retry ownership."); Closed(fixture);
+        }
+        using (var fixture = new Fixture([429, 200], new(1)) { FailureStage = "response" })
+        {
+            var result = await fixture.Complete();
+            Check(result.Message.StopReason == StopReason.Error && fixture.Handler.Sends == 1 &&
+                fixture.ResponseStatuses.SequenceEqual([429]) && fixture.Decisions.Count == 0,
+                "A rejected response hook failure must stop before retrying.");
+            Clean(result); Closed(fixture);
         }
         foreach (var stage in new[] { "factory", "payload", "response", "stream", "retry-observer" })
         {
@@ -221,7 +229,8 @@ internal static class CompletionsAuthRetryTests
     {
         public Handler Handler { get; } public HttpClient Client { get; } public CompletionsHttpSseTransport Transport { get; }
         public Dictionary<string, string> ResponseHeaders => Handler.Headers;
-        public int FactoryCalls, PayloadCalls, ResponseCalls; public string? FailureStage; public bool AddRequestOptions, AddEmptyHeaders;
+        public List<int> ResponseStatuses { get; } = [];
+        public int FactoryCalls, PayloadCalls; public string? FailureStage; public bool AddRequestOptions, AddEmptyHeaders;
         public JsonData? PayloadReplacement;
         public object Opaque { get; } = new(); public HttpRequestMessage? CreatedRequest;
         public List<CompletionsRetryObservation> Decisions { get; } = []; public Action<CompletionsRetryObservation>? OnDecision;
@@ -231,7 +240,7 @@ internal static class CompletionsAuthRetryTests
             var factory = Factory(new(Headers: JsonData.Parse(headers)));
             var hooks = new CompletionsLifecycleHooks {
                 OnPayload = (_, _, _) => { PayloadCalls++; if (FailureStage == "payload") throw new HttpRequestException("PRIVATE_PAYLOAD"); return ValueTask.FromResult(PayloadReplacement); },
-                OnResponse = (_, _, _) => { ResponseCalls++; if (FailureStage == "response") throw new HttpRequestException("PRIVATE_RESPONSE"); return ValueTask.CompletedTask; },
+                OnResponse = (response, _, _) => { ResponseStatuses.Add(response.Status); if (FailureStage == "response") throw new HttpRequestException("PRIVATE_RESPONSE"); return ValueTask.CompletedTask; },
                 OnProviderStreamEvent = (_, _, _) => { if (FailureStage == "stream") throw new HttpRequestException("PRIVATE_STREAM"); return ValueTask.CompletedTask; } };
             Transport = CompletionsHttpSseTransport.FromAsyncRequestFactory(Client, async (request, token) => {
                 FactoryCalls++; if (FailureStage == "factory") throw new HttpRequestException("PRIVATE_FACTORY");

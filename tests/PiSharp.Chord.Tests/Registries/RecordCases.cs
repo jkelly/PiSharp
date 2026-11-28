@@ -203,6 +203,19 @@ internal static partial class Program
             Equal(start + 1, metered.Counts().GetValueOrDefault("chord.registry.composes"), "one compose");
             host.Close();
         }),
+        Case("registries.record.changed-version-cannot-return-an-older-versions-last-good-composition", async () =>
+        {
+            var first = Registry.Define<int, int>("app.count", new() { Version = 1 });
+            var next = Registry.Define<int, int>("app.count", new() { Version = 2 });
+            var host = new RegistryHost();
+            host.Load(("@app/count", facet => facet.Serve(first, new RegistryProvider<int, int> { Compose = (_, _) => 42 })));
+            Equal(42, (await host.RegistryAsync(first)).Value, "first version");
+            host.Reload("@app/count", facet => facet.Serve(next, new RegistryProvider<int, int>
+                { Compose = (_, _) => throw new InvalidOperationException("second version failed") }));
+            var error = Throws<InvalidOperationException>(() => _ = host.Record("app.count").Value<int>(2).Value, "failed composition");
+            Equal("second version failed", error.Message, "new version owns its failure");
+            host.Close();
+        }),
         Case("registries.record.compose-reports-a-conflict-once-per-episode", async () =>
         {
             var routes = Registry.Define<IReadOnlyDictionary<string, string>, IReadOnlyDictionary<string, TableItem<string>>>("app.routes", new() { Version = 1 });

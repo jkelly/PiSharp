@@ -53,6 +53,11 @@ internal sealed partial class InteractiveMode : IRpcExtensionUiPresentationObser
             {
                 if (openRpcDialogs.ContainsKey(id)) return;
                 var title = S(request["title"]) ?? "";
+                var blocked = BlockedStatus.ForDialog(S(request["blockedKind"]) switch
+                {
+                    "auth" => ProgramBlockedKind.Auth, "permission" => ProgramBlockedKind.Permission, "question" => ProgramBlockedKind.Question,
+                    _ => method == "confirm" ? ProgramBlockedKind.Permission : ProgramBlockedKind.Question
+                }, title);
                 var answered = false;
                 // Pi 1.4.0: each dialog closes on its own (the stack shows the one below); a retired request closes only its dialog.
                 var close = new CancellationTokenSource();
@@ -63,18 +68,18 @@ internal sealed partial class InteractiveMode : IRpcExtensionUiPresentationObser
                     case "select":
                     {
                         var options = request["options"] is JsonArray array ? array.Select(S).OfType<string>().ToList() : [];
-                        _ = ShowExtensionSelectorAsync(title, options, timeout, signal: close.Token).ContinueWith(task =>
+                        _ = ShowExtensionSelectorAsync(title, options, timeout, blocked, close.Token).ContinueWith(task =>
                             context.Loop.Post(() => Answer(task.Result is { } value ? new JsonObject { ["value"] = value } : new JsonObject { ["cancelled"] = true })),
                             TaskScheduler.Default);
                         break;
                     }
                     case "confirm":
-                        _ = ShowExtensionSelectorAsync($"{title}\n{S(request["message"])}", ["Yes", "No"], timeout, new BlockedStatus(ProgramBlockedKind.Permission, title), close.Token)
+                        _ = ShowExtensionSelectorAsync($"{title}\n{S(request["message"])}", ["Yes", "No"], timeout, blocked, close.Token)
                             .ContinueWith(task => context.Loop.Post(() => Answer(task.Result is null ? new JsonObject { ["cancelled"] = true } : new JsonObject { ["confirmed"] = task.Result == "Yes" })),
                                 TaskScheduler.Default);
                         break;
                     case "input":
-                        _ = ShowExtensionInputAsync(title, S(request["placeholder"]), timeout, close.Token).ContinueWith(task =>
+                        _ = ShowExtensionInputAsync(title, S(request["placeholder"]), timeout, close.Token, blocked).ContinueWith(task =>
                             context.Loop.Post(() => Answer(task.Result is { } value ? new JsonObject { ["value"] = value } : new JsonObject { ["cancelled"] = true })),
                             TaskScheduler.Default);
                         break;
@@ -164,19 +169,19 @@ internal sealed partial class InteractiveMode : IRpcExtensionUiPresentationObser
         }
         selector = new ExtensionSelectorComponent(title, options, option => Finish(option), () => Finish(null),
             new ExtensionSelectorOptions(ui, timeout, ToggleToolOutputExpansion, description));
-        PushExtensionDialog(selector, blocked ?? new BlockedStatus(ProgramBlockedKind.Question, title), selector.Dispose);
+        PushExtensionDialog(selector, blocked ?? BlockedStatus.ForDialog(ProgramBlockedKind.Question, title), selector.Dispose);
         registration = signal.Register(() => context.Loop.Post(() => Finish(null)));
         return result.Task;
     }
 
     internal async Task<bool> ShowExtensionConfirmAsync(string title, string message, double? timeout = null)
     {
-        var result = await ShowExtensionSelectorAsync($"{title}\n{message}", ["Yes", "No"], timeout, new BlockedStatus(ProgramBlockedKind.Permission, title));
+        var result = await ShowExtensionSelectorAsync($"{title}\n{message}", ["Yes", "No"], timeout, BlockedStatus.ForDialog(ProgramBlockedKind.Permission, title));
         return result == "Yes";
     }
 
     /// <summary>A text input for extensions; resolves with the value or null when cancelled, timed out or aborted.</summary>
-    internal Task<string?> ShowExtensionInputAsync(string title, string? placeholder, double? timeout = null, CancellationToken signal = default)
+    internal Task<string?> ShowExtensionInputAsync(string title, string? placeholder, double? timeout = null, CancellationToken signal = default, BlockedStatus? blocked = null)
     {
         var result = new TaskCompletionSource<string?>(TaskCreationOptions.RunContinuationsAsynchronously);
         if (signal.IsCancellationRequested) { result.TrySetResult(null); return result.Task; }
@@ -193,7 +198,7 @@ internal sealed partial class InteractiveMode : IRpcExtensionUiPresentationObser
             result.TrySetResult(value);
         }
         input = new ExtensionInputComponent(title, placeholder, value => Finish(value), () => Finish(null), new ExtensionInputOptions(ui, timeout));
-        PushExtensionDialog(input, new BlockedStatus(ProgramBlockedKind.Question, title), input.Dispose);
+        PushExtensionDialog(input, blocked ?? BlockedStatus.ForDialog(ProgramBlockedKind.Question, title), input.Dispose);
         registration = signal.Register(() => context.Loop.Post(() => Finish(null)));
         return result.Task;
     }
@@ -217,7 +222,7 @@ internal sealed partial class InteractiveMode : IRpcExtensionUiPresentationObser
         }
         dialog = new ExtensionEditorComponent(ui, keybindings.Manager, title, prefill, value => Finish(value), () => Finish(null),
             description is null ? null : new ExtensionEditorOptions(Description: description), settings.ExternalEditorCommand);
-        PushExtensionDialog(dialog, new BlockedStatus(ProgramBlockedKind.Question, title));
+        PushExtensionDialog(dialog, BlockedStatus.ForDialog(ProgramBlockedKind.Question, title));
         registration = signal.Register(() => context.Loop.Post(() => Finish(null)));
         return result.Task;
     }

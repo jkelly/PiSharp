@@ -163,6 +163,33 @@ internal static class Program
             Check(!IsRunning(foreground!.Pid), "close kills foreground job");
             Check((await Throws<RemoteError>(async () => await terminal.ForegroundAsync())).Code == "EBADF", "terminal removed after close");
         });
+        foreach (var closeTerminal in new[] { false, true })
+        {
+            await Case("native-terminal-background-job-ends-on-" + (closeTerminal ? "close" : "exit"), async () =>
+            {
+                await using var connection = Connect("--daemon");
+                var output = new Collector();
+                await using var terminal = await RemoteTerminal.OpenAsync(connection, Options("/bin/sh", output) with
+                {
+                    Argv = ["/bin/sh", "-c", "set -m; (trap '' HUP; exec sleep 30) & printf 'JOB:%s:END\\n' $!; read line"]
+                });
+                await output.WaitForAsync(":END");
+                var start = output.Text.IndexOf("JOB:", StringComparison.Ordinal) + 4;
+                var pid = int.Parse(output.Text[start..output.Text.IndexOf(":END", StringComparison.Ordinal)]);
+                if (closeTerminal)
+                {
+                    terminal.Close();
+                    await Throws<RemoteError>(async () => await terminal.Exited);
+                }
+                else
+                {
+                    terminal.Write("done\n");
+                    Check(await terminal.Exited == 0, "shell exited normally");
+                }
+                for (var attempt = 0; attempt < 100 && IsRunning(pid); attempt++) await Task.Delay(20);
+                Check(!IsRunning(pid), "background process group ended with its owning terminal");
+            });
+        }
         await Case("native-terminal-ordered-input-and-missing-executable", async () =>
         {
             await using var connection = Connect("--daemon"); var output = new Collector();

@@ -1,3 +1,4 @@
+// Pi fb0fe823539f6d04850f6e34748c01f01f212e1f (MIT): packages/chord/src/host/read-declarations.ts (v1.7.0 updates).
 // Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/chord/src/host/read-declarations.ts, and the declarations of
 // packages/chord/src/host/{attempt,staging}.ts that use it (queries, liveQuery, count, list).
 //
@@ -86,7 +87,7 @@ internal static class ReadDeclarations
         {
             if (entry?.Build is null) throw new ArgumentException($"{label}: self.queries: \"{name}\" has no builder");
             // The builder is plugin code: what it returns is checked when a read opens.
-            named.Add((name, entry, entry.Args is null ? null : ContractsInternal.SnapshotArguments(entry.Args, $"{label}: query \"{name}\": args")));
+            named.Add((name, entry, entry.Args is null ? null : ContractsInternal.QueryArguments(entry.Args, $"{label}: query \"{name}\": args")));
         }
         return named;
     }

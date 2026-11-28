@@ -230,7 +230,8 @@ internal static partial class Program
         foreach (var (old, replacement) in Pi120TextChanges) line = line.Replace(old, replacement, StringComparison.Ordinal);
         foreach (var (old, replacement) in Pi150TextChanges) line = line.Replace(old, replacement, StringComparison.Ordinal);
         foreach (var (old, replacement) in Pi160TextChanges) line = line.Replace(old, replacement, StringComparison.Ordinal);
-        return line;
+        // Pi 1.7.0 core/tools/bash.ts adds the optional spill failure to its generated tool declaration.
+        return line.Replace("full_output_path?, exit_code, wall_time_seconds", "full_output_path?, full_output_error?, exit_code, wall_time_seconds", StringComparison.Ordinal);
     }
 
     /// <summary>Authored, not captured: Pi f9a26365 (1.5.0) models.ts calculateCost ends with <c>usage.cost.totalFromProvider = false</c>,

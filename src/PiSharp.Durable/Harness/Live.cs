@@ -1,4 +1,4 @@
-// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/src/harness/live.ts (LiveDoc, endRun, compaction statuses and
+// Pi fb0fe823539f6d04850f6e34748c01f01f212e1f (MIT): packages/durable/src/harness/live.ts (LiveDoc, endRun, compaction statuses and
 // failures, tool slot lookup, finishing and nested slot removal, and settleSchedulerOutcome, the cleanup the scheduler runs for faulted and
 // orphaned outcomes). The state is upstream's JSON: {run?: {taskId, inputs, turns, first?, afterRun?: {tasks?}}, generation?: {attempt, message?, retry?, deferred?},
 // tools?: ToolSlot[], nestedTools?: NestedToolSlot[], compactions?: [...], compactionFailure?: {taskId, trigger, error}, runFailure?:
@@ -199,10 +199,13 @@ public static class Live
     /// The slot of tool task <paramref name="taskId"/>, model-issued or nested, if <c>pi.live</c> still lists it (upstream <c>toolSlot</c>).
     /// Nested slots are found by binary search: a tool may make thousands of nested calls, each of which looks up its slot in several commits.
     /// Their task IDs ascend: each slot is appended in the commit that creates its task, task IDs ascend in commit order, and removal keeps
-    /// the order. A nested slot is told apart by its <c>parentTaskId</c> (<see cref="IsNested"/>).
+    /// the order.
     /// </summary>
-    public static DraftObject? ToolSlot(DraftObject live, TaskId taskId)
+    public static DraftObject? ToolSlot(DraftObject live, TaskId taskId) => ToolSlot(live, taskId, out _);
+
+    internal static DraftObject? ToolSlot(DraftObject live, TaskId taskId, out bool nestedSlot)
     {
+        nestedSlot = false;
         if (live.ContainsKey("tools") && live.Get("tools") is JsonArrayValue)
         {
             var slots = live.GetArray("tools");
@@ -217,7 +220,11 @@ public static class Live
         {
             var middle = (int)((uint)(low + high) >> 1);
             var candidate = Id(((JsonObjectValue)nested.Get(middle))["taskId"]);
-            if (candidate == taskId.Value) return nested.GetObject(middle);
+            if (candidate == taskId.Value)
+            {
+                nestedSlot = true;
+                return nested.GetObject(middle);
+            }
             if (candidate < taskId.Value) low = middle + 1;
             else high = middle - 1;
         }
@@ -245,9 +252,6 @@ public static class Live
         }
         return null;
     }
-
-    /// <summary>Whether <paramref name="slot"/> is a nested call's (upstream <c>"parentTaskId" in slot</c>).</summary>
-    public static bool IsNested(DraftObject slot) => slot.ContainsKey("parentTaskId");
 
     /// <summary>Marks a slot done and clears its running output (upstream <c>finishSlot</c>); the caller sets a model-issued call's result
     /// <c>entry</c>, or a nested call's <c>summary</c>. Neither is set when the task faulted or was orphaned.</summary>

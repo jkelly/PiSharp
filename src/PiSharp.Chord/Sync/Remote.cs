@@ -1,4 +1,4 @@
-// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/chord/src/sync/remote.ts.
+// Pi fb0fe823539f6d04850f6e34748c01f01f212e1f (MIT): packages/chord/src/sync/remote.ts.
 using System.Text.Json.Nodes;
 
 namespace PiSharp.Chord.Sync;
@@ -12,7 +12,8 @@ public sealed record RemoteListing(IReadOnlyList<BatchInfo> Batches, IReadOnlyLi
 public sealed record RemoteHistory(long? Snapshot, IReadOnlyList<BatchInfo> Batches, long Head);
 public sealed record SessionSummary(string Id, long Head, JsonObject? Meta);
 public sealed record SessionChanges(IReadOnlyList<SessionSummary> Sessions, string Cursor, bool More);
-public sealed record PutBatchOptions(bool Archive = false, long? Epoch = null);
+public sealed record PutBatchOptions(bool Archive = false);
+public enum RefusalReason { ContentMismatch, NextIdRegression, ProtocolTooOld }
 
 public abstract record PutBatchResult
 {
@@ -20,7 +21,7 @@ public abstract record PutBatchResult
     public sealed record Created : PutBatchResult;
     public sealed record Exists(long To, string Device) : PutBatchResult;
     public sealed record NotHead(long Head) : PutBatchResult;
-    public sealed record StaleEpoch(long Epoch) : PutBatchResult;
+    public sealed record Refused(RefusalReason Reason) : PutBatchResult;
 }
 
 /// <summary>What an upload needs of a remote: creating slots (<c>SessionSync.UploadSessionAsync</c>).</summary>
@@ -59,6 +60,7 @@ public sealed class HistoryUnavailableError(long head) : Exception($"The remote 
 /// it: the newest snapshot or archive slot, whichever ends later.</summary>
 public static class SyncRemote
 {
+    public const int SyncProtocol = 1;
     public const long LogStart = 0;
 
     public static RemoteHistory History(RemoteListing listing, long? from = null)

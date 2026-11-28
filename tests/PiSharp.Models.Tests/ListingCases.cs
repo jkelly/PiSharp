@@ -63,7 +63,7 @@ internal static partial class Program
         var (output, error) = await List(path, null);
         Equal("No models available. Use /login to log into a provider via OAuth or API key. See:\n  " +
             Path.Combine("/pi/docs", "providers.md") + "\n  " + Path.Combine("/pi/docs", "models.md") + "\n", output, "no models");
-        Equal("Warning: errors loading models.json:\nProvider \"broken\": Provider broken: must specify \"baseUrl\", \"headers\", \"compat\", \"modelOverrides\", or \"models\".\n",
+        Equal("Warning: models.json error: Provider \"broken\": Provider broken: must specify \"baseUrl\", \"headers\", \"compat\", \"modelOverrides\", or \"models\".\n",
             error, "models.json warning");
     }
 

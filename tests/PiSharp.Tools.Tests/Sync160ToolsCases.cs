@@ -26,6 +26,20 @@ internal static class Sync160ToolsCases
         ("sync160.read-image-keeps-text-only-model-warning-out-of-content", ReadImageDetails),
         ("sync160.read-abort-while-opening-is-a-clean-cancelled-result", ReadAbortOnOpen),
         ("sync160.read-abort-mid-read-stops-reading", ReadAbortMidRead),
+        ("sync170.bash-blank-line-after-large-line-and-unwritable-spill", async () =>
+        {
+            using var temp = new Temp();
+            var path = Path.Combine(temp.Root, "absent", "spill.log");
+            await using var output = new ShellOutputAccumulator(path, new ProcessRunnerOptions(ModelMaxBytes: 32), new LocalProcessOutputStorage(), allowSpillFailure: true);
+            await output.AppendAsync(Encoding.UTF8.GetBytes(new string('x', 300) + "END\n\n"));
+            await output.FinishAsync();
+            var captured = output.Snapshot();
+            Check(captured.FullOutputError is { Length: > 0 } && captured.FullOutputPath is null, "failed spill recorded");
+            Check(captured.Content.EndsWith("END\n", StringComparison.Ordinal) && captured.Truncation.LastLinePartial, "long line retained ahead of blank line");
+            var structured = output.Structured();
+            Check(structured.Truncated && structured.Content == "[... 241 bytes omitted ...]\n\n" + new string('x', 59) + "END\n\n",
+                "failed spill exposes only the retained tail and its omitted byte count");
+        }),
         ("sync160.bash-over-long-last-line-shows-its-end", BashLongLastLine)
     ];
 

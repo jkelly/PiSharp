@@ -1,3 +1,4 @@
+// Pi fb0fe823539f6d04850f6e34748c01f01f212e1f (MIT): packages/ai/src/api/openai-responses.ts.
 using System.Runtime.CompilerServices;
 using System.Text.Json;
 using System.Text;
@@ -115,6 +116,9 @@ public sealed class ResponsesHttpSseTransport : IChatTransport
                 HttpCompletionOption.ResponseHeadersRead, cancellationToken))).ConfigureAwait(false);
             prepared = new(this, response, ownedRequest, request.Model, context, cancellationToken);
             cancellationToken.ThrowIfCancellationRequested();
+            if (_factory?.Policy.OnResponse is { } responseHook)
+                await context.Source(() => responseHook(ResponseObservation(response), request.Model, cancellationToken)).ConfigureAwait(false);
+            cancellationToken.ThrowIfCancellationRequested();
             if (!response.IsSuccessStatusCode)
             {
                 var body = await ReadErrorBody(prepared, context, cancellationToken).ConfigureAwait(false);
@@ -124,9 +128,6 @@ public sealed class ResponsesHttpSseTransport : IChatTransport
                 context.DisplayMessage = ProviderErrorText.Format(ProviderErrorText.OpenAIStatus((int)response.StatusCode, body), prefix + " API error");
                 throw rejection;
             }
-            if (_factory?.Policy.OnResponse is { } responseHook)
-                await context.Source(() => responseHook(ResponseObservation(response), request.Model, cancellationToken)).ConfigureAwait(false);
-            cancellationToken.ThrowIfCancellationRequested();
             return prepared;
         }
         catch

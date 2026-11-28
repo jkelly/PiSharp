@@ -14,10 +14,8 @@ internal static partial class Program
 {
     private static IEnumerable<(string, Func<Task>)> ConfigSchemaCases() =>
     [
-        // Pi 1.6.0: the embedded models schema is the upstream file again. Both cases keep their ids; the second now pins the exact
-        // difference between the frozen v1.5.0 fixture and the v1.6.0 file instead of a PiSharp-only derivative.
         ("schemas.published-baselines-and-reviewed-derivative-integrity", Sync(SchemasEmbedded)),
-        ("schemas.models-derivative-only-adds-reviewed-compatibility", Sync(ModelsSchemaDerivative)),
+        ("schemas.models-170-compatibility-and-pricing", Sync(ModelsSchemaCompatibility)),
         ("schemas.representative-documents-and-limits", Sync(SchemasRepresentative)),
         ("schemas.settings-values-runtime-accessors-reject", Sync(SchemasSettingsRuntime)),
         ("settings.dollar-schema-accepted-and-unknown-settings-kept", SettingsDollarSchema),
@@ -30,13 +28,10 @@ internal static partial class Program
 
     private static void SchemasEmbedded()
     {
-        // Current settings are pinned to v1.5.2 and the models schema to v1.6.0 (662bef1c at v1.5.2 added supportsMessageThreads and
-        // the upstream form of the three former native extensions; v1.6.0 reworded two descriptions).
-        // Keybindings and theme are unchanged since v1.2.0.
         var blobs = new Dictionary<string, string>
         {
-            [PiConfigurationSchemas.ModelsFileName] = "832194451e28b45820b27d765c36c1288ad04a6b", // v1.6.0
-            [PiConfigurationSchemas.SettingsFileName] = "cc28afe3a71e57f933fffe7bcf9fc0ec399e5332", // v1.5.2: idle cache-warming default
+            [PiConfigurationSchemas.ModelsFileName] = "3246eb5b1072865463eb62d28bafeb5ef06a65c7", // v1.7.0
+            [PiConfigurationSchemas.SettingsFileName] = "f1dce702684ae821d249db442f745ec38a847b1f", // v1.7.0
             [PiConfigurationSchemas.KeybindingsFileName] = "aa3b3e9be501475ce465855ee676abe32b8b9c2e",
             [PiConfigurationSchemas.ThemeFileName] = "95350a58db931d116d982d3212dbfd2c5c946760",
         };
@@ -48,8 +43,8 @@ internal static partial class Program
         }
         // The frozen v1.5.0 fixture keeps its original byte claim; the embedded file is no longer a derivative of it.
         Equal("c51a82c358ef1d92d4b2a2481be1e9d37258057e", GitBlob(UpstreamModelsSchemaBytes()), "frozen v1.5.0 models schema fixture");
-        Equal("b5679d7ad00fa34aa4f0b42aa7578ed85ae1fbf4b254ddeba5a4288e1c3c4f27",
-            Convert.ToHexStringLower(SHA256.HashData(PiConfigurationSchemas.ReadBytes(PiConfigurationSchemas.ModelsFileName))), "current models schema SHA256 (v1.6.0 bytes)");
+        Equal("efc75d98adbcf641219b90dc63940b9e793b6432d13a043302eeb85d5a875032",
+            Convert.ToHexStringLower(SHA256.HashData(PiConfigurationSchemas.ReadBytes(PiConfigurationSchemas.ModelsFileName))), "current models schema SHA256 (v1.7.0 bytes)");
         // The built-in themes point at the published theme schema.
         foreach (var theme in new[] { "dark.json", "light.json" })
             Equal("https://pi.dev/schemas/theme.schema.json", JsonNode.Parse(Encoding.UTF8.GetString(SessionHtmlExport.ReadAssetBytes(theme)))!["$schema"]!.GetValue<string>(), theme);
@@ -62,18 +57,11 @@ internal static partial class Program
         using var buffer = new MemoryStream(); stream.CopyTo(buffer); return buffer.ToArray();
     }
 
-    private static void ModelsSchemaDerivative()
+    private static void ModelsSchemaCompatibility()
     {
-        var expected = JsonNode.Parse(Encoding.UTF8.GetString(UpstreamModelsSchemaBytes()))!.AsObject();
-        var properties = expected["$defs"]!["ProviderCompat"]!["properties"]!.AsObject();
-        // v1.5.0 to v1.6.0 is exactly: the three compatibility properties PiSharp first carried as native extensions (now in upstream's
-        // wording and anyOf form), supportsMessageThreads, and the supportsMidConvoEffort description that names the Codex API.
-        properties["requiresNonNullAssistantContent"] = JsonNode.Parse("""{"type":"boolean","description":"Whether replayed assistant messages with no text (e.g. tool-call-only messages) must send \"\" instead of null content. Default: false."}""");
-        properties["requiresToolsWithToolHistory"] = JsonNode.Parse("""{"type":"boolean","description":"Whether requests without tools must send \"tools\": [] when the conversation contains tool calls or tool results. Needed by some proxies in front of Anthropic, such as older LiteLLM versions. Default: false, the field is omitted."}""");
-        properties["promptCacheKeyMode"] = JsonNode.Parse("""{"anyOf":[{"type":"string","const":"auto"},{"type":"string","const":"enabled"},{"type":"string","const":"disabled"}],"description":"Controls the prompt_cache_key request field for openai-completions and openai-responses: auto keeps each API's default, enabled sends it whenever caching is active, disabled never sends it. Default: auto."}""");
-        properties["supportsMessageThreads"] = JsonNode.Parse("""{"type":"boolean","description":"Whether the endpoint supports Anthropic message threads, which let a request with a session id send only the new messages and continue from the previous reply. Default: true for a baseUrl on api.anthropic.com, false otherwise. Set true for gateways that forward the thread request field."}""");
-        properties["supportsMidConvoEffort"]!["description"] = "Whether thinking level changes are sent inside the conversation instead of changing the request's effort, so a change keeps the prompt cache. Used by the anthropic-messages, openai-responses, and openai-codex-responses APIs.";
-        Check(JsonNode.DeepEquals(expected, JsonNode.Parse(PiConfigurationSchemas.Read(PiConfigurationSchemas.ModelsFileName))), "the v1.6.0 schema differs from v1.5.0 by exactly the four added compatibility properties and one description");
+        Check(PiConfigurationSchemas.Models.CheckJson("""{"providers":{"p":{"compat":{"supportsReasoningReplay":false,"thinkingFormat":"ant-ling"},"modelOverrides":{"test":{"cost":{"imageOutput":8.5}}}}}}"""), "reasoning replay, deprecated thinking format and image pricing accepted");
+        Check(!PiConfigurationSchemas.Models.CheckJson("""{"providers":{"p":{"compat":{"supportsReasoningReplay":"false"}}}}"""), "reasoning replay requires a boolean");
+        Check(!PiConfigurationSchemas.Models.CheckJson("""{"providers":{"p":{"modelOverrides":{"test":{"cost":{"imageOutput":"8.5"}}}}}}"""), "image price requires a number");
         Check(PiConfigurationSchemas.Models.CheckJson("""{"providers":{"p":{"compat":{"requiresNonNullAssistantContent":true,"requiresToolsWithToolHistory":false,"promptCacheKeyMode":"enabled"}}}}"""), "native compatibility extensions accepted");
         Check(!PiConfigurationSchemas.Models.CheckJson("""{"providers":{"p":{"compat":{"requiresNonNullAssistantContent":"yes"}}}}"""), "nonboolean content flag rejected");
         Check(!PiConfigurationSchemas.Models.CheckJson("""{"providers":{"p":{"compat":{"requiresToolsWithToolHistory":1}}}}"""), "nonboolean tools flag rejected");

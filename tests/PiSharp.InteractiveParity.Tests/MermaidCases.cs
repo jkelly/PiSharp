@@ -35,7 +35,10 @@ internal static class MermaidCases
         Equal(expected, transform(markdown, Context()), "final render");
         Equal(expected, transform(markdown, Context(streaming: true)), "streaming render in streaming mode");
         Equal(markdown, transform(markdown, Context(MarkdownMessageType.AssistantThinking)), "thinking is never transformed");
-        Equal(markdown, transform(markdown, Context(width: art.Width - 1)), "a diagram wider than the available width stays code");
+        var narrowWarning = $"Mermaid diagram not rendered: needs {art.Width} columns, {art.Width - 1} available";
+        Equal(markdown.Replace("\n```\n\nAfter", "\n```\n" + MermaidTransformer.CodeSpan(narrowWarning) + "  \n\n\nAfter", StringComparison.Ordinal),
+            transform(markdown, Context(width: art.Width - 1)), "wide diagram keeps source and explains the width needed");
+        Equal(markdown, transform(markdown, Context(streaming: true, width: art.Width - 1)), "streaming wide diagram keeps source");
         mode = "final";
         Equal(markdown, transform(markdown, Context(streaming: true)), "final mode skips streaming messages");
         Equal(expected, transform(markdown, Context()), "final mode renders the final message");

@@ -414,10 +414,11 @@ public sealed class CompletionsKeyAuthRequestFactory
             var nonStandard = isNvidia || isCerebras || isGrok || isTogether || baseUrl.Contains("chutes.ai", StringComparison.Ordinal) || isDeepSeek || isZai || isMoonshot ||
                 provider == "opencode" || baseUrl.Contains("opencode.ai", StringComparison.Ordinal) || isWorkers || isGateway || isAntLing;
             var useMaxTokens = baseUrl.Contains("chutes.ai", StringComparison.Ordinal) || isDeepSeek || isMoonshot || isGateway || isTogether || isNvidia || isAntLing || isZai;
-            var detectedFormat = isDeepSeek ? "deepseek" : isZai ? "zai" : isTogether ? "together" : isAntLing ? "ant-ling" : isOpenRouter ? "openrouter" : "openai";
+            var detectedFormat = isDeepSeek ? "deepseek" : isZai ? "zai" : isTogether ? "together" : isAntLing ? "deepseek" : isOpenRouter ? "openrouter" : "openai";
             var thinkingFormat = Text("thinkingFormat", detectedFormat)!;
+            if (thinkingFormat == "ant-ling") thinkingFormat = "deepseek";
             if (thinkingFormat is not ("openai" or "openrouter" or "zai" or "qwen" or "qwen-chat-template" or
-                "chat-template" or "baseten" or "deepseek" or "ant-ling" or "together" or "string-thinking"))
+                "chat-template" or "baseten" or "deepseek" or "together" or "string-thinking"))
                 throw Fail(CompletionsRequestFailure.UnsupportedContent);
             var grammarTools = Flag("supportsOpenAIGrammarTools", false);
             var budgetField = Text("thinkingTokenBudgetField", null);
@@ -604,14 +605,6 @@ public sealed class CompletionsKeyAuthRequestFactory
                     else if (!_thinkingLevelMap.TryGetValue("off", out var off) || off is not null)
                         add("reasoning", Effort(off ?? "none"));
                     break;
-                case "ant-ling":
-                    if (enabled)
-                    {
-                        if (_thinkingLevelMap.TryGetValue(requested!, out var effort) && effort is not null)
-                            add("reasoning", Effort(effort));
-                    }
-                    else OffEffort(); // Source falls through to its generic off branch.
-                    break;
                 case "together":
                     add("reasoning", JsonData.Parse("{\"enabled\":" + (enabled ? "true" : "false") + "}"));
                     RequestedEffort();
@@ -653,7 +646,6 @@ public sealed class CompletionsKeyAuthRequestFactory
             "zai" or "qwen" or "qwen-chat-template" or "deepseek" or "together" or "string-thinking" or "openrouter" => true,
             "chat-template" => HasTemplateControl(_chatTemplateKwargs),
             "baseten" => HasTemplateControl(_chatTemplateArgs) || _options.SupportsReasoningEffort,
-            "ant-ling" => _thinkingLevelMap.TryGetValue(level, out var effort) && effort is not null,
             _ => _options.SupportsReasoningEffort
         };
         return formatControl || _thinkingTokenBudgetField is not null && hasBudget;

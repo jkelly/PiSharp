@@ -1,0 +1,545 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "tag": "v1.7.0",
+    "commit": "fb0fe823539f6d04850f6e34748c01f01f212e1f",
+    "tree": "12bd22b80a5e430b42054f55b5cf7885320950fb"
+  },
+  "previous": {
+    "tag": "v1.6.0",
+    "commit": "faac585884ae2c013a6b1400f3e9e77f10b34bac",
+    "tree": "7b395e942aa81ffe0dba09ae2939184c200e4d3b"
+  },
+  "targetLock": "compatibility/target.lock.json",
+  "preservedMap": "compatibility/durable-port-map.v1.5.0.json",
+  "preservedMapSha256": "45fb24e89fb9d0c63ccc2fd8c05dd6e66f3b63fad0d7500f2964303380690ee2",
+  "previousOverlay": "compatibility/durable-sync-1.6.0-overlay.json",
+  "scope": "Changed Durable files and mapped Chord files used by Durable. Locations identify native counterparts; the overlay records source coverage, not execution evidence.",
+  "rows": [
+    {
+      "upstream": "packages/chord/src/context/index.ts",
+      "change": "M",
+      "beforeBlob": "7318e08e6880c913e413cf430993cde840364d83",
+      "afterBlob": "5627a00d33b5996ef9b59b864bde9514e2981e8a",
+      "nativeLocation": "src/PiSharp.Durable/Chord/DurableContext.cs"
+    },
+    {
+      "upstream": "packages/chord/src/delta/diff.ts",
+      "change": "M",
+      "beforeBlob": "5fbebe05b85a71d06dc50391b00c2968353cf821",
+      "afterBlob": "e6643bd6e009e1b6688e03a43fc45c14ed89b058",
+      "nativeLocation": "src/PiSharp.Durable/Chord/Delta/Diff.cs"
+    },
+    {
+      "upstream": "packages/chord/test/context.test.ts",
+      "change": "M",
+      "beforeBlob": "88b9e7f759fec70a259cfc8259a782461142a058",
+      "afterBlob": "70aa7cac1f3f1c9ab29a79ae6af40ea3732b40fd",
+      "nativeLocation": "tests/PiSharp.Durable.Tests/Chord/ContextCases.cs"
+    },
+    {
+      "upstream": "packages/chord/test/delta-diff.test.ts",
+      "change": "M",
+      "beforeBlob": "e00aa45c7745d062dd1c6f77da8e486a0347d3fa",
+      "afterBlob": "2c749c9bc6f66f3f730e9683d24991c19eaead79",
+      "nativeLocation": "tests/PiSharp.Durable.Tests/Chord/DiffCases.cs"
+    },
+    {
+      "upstream": "packages/durable/CHANGELOG.md",
+      "change": "M",
+      "beforeBlob": "289559709de72561f67d2dbd7fa6dd98cdd6641f",
+      "afterBlob": "67e6068fadc717ff83ae2ac4af42e169d96810c3",
+      "nativeLocation": null
+    },
+    {
+      "upstream": "packages/durable/README.md",
+      "change": "M",
+      "beforeBlob": "3d21a80ca27e8afa095ef9b88621e516bc31dc70",
+      "afterBlob": "d6af5881c6796d925b2107f71a383fd287f9216a",
+      "nativeLocation": null
+    },
+    {
+      "upstream": "packages/durable/docs/group-commit.md",
+      "change": "M",
+      "beforeBlob": "4af775d710d2648cee0ac0fe19b2026a4f217da6",
+      "afterBlob": "c4e80f1fff2933f3f24e8b693811bf54d75c57fe",
+      "nativeLocation": null
+    },
+    {
+      "upstream": "packages/durable/docs/spec.md",
+      "change": "M",
+      "beforeBlob": "4e9ebae6b58d099df8b5356b3c993758a5d7dffe",
+      "afterBlob": "55f761af4ad39e81137ffc98616371dbe34c9795",
+      "nativeLocation": null
+    },
+    {
+      "upstream": "packages/durable/docs/suspendable/spec.md",
+      "change": "M",
+      "beforeBlob": "f7c53d35ed54649afca0f5138452d4d5fcdf7fe7",
+      "afterBlob": "1c099d15778434ffa4d40a30ffa90bc2c413f70b",
+      "nativeLocation": null
+    },
+    {
+      "upstream": "packages/durable/package.json",
+      "change": "M",
+      "beforeBlob": "deded4390ac8e1ade04896920066e0392686dab1",
+      "afterBlob": "abe5c3f6c6cc675d8b35be286f3a456833d3d5f5",
+      "nativeLocation": null
+    },
+    {
+      "upstream": "packages/durable/src/codemode/codemode.ts",
+      "change": "M",
+      "beforeBlob": "a20c7842406715ef9111cfbc4a74f42b68ca73aa",
+      "afterBlob": "0f06539fbd86ee5f0f88704f935f3d12f3f9d17d",
+      "nativeLocation": "src/PiSharp.Durable.Tools/Codemode/Codemode.cs"
+    },
+    {
+      "upstream": "packages/durable/src/codemode/output.ts",
+      "change": "M",
+      "beforeBlob": "5f9048c0fe701428519635e0aa2367693828964b",
+      "afterBlob": "c1b6a411cb2bfcbccb837b123a49018e13290319",
+      "nativeLocation": "src/PiSharp.Durable.Tools/Codemode/Output.cs"
+    },
+    {
+      "upstream": "packages/durable/src/env/node.ts",
+      "change": "M",
+      "beforeBlob": "224a06261c6bb29abad21927a679024fb1f30368",
+      "afterBlob": "742975f2dc1f1e83b355c273283f4da4b96995a3",
+      "nativeLocation": [
+        "src/PiSharp.Durable/Env/Local/LocalFileSystem.cs",
+        "src/PiSharp.Durable.Tools/Env/LocalExecutionEnv.cs"
+      ]
+    },
+    {
+      "upstream": "packages/durable/src/harness/agent.ts",
+      "change": "M",
+      "beforeBlob": "f8206a901e113b59d0ebfe5cd9e4229c0b63c956",
+      "afterBlob": "dee8190442acd44e9090da75c7170123fb0b9977",
+      "nativeLocation": "src/PiSharp.Durable/Harness/Agent.cs"
+    },
+    {
+      "upstream": "packages/durable/src/harness/compaction.ts",
+      "change": "M",
+      "beforeBlob": "65b855dbea47d34fc27f983532ee2703eaead28c",
+      "afterBlob": "f4c180a939c19480871c53dc53506514565f768b",
+      "nativeLocation": "src/PiSharp.Durable/Harness/Compaction.cs"
+    },
+    {
+      "upstream": "packages/durable/src/harness/define.ts",
+      "change": "M",
+      "beforeBlob": "71851103001f406c5768bd3680d1557c4d716f31",
+      "afterBlob": "c15e5291937793076714146711250c35f49f0500",
+      "nativeLocation": "src/PiSharp.Durable/Harness/Define.cs"
+    },
+    {
+      "upstream": "packages/durable/src/harness/generation.ts",
+      "change": "M",
+      "beforeBlob": "0ba447c56ffa3d2c9fbe7705a8d1591102cb6245",
+      "afterBlob": "588adc5781cbc70463dd7fcca05b910639b6967a",
+      "nativeLocation": "src/PiSharp.Durable/Harness/Generation.cs"
+    },
+    {
+      "upstream": "packages/durable/src/harness/harness.ts",
+      "change": "M",
+      "beforeBlob": "579775c4ba683e7318b0f32cc711cf5161cddf92",
+      "afterBlob": "b8076966d4cdd5ec5764e639d1821481c3bfef0d",
+      "nativeLocation": "src/PiSharp.Durable/Harness/Harness.cs"
+    },
+    {
+      "upstream": "packages/durable/src/harness/live.ts",
+      "change": "M",
+      "beforeBlob": "6d701d8b90dc6db086a7256c21f1dd7fe6c4b719",
+      "afterBlob": "ea9f12c63112f05db68bbdd0f5597b386deda981",
+      "nativeLocation": "src/PiSharp.Durable/Harness/Live.cs"
+    },
+    {
+      "upstream": "packages/durable/src/harness/parks.ts",
+      "change": "M",
+      "beforeBlob": "5b9406b643388595253f7eabff7e4cf0e11f1e66",
+      "afterBlob": "29f9fc6f78a1a91ee61c93d8b3bf1dd4e88de08e",
+      "nativeLocation": [
+        "src/PiSharp.Durable/Harness/Parks.cs"
+      ]
+    },
+    {
+      "upstream": "packages/durable/src/harness/scheduler.ts",
+      "change": "M",
+      "beforeBlob": "be1e4d98082e494e373b3e982174453ac1380dce",
+      "afterBlob": "7567b61655ff03543a2a2268462b25a24190fb13",
+      "nativeLocation": "src/PiSharp.Durable/Harness/Scheduler.cs"
+    },
+    {
+      "upstream": "packages/durable/src/harness/tool.ts",
+      "change": "M",
+      "beforeBlob": "7e9326a128ec0c3ab6da123425156d2b873730ca",
+      "afterBlob": "d25f538d9888a82e2a75c8de51e865fae8f9ce41",
+      "nativeLocation": "src/PiSharp.Durable/Harness/Tool.cs"
+    },
+    {
+      "upstream": "packages/durable/src/harness/types.ts",
+      "change": "M",
+      "beforeBlob": "9ec73483ccc6db8a684943ef46228cbeb598cab0",
+      "afterBlob": "f65107b50671c8da25c01eb23de27ad98e10a6de",
+      "nativeLocation": "src/PiSharp.Durable/Harness/Types.cs"
+    },
+    {
+      "upstream": "packages/durable/src/harness/usage.ts",
+      "change": "M",
+      "beforeBlob": "1b62da05c3d734bbec6abc288f4773154c6f5af2",
+      "afterBlob": "ab227bb88b85a24b56679395f9c47a3b9132d1db",
+      "nativeLocation": "src/PiSharp.Durable/Harness/Usage.cs"
+    },
+    {
+      "upstream": "packages/durable/src/images/node-worker.ts",
+      "change": "M",
+      "beforeBlob": "42a43db8ea23ed9f89ab0a81bb5379341ea0e302",
+      "afterBlob": "2fbf78442db1502e89b9df1657149bf520df97c4",
+      "nativeLocation": "src/PiSharp.Durable.Tools/Images/NodeWorker.cs"
+    },
+    {
+      "upstream": "packages/durable/src/images/node.ts",
+      "change": "M",
+      "beforeBlob": "adf55602385eb0de9a4cbd677ce14c62157ea01c",
+      "afterBlob": "da4a9b5091fa21b70bd4ba09424dfceff27ec937",
+      "nativeLocation": "src/PiSharp.Durable.Tools/Images/Node.cs"
+    },
+    {
+      "upstream": "packages/durable/src/session/transaction.ts",
+      "change": "M",
+      "beforeBlob": "548a7ad16279ea4a69724d1e6032e8cd512f46dc",
+      "afterBlob": "863350060f09dca18050d4ea6bfaa235eda7f0ce",
+      "nativeLocation": "src/PiSharp.Durable/Session/Transaction.cs"
+    },
+    {
+      "upstream": "packages/durable/src/session/writer.ts",
+      "change": "M",
+      "beforeBlob": "2ff0d321185563518d81599892ebc491e0dc6943",
+      "afterBlob": "6020f7c0e285110e80b125ec323222ead7020da7",
+      "nativeLocation": "src/PiSharp.Durable/Session/Writer.cs"
+    },
+    {
+      "upstream": "packages/durable/src/signals.ts",
+      "change": "M",
+      "beforeBlob": "10a3ce3d690585b5d8c9ce920cbbee1dd1eb0f10",
+      "afterBlob": "959a16ec81818319a4073fc51bac77b55b6260ef",
+      "nativeLocation": [
+        "src/PiSharp.Durable/Signals.cs"
+      ]
+    },
+    {
+      "upstream": "packages/durable/src/storage/indexeddb.ts",
+      "change": "M",
+      "beforeBlob": "61dde41df134220491cec82724437e18dc8a5290",
+      "afterBlob": "a968fba4505a4020809f72df9e5a17b9afb1914b",
+      "nativeLocation": null
+    },
+    {
+      "upstream": "packages/durable/src/storage/jsonl/storage.ts",
+      "change": "M",
+      "beforeBlob": "2bc72eadf4f850d7e2c2cf62414de5db63f3d468",
+      "afterBlob": "91918c38d4565d8afc468e188487dab6d3c99bdf",
+      "nativeLocation": "src/PiSharp.Durable/Storage/Jsonl/JsonlStorage.cs"
+    },
+    {
+      "upstream": "packages/durable/src/storage/memory.ts",
+      "change": "M",
+      "beforeBlob": "bc5e669af7149959ace5535d526d2fb4f302d43b",
+      "afterBlob": "97bfcece20b1541184acc3f7d79363f9f6dcfabb",
+      "nativeLocation": "src/PiSharp.Durable/Storage/Memory.cs"
+    },
+    {
+      "upstream": "packages/durable/src/storage/sqlite/storage.ts",
+      "change": "M",
+      "beforeBlob": "dfd2ad9a6b243fbf2cd9af75fb14ea9f18e4d9de",
+      "afterBlob": "ed7c75e2309dabf5dd4eecab5b1848671be0eaeb",
+      "nativeLocation": "src/PiSharp.Durable.Sqlite/Storage.cs"
+    },
+    {
+      "upstream": "packages/durable/src/testing/commit-writes.ts",
+      "change": "M",
+      "beforeBlob": "36751a8984b77701d574aad8400173d2cacc35f1",
+      "afterBlob": "c40495459ba7a39909fae664460bc2d4ff38e597",
+      "nativeLocation": "src/PiSharp.Durable/Testing/CommitWrites.cs"
+    },
+    {
+      "upstream": "packages/durable/src/testing/storage-conformance.ts",
+      "change": "M",
+      "beforeBlob": "75a7324537c4981e6283ec64885947030380e79f",
+      "afterBlob": "c1aabb3195fa7b3bda562a925b38b8f56f3a4ccb",
+      "nativeLocation": "src/PiSharp.Durable/Testing/StorageConformance.cs"
+    },
+    {
+      "upstream": "packages/durable/src/types.ts",
+      "change": "M",
+      "beforeBlob": "ee103e18098e353c1ffbd34cc557fb74b5fed339",
+      "afterBlob": "6981bfb0aefc21d1219f44d79207425a018f0f33",
+      "nativeLocation": "src/PiSharp.Durable/Types.cs"
+    },
+    {
+      "upstream": "packages/durable/test/examples/27-reviewer.ts",
+      "change": "M",
+      "beforeBlob": "6dbdf25b3f49df9a729cd0065431853b52a999bc",
+      "afterBlob": "57548daec50b7bf6885f191dbd03918b65948dac",
+      "nativeLocation": "samples/Durable.Examples/ExamplesAgents.cs"
+    },
+    {
+      "upstream": "packages/durable/test/examples/32-tests-after-edits.ts",
+      "change": "M",
+      "beforeBlob": "3c4d23e1971411085561df9a6515e5d8a2fb0e30",
+      "afterBlob": "0910bcb14204379d80b57d818995f461d5994ac4",
+      "nativeLocation": "samples/Durable.Examples/ExamplesTestsAfterEdits.cs"
+    },
+    {
+      "upstream": "packages/durable/test/examples/34-submit-in-commit.ts",
+      "change": "M",
+      "beforeBlob": "5cdfa918ff27af11dc9113282c18b4d0525d9e3a",
+      "afterBlob": "53d7a120c866a88b80a85569b2f1ceb4155c7451",
+      "nativeLocation": "samples/Durable.Examples/ExamplesSubmitInCommit.cs"
+    },
+    {
+      "upstream": "packages/durable/test/examples/38-signals.ts",
+      "change": "M",
+      "beforeBlob": "2968ff862dbb11db692462dee40677dd8aff47b4",
+      "afterBlob": "ebe15f5c70d91f058dfbb0e2ac53000906d7c083",
+      "nativeLocation": [
+        "samples/Durable.Examples/ExamplesSignals.cs"
+      ]
+    },
+    {
+      "upstream": "packages/durable/test/examples/39-ask-a-person.ts",
+      "change": "M",
+      "beforeBlob": "b4639cd31bdf1dfc7b174ab0c2b011d0555ef28c",
+      "afterBlob": "7bcff73a629f52df66360f3d290335e19d632e1e",
+      "nativeLocation": [
+        "samples/Durable.Examples/ExamplesSignals.cs"
+      ]
+    },
+    {
+      "upstream": "packages/durable/test/examples/40-tool-waits-for-webhook.ts",
+      "change": "M",
+      "beforeBlob": "deead58007068970eb71cf6e82d6df73ea07d9c7",
+      "afterBlob": "967eea9c86302fd219abaae0af58e7b49001de12",
+      "nativeLocation": [
+        "samples/Durable.Examples/ExamplesToolParks.cs"
+      ]
+    },
+    {
+      "upstream": "packages/durable/test/examples/41-tool-polls.ts",
+      "change": "M",
+      "beforeBlob": "eaabb80cfedfae6d534229dd1dac615307d43da0",
+      "afterBlob": "8d7f4a9d48592238c54581f5229d76247e5492f2",
+      "nativeLocation": [
+        "samples/Durable.Examples/ExamplesToolParks.cs"
+      ]
+    },
+    {
+      "upstream": "packages/durable/test/examples/42-parallel-children.ts",
+      "change": "M",
+      "beforeBlob": "70d030c4130bd5bfab04714d05629fb613944df0",
+      "afterBlob": "03bea9ec21ad723feb04b85c89ec4e646e79c06f",
+      "nativeLocation": [
+        "samples/Durable.Examples/ExamplesToolParks.cs"
+      ]
+    },
+    {
+      "upstream": "packages/durable/test/examples/43-subagent-waits.ts",
+      "change": "M",
+      "beforeBlob": "0b2172ee15ead026e90e4ff42056b450d30b4f51",
+      "afterBlob": "bf720fd0f9cd7f3bc9e13f2b9071b27dd7ed4675",
+      "nativeLocation": [
+        "samples/Durable.Examples/ExamplesToolParks.cs"
+      ]
+    },
+    {
+      "upstream": "packages/durable/test/examples/44-approval-gate.ts",
+      "change": "M",
+      "beforeBlob": "cef493c8fb9904a8c4cdad0f0002bde71be453b2",
+      "afterBlob": "1cda02722f676081177f607cb9fd2362e73a7ffc",
+      "nativeLocation": [
+        "samples/Durable.Examples/ExamplesGates.cs"
+      ]
+    },
+    {
+      "upstream": "packages/durable/test/examples/45-review-on-yield.ts",
+      "change": "M",
+      "beforeBlob": "be2a8a93e1d349a8d05cfa887ff325340e82b8c5",
+      "afterBlob": "aedbd7c388698c186f1222232de604163c6b36b7",
+      "nativeLocation": [
+        "samples/Durable.Examples/ExamplesGates.cs"
+      ]
+    },
+    {
+      "upstream": "packages/durable/test/examples/46-after-tools-terminate.ts",
+      "change": "M",
+      "beforeBlob": "c97f1cfa8059e01d4b85eaf7ef71a8dd83c745c7",
+      "afterBlob": "9a711686ed4fb7799b6814a01ebcea27d997aa4b",
+      "nativeLocation": [
+        "samples/Durable.Examples/ExamplesGates.cs"
+      ]
+    },
+    {
+      "upstream": "packages/durable/test/harness-after-run.test.ts",
+      "change": "M",
+      "beforeBlob": "593ad5f8c70c503c65d0624593f36a4eda21bef7",
+      "afterBlob": "72188bce2ca3a00659cafa66c7d2af5be19a49cc",
+      "nativeLocation": "tests/PiSharp.Durable.Tests/HarnessAfterRunCases.cs"
+    },
+    {
+      "upstream": "packages/durable/test/harness-compaction.test.ts",
+      "change": "M",
+      "beforeBlob": "5ab681d61ca4dd8172bf6dffd5dec104f7fe85f8",
+      "afterBlob": "cc6b701e1f7a144ea1347312569fcebe27525340",
+      "nativeLocation": "tests/PiSharp.Durable.Tests/Harness/HarnessCompactionCases.cs"
+    },
+    {
+      "upstream": "packages/durable/test/harness-hook-tasks.test.ts",
+      "change": "M",
+      "beforeBlob": "996141fd6a210757a17b0e3241b36a99bcab1287",
+      "afterBlob": "cfa028b11ecb6d2542d7033af9c90446e29a6a2e",
+      "nativeLocation": [
+        "tests/PiSharp.Durable.Tests/Sync160HookTasksCases.cs"
+      ]
+    },
+    {
+      "upstream": "packages/durable/test/harness-inbox.test.ts",
+      "change": "M",
+      "beforeBlob": "a4cb91837d244cf066acd2bf38bcb687a752086d",
+      "afterBlob": "6a5bc0cf313bf22aec54632391571e9906685f2e",
+      "nativeLocation": "tests/PiSharp.Durable.Tests/Harness/HarnessInboxCases.cs"
+    },
+    {
+      "upstream": "packages/durable/test/harness-nested-tools.test.ts",
+      "change": "M",
+      "beforeBlob": "a7577601b70ffa6afdcc5fb95d21143252409e80",
+      "afterBlob": "6792aec940db386385eef4a24cf8e71ee6491ae1",
+      "nativeLocation": "tests/PiSharp.Durable.Tests/HarnessNestedToolsCases.cs"
+    },
+    {
+      "upstream": "packages/durable/test/harness-park-children.test.ts",
+      "change": "M",
+      "beforeBlob": "bcb1e1c2fa200afdd122c976e198fdcf89a33111",
+      "afterBlob": "cd71af91e4dcb1813f12163d37830d1b89f414c0",
+      "nativeLocation": [
+        "tests/PiSharp.Durable.Tests/Sync160ParkChildrenCases.cs"
+      ]
+    },
+    {
+      "upstream": "packages/durable/test/harness-signals.test.ts",
+      "change": "M",
+      "beforeBlob": "f807c34494a163c08f5ad25451553930de826e8c",
+      "afterBlob": "4e78d81e436e807b681ee5ef0af1d80f011782a1",
+      "nativeLocation": [
+        "tests/PiSharp.Durable.Tests/Sync160SignalsCases.cs"
+      ]
+    },
+    {
+      "upstream": "packages/durable/test/harness-submit-in-commit.test.ts",
+      "change": "M",
+      "beforeBlob": "1edb9e422f235de12acf5ec3ad8616ed0bebb2c4",
+      "afterBlob": "d115186ddcb902d969d4dc5e2fb74f47a9559787",
+      "nativeLocation": "tests/PiSharp.Durable.Tests/HarnessSubmitInCommitCases.cs"
+    },
+    {
+      "upstream": "packages/durable/test/harness-telemetry.test.ts",
+      "change": "M",
+      "beforeBlob": "58bcbc9e8eaa5763e1106c54fa0d68f41097b756",
+      "afterBlob": "468f5a098d6d14d08d43133238dde1f0a915b3b6",
+      "nativeLocation": "tests/PiSharp.Durable.Tests/HarnessTelemetryCases.cs"
+    },
+    {
+      "upstream": "packages/durable/test/harness-tool-gates.test.ts",
+      "change": "M",
+      "beforeBlob": "75e3566104e1991e8e0d56f2c359e8ac75fe3f04",
+      "afterBlob": "d5b6967bcad9542fc6e8edd51d4d13bf093022a2",
+      "nativeLocation": [
+        "tests/PiSharp.Durable.Tests/Sync160ToolGatesCases.cs"
+      ]
+    },
+    {
+      "upstream": "packages/durable/test/harness-tool-parks.test.ts",
+      "change": "M",
+      "beforeBlob": "ba52249caf7f7eb652b5126d81dd475c22265a66",
+      "afterBlob": "bc6db51c240f2d6dd2187ba3641ce671e62b65bf",
+      "nativeLocation": [
+        "tests/PiSharp.Durable.Tests/Sync160ToolParksCases.cs"
+      ]
+    },
+    {
+      "upstream": "packages/durable/test/harness-tools.test.ts",
+      "change": "M",
+      "beforeBlob": "3dc7b00df09f484b8a53244927c335e7b57012bf",
+      "afterBlob": "8930d440591a4728754cdb28dac596c1fd10bb91",
+      "nativeLocation": "tests/PiSharp.Durable.Tests/Harness/HarnessToolsCases.cs"
+    },
+    {
+      "upstream": "packages/durable/test/harness-turn-limit.test.ts",
+      "change": "M",
+      "beforeBlob": "7f8ad61e1ab2a7c591c03aa4b86bf0cc7264e85a",
+      "afterBlob": "18ec8c5ae3718d03dcd4ad6aaf7ad2cd64e30486",
+      "nativeLocation": "tests/PiSharp.Durable.Tests/HarnessTurnLimitCases.cs"
+    },
+    {
+      "upstream": "packages/durable/test/indexeddb-storage.test.ts",
+      "change": "M",
+      "beforeBlob": "ff14fcce3db095733430b4f2708f99531a6dcfa5",
+      "afterBlob": "5c9fec4f5faf6ce0863484ab990281918073eeb3",
+      "nativeLocation": null
+    },
+    {
+      "upstream": "packages/durable/test/jsonl-storage.test.ts",
+      "change": "M",
+      "beforeBlob": "2cf0d5150c7debba89e358645d93fa57ecd243e5",
+      "afterBlob": "034288e807c466d95ee9c27e870e421fda144dec",
+      "nativeLocation": "tests/PiSharp.Durable.Tests/Storage/JsonlStorageCases.cs"
+    },
+    {
+      "upstream": "packages/durable/test/session-cached-storage.test.ts",
+      "change": "M",
+      "beforeBlob": "bfe4d4347473e25f28385ee3cedbdb5ada31c799",
+      "afterBlob": "aeb0e4a81ba7003d14f624e9c124dc552a92c5cf",
+      "nativeLocation": "tests/PiSharp.Durable.Tests/SessionCachedStorageCases.cs"
+    },
+    {
+      "upstream": "packages/durable/test/session-support.ts",
+      "change": "M",
+      "beforeBlob": "1d770cb904e68bbb7494b45a40385ae61330f496",
+      "afterBlob": "6137f3bfe8ded5fb37a2d9861780500b2d74db5a",
+      "nativeLocation": "tests/PiSharp.Durable.Tests/Session/SessionSupport.cs"
+    },
+    {
+      "upstream": "packages/durable/test/spec-usage.test.ts",
+      "change": "M",
+      "beforeBlob": "7e5341c1038fbec097f8d69fbb02c832cb65cf39",
+      "afterBlob": "38e6f303f6d7d9b709ee89cca4a9638f6d0b2cd4",
+      "nativeLocation": "tests/PiSharp.Durable.Tests/SpecUsageCases.cs"
+    },
+    {
+      "upstream": "packages/durable/test/sqlite-commit.test.ts",
+      "change": "M",
+      "beforeBlob": "d40875a841899192d286e0af46a11e732ca2b0f9",
+      "afterBlob": "cf6bb0696d2b285a15d1d85a8b7721034d85eb19",
+      "nativeLocation": "tests/PiSharp.Durable.Tests/Storage/SqliteDetailedBulkCases.cs"
+    },
+    {
+      "upstream": "packages/durable/test/sqlite-storage.test.ts",
+      "change": "M",
+      "beforeBlob": "4c88675ff99e7175b8c629d6f84a27dc08ddcb95",
+      "afterBlob": "c9c4e6c5baf9c91f758c71adce9552d6ab17e833",
+      "nativeLocation": "tests/PiSharp.Durable.Tests/Storage/SqliteStorageCases.cs"
+    },
+    {
+      "upstream": "packages/durable/test/store-storage-commit.test.ts",
+      "change": "M",
+      "beforeBlob": "dd29d569875c811b807ff66b0a3b953229805f8b",
+      "afterBlob": "7d6e931c6be7bd56c09d68e5e7ed81644f68ec78",
+      "nativeLocation": "tests/PiSharp.Durable.Tests/StoreStorageCommitCases.cs"
+    },
+    {
+      "upstream": "packages/durable/test/store-storage.test.ts",
+      "change": "M",
+      "beforeBlob": "075ad8baca9a6a10708ab447551f6188cfbea65a",
+      "afterBlob": "64da67b844a49ce94df48ecef995a57e2010a16c",
+      "nativeLocation": "tests/PiSharp.Durable.Tests/StoreStorageCases.cs"
+    }
+  ]
+}

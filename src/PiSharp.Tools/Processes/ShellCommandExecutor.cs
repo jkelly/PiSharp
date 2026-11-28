@@ -15,7 +15,14 @@ public interface IShellOperations
 }
 
 /// <summary>Source BashResult. <see cref="ExitCode"/> is null when the command was cancelled or killed.</summary>
-public sealed record ShellCommandResult(string Output, int? ExitCode, bool Cancelled, bool Truncated, string? FullOutputPath);
+[method: System.Text.Json.Serialization.JsonConstructor]
+public sealed record ShellCommandResult(string Output, int? ExitCode, bool Cancelled, bool Truncated, string? FullOutputPath)
+{
+    public string? FullOutputError { get; init; }
+
+    public ShellCommandResult(string output, int? exitCode, bool cancelled, bool truncated, string? fullOutputPath, string? fullOutputError)
+        : this(output, exitCode, cancelled, truncated, fullOutputPath) => FullOutputError = fullOutputError;
+}
 
 /// <summary>Sanitized streamed text (source onChunk), awaited before the next raw chunk is processed.</summary>
 public delegate ValueTask ShellTextCallback(string chunk);
@@ -52,10 +59,12 @@ public sealed class ShellCommandExecutor
     {
         ArgumentNullException.ThrowIfNull(command); ArgumentNullException.ThrowIfNull(workingDirectory);
         var chunks = new LinkedList<string>(); var retained = 0; long totalBytes = 0;
-        var stream = new ShellTextStream(); Stream? spill = null; string? spillPath = null;
+        var discardedOutput = false;
+        var acceptingOutput = true;
+        var stream = new ShellTextStream(); Stream? spill = null; string? spillPath = null, spillError = null;
         async ValueTask EnsureSpillAsync()
         {
-            if (spillPath is not null) return;
+            if (spillPath is not null || spillError is not null) return;
             var name = _nextSpillFileName();
             if (string.IsNullOrEmpty(name) || Path.GetFileName(name) != name) throw new InvalidOperationException("Invalid spill file name.");
             var path = Path.Combine(_spillDirectory, name);
@@ -67,10 +76,19 @@ public sealed class ShellCommandExecutor
         async ValueTask AppendAsync(string text)
         {
             if (text.Length == 0) return;
-            if (totalBytes > ToolOutputTruncator.DefaultMaxBytes) await EnsureSpillAsync().ConfigureAwait(false);
-            if (spill is not null) await WriteSpillAsync(text).ConfigureAwait(false);
+            try
+            {
+                if (totalBytes > ToolOutputTruncator.DefaultMaxBytes) await EnsureSpillAsync().ConfigureAwait(false);
+                if (spill is not null && spillError is null) await WriteSpillAsync(text).ConfigureAwait(false);
+            }
+            catch (Exception error) when (error is IOException or UnauthorizedAccessException) { spillError ??= error.Message; }
             chunks.AddLast(text); retained += text.Length;
-            while (retained > MaximumRetainedCharacters && chunks.Count > 1) { retained -= chunks.First!.Value.Length; chunks.RemoveFirst(); }
+            while (retained > MaximumRetainedCharacters && chunks.Count > 1)
+            {
+                retained -= chunks.First!.Value.Length;
+                chunks.RemoveFirst();
+                discardedOutput = true;
+            }
             if (onChunk is not null) await onChunk(text).ConfigureAwait(false);
         }
         try
@@ -80,21 +98,43 @@ public sealed class ShellCommandExecutor
             {
                 exitCode = await _operations.ExecuteAsync(command, workingDirectory, async data =>
                 {
+                    if (!Volatile.Read(ref acceptingOutput)) return;
                     totalBytes += data.Length;
                     await AppendAsync(Clean(stream.Append(data.Span))).ConfigureAwait(false);
                 }, cancellationToken).ConfigureAwait(false);
             }
             // An aborted command still returns the output it produced so far.
             catch (Exception) when (cancellationToken.IsCancellationRequested) { }
+            finally { Volatile.Write(ref acceptingOutput, false); }
+            var cancelled = cancellationToken.IsCancellationRequested;
             await AppendAsync(Clean(stream.Flush())).ConfigureAwait(false);
             var full = string.Concat(chunks);
             var tail = ToolOutputTruncator.Tail(full);
-            if (tail.Truncated) await EnsureSpillAsync().ConfigureAwait(false);
-            if (spill is not null) await spill.FlushAsync(CancellationToken.None).ConfigureAwait(false);
-            var cancelled = cancellationToken.IsCancellationRequested;
-            return new(tail.Truncated ? tail.Content : full, cancelled ? null : exitCode, cancelled, tail.Truncated, spillPath);
+            try
+            {
+                if (tail.Truncated) await EnsureSpillAsync().ConfigureAwait(false);
+                if (spill is not null)
+                {
+                    var closing = spill;
+                    spill = null;
+                    await closing.DisposeAsync().ConfigureAwait(false);
+                }
+            }
+            catch (Exception error) when (error is IOException or UnauthorizedAccessException) { spillError ??= error.Message; }
+            var truncated = discardedOutput || tail.Truncated;
+            return new(tail.Truncated ? tail.Content : full, cancelled ? null : exitCode, cancelled, truncated,
+                spillError is null ? spillPath : null, truncated ? spillError : null);
         }
-        finally { if (spill is not null) await spill.DisposeAsync().ConfigureAwait(false); }
+        finally
+        {
+            try { if (spill is not null) await spill.DisposeAsync().ConfigureAwait(false); }
+            catch (Exception error) when (error is IOException or UnauthorizedAccessException) { spillError ??= error.Message; }
+            finally
+            {
+                if (spillError is not null && spillPath is not null && _storage is LocalProcessOutputStorage)
+                    LocalProcessOutputStorage.RemoveIncomplete(spillPath);
+            }
+        }
     }
 
     // A lone C1 CSI introducer that never formed a sequence is not admitted display text in the native session profile.

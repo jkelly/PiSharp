@@ -57,34 +57,45 @@ internal sealed class ExtensionProviderHttpHandler : DelegatingHandler
             request.Options.TryGetValue(PiSharp.AI.Providers.ProviderRequestSigning.Resign, out var resign))
             await resign(request, cancellationToken).ConfigureAwait(false);
         var response = await base.SendAsync(request, cancellationToken).ConfigureAwait(false);
-        if (_registry.HasObservers(_captured, "after_provider_response"))
-            await Observe("after_provider_response", Event("after_provider_response", writer =>
+        try
+        {
+            if (_registry.HasObservers(_captured, "after_provider_response"))
+                await Observe("after_provider_response", Event("after_provider_response", writer =>
+                {
+                    writer.WriteNumber("status", (int)response.StatusCode); writer.WritePropertyName("headers"); writer.WriteStartObject();
+                    var headers = new SortedDictionary<string, string>(StringComparer.Ordinal);
+                    // Google SDK errors expose the HTTP status but do not carry response headers.
+                    if (response.IsSuccessStatusCode || _model.Api is not ("google-generative-ai" or "google-vertex"))
+                        foreach (var header in response.Headers.Concat(response.Content.Headers))
+                        {
+                            var values = header.Value.Select(item => item.Trim(' ', '\t')).ToArray();
+                            headers[header.Key.ToLowerInvariant()] = header.Key.Equals("Set-Cookie", StringComparison.OrdinalIgnoreCase)
+                                ? values.LastOrDefault() ?? "" : string.Join(", ", values);
+                        }
+                    foreach (var header in headers) writer.WriteString(header.Key, header.Value);
+                    writer.WriteEndObject();
+                }), cancellationToken).ConfigureAwait(false);
+            if (response.IsSuccessStatusCode && _registry.HasObservers(_captured, "provider_stream_event") &&
+                response.Content.Headers.ContentType?.MediaType?.Equals("text/event-stream", StringComparison.OrdinalIgnoreCase) == true)
             {
-                writer.WriteNumber("status", (int)response.StatusCode); writer.WritePropertyName("headers"); writer.WriteStartObject();
-                var headers = new Dictionary<string, string>(StringComparer.Ordinal);
-                foreach (var header in response.Headers.Concat(response.Content.Headers)) headers[header.Key.ToLowerInvariant()] = string.Join(", ", header.Value);
-                foreach (var header in headers) writer.WriteString(header.Key, header.Value);
-                writer.WriteEndObject();
-            }), cancellationToken).ConfigureAwait(false);
-        if (_registry.HasObservers(_captured, "provider_stream_event") &&
-            response.Content.Headers.ContentType?.MediaType?.Equals("text/event-stream", StringComparison.OrdinalIgnoreCase) == true)
-        {
-            var original = response.Content;
-            var stream = new StreamEventTee(await original.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false), this);
-            var tee = new StreamContent(stream);
-            foreach (var header in original.Headers) tee.Headers.TryAddWithoutValidation(header.Key, header.Value);
-            response.Content = tee;
+                var original = response.Content;
+                var stream = new StreamEventTee(await original.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false), this);
+                var tee = new StreamContent(stream);
+                foreach (var header in original.Headers) tee.Headers.TryAddWithoutValidation(header.Key, header.Value);
+                response.Content = tee;
+            }
+            else if (response.IsSuccessStatusCode && _registry.HasObservers(_captured, "provider_stream_event") &&
+                response.Content.Headers.ContentType?.MediaType?.Equals("application/vnd.amazon.eventstream", StringComparison.OrdinalIgnoreCase) == true)
+            {
+                // Bedrock ConverseStream: each decoded event-stream message is the SDK's output union member, { eventType: payload }.
+                var original = response.Content;
+                var tee = new StreamContent(new EventStreamTee(await original.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false), this));
+                foreach (var header in original.Headers) tee.Headers.TryAddWithoutValidation(header.Key, header.Value);
+                response.Content = tee;
+            }
+            return response;
         }
-        else if (_registry.HasObservers(_captured, "provider_stream_event") &&
-            response.Content.Headers.ContentType?.MediaType?.Equals("application/vnd.amazon.eventstream", StringComparison.OrdinalIgnoreCase) == true)
-        {
-            // Bedrock ConverseStream: each decoded event-stream message is the SDK's output union member, { eventType: payload }.
-            var original = response.Content;
-            var tee = new StreamContent(new EventStreamTee(await original.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false), this));
-            foreach (var header in original.Headers) tee.Headers.TryAddWithoutValidation(header.Key, header.Value);
-            response.Content = tee;
-        }
-        return response;
+        catch { response.Dispose(); throw; }
     }
 
     /// <summary>Pi 1.5.0 identity.ts getIdentityHeaders: the `User-Agent` and attribution headers (OpenRouter, NVIDIA NIM, OpenCode) the AI
@@ -183,7 +194,8 @@ internal sealed class ExtensionProviderHttpHandler : DelegatingHandler
     private sealed class StreamEventTee(Stream inner, ExtensionProviderHttpHandler owner) : Stream
     {
         private readonly StringBuilder _line = new(); private readonly Decoder _decoder = Encoding.UTF8.GetDecoder();
-        private readonly StringBuilder _data = new();
+        private readonly List<string> _data = [];
+        private bool _firstCharacter = true, _skipLf;
         public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken token = default)
         {
             var count = await inner.ReadAsync(buffer, token).ConfigureAwait(false);
@@ -191,19 +203,31 @@ internal sealed class ExtensionProviderHttpHandler : DelegatingHandler
             _decoder.GetChars(buffer.Span[..count], chars, count == 0);
             foreach (var character in chars)
             {
-                if (character != '\n') { if (character != '\r') _line.Append(character); continue; }
-                var line = _line.ToString(); _line.Clear();
-                if (line.Length == 0) { await FlushEventAsync(token).ConfigureAwait(false); continue; }
-                if (line.StartsWith("data:", StringComparison.Ordinal))
-                { if (_data.Length > 0) _data.Append('\n'); _data.Append(line.AsSpan(line.StartsWith("data: ", StringComparison.Ordinal) ? 6 : 5)); }
+                if (_firstCharacter) { _firstCharacter = false; if (character == '\uFEFF') continue; }
+                if (_skipLf) { _skipLf = false; if (character == '\n') continue; }
+                if (character is not ('\r' or '\n')) { _line.Append(character); continue; }
+                _skipLf = character == '\r';
+                if (_line.Length == 0) await FlushEventAsync(token).ConfigureAwait(false);
+                else FinishLine();
             }
-            if (count == 0) await FlushEventAsync(token).ConfigureAwait(false);
+            if (count == 0)
+            {
+                if (_line.Length != 0) FinishLine();
+                await FlushEventAsync(token).ConfigureAwait(false);
+            }
             return count;
+        }
+        private void FinishLine()
+        {
+            var line = _line.ToString(); _line.Clear();
+            if (line == "data") _data.Add("");
+            else if (line.StartsWith("data:", StringComparison.Ordinal))
+                _data.Add(line[(line.StartsWith("data: ", StringComparison.Ordinal) ? 6 : 5)..]);
         }
         private async ValueTask FlushEventAsync(CancellationToken token)
         {
-            if (_data.Length == 0) return;
-            var text = _data.ToString(); _data.Clear();
+            if (_data.Count == 0) return;
+            var text = string.Join('\n', _data); _data.Clear();
             JsonData? data = null;
             try { data = JsonData.Parse(text); } catch (JsonException) { }
             if (data is not null) await owner.ObserveStreamEventAsync(data, token).ConfigureAwait(false);

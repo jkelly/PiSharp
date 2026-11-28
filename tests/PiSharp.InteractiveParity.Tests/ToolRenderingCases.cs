@@ -232,6 +232,21 @@ internal static partial class ToolRenderingCases
             Check(!rendered.Contains("[Showing lines 2001-4000 of 4000. Full output:", StringComparison.Ordinal), "footer removed");
         }));
 
+        yield return ("tool.exec.bash-spill-failure-appears-once", Sync(() =>
+        {
+            var component = Tool("bash", """{"command":"generate output"}""", BuiltInToolRenderers.ForToolDefinition("bash"), Environment.CurrentDirectory);
+            component.SetExpanded(false);
+            var details = new JsonObject
+            {
+                ["truncation"] = new JsonObject { ["truncated"] = true, ["truncatedBy"] = "bytes", ["outputLines"] = 1 },
+                ["fullOutputError"] = "disk full",
+            };
+            component.UpdateResult(TextResult("last line\n\n[Showing last 50KB. Could not save the full output: disk full]", details: details));
+            var rendered = Render(component, 200);
+            Equal(1, CountOccurrences(rendered, "Could not save the full output: disk full"), "one visible warning");
+            Check(!rendered.Contains("[Showing last 50KB", StringComparison.Ordinal), "old footer removed");
+        }));
+
         // Issue #9628: keep short durations precise and make long shell durations readable.
         foreach (var (ms, formatted) in new (long, string)[]
         {
@@ -546,7 +561,7 @@ internal static partial class ToolRenderingCases
         {
             var component = new BashExecutionComponent("pwd", Ui());
             component.AppendOutput("/tmp");
-            Lines(["", border, " $ pwd", "", " /tmp", "", " ⠋ Running... (escape/ctrl+c to cancel)", border], component.Render(40), "running");
+            Lines(["", border, " $ pwd", "", " /tmp", "", " ⠋ Running... (escape to cancel)", border], component.Render(40), "running");
             component.SetComplete(0, false);
         }));
 

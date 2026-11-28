@@ -1,3 +1,4 @@
+// Pi fb0fe823539f6d04850f6e34748c01f01f212e1f (MIT): packages/ai/src/api/openai-completions.ts and utils/openrouter-finish-reason.ts.
 // Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/ai/src/api/openai-completions.ts (the chunk stream processing and parseChunkUsage).
 using System.Collections.Immutable;
 using System.Globalization;
@@ -167,7 +168,13 @@ public sealed class OpenAICompletionsWireSource : IChatTransport
             }
         }
         if (cancellationToken.IsCancellationRequested) failure = OpenAICompletionsWireFailure.Cancelled;
-        foreach (var final in owner?.Finish(failure) ?? state.Finish(failure))
+        var finals = owner?.Finish(failure) ?? state.Finish(failure);
+        if (owner is not null && failure is null && finals.LastOrDefault() is StreamError && state.ProviderStopError is { } providerError)
+        {
+            try { owner.Admit(new CompletionsPublicFailureException(new(providerError))); }
+            catch (ArgumentException) { } // Text outside the admitted public-error bounds retains the fixed diagnostic.
+        }
+        foreach (var final in finals)
         {
             if (owner is null && cancellationToken.IsCancellationRequested)
             {
@@ -240,6 +247,8 @@ public sealed class OpenAICompletionsWireSource : IChatTransport
         private int _chunks;
         private long _inputCharacters, _contentCharacters, _usageCharacters, _costCharacters,
             _reasoningDetailCharacters, _sourceSnapshotCharacters;
+        private string? _reasoningOpaque, _reasoningField, _nativeFinishReason, _providerStopError;
+        internal string? ProviderStopError => _providerStopError;
         private bool _hasFinishReason;
         private bool _sourceResponseIdAssigned;
         private JsonData? _sourceResponseId;
@@ -357,10 +366,13 @@ public sealed class OpenAICompletionsWireSource : IChatTransport
             var choice = Object(choices[0]);
             if (!hasUsage && choice.TryGetProperty("usage", out var choiceUsage) && choiceUsage.ValueKind != JsonValueKind.Null)
                 ReadUsage(Object(choiceUsage));
+            if ((_options.OpenRouterReportedCost || Start.Partial.Provider == "openrouter") &&
+                OptionalString(choice, "native_finish_reason") is { Length: > 0 } nativeReason)
+                _nativeFinishReason = nativeReason;
             var finish = OptionalString(choice, "finish_reason");
             if (!string.IsNullOrEmpty(finish))
             {
-                Set("rawStopReason", finish); _hasFinishReason = true;
+                Set("rawStopReason", _nativeFinishReason is { } native && native != finish ? finish + "." + native : finish); _hasFinishReason = true;
                 _reason = finish switch
                 {
                     "stop" or "end" => StopReason.Stop,
@@ -368,12 +380,15 @@ public sealed class OpenAICompletionsWireSource : IChatTransport
                     "function_call" or "tool_calls" => StopReason.ToolUse,
                     _ => StopReason.Error
                 };
+                if (_reason == StopReason.Error && (finish is "error" or "content_filter" || _nativeFinishReason is not null))
+                    _providerStopError = $"Provider finish_reason: {finish}" +
+                        (_nativeFinishReason is { } detail && detail != finish ? $" (native_finish_reason: {detail})" : "");
             }
             if (!choice.TryGetProperty("delta", out var delta) || delta.ValueKind == JsonValueKind.Null) return;
             Object(delta);
             foreach (var property in delta.EnumerateObject())
             {
-                if (property.Name is "role" or "content" or "reasoning_content" or "reasoning" or "reasoning_text" or "tool_calls" or "reasoning_details")
+                if (property.Name is "role" or "content" or "reasoning_content" or "reasoning" or "reasoning_text" or "reasoning_opaque" or "tool_calls" or "reasoning_details")
                     continue;
                 if (property.Name == "reasoning_details" && (property.Value.ValueKind == JsonValueKind.Null ||
                     property.Value.ValueKind == JsonValueKind.Array && property.Value.GetArrayLength() == 0)) continue;
@@ -392,6 +407,7 @@ public sealed class OpenAICompletionsWireSource : IChatTransport
                 var reasoning = OptionalString(delta, field);
                 if (string.IsNullOrEmpty(reasoning)) continue;
                 Charge(reasoning.Length);
+                _reasoningField = Start.Partial.Provider == "opencode-go" && field == "reasoning" ? "reasoning_content" : field;
                 if (_thinkingIndex is null)
                 {
                     _thinkingIndex = NextIndex();
@@ -402,6 +418,18 @@ public sealed class OpenAICompletionsWireSource : IChatTransport
                 }
                 Push(new ThinkingDelta(_thinkingIndex.Value, reasoning));
                 break;
+            }
+            if (delta.TryGetProperty("reasoning_opaque", out var opaqueField) && opaqueField.ValueKind == JsonValueKind.String &&
+                opaqueField.GetString() is { Length: > 0 } opaque)
+            {
+                Charge(opaque.Length - (_reasoningOpaque?.Length ?? 0));
+                _reasoningOpaque = opaque;
+                if (_thinkingIndex is null)
+                {
+                    _thinkingIndex = NextIndex();
+                    Charge("thinkingSignature".Length + 2);
+                    Push(new ThinkingStarted(_thinkingIndex.Value, new("", JsonFields.Empty.Set("thinkingSignature", TextData("")))));
+                }
             }
             if (delta.TryGetProperty("reasoning_details", out var details) && details.ValueKind == JsonValueKind.Array)
                 foreach (var detail in details.EnumerateArray())
@@ -509,6 +537,14 @@ public sealed class OpenAICompletionsWireSource : IChatTransport
             {
                 if (_options.SupportsFinishReason) failure = OpenAICompletionsWireFailure.UnexpectedEof;
             }
+            if (failure is null && (_reason == StopReason.Stop || (!_hasFinishReason && !_options.SupportsFinishReason)) &&
+                _nativeFinishReason is { } native && native.ToLowerInvariant() is not
+                    ("stop" or "end_turn" or "stop_sequence" or "eos" or "complete" or "completed" or "pause_turn" or "compaction" or "end_of_stream") &&
+                !_reducer.Snapshot().Content.Any(block => block is ToolCallContent || block is TextContent t && !string.IsNullOrWhiteSpace(t.Text)))
+            {
+                _reason = StopReason.Error;
+                _providerStopError = $"OpenRouter returned an empty response (native_finish_reason: {native})";
+            }
             if (failure is null && _reason == StopReason.Error) failure = OpenAICompletionsWireFailure.ProviderError;
             var progress = new List<StreamEvent>();
             if (failure is null)
@@ -531,9 +567,9 @@ public sealed class OpenAICompletionsWireSource : IChatTransport
                     for (var index = 0; index < snapshot.Content.Length; index++)
                     {
                         JsonFields? thinkingProperties = snapshot.Content[index].ExtraProperties;
-                        if (snapshot.Content[index] is ThinkingContent && _reasoningDetails.Count > 0)
+                        if (snapshot.Content[index] is ThinkingContent && HasReasoningReplay)
                         {
-                            var signature = EcmaScriptJsonProjection.Project(_reasoningDetails.ToJsonString(), ProjectionLimits());
+                            var signature = ReasoningSignature();
                             var previous = 0;
                             if (thinkingProperties is not null && thinkingProperties.TryGet("thinkingSignature", out var old)) previous = old!.ToString().Length;
                             var value = TextData(signature); Charge(value.ToString().Length - previous);
@@ -569,7 +605,7 @@ public sealed class OpenAICompletionsWireSource : IChatTransport
             if (failure is { } rejected)
             {
                 properties = properties.Set("errorMessage", TextData(rejected == OpenAICompletionsWireFailure.Cancelled
-                        ? "Completions stream was cancelled." : "Completions stream did not complete."));
+                        ? "Completions stream was cancelled." : rejected == OpenAICompletionsWireFailure.ProviderError && _providerStopError is not null ? _providerStopError : "Completions stream did not complete."));
             }
             var final = finalSnapshot with { Usage = _usage, StopReason = reason, ExtraProperties = properties };
             StreamTerminalEvent terminal = failure is null
@@ -596,9 +632,20 @@ public sealed class OpenAICompletionsWireSource : IChatTransport
             progress.Add(terminal); return progress;
         }
 
+        private bool HasReasoningReplay => _reasoningDetails.Count > 0 || _reasoningOpaque is not null;
+
+        private string ReasoningSignature()
+        {
+            if (_reasoningDetails.Count > 0) return EcmaScriptJsonProjection.Project(_reasoningDetails.ToJsonString(), ProjectionLimits());
+            var signature = new JsonObject();
+            if (_reasoningField is not null) signature["field"] = _reasoningField;
+            signature["reasoning_opaque"] = _reasoningOpaque;
+            return EcmaScriptJsonProjection.Project(signature.ToJsonString(), ProjectionLimits());
+        }
+
         private AssistantMessage RetainErrorThinkingDetails(AssistantMessage snapshot)
         {
-            if (_reasoningDetails.Count == 0 || _thinkingIndex is not { } index ||
+            if (!HasReasoningReplay || _thinkingIndex is not { } index ||
                 snapshot.Content[index] is not ThinkingContent thinking) return snapshot;
             if (!_errorThinkingSignatureAttempted)
             {
@@ -607,7 +654,7 @@ public sealed class OpenAICompletionsWireSource : IChatTransport
                 {
                     // Pi's catch applies accumulated replay metadata without publishing thinking_end.
                     // Charge the owned terminal overlay once, including repeated cancellation Finish calls.
-                    var signature = TextData(EcmaScriptJsonProjection.Project(_reasoningDetails.ToJsonString(), ProjectionLimits()));
+                    var signature = TextData(ReasoningSignature());
                     var previous = thinking.ExtraProperties is { } properties && properties.TryGet("thinkingSignature", out var old)
                         ? old!.ToString().Length : 0;
                     Charge(signature.ToString().Length - previous);

@@ -25,8 +25,8 @@ internal static partial class Program
             Equal("1.5.0", root.GetProperty("upstreamVersion").GetString(), "historical port map version");
             var candidate = root.GetProperty("currentImplementation").GetProperty("candidate");
             Equal(DurableUpstream.Commit, candidate.GetProperty("source").GetProperty("commit").GetString(), "current candidate commit");
-            Equal("v1.6.0", candidate.GetProperty("source").GetProperty("tag").GetString(), "current candidate tag");
-            Equal("compatibility/durable-sync-1.6.0-overlay.json", candidate.GetProperty("overlay").GetString(), "current overlay");
+            Equal("v1.7.0", candidate.GetProperty("source").GetProperty("tag").GetString(), "current candidate tag");
+            Equal("compatibility/durable-sync-1.7.0-overlay.json", candidate.GetProperty("overlay").GetString(), "current overlay");
             var statuses = root.GetProperty("statusMeaning").EnumerateObject().Select(property => property.Name).ToHashSet(StringComparer.Ordinal);
             var upstream = new HashSet<string>(StringComparer.Ordinal);
             foreach (var row in root.GetProperty("files").EnumerateArray())
@@ -50,7 +50,7 @@ internal static partial class Program
             var repository = RepositoryRoot();
             using var native = JsonDocument.Parse(File.ReadAllText(Path.Combine(repository, "tools", "DurablePortMap", "sync-1.6.0-native-map.json")));
             using var overlay = JsonDocument.Parse(File.ReadAllText(Path.Combine(repository, "compatibility", "durable-sync-1.6.0-overlay.json")));
-            Equal(DurableUpstream.Commit, native.RootElement.GetProperty("source").GetProperty("commit").GetString(), "the native map's commit");
+            Equal("faac585884ae2c013a6b1400f3e9e77f10b34bac", native.RootElement.GetProperty("source").GetProperty("commit").GetString(), "the native map's commit");
             var files = native.RootElement.GetProperty("files");
             var listed = new HashSet<string>(StringComparer.Ordinal);
             foreach (var entry in files.EnumerateObject())

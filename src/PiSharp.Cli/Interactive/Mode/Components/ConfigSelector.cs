@@ -232,7 +232,7 @@ internal sealed partial class ConfigSelectorComponent
             var sep = theme.Fg("muted", " · ");
             var switchHint = projectModeAvailable ? KeybindingHints.KeyHint("tui.input.tab", "switch mode") + sep : "";
             var actionHint = writeScope == "project" ? KeybindingHints.RawKeyHint("space", "cycle inherit/+/-") : KeybindingHints.RawKeyHint("space", "toggle");
-            var hint = switchHint + actionHint + sep + KeybindingHints.RawKeyHint("esc", "close");
+            var hint = switchHint + actionHint + sep + KeybindingHints.KeyHint("tui.select.cancel", "close");
             var spacing = Math.Max(1, width - TextUtils.VisibleWidth(title) - TextUtils.VisibleWidth(hint));
             var scopeHint = writeScope == "project"
                 ? theme.Fg("muted", $"{PiConfig.ConfigDirName}/settings.json · inherited global resources are dimmed")

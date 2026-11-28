@@ -1,4 +1,4 @@
-// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/ai/src/utils/retry.ts (isRetryableAssistantError, retryDelayMs) over a pi-ai
+// Pi fb0fe823539f6d04850f6e34748c01f01f212e1f (MIT): packages/ai/src/utils/retry.ts (isRetryableAssistantError, retryDelayMs) over a pi-ai
 // wire assistant message. PiSharp.CodingAgent's AgentRetryPolicy ports the same classifier over PiSharp.Contracts stop reasons, but
 // PiSharp.Durable does not reference PiSharp.CodingAgent; this port uses its regex translation, and the test project compares the two on
 // shared inputs. retryAssistantCall is not ported: generation drives its own durable retry loop.
@@ -30,15 +30,15 @@ internal static class PiAiRetry
 
     private static readonly Regex RetryableProviderError = Pattern(string.Join("|",
         // Generic provider load, HTTP status, and server-side transient failures.
-        "overloaded", "server_busy", "servers are currently busy", "currently experiencing high demand", "model is at capacity", "rate.?limit",
-        "too many requests",
+        "overloaded", "server_busy", "servers are currently busy", "currently experiencing high demand", "model is at capacity", "admission ceiling", "rate.?limit",
+        "too many requests", "rate increased too quickly",
         // Status codes must not be part of a longer word or number, e.g. a request id or byte count (#11057).
-        "(?<![a-z0-9])(?:429|500|502|503|504|520|524)(?![a-z0-9])",
+        "(?<![a-z0-9])(?:429|500|502|503|504|520|524|525)(?![a-z0-9])",
         // Also matches "The service is temporarily unavailable" (#10965).
-        "service.?(?:is.?)?(?:temporarily.?)?unavailable", "server.?error", "internal.?error",
+        "service.?(?:is.?)?(?:temporarily.?)?unavailable", "provider.?(?:is.?)?temporarily.?unavailable", "server.?error", "internal.?error",
         // Wrapper/provider text for transient upstream failures, including gateway wording such as "The upstream provider returned an
         // error" (Pi v1.2.0, #10842).
-        "provider.?returned.?(?:an.?)?error", "exceeded request buffer limit while retrying upstream",
+        "provider.?returned.?(?:an.?)?error", "\"type\"\\s*:\\s*\"api_error\"", "exceeded request buffer limit while retrying upstream",
         // Gateway failures relaying the upstream response stream, as `response.failed` events or error codes (#10920).
         "unable to forward upstream", "upstream.?request.?failed", "upstream_stream_read_error", "stream was interrupted", "http/?2 stream failed",
         // Network, proxy, and fetch transport failures; node-fetch system errors such as a Google ADC token refresh (#10996).
@@ -57,11 +57,13 @@ internal static class PiAiRetry
         "websocket.?connection.?limit.?reached",
         // Premature stream endings from SDKs and transports, including Codex CLI proxies' mid-stream disconnect (#11057).
         "ended without", "stream ended before message_stop", "stream ended before a terminal response event",
-        "http2 request did not get a response", "stream disconnected before completion", "cut short after the reply had begun", "pending stream has been canceled",
+        "http2 request did not get a response", "provider finish_reason: error", "provider stopped with: error",
+        "returned an empty response", "stopped before completing the response", "ended the response before it was complete",
+        "connection to the provider was reset", "reported a failure while generating the response", "stream disconnected before completion", "cut short after the reply had begun", "pending stream has been canceled",
         // Provider-requested retry delay cap failures.
         "retry delay",
         // Explicit retry guidance emitted mid-stream.
-        "you can retry your request", "try your request again", "please retry your request",
+        "you can retry your request", "try your request again", "please retry your request", "repeat the request later",
         // gRPC based providers.
         "ResourceExhausted",
         // Sign in with ChatGPT: usage or user data temporarily unavailable.

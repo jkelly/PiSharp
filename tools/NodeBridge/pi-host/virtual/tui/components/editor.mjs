@@ -1,4 +1,4 @@
-// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/tui/src/components/editor.ts.
+// Pi fb0fe823539f6d04850f6e34748c01f01f212e1f (MIT): packages/tui/src/components/editor.ts.
 // Ported to plain ESM for the PiSharp Node extension bridge (TypeScript types stripped mechanically; behaviour unchanged).
 import { getKeybindings } from "../keybindings.mjs";
 import { decodePrintableKey, matchesKey } from "../keys.mjs";
@@ -275,7 +275,8 @@ export class Editor {
     addToHistory(text) {
         const trimmed = text.trim();
         if (!trimmed) return;
-        if (this.history.length > 0 && this.history[0] === trimmed) return;
+        const existing = this.history.indexOf(trimmed);
+        if (existing !== -1) this.history.splice(existing, 1);
         this.history.unshift(trimmed);
         if (this.history.length > 100) {
             this.history.pop();
@@ -529,37 +530,12 @@ export class Editor {
                 return;
             }
             if (kb.matches(data, "tui.input.tab")) {
-                const selected = this.autocompleteList.getSelectedItem();
-                if (selected && this.autocompleteProvider) {
-                    this.pushUndoSnapshot();
-                    this.lastAction = null;
-                    const result = this.autocompleteProvider.applyCompletion(this.state.lines, this.state.cursorLine, this.state.cursorCol, selected, this.autocompletePrefix);
-                    this.state.lines = result.lines;
-                    this.state.cursorLine = result.cursorLine;
-                    this.setCursorCol(result.cursorCol);
-                    this.cancelAutocomplete();
-                    if (this.onChange) this.onChange(this.getText());
-                }
+                if (this.applySelectedCompletion() && this.onChange) this.onChange(this.getText());
                 return;
             }
             if (kb.matches(data, "tui.select.confirm")) {
-                const selected = this.autocompleteList.getSelectedItem();
-                if (selected && this.autocompleteProvider) {
-                    const beforeCursor = (this.state.lines[this.state.cursorLine] || "").slice(0, this.state.cursorCol);
-                    const submitsCommand = this.autocompletePrefix.startsWith("/") && this.isInSlashCommandNameContext(beforeCursor);
-                    this.pushUndoSnapshot();
-                    this.lastAction = null;
-                    const result = this.autocompleteProvider.applyCompletion(this.state.lines, this.state.cursorLine, this.state.cursorCol, selected, this.autocompletePrefix);
-                    this.state.lines = result.lines;
-                    this.state.cursorLine = result.cursorLine;
-                    this.setCursorCol(result.cursorCol);
-                    if (submitsCommand) {
-                        this.cancelAutocomplete();
-                    } else {
-                        this.cancelAutocomplete();
-                        if (this.onChange) this.onChange(this.getText());
-                        return;
-                    }
+                if (this.confirmAutocomplete() === "applied") {
+                    return;
                 }
             }
         }
@@ -1696,6 +1672,35 @@ export class Editor {
     cancelAutocomplete() {
         this.cancelAutocompleteRequest();
         this.clearAutocompleteUi();
+    }
+    confirmAutocomplete() {
+        const beforeCursor = (this.state.lines[this.state.cursorLine] || "").slice(0, this.state.cursorCol);
+        const submitsCommand = this.autocompletePrefix.startsWith("/") && this.isInSlashCommandNameContext(beforeCursor);
+        if (!this.applySelectedCompletion()) {
+            return "none";
+        }
+        if (submitsCommand) {
+            return "submit";
+        }
+        if (this.onChange) this.onChange(this.getText());
+        return "applied";
+    }
+    applySelectedCompletion() {
+        if (!this.autocompleteState || !this.autocompleteList || !this.autocompleteProvider) {
+            return false;
+        }
+        const selected = this.autocompleteList.getSelectedItem();
+        if (!selected) {
+            return false;
+        }
+        this.pushUndoSnapshot();
+        this.lastAction = null;
+        const result = this.autocompleteProvider.applyCompletion(this.state.lines, this.state.cursorLine, this.state.cursorCol, selected, this.autocompletePrefix);
+        this.state.lines = result.lines;
+        this.state.cursorLine = result.cursorLine;
+        this.setCursorCol(result.cursorCol);
+        this.cancelAutocomplete();
+        return true;
     }
     isShowingAutocomplete() {
         return this.autocompleteState !== null;

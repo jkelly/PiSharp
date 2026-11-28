@@ -171,7 +171,8 @@ internal sealed class PiExtensionModels
     private static ExtensionModelRequestOptions ExtensionOptions(ModelRequestOptions? options) => new()
     {
         ApiKey = options?.ApiKey, Headers = options?.Headers ?? [], TimeoutMs = options?.TimeoutMs, MaxRetries = options?.MaxRetries,
-        MaxRetryDelayMs = options?.MaxRetryDelayMs, Temperature = (options as ClassifierOptions)?.Temperature
+        MaxRetryDelayMs = options?.MaxRetryDelayMs, Temperature = (options as ClassifierOptions)?.Temperature,
+        SessionId = options?.SessionId, AspectRatio = (options as ImagesOptions)?.AspectRatio, Size = (options as ImagesOptions)?.Size
     };
 
     private sealed class NativeClassifier(string api, ExtensionClassifierImplementation implementation) : IClassifierApi
@@ -192,6 +193,9 @@ internal sealed class PiExtensionModels
     {
         var json = new JsonObject();
         if (options?.ApiKey is { } key) json["apiKey"] = key;
+        if (options?.SessionId is { } sessionId) json["sessionId"] = sessionId;
+        if (options is ImagesOptions { AspectRatio: { } ratio }) json["aspectRatio"] = ratio;
+        if (options is ImagesOptions { Size: { } size }) json["size"] = size;
         if (options is { Headers.IsDefaultOrEmpty: false })
         {
             var headers = new JsonObject();
@@ -349,9 +353,10 @@ internal sealed class PiExtensionModels
     {
         if (args.GetArrayLength() <= index || args[index].ValueKind != JsonValueKind.Object) return null;
         var value = args[index];
+        string? Text(string field) => value.TryGetProperty(field, out var item) && item.ValueKind == JsonValueKind.String ? item.GetString() : null;
         var options = new T
         {
-            ApiKey = value.TryGetProperty("apiKey", out var key) && key.ValueKind == JsonValueKind.String ? key.GetString() : null,
+            ApiKey = Text("apiKey"), SessionId = Text("sessionId"),
             TimeoutMs = value.TryGetProperty("timeoutMs", out var timeout) && timeout.ValueKind == JsonValueKind.Number ? timeout.GetInt32() : null,
             MaxRetries = value.TryGetProperty("maxRetries", out var retries) && retries.ValueKind == JsonValueKind.Number ? retries.GetInt32() : null,
             Headers = value.TryGetProperty("headers", out var headers) && headers.ValueKind == JsonValueKind.Object
@@ -359,6 +364,8 @@ internal sealed class PiExtensionModels
         };
         if (options is ClassifierOptions classifier && value.TryGetProperty("temperature", out var temperature) && temperature.ValueKind == JsonValueKind.Number)
             return (T)(ModelRequestOptions)(classifier with { Temperature = temperature.GetDouble() });
+        if (options is ImagesOptions images)
+            return (T)(ModelRequestOptions)(images with { AspectRatio = Text("aspectRatio"), Size = Text("size") });
         return options;
     }
 }

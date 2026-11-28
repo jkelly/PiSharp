@@ -88,6 +88,7 @@ internal sealed partial class InteractiveMode
         if (type is "message_start" or "message_end" or "tool_execution_start" or "turn_end" or "agent_end" or "entry_appended" or "compaction_end")
             RequestSessionSync();
         programStatus.HandleEvent(e);
+        if (reportedResumeCommand is null && type is "message_start" or "agent_settled") ReportProgramResume();
 
         switch (type)
         {
@@ -129,7 +130,7 @@ internal sealed partial class InteractiveMode
                     AddMessageToChat(SessionEntries.CreateCustomMessage(S(entry["customType"]) ?? "", entry["content"], true, entry["details"], S(entry["timestamp"])));
                     ui.RequestRender();
                 }
-                else if (entryType == "message" && S(entry["message"]?["role"]) == "assistant" && settings.ShowCacheMissNotices &&
+                else if (entryType == "message" && S(entry["message"]?["role"]) == "assistant" && settings.Notice("cacheMisses") &&
                     S(entry["message"]?["stopReason"]) is not ("aborted" or "error") && context.DetectCacheMissForEntry?.Invoke(entryId) is { } entryMiss)
                 {
                     AddCacheMissNotice(entryMiss);
@@ -423,6 +424,7 @@ internal sealed partial class InteractiveMode
             footerDataProvider.SetCwd(cwd);
         }
         await RefreshSessionAsync();
+        ReportProgramResume();
         // rebindCurrentSession -> applyRuntimeSettings: footer.setAutoCompactEnabled(session.autoCompactionEnabled).
         footer.SetAutoCompactEnabled(state.AutoCompactionEnabled);
         await RefreshCommandsAsync();
@@ -511,7 +513,7 @@ internal sealed partial class InteractiveMode
                 component.SetExpanded(toolOutputExpanded);
                 if (S(message["output"]) is { Length: > 0 } output) component.AppendOutput(output);
                 component.SetComplete(message["exitCode"] is JsonValue code && code.TryGetValue<int>(out var exit) ? exit : null, B(message["cancelled"]),
-                    B(message["truncated"]) ? TruncatedOutput(null) : null, S(message["fullOutputPath"]));
+                    B(message["truncated"]) ? TruncatedOutput(null) : null, S(message["fullOutputPath"]), S(message["fullOutputError"]));
                 chatContainer.AddChild(component);
                 break;
             }
@@ -578,7 +580,7 @@ internal sealed partial class InteractiveMode
     {
         pendingTools.Clear();
         var renderedPendingTools = new Dictionary<string, ToolExecutionComponent>(StringComparer.Ordinal);
-        var cacheMisses = settings.ShowCacheMissNotices ? context.CollectCacheMisses?.Invoke(state.Entries) : null;
+        var cacheMisses = settings.Notice("cacheMisses") ? context.CollectCacheMisses?.Invoke(state.Entries) : null;
         if (updateFooter)
         {
             footer.Invalidate();
@@ -657,7 +659,7 @@ internal sealed partial class InteractiveMode
 
     private void AddCacheWarmingUsage(JsonObject entry)
     {
-        if (!settings.ShowCacheMissNotices) return;
+        if (!settings.Notice("cacheWarming")) return;
         var note = S(entry["note"]);
         if (cacheWarmingNotice is { } previous && ReferenceEquals(chatContainer.Children.LastOrDefault(), previous.Component) && previous.Note == note)
         {
@@ -677,7 +679,7 @@ internal sealed partial class InteractiveMode
 
     private void AddCompactionCostNotice(string kind, JsonObject usage)
     {
-        if (!settings.ShowCacheMissNotices) return;
+        if (!settings.Notice("compactionCosts")) return;
         var tokens = N(usage["input"]) + N(usage["output"]) + N(usage["cacheRead"]) + N(usage["cacheWrite"]);
         var total = N(usage["cost"]?["total"]);
         var cost = total >= 0.01 ? $" (~${total.ToString("F2", CultureInfo.InvariantCulture)})" : "";
@@ -764,7 +766,7 @@ internal sealed partial class InteractiveMode
 
     private void MaybeShowThinkingDropNotice(JsonObject message)
     {
-        if (!settings.ShowCacheMissNotices) return;
+        if (!settings.Notice("reasoningDrops")) return;
         if (ReasoningDropNotice(message, BranchBefore(message, SessionEntries.BuildSessionPath(state.Entries, state.LeafId))) is not { } notice) return;
         chatContainer.AddChild(new Spacer(1));
         chatContainer.AddChild(new ThemedText(() => theme.Fg("warning", notice), 1, 0));
@@ -772,7 +774,7 @@ internal sealed partial class InteractiveMode
 
     private void MaybeShowCacheMissNotice(JsonObject message)
     {
-        if (!settings.ShowCacheMissNotices) return;
+        if (!settings.Notice("cacheMisses")) return;
         if (context.DetectCacheMiss?.Invoke(state.Entries, message) is { } miss) AddCacheMissNotice(miss);
     }
 

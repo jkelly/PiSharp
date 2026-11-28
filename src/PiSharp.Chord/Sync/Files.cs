@@ -1,4 +1,4 @@
-// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/chord/src/sync/files.ts.
+// Pi fb0fe823539f6d04850f6e34748c01f01f212e1f (MIT): packages/chord/src/sync/files.ts.
 using System.Text;
 
 namespace PiSharp.Chord.Sync;
@@ -50,6 +50,7 @@ public interface ISyncFileSystem
     Task<FileResult<bool>> AppendFileAsync(string path, ReadOnlyMemory<byte> content, ChordContext context);
     Task<FileResult<bool>> AppendFileAsync(string path, string content, ChordContext context)
         => AppendFileAsync(path, Encoding.UTF8.GetBytes(content), context);
+    Task<FileResult<bool>> FlushFileAsync(string path, ChordContext context);
     Task<FileResult<bool>> RenameFileAsync(string sourcePath, string destinationPath, ChordContext context);
     Task<FileResult<IReadOnlyList<SyncFileInfo>>> ListDirAsync(string path, ChordContext context);
     Task<FileResult<bool>> CreateDirAsync(string path, SyncCreateDirectoryOptions? options, ChordContext context);
@@ -97,6 +98,13 @@ public sealed class LocalSyncFileSystem : ISyncFileSystem
         });
     public Task<FileResult<bool>> AppendFileAsync(string path, string content, ChordContext context)
         => AppendFileAsync(path, Encoding.UTF8.GetBytes(content), context);
+    public Task<FileResult<bool>> FlushFileAsync(string path, ChordContext context)
+        => Run(context, _ =>
+        {
+            using var stream = new FileStream(path, FileMode.Open, FileAccess.Write, FileShare.Read);
+            stream.Flush(flushToDisk: true);
+            return Task.FromResult(true);
+        });
     public Task<FileResult<bool>> RenameFileAsync(string sourcePath, string destinationPath, ChordContext context)
         => Run(context, _ => { File.Move(sourcePath, destinationPath, overwrite: true); return Task.FromResult(true); });
     public Task<FileResult<IReadOnlyList<SyncFileInfo>>> ListDirAsync(string path, ChordContext context)
@@ -171,6 +179,7 @@ internal static class SyncFiles
                 (await fs.AppendFileAsync(temporary, chunk, context).ConfigureAwait(false)).Unwrap();
             }
             context.AbortSignal?.ThrowIfCancellationRequested();
+            (await fs.FlushFileAsync(temporary, context).ConfigureAwait(false)).Unwrap();
             (await fs.RenameFileAsync(temporary, path, context).ConfigureAwait(false)).Unwrap();
         }
         catch

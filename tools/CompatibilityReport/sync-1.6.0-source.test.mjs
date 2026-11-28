@@ -3,7 +3,7 @@
 import { defineSourceChecks } from './sync-source-checks.mjs';
 
 defineSourceChecks({
-  lockPath: 'compatibility/target.lock.json',
+  lockPath: 'compatibility/target.v1.6.0.lock.json',
   previousLockPath: 'compatibility/target.v1.5.2.lock.json',
   previousLockSha256: '5934c0481fd2c908ada840dfc33d1f9a69b11b03d1848d7080edf9116782eb66',
   inventoryPath: 'compatibility/sync-1.6.0-files.json',

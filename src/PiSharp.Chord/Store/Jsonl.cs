@@ -1,3 +1,4 @@
+// Pi fb0fe823539f6d04850f6e34748c01f01f212e1f (MIT): packages/chord/src/store/jsonl.ts (v1.7.0 updates).
 // Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/chord/src/next/store/jsonl.ts
 //
 // Plain JSONL for archives (slice 6a §13): one part per line, UTF-8. The store yields and takes parts; this is the encoding it ships
@@ -46,7 +47,7 @@ public static partial class Tables
     {
         ArgumentNullException.ThrowIfNull(bytes);
         var decoder = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true).GetDecoder();
-        var rest = "";
+        var rest = new StringBuilder();
         long line = 0;
         var started = false;
         JsonNode? Parse(string text)
@@ -84,20 +85,21 @@ public static partial class Tables
         }
         await foreach (var chunk in bytes.WithCancellation(cancellationToken).ConfigureAwait(false))
         {
-            rest += Decode(chunk.Span, flush: false);
+            var chunkText = Decode(chunk.Span, flush: false);
             var start = 0;
-            for (var end = rest.IndexOf('\n'); end >= 0; end = rest.IndexOf('\n', start))
+            for (var end = chunkText.IndexOf('\n'); end >= 0; end = chunkText.IndexOf('\n', start))
             {
-                var text = rest[start..end];
+                var text = rest.Append(chunkText, start, end - start).ToString();
+                rest.Clear();
                 start = end + 1;
                 line++;
                 if (!StoreInternal.IsBlank(text)) yield return Parse(text);
             }
-            rest = rest[start..];
+            rest.Append(chunkText, start, chunkText.Length - start);
         }
-        rest += Decode([], flush: true);
+        var lastLine = rest.Append(Decode([], flush: true)).ToString();
         line++;
-        if (!StoreInternal.IsBlank(rest)) yield return Parse(rest);
+        if (!StoreInternal.IsBlank(lastLine)) yield return Parse(lastLine);
     }
 }
 

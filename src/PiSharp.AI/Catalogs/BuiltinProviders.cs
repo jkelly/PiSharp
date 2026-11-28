@@ -29,6 +29,7 @@ public enum ProviderAuthKind
 public sealed record ProviderStoredCredential(string Type, string? Key = null, IReadOnlyDictionary<string, string>? Environment = null,
     ImmutableArray<string>? AvailableModelIds = null)
 {
+    public PiSharp.Contracts.JsonData? GatewayConfig { get; init; }
     public override string ToString() => $"ProviderStoredCredential ({Type}) [redacted]";
 }
 
@@ -68,7 +69,7 @@ public static class BuiltinProviders
             [Completions, "cloudflare-workers-ai-system-one"]),
         P("deepseek", "DeepSeek", "https://api.deepseek.com", "DEEPSEEK_API_KEY", null, Completions),
         P("fireworks", "Fireworks", "https://api.fireworks.ai/inference", "FIREWORKS_API_KEY", null, Messages, Completions),
-        P("github-copilot", "GitHub Copilot", "https://api.individual.githubcopilot.com", "COPILOT_GITHUB_TOKEN", "GitHub Copilot", Messages, Completions, Responses, "typesafe-system-one"),
+        P("github-copilot", "GitHub Copilot", "https://api.individual.githubcopilot.com", "COPILOT_GITHUB_TOKEN", "GitHub Copilot", Messages, Completions, Responses, "typesafe-system-one", "openai-decisions"),
         P("google", "Google", "https://generativelanguage.googleapis.com/v1beta", "GEMINI_API_KEY", null, "google-generative-ai"),
         new("google-vertex", "Google Vertex AI", null, ["GOOGLE_CLOUD_API_KEY"], ProviderAuthKind.GoogleVertex, null, ["google-vertex"]),
         P("groq", "Groq", "https://api.groq.com/openai/v1", "GROQ_API_KEY", null, Completions),
@@ -92,7 +93,7 @@ public static class BuiltinProviders
         Qwen("qwen-token-plan-cn", "Qwen Token Plan Team CN", QwenChina, "QWEN_TOKEN_PLAN_TEAM_CN_API_KEY", "QWEN_TOKEN_PLAN_CN_API_KEY"),
         Qwen("qwen-token-plan-individual", "Qwen Token Plan Individual", QwenInternational, "QWEN_TOKEN_PLAN_INDIVIDUAL_API_KEY", "QWEN_TOKEN_PLAN_API_KEY"),
         Qwen("qwen-token-plan-individual-cn", "Qwen Token Plan Individual CN", QwenChina, "QWEN_TOKEN_PLAN_INDIVIDUAL_CN_API_KEY", "QWEN_TOKEN_PLAN_CN_API_KEY"),
-        P("radius", "Radius", null, "RADIUS_API_KEY", "Radius", "pi-messages"),
+        P("radius", "Radius", null, "RADIUS_API_KEY", "Radius", "pi-messages", "pi-decision", "pi-image"),
         P("together", "Together", "https://api.together.ai/v1", "TOGETHER_API_KEY", null, Completions),
         P("typesafe", "TypeSafe", null, "TYPESAFE_API_KEY", null, "typesafe-system-one"),
         P("vercel-ai-gateway", "Vercel AI Gateway", "https://ai-gateway.vercel.sh", "AI_GATEWAY_API_KEY", null, Messages, "typesafe-system-one"),

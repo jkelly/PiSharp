@@ -1,4 +1,4 @@
-// Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/durable/src/harness/usage.ts. Usage values are pi-ai Usage wire JSON. Upstream's
+// Pi fb0fe823539f6d04850f6e34748c01f01f212e1f (MIT): packages/durable/src/harness/usage.ts. Usage values are pi-ai Usage wire JSON. Upstream's
 // addUsage mutates a draft or a plain object; here AddUsage(DraftObject, ...) changes a draft in a commit, and the plain-value overload and
 // AddUsageState return a new value. A summed key keeps its position and a new key goes last, as upstream's assignments do.
 using PiSharp.Durable.Chord;
@@ -33,6 +33,7 @@ public static class UsageLedger
         foreach (var key in new[] { "input", "output", "cacheRead", "cacheWrite", "totalTokens" }) Add(total, key, Number(usage, key));
         if (usage.TryGetValue("cacheWrite1h", out var cacheWrite1h)) Add(total, "cacheWrite1h", Number(cacheWrite1h));
         if (usage.TryGetValue("reasoning", out var reasoning)) Add(total, "reasoning", Number(reasoning));
+        if (usage.TryGetValue("imageOutput", out var imageOutput)) Add(total, "imageOutput", Number(imageOutput));
         var cost = total.GetObject("cost");
         var spent = (JsonObjectValue)usage["cost"];
         foreach (var key in new[] { "input", "output", "cacheRead", "cacheWrite", "total" }) Add(cost, key, Number(spent, key));
@@ -45,6 +46,7 @@ public static class UsageLedger
         foreach (var key in new[] { "input", "output", "cacheRead", "cacheWrite", "totalTokens" }) Add(sum, key, Number(usage, key));
         if (usage.TryGetValue("cacheWrite1h", out var cacheWrite1h)) Add(sum, "cacheWrite1h", Number(cacheWrite1h));
         if (usage.TryGetValue("reasoning", out var reasoning)) Add(sum, "reasoning", Number(reasoning));
+        if (usage.TryGetValue("imageOutput", out var imageOutput)) Add(sum, "imageOutput", Number(imageOutput));
         var cost = ((JsonObjectValue)total["cost"]).ToBuilder();
         var spent = (JsonObjectValue)usage["cost"];
         foreach (var key in new[] { "input", "output", "cacheRead", "cacheWrite", "total" }) Add(cost, key, Number(spent, key));

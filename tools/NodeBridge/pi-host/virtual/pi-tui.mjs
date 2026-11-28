@@ -1,4 +1,4 @@
-// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/tui/src/index.ts.
+// Pi fb0fe823539f6d04850f6e34748c01f01f212e1f (MIT): packages/tui/src/index.ts.
 // Ported to plain ESM for the PiSharp Node extension bridge (TypeScript types stripped mechanically; behaviour unchanged).
 export { Marked } from "./vendor/marked.mjs";
 export { CombinedAutocompleteProvider } from "./tui/autocomplete.mjs";
@@ -25,6 +25,7 @@ export { decodeKittyPrintable, isKeyRelease, isKeyRepeat, isKittyProtocolActive,
 export { renderLatex } from "./tui/latex.mjs";
 export { getNativeClipboard } from "./tui/native-platform.mjs";
 export { oklabToOkhslLightness } from "./tui/oklab.mjs";
+export { formatProgramResume, formatProgramResumeClear, takeProgramResumeToken } from "./tui/program-resume.mjs";
 export { formatProgramStatus } from "./tui/program-status.mjs";
 export { StdinBuffer } from "./tui/stdin-buffer.mjs";
 export { isAppleTerminalSession, ProcessTerminal } from "./tui/terminal.mjs";

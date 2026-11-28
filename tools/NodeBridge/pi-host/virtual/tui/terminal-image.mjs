@@ -1,4 +1,4 @@
-// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/tui/src/terminal-image.ts.
+// Pi fb0fe823539f6d04850f6e34748c01f01f212e1f (MIT): packages/tui/src/terminal-image.ts.
 // Ported to plain ESM for the PiSharp Node extension bridge (TypeScript types stripped mechanically; behaviour unchanged).
 import { execSync } from "node:child_process";
 import { homedir } from "node:os";
@@ -235,7 +235,7 @@ export function stripImageSequences(line) {
     return line.replace(/\x1b_G[^\x1b]*\x1b\\/g, "").replace(/(?:\x1b\[\d+A)?\x1b\]1337;File=[^\x07]*\x07/g, "");
 }
 export function allocateImageId() {
-    return Math.floor(Math.random() * 0xfffffffe) + 1;
+    return Math.floor(Math.random() * 0x7fffffff) + 1;
 }
 export function encodeKitty(base64Data, options = {}) {
     const CHUNK_SIZE = 4096;
@@ -640,7 +640,11 @@ export function renderImage(base64Data, imageDimensions, options = {}) {
     }
     return null;
 }
+const MAX_HYPERLINK_URL_LENGTH = 8192;
 export function hyperlink(text, url) {
+    if (url.length > MAX_HYPERLINK_URL_LENGTH) {
+        return text;
+    }
     return `\x1b]8;;${url}\x1b\\${text}\x1b]8;;\x1b\\`;
 }
 function shortenImagePath(filename) {

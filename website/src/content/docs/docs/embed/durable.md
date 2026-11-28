@@ -52,6 +52,14 @@ PiSharp 1.5.0 follows `pi-durable` v1.5.0, which changed the API and the stored 
 - **Streamed progress is deferred.** Partial answers and tool output are stored about once a second, so a crash loses up to about a second of streamed text. `ProgressSettings.PersistWithinMs = 0` stores each one at once.
 - **The examples were renumbered** to upstream v1.5.0's names (see [Samples](#samples)).
 
+## Migrating to the 1.7.0 API
+
+Use `conversation.AdmitAsync(tx, draft)` to admit a submission inside a transaction. Outside a transaction, continue using `SubmitAsync(draft, context)`.
+
+A parked tool returns a `ToolPark` with `Kind` set to `"sleep"` or `"wait"`. Read its `Checkpoint` and wait or sleep fields directly. The `Sleeping` and `Waiting` factories construct the corresponding variants. In a wrapper, return the base tool's original park object so the harness can recognize it.
+
+Signal states distinguish a delivered value (including JSON null) from an expired key through `Kind`. Wraps, yield and compaction decisions, and storage commit results expose their discriminants through `Kind` as well. Stored signal memos retain their existing format.
+
 ## New in 1.6.0
 
 PiSharp 1.6.0 follows `pi-durable` v1.6.0. The [1.6.0 release notes](https://github.com/jkelly/PiSharp/blob/main/docs/release-notes/1.6.0.md) list what was tested and what was not.
@@ -141,7 +149,7 @@ Cancel = async (_, api, ctx) => { /* stop the external work of a parked call tha
 
 `TextOutput`, `Trigger` and `ciResult` stand for your own code. The pieces:
 
-- `ToolPark.Sleeping(until, signals, checkpoint)` sleeps until a time, a signal or both. `ToolPark.Waiting(on, policy, checkpoint)` waits for tasks. A `ToolPark` converts to a `ToolExecutionResult`, so `Execute`'s signature is unchanged.
+- `ToolPark.Sleeping(until, signals, checkpoint)` sleeps until a time, a signal or both. `ToolPark.Waiting(on, policy, checkpoint)` waits for tasks. A `ToolPark` derives from `ToolExecutionResult`, so `Execute`'s signature is unchanged.
 - An invalid park, such as one with a result field, ends the call with an `invalid_park` result.
 - `ToolRegistration.Cancel` cleans up the external work of a parked call that is aborted.
 - Wrappers never park: a composite's park that its base did not return is invalid.
@@ -158,7 +166,7 @@ BeforeTool = async (call, api, ctx) =>
 {
     var state = await api.ReadSignalAsync(approval, key, ctx);
     if (state is null) return new BeforeToolDecision(Sleep: new GateSleep(until, ImmutableArray.Create(approval.Key(key))));
-    if (state.Expired) return new BeforeToolDecision(Block: "No approval within a day");
+    if (state.Kind == "expired") return new BeforeToolDecision(Block: "No approval within a day");
     return IsAllowed(state.Value) ? null : new BeforeToolDecision(Block: "Not approved");
 },
 ```
@@ -470,7 +478,7 @@ From `ISession` it has `CommitAsync` (four overloads over an `ITx`, each with op
 | `AgentAsync(context)` | The agent choices resolved against the registry: model, thinking level, extensions, tools, sections, instructions, cwd. |
 | `ConfigureAsync(change, context)` | Applies an `AgentChange`. |
 | `SubmitAsync(draft, context)` | Queues an input or a passive write; returns an `ISubmission`. |
-| `SubmitAsync(tx, draft)` | (from 1.5.0) Admits a submission inside your own commit, with the same rules, and returns its id. |
+| `AdmitAsync(tx, draft)` | Admits a submission inside your own commit, with the same rules, and returns its id. |
 | `CompactAsync(instructions, context)` | Starts a manual compaction task. |
 | `ResetAsync(handoff, context)` | Starts the context over from a reset entry. |
 | `CommitAsync(...)` | A transaction scoped to this conversation. |
@@ -809,7 +817,7 @@ To test your own agent, script the model as in [A first agent](#a-first-agent), 
 
 From 1.5.0, `HarnessOptions.Telemetry` takes a host-owned `ITelemetryContext` from `PiSharp.Telemetry`, with optional propagation and metrics; without one, nothing is recorded. `DurableTelemetry.Schema` lists its typed spans, events and metrics. Attributes hold record IDs and fixed categories, never messages, arguments or results; the IDs point to the transcript. Every async call takes a `DurableContext`, which carries cancellation and its current span (`DurableContext.Background` never cancels and records nothing).
 
-- **`pi.durable.submit`** covers a public submission and its commit. For `SubmitAsync(tx, draft)` it covers the admission only: its result is provisional until your commit is stored, and the commit's events go to your commit's context. Each input starts a new trace linked to its caller's current span, and a write is a child of its caller. A duplicate `RequestId` keeps the original submission and its carrier.
+- **`pi.durable.submit`** covers a public submission and its commit. For `AdmitAsync(tx, draft)` it covers the admission only: its result is provisional until your commit is stored, and the commit's events go to your commit's context. Each input starts a new trace linked to its caller's current span, and a write is a child of its caller. A duplicate `RequestId` keeps the original submission and its carrier.
 - **`pi.durable.phase`** covers one run or abort phase of a task, with its decision commit; never the next phase, a durable wait or a restart. It names the task, the phase, the attempt, whether it resumed and its outcome, and for a tool phase the tool and call. Nested tasks and background compactions inherit the phase that created them, and model requests get its context. Hooks add no spans.
 - **Failures.** A faulted, failed or orphaned outcome sets error status with `task_faulted`, `task_failed` or `task_orphaned` and the outcome's diagnostic, cut to 500 characters. Diagnostics can contain caller content; no exception detail is recorded. An aborted outcome keeps status ok.
 - **Reports.** Every `OnReport` report also becomes a `pi.durable.report` event on its current span, with only its kind, a fixed reason, the extension and the task ID. `pi.durable.reports` counts reports by kind. The `OnReport` callback is unchanged.

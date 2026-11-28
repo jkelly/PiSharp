@@ -68,7 +68,7 @@ public static partial class Examples
                     {
                         // Admitted with this commit, before its own table writes: placed when the run ends.
                         if (!result.Passed && attempt < 3)
-                            await conversation.SubmitAsync(tx,
+                            await conversation.AdmitAsync(tx,
                                 SubmissionDraft.Input($"The tests failed: {result.Output}. Fix it.", WhenBusy.FollowUp, $"fix-{attempt}"));
                         await tx.AppendEntryAsync(runtime.ConversationId, new EntryDraft
                         {

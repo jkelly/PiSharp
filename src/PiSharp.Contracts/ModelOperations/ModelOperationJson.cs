@@ -112,6 +112,7 @@ public static class ModelOperationJson
         return new(Str(value, "api"), Str(value, "provider"), Str(value, "model"), answers.ToImmutable(), StopReason(value),
             value.TryGetProperty("timestamp", out var at) && at.ValueKind == JsonValueKind.Number ? at.GetInt64() : DateTimeOffset.UtcNow.ToUnixTimeMilliseconds())
         {
+            ResponseId = value.TryGetProperty("responseId", out var responseId) && responseId.ValueKind == JsonValueKind.String ? responseId.GetString() : null,
             Usage = value.TryGetProperty("usage", out var usage) && usage.ValueKind == JsonValueKind.Object ? PiWireJson.ReadUsageObject(usage) : null,
             ErrorMessage = value.TryGetProperty("errorMessage", out var error) && error.ValueKind == JsonValueKind.String ? error.GetString() : null
         };
@@ -126,7 +127,7 @@ public static class ModelOperationJson
         return new(Str(value, "api"), Str(value, "provider"), Str(value, "model"), output, StopReason(value),
             value.TryGetProperty("timestamp", out var at) && at.ValueKind == JsonValueKind.Number ? at.GetInt64() : DateTimeOffset.UtcNow.ToUnixTimeMilliseconds())
         {
-            ResponseId = value.TryGetProperty("responseId", out var id) && id.ValueKind == JsonValueKind.String ? id.GetString() : null,
+            ResponseId = value.TryGetProperty("responseId", out var responseId) && responseId.ValueKind == JsonValueKind.String ? responseId.GetString() : null,
             Usage = value.TryGetProperty("usage", out var usage) && usage.ValueKind == JsonValueKind.Object ? PiWireJson.ReadUsageObject(usage) : null,
             ErrorMessage = value.TryGetProperty("errorMessage", out var error) && error.ValueKind == JsonValueKind.String ? error.GetString() : null
         };
@@ -173,6 +174,7 @@ public static class ModelOperationJson
             writer.WriteEndObject();
             writer.WriteString("stopReason", StopReasonName(result.StopReason));
             writer.WriteNumber("timestamp", result.Timestamp);
+            if (result.ResponseId is { } responseId) writer.WriteString("responseId", responseId);
             if (result.Usage is { } usage) { writer.WritePropertyName("usage"); WriteUsage(writer, usage); }
             if (result.ErrorMessage is { } error) writer.WriteString("errorMessage", error);
             writer.WriteEndObject();

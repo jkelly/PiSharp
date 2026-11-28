@@ -1,9 +1,9 @@
-// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/ai/src/utils/overflow.ts.
+// Pi fb0fe823539f6d04850f6e34748c01f01f212e1f (MIT): packages/ai/src/utils/overflow.ts.
 // Ported to plain ESM for the PiSharp Node extension bridge (TypeScript types stripped mechanically; behaviour unchanged).
 const OVERFLOW_PATTERNS = [
     /prompt (?:is )?too long/i,
     /prompt exceeds max length/i,
-    /request_too_large/i,
+    /(?<![a-z0-9_])request_too_large(?![a-z0-9_])/i,
     /input is too long for requested model/i,
     /exceeds the context window/i,
     /exceeds (?:the )?(?:model'?s )?maximum context length(?: of [\d,]+ tokens?|\s*\([\d,]+\))/i,

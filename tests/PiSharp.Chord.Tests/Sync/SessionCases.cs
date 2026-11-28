@@ -16,6 +16,7 @@ internal static partial class Program
     {
         internal readonly Dictionary<string, SyncState> Values = new(StringComparer.Ordinal);
         public Task<SyncState?> GetAsync(string id, ChordContext context) => Task.FromResult(Values.GetValueOrDefault(id));
+        public Task DeleteAsync(string id, ChordContext context) { Values.Remove(id); return Task.CompletedTask; }
         public Task SetAsync(string id, SyncState state, ChordContext context)
         {
             Values[id] = state;
@@ -30,16 +31,14 @@ internal static partial class Program
         private readonly Dictionary<string, Dictionary<long, byte[]>> snapshots = new(StringComparer.Ordinal);
         private readonly Dictionary<string, JsonObject> meta = new(StringComparer.Ordinal);
         internal bool LoseNextResponse;
-        internal long? RequireEpoch;
-        internal long? LastEpoch;
+        internal RefusalReason? Refusal;
         internal bool RejectWithoutReading;
         internal long? MissingAfter;
 
         public async Task<PutBatchResult> PutBatchAsync(string id, long after, long to, string device,
             IAsyncEnumerable<ReadOnlyMemory<byte>> body, ChordContext context, PutBatchOptions? options = null)
         {
-            LastEpoch = options?.Epoch;
-            if (RequireEpoch is { } epoch && options?.Epoch != epoch) return new PutBatchResult.StaleEpoch(epoch);
+            if (Refusal is { } reason) return new PutBatchResult.Refused(reason);
             if (RejectWithoutReading) return new PutBatchResult.Exists(to, "other");
             if (!Slots.TryGetValue(id, out var slots)) Slots[id] = slots = [];
             if (slots.TryGetValue(after, out var found)) return new PutBatchResult.Exists(found.Slot.To, found.Slot.Device);
@@ -116,8 +115,8 @@ internal static partial class Program
     }
 
     private static Task<UploadResult> SyncUpload(IStore source, SyncMemoryRemote remote, SyncMemoryState state,
-        string device = "laptop", long? epoch = null) => SessionSync.UploadSessionAsync(new UploadOptions
-        { SessionId = SyncSession, Device = device, Source = source, Store = remote, State = state, Context = SyncContext, Epoch = epoch });
+        string device = "laptop") => SessionSync.UploadSessionAsync(new UploadOptions
+        { SessionId = SyncSession, Device = device, Source = source, Store = remote, State = state, Context = SyncContext });
 
     private static Task<PullResult> SyncPull(LocalCopy local, SyncMemoryRemote remote, SyncMemoryState state,
         ChordContext? context = null) => SessionSync.PullSessionAsync(new PullOptions
@@ -181,7 +180,7 @@ internal static partial class Program
             await SyncUpload(laptop, remote, laptopState);
             Equal(new UploadResult.Diverged(forkAt), await SyncUpload(phone, remote, phoneState, "phone"), "first writer keeps slot");
         }),
-        Case("sync.session.lost-response-is-idempotent-and-epoch-is-forwarded", async () =>
+        Case("sync.session.lost-response-is-idempotent-and-refusal-preserves-outbox", async () =>
         {
             await using var source = await MemoryStore(true);
             await SyncCommit(source, "one");
@@ -192,10 +191,19 @@ internal static partial class Program
             await SyncCommit(source, "two");
             Equal(new UploadResult.Uploaded(source.LastSeq), await SyncUpload(source, remote, state), "retry same device and continue");
             Equal(2, remote.Slots[SyncSession].Count, "one slot per range");
-            await SyncCommit(source, "three"); remote.RequireEpoch = 9;
-            Equal(new UploadResult.StaleEpoch(2, 9), await SyncUpload(source, remote, state, epoch: 8), "stale epoch");
-            Equal(8L, remote.LastEpoch, "sent epoch");
-            Equal(new UploadResult.Uploaded(3), await SyncUpload(source, remote, state, epoch: 9), "current epoch");
+            await SyncCommit(source, "three");
+            foreach (var reason in Enum.GetValues<RefusalReason>())
+            {
+                remote.Refusal = reason;
+                Equal(new UploadResult.Refused(reason), await SyncUpload(source, remote, state), "permanent refusal");
+                Equal(2L, source.Outbox.Floor, "refusal preserves outbox");
+                Equal(2L, state.Values[SyncSession].SyncedHead, "refusal preserves bookmark");
+            }
+            remote.Refusal = null;
+            remote.Slots.Clear();
+            Equal(new UploadResult.RemoteEmpty(2), await SyncUpload(source, remote, state), "remote lost its copy");
+            await state.DeleteAsync(SyncSession, SyncContext);
+            Equal(new UploadResult.Uploaded(3), await SyncUpload(source, remote, state), "fresh archive upload");
         }),
         Case("sync.session.lost-local-commits-must-pull-before-upload", async () =>
         {

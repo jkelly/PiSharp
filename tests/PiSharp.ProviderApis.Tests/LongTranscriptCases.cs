@@ -63,12 +63,12 @@ internal static partial class Program
 
     /// <summary>The first chat model of a provider that declares the API and has a live route.</summary>
     private static string LongModel(string provider, string api) =>
-        BuiltinModelCatalog.Get(provider).Models.First(model => model.Type == CatalogModelType.Chat && model.DeclaredApi == api &&
+        CurrentModelCatalog.Get(provider)!.Models.First(model => model.Type == CatalogModelType.Chat && model.DeclaredApi == api &&
             LiveSessionSelection.SupportedApi(provider, api)).Id;
 
     private static string CompletionsProvider() => BuiltinProviders.All.Select(item => item.Id)
         .Where(id => !LiveProviderRoute.Handles(id) && id is not ("azure" or "mistral" or "anthropic") && ProviderEnvironmentKeys.GetApiKeyVariables(id) is { Count: > 0 })
-        .First(id => BuiltinModelCatalog.Get(id).Models.Any(model => model.Type == CatalogModelType.Chat && model.DeclaredApi == "openai-completions"));
+        .First(id => CurrentModelCatalog.Get(id)!.Models.Any(model => model.Type == CatalogModelType.Chat && model.DeclaredApi == "openai-completions"));
 
     private static async Task LongTranscriptEveryFamily()
     {
@@ -106,7 +106,7 @@ internal static partial class Program
             ("bedrock-converse-stream", "amazon-bedrock", "amazon.nova-lite-v1:0"),
             ("openai-codex-responses", "openai-codex", "gpt-5.6-sol"),
             ("github-copilot-completions", "github-copilot", "kimi-k3"), ("github-copilot-anthropic", "github-copilot", "claude-sonnet-4.6"),
-            ("cloudflare-workers-ai", "cloudflare-workers-ai", "@cf/deepseek-ai/deepseek-v4-flash-0731"),
+            ("cloudflare-workers-ai", "cloudflare-workers-ai", "@cf/zai-org/glm-5.3"),
             ("cloudflare-ai-gateway", "cloudflare-ai-gateway", "claude-fable-5"),
         };
         var report = new List<string>();

@@ -19,7 +19,7 @@ internal sealed class BashExecutionComponent : Container
     private int? exitCode;
     private readonly Loader loader;
     private ToolOutputTruncationResult? truncationResult;
-    private string? fullOutputPath;
+    private string? fullOutputPath, fullOutputError;
     private bool expanded;
     private readonly Container contentContainer;
     /// <summary>"dim" marks <c>!!</c> commands, whose output is excluded from the model context.</summary>
@@ -44,7 +44,7 @@ internal sealed class BashExecutionComponent : Container
         AddChild(contentContainer);
 
         loader = new Loader(ui, spinner => theme.Fg(colorKey, spinner), text => theme.Fg("muted", text),
-            $"Running... ({KeybindingHints.KeyText("tui.select.cancel")} to cancel)"); // Plain text for loader
+            $"Running... ({KeybindingHints.KeyText("app.interrupt")} to cancel)"); // Plain text for loader
 
         // Bottom border
         AddChild(new DynamicBorder(borderColor));
@@ -90,12 +90,13 @@ internal sealed class BashExecutionComponent : Container
         UpdateDisplay();
     }
 
-    public void SetComplete(int? exitCode, bool cancelled, ToolOutputTruncationResult? truncationResult = null, string? fullOutputPath = null)
+    public void SetComplete(int? exitCode, bool cancelled, ToolOutputTruncationResult? truncationResult = null, string? fullOutputPath = null, string? fullOutputError = null)
     {
         this.exitCode = exitCode;
         status = cancelled ? "cancelled" : exitCode is not null && exitCode != 0 ? "error" : "complete";
         this.truncationResult = truncationResult;
         this.fullOutputPath = fullOutputPath;
+        this.fullOutputError = fullOutputError;
 
         // Stop loader
         loader.Stop();
@@ -160,8 +161,9 @@ internal sealed class BashExecutionComponent : Container
 
             // Add truncation warning (context truncation, not preview truncation)
             var wasTruncated = truncationResult?.Truncated == true || contextTruncation.Truncated;
-            if (wasTruncated && !string.IsNullOrEmpty(fullOutputPath))
-                statusParts.Add(theme.Fg("warning", $"Output truncated. Full output: {fullOutputPath}"));
+            if (wasTruncated)
+                statusParts.Add(theme.Fg("warning", fullOutputPath is { Length: > 0 } ? $"Output truncated. Full output: {fullOutputPath}" :
+                    fullOutputError is { Length: > 0 } ? $"Output truncated. Could not save the full output: {fullOutputError}" : "Output truncated"));
 
             if (statusParts.Count > 0) contentContainer.AddChild(new Text("\n" + string.Join("\n", statusParts), outputPad, 0));
         }

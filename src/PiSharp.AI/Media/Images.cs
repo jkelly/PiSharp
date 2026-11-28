@@ -1,6 +1,6 @@
 // PiSharp-only (no upstream Pi source): image generation over OpenAI's Images API, OpenRouter's Image API and Google's Gemini and
 // Imagen APIs, as implementations of the upstream image API contract (IImagesApi), next to the ported OpenRouterImages (which goes
-// through OpenRouter's chat completions and takes no image options).
+// through OpenRouter's chat completions).
 using System.Collections.Immutable;
 using System.Net.Http.Headers;
 using System.Text.Json;

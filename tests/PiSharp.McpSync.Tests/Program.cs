@@ -9,6 +9,7 @@ using PiSharp.Extensions.Mcp.Authentication;
 using PiSharp.Extensions.Mcp.Configuration;
 using PiSharp.Extensions.Mcp.Transport;
 using PiSharp.Extensions.Runtime.Mcp.Authentication;
+using PiSharp.Extensions.Runtime.Mcp.Resources;
 
 // Authored offline expectations for the Pi v1.1.0 MCP sync (names, exposure/prompt, OAuth), updated to Pi v1.2.0 (the iss check
 // without metadata, namespace aliases, no dispatch after a request settles) and synced to Pi v1.5.0 under decision 0013 (`mcp login
@@ -24,6 +25,7 @@ internal static partial class Program
         if (args.Length != 0 && (args.Length != 2 || args[0] != "--report")) throw new ArgumentException("Use [--report <fresh path>].");
         var cases = new List<(string Id, Func<Task> Run)>
         {
+            ("sync170.public-model-content-and-result-schema", SharedMcpResult),
             ("names.dash-and-underscore-tools-dispatch-distinct", DistinctDispatch),
             ("names.collisions-get-stable-hash-suffixes", StableSuffixes),
             ("names.colliding-server-names-fail-predictably", CollidingServers),
@@ -69,6 +71,19 @@ internal static partial class Program
         }
         Console.WriteLine(json);
         return failures == 0 ? 0 : 1;
+    }
+
+    private static async Task SharedMcpResult()
+    {
+        var doc = JsonData.Parse("""
+            {"content":[{"type":"resource_link","uri":"docs:item","name":"Item"},
+                        {"type":"resource","resource":{"uri":"docs:blob","mimeType":"application/octet-stream","blob":"AQI="}}]}
+            """);
+        var result = await McpModelContent.ConvertAsync("docs", doc, readResourceTool: "read_docs");
+        Equal("[Resource docs:item \"Item\". Read it with read_docs (server \"docs\")]", result[0].Value.GetProperty("text").GetString());
+        Equal("[binary resource docs:blob (application/octet-stream) omitted]", result[1].Value.GetProperty("text").GetString());
+        var schema = McpResultSchema.Create(JsonData.Parse("""{"$ref":"#/$defs/Item","$defs":{"Item":{"type":"string"}}}""").Value);
+        Equal("#/properties/structuredContent/$defs/Item", schema.Value.GetProperty("properties").GetProperty("structuredContent").GetProperty("$ref").GetString());
     }
 
     // ---------- names ----------

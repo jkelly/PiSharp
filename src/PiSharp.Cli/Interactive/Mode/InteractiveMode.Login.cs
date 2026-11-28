@@ -39,7 +39,11 @@ internal sealed partial class InteractiveMode
 
         public ProviderAuthStatus GetProviderAuthStatus(string providerId)
         {
-            if (mode.storedCredentialTypes.ContainsKey(providerId)) return new(true, null, "stored credential");
+            if (mode.storedCredentialTypes.ContainsKey(providerId))
+            {
+                var status = mode.context.GetStoredProviderStatus?.Invoke(providerId);
+                return new(status?.Configured ?? true, status?.Configured == false ? null : "stored credential", "stored");
+            }
             var provider = ProviderAuthCatalog.Find(providerId);
             var variable = provider?.EnvironmentVariables.FirstOrDefault(name => !string.IsNullOrEmpty(mode.context.GetEnvironment(name)));
             return variable is not null ? new(true, null, variable) : new(false);

@@ -1,3 +1,4 @@
+// Pi fb0fe823539f6d04850f6e34748c01f01f212e1f (MIT): packages/ai/src/api/openrouter-images.ts.
 // Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/ai/src/api/openrouter-images.ts, the request and error
 // behaviour of the OpenAI SDK client it uses (chat.completions.create with maxRetries 0, APIError messages), and
 // packages/ai/src/images-api-registry.ts.
@@ -40,7 +41,7 @@ public sealed partial class OpenRouterImages : IImagesApi
         try
         {
             if (string.IsNullOrEmpty(options?.ApiKey)) throw new InvalidOperationException($"No API key for provider: {model.Provider}");
-            JsonNode payload = BuildParams(model, context);
+            JsonNode payload = BuildParams(model, context, options);
             if (options.OnPayload is { } onPayload && await onPayload(payload.DeepClone(), model, cancellationToken).ConfigureAwait(false) is { } replaced)
                 payload = replaced;
             var text = ProviderRequest.Stringify(payload);
@@ -53,15 +54,14 @@ public sealed partial class OpenRouterImages : IImagesApi
                     ProviderRequest.Nullable(model.Headers), options.Headers)));
             var url = new Uri(model.BaseUrl + (model.BaseUrl.EndsWith('/') ? "chat/completions" : "/chat/completions"));
             var http = ProviderRequest.Http(options);
-            var (response, body) = await ProviderRequest.RetryAsync(async () =>
+            var body = await ProviderRequest.RetryAsync(async () =>
             {
                 var (info, responseText) = await ProviderRequest.PostAsync(http, url, headers, text, options, cancellationToken,
                     error => new ProviderRequestException("Connection error.", null, []),
-                    timeoutMessage: "Request timed out.").ConfigureAwait(false);
+                    timeoutMessage: "Request timed out.", model: model).ConfigureAwait(false);
                 if (!ProviderRequest.IsSuccess(info.Status)) throw ApiError(info, responseText);
-                return (info, ProviderRequest.ParseJson("OpenRouter", responseText));
+                return ProviderRequest.ParseJson("OpenRouter", responseText);
             }, options.MaxRetries ?? 0, options, null, cancellationToken).ConfigureAwait(false);
-            if (options.OnResponse is { } onResponse) await onResponse(response, model, cancellationToken).ConfigureAwait(false);
             return Parse(output, model, body);
         }
         catch (Exception error)
@@ -74,7 +74,7 @@ public sealed partial class OpenRouterImages : IImagesApi
         }
     }
 
-    private static JsonObject BuildParams(ImageModel model, ImagesContext context)
+    private static JsonObject BuildParams(ImageModel model, ImagesContext context, ImagesOptions options)
     {
         var content = new JsonArray();
         foreach (var item in context.Input.IsDefault ? [] : context.Input)
@@ -87,13 +87,26 @@ public sealed partial class OpenRouterImages : IImagesApi
                 },
                 _ => throw new ArgumentException("Unsupported image input block.")
             });
-        return new JsonObject
+        var body = new JsonObject
         {
             ["model"] = model.Id,
             ["messages"] = new JsonArray { new JsonObject { ["role"] = "user", ["content"] = content } },
             ["stream"] = false,
             ["modalities"] = !model.Output.IsDefault && model.Output.Contains("text") ? new JsonArray("image", "text") : new JsonArray("image")
         };
+        var config = new JsonObject();
+        if (!string.IsNullOrEmpty(options.AspectRatio)) config["aspect_ratio"] = options.AspectRatio;
+        if (!string.IsNullOrEmpty(options.Size)) config["image_size"] = options.Size;
+        if (config.Count > 0) body["image_config"] = config;
+        return body;
+    }
+
+    private static string? Error(JsonElement? error)
+    {
+        if (error is not { ValueKind: JsonValueKind.Object } value) return null;
+        if (ProviderRequest.IsString(value, "message", out var msg) && msg.Trim().Length > 0) return msg.Trim();
+        var code = ClassifierShared.Field(value, "code")?.ToString().Trim();
+        return string.IsNullOrEmpty(code) ? null : $"Provider error ({code})";
     }
 
     private static AssistantImages Parse(AssistantImages output, ImageModel model, JsonElement response)
@@ -101,9 +114,18 @@ public sealed partial class OpenRouterImages : IImagesApi
         if (response.ValueKind != JsonValueKind.Object) throw new InvalidDataException("OpenRouter returned an unexpected response");
         if (ProviderRequest.IsString(response, "id", out var id)) output = output with { ResponseId = id };
         if (ClassifierShared.Field(response, "usage") is { ValueKind: JsonValueKind.Object } usage) output = output with { Usage = ParseUsage(usage, model) };
-        if (ClassifierShared.Field(response, "choices") is not { ValueKind: JsonValueKind.Array } choices)
-            throw new InvalidDataException("OpenRouter returned an unexpected response");
-        if (choices.GetArrayLength() == 0) return output;
+        var responseError = Error(ClassifierShared.Field(response, "error"));
+        if (ClassifierShared.Field(response, "choices") is not { ValueKind: JsonValueKind.Array } choices || choices.GetArrayLength() == 0)
+            return output with { StopReason = ModelOperationStopReason.Error, ErrorMessage = responseError ?? "Provider returned no choices" };
+        var choice = choices[0];
+        if ((Error(ClassifierShared.Field(choice, "error")) ?? responseError) is { } messageError)
+            return output with { StopReason = ModelOperationStopReason.Error, ErrorMessage = messageError };
+        if (ProviderRequest.IsString(choice, "finish_reason", out var reason) && reason is not ("" or "stop" or "end"))
+        {
+            var detail = ProviderRequest.IsString(choice, "native_finish_reason", out var native) && native.Length > 0 && native != reason
+                ? $" (native_finish_reason: {native})" : "";
+            return output with { StopReason = ModelOperationStopReason.Error, ErrorMessage = $"Provider finish_reason: {reason}{detail}" };
+        }
         var blocks = ImmutableArray.CreateBuilder<ImagesContentBlock>();
         if (ClassifierShared.Field(choices[0], "message") is not { ValueKind: JsonValueKind.Object } message)
             throw new InvalidDataException("OpenRouter returned an unexpected response");
@@ -136,12 +158,15 @@ public sealed partial class OpenRouterImages : IImagesApi
         var cacheRead = cacheWrite > 0 ? Math.Max(0, reportedCached - cacheWrite) : reportedCached;
         var input = Math.Max(0, promptTokens - cacheRead - cacheWrite);
         var completion = Count(ClassifierShared.Field(raw, "completion_tokens"));
-        var inputCost = model.Cost.Input / 1000000 * input; var outputCost = model.Cost.Output / 1000000 * completion;
-        var readCost = model.Cost.CacheRead / 1000000 * cacheRead; var writeCost = model.Cost.CacheWrite / 1000000 * cacheWrite;
-        static double Tokens(double value) => value;
-        return ProviderRequest.Usage(Tokens(input), Tokens(completion), Tokens(cacheRead), Tokens(cacheWrite),
-            Tokens(input + completion + cacheRead + cacheWrite),
-            (inputCost, outputCost, readCost, writeCost, inputCost + outputCost + readCost + writeCost), totalFromProvider: false);
+        var split = ClassifierShared.Field(raw, "completion_tokens_details");
+        var reasoning = split is { } d1 ? Count(ClassifierShared.Field(d1, "reasoning_tokens")) : 0;
+        double? image = split is { } d2 && ClassifierShared.Field(d2, "image_tokens") is { } field &&
+            ProviderRequest.FiniteNumber(field, out var count) ? count : null;
+        var cost = model.Cost.Calculate(input, completion, cacheRead, cacheWrite, image);
+        var reported = Protocols.ProviderShared.ProviderCost.OpenRouterReportedTotal(raw);
+        if (reported is { } total) cost.Total = total;
+        return PiUsage.WithSplits(ProviderRequest.Usage(input, completion, cacheRead, cacheWrite, input + completion + cacheRead + cacheWrite,
+            cost, reported.HasValue), reasoning, image);
     }
 
     /// <summary>OpenAI SDK <c>APIError</c>: the message is built from the parsed body's <c>error</c> member (or the raw text

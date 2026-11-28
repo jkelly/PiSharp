@@ -147,7 +147,7 @@ internal static class ModelListing
         CancellationToken cancellationToken = default)
     {
         if (registry.GetError() is { } loadError)
-            await error.WriteAsync(("Warning: errors loading models.json:\n" + loadError + "\n").AsMemory(), cancellationToken).ConfigureAwait(false);
+            await error.WriteAsync(("Warning: models.json error: " + loadError + "\n").AsMemory(), cancellationToken).ConfigureAwait(false);
         var models = registry.GetAvailable();
         if (models.Count == 0)
         {

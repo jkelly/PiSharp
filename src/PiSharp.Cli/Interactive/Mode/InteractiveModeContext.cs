@@ -74,11 +74,11 @@ internal sealed record InteractiveModeContext
     public Action<Action, Action> Suspend { get; init; } = (stop, resume) => { stop(); resume(); };
     public Func<JsonObject, bool> IsRetryableAssistantError { get; init; } = _ => false;
     public Func<Task<bool>> IsAnthropicSubscriptionAuth { get; init; } = () => Task.FromResult(false);
+    public Func<string, PiSharp.Cli.Models.ProviderAuthStatus?>? GetStoredProviderStatus { get; init; }
     public Func<string?>? GetModelsJsonError { get; init; }
 
     // Changelog and telemetry
     public Func<IReadOnlyList<ChangelogEntry>> ParseChangelogEntries { get; init; } = () => Changelog.ParseChangelog(Changelog.GetChangelogPath());
-    public Action<string, InteractiveSettings> ReportInstallTelemetry { get; init; } = (_, _) => { };
 
     // Extensions
     public Func<string, ToolRenderers?>? ResolveToolRenderers { get; init; }

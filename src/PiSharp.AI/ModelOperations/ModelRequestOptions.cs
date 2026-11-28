@@ -1,3 +1,4 @@
+// Pi fb0fe823539f6d04850f6e34748c01f01f212e1f (MIT): packages/ai/src/types.ts, api/pi-image.ts and api/pi-decision.ts.
 // Pi f9a26365568127461c47a07a37dcb42c140a3ac5 (MIT): packages/ai/src/types.ts (ProviderRequestOptions, ClassifierOptions,
 // ImagesOptions, ProviderResponse).
 using System.Collections.Immutable;
@@ -21,6 +22,7 @@ public record ModelRequestOptions
 {
     /// <summary>The credential sent as <c>Authorization: Bearer</c>. Registry calls resolve it from provider auth.</summary>
     public string? ApiKey { get; init; }
+    public string? SessionId { get; init; }
     /// <summary>Request headers merged case-insensitively over provider defaults and model headers, in order; a null value
     /// suppresses a default or model header of that name.</summary>
     public ImmutableArray<KeyValuePair<string, string?>> Headers { get; init; } = [];
@@ -61,6 +63,8 @@ public sealed record ClassifierOptions : ModelRequestOptions
 /// <summary>types.ts <c>ImagesOptions</c>.</summary>
 public sealed record ImagesOptions : ModelRequestOptions
 {
+    public string? Size { get; init; }
+    public string? AspectRatio { get; init; }
     /// <summary>Request metadata; providers use the fields they understand (OpenRouter images uses none).</summary>
     public JsonData? Metadata { get; init; }
 }

@@ -1,4 +1,4 @@
-// Pi faac585884ae2c013a6b1400f3e9e77f10b34bac (MIT): packages/ai/src/api/google-generative-ai.ts, google-vertex.ts (buildParams), google-shared.ts,
+// Pi fb0fe823539f6d04850f6e34748c01f01f212e1f (MIT): packages/ai/src/api/google-generative-ai.ts, google-vertex.ts (buildParams), google-shared.ts,
 // constrained-sampling.ts, transform-messages.ts and utils/transcript.ts.
 using System.Text;
 using System.Text.Json;
@@ -72,7 +72,9 @@ public static class GoogleRequestProjector
                 var sampling = tool["constrainedSampling"] as JsonObject;
                 if (Text(sampling, "type") == "json_schema")
                 {
-                    var strict = Major(request.Model.Id) >= 3;
+                    var strict = model.TryGetProperty("compat", out var compat) && compat.ValueKind == JsonValueKind.Object &&
+                        compat.TryGetProperty("supportsStrictMode", out var setting) && setting.ValueKind is JsonValueKind.True or JsonValueKind.False
+                        ? setting.GetBoolean() : Major(request.Model.Id) >= 3;
                     if (strict) try { MakeStrict(parameters); if (Text(parameters, "type") != "object") throw GoogleData.Fail(GoogleFailure.UnsupportedValue); }
                         catch (Exception error) when (error is GoogleGenerativeAIException or InvalidOperationException)
                         { strict = false; parameters = tool["parameters"]!.DeepClone(); }
@@ -102,7 +104,7 @@ public static class GoogleRequestProjector
                 control["includeThoughts"] = true;
                 if (thinking.Level is { } level)
                 {
-                    if (level is not ("THINKING_LEVEL_UNSPECIFIED" or "MINIMAL" or "LOW" or "MEDIUM" or "HIGH"))
+                    if (level is not ("THINKING_LEVEL_UNSPECIFIED" or "MINIMAL" or "LOW" or "MEDIUM" or "HIGH" or "XHIGH"))
                         throw GoogleData.Fail(GoogleFailure.UnsupportedValue);
                     control["thinkingLevel"] = level;
                 }
@@ -119,7 +121,7 @@ public static class GoogleRequestProjector
                     else
                     {
                         var resolved = levels.TryGetProperty(fallback, out var mapped) && mapped.ValueKind == JsonValueKind.String ? mapped.GetString()!.ToLowerInvariant() : fallback;
-                        if (resolved is not ("minimal" or "low" or "medium" or "high")) throw GoogleData.Fail(GoogleFailure.UnsupportedValue);
+                        if (resolved is not ("minimal" or "low" or "medium" or "high" or "xhigh")) throw GoogleData.Fail(GoogleFailure.UnsupportedValue);
                         control["thinkingLevel"] = resolved.ToUpperInvariant();
                     }
                 }
@@ -387,12 +389,12 @@ public static class GoogleRequestProjector
     private static string? Text(JsonNode? value, string name) => value is JsonObject obj && obj[name] is JsonValue scalar && scalar.TryGetValue<string>(out var text) ? text : null;
     private static string ContentText(JsonNode? content) => content is JsonValue value ? value.GetValue<string>() :
         string.Join("\n", (content as JsonArray ?? new JsonArray()).Where(x => Text(x, "type") == "text").Select(x => Text(x, "text") ?? ""));
-    internal static int? Major(string id) => Regex.Match(id.ToLowerInvariant(), @"^gemini(?:-live)?-(\d+)") is { Success: true } m && int.TryParse(m.Groups[1].Value, out var n) ? n : null;
+    internal static int? Major(string id) => Regex.Match(id.ToLowerInvariant(), @"gemini(?:-live)?-(\d+)") is { Success: true } m && int.TryParse(m.Groups[1].Value, out var n) ? n : null;
     // usesGoogleThinkingLevel: Gemini 3 Pro/Flash, Gemini 4 and later (#10890), the flash aliases and both Gemma 4 forms.
     internal static bool UsesLevel(string id)
     {
         var normalized = id.ToLowerInvariant();
-        return Regex.IsMatch(normalized, @"gemini-3(?:\.[0-9]+)?-(?:pro|flash)|gemini-(?:[4-9]|[1-9][0-9])|gemma-?4") || normalized is "gemini-flash-latest" or "gemini-flash-lite-latest";
+        return Regex.IsMatch(normalized, @"gemini-3(?:\.[0-9]+)?-(?:pro|flash)|gemma-?4") || Major(normalized) >= 4 || normalized is "gemini-flash-latest" or "gemini-flash-lite-latest";
     }
     private static bool ValidSignature(string? value) => value is { Length: > 0 } && value.Length % 4 == 0 && Regex.IsMatch(value, @"^[A-Za-z0-9+/]+={0,2}$");
     private static bool IsIndex(string key) => uint.TryParse(key, System.Globalization.NumberStyles.None,

@@ -47,6 +47,24 @@ internal static partial class Program
         var context = ChordContext.Background;
         return
         [
+            Case("store.outbox.switch-in-flight-orders-commits-and-persists", () =>
+                StoreOutboxOnFile(async (open, _) =>
+                {
+                    var store = await open(null);
+                    var before = StoreOutboxCreated(store, "before");
+                    var enable = store.SetOutboxAsync(true, context);
+                    var after = StoreOutboxCreated(store, "after");
+                    await Task.WhenAll(before, enable, after);
+                    Equal(1L, store.Outbox!.Floor, "floor is the commit before the switch");
+                    Sequence(new long[] { 2 }, (await store.Outbox.ReadAsync(1, 10, context)).Select(row => row.Seq), "recorded only later commit");
+                    await store.SetOutboxAsync(true, context);
+                    Equal(1L, store.Outbox.Floor, "idempotent");
+                    await store.CloseAsync(context);
+                    await using var reopened = await open(null);
+                    Equal(1L, reopened.Outbox!.Floor, "setting and floor survive reopen");
+                    await reopened.SetOutboxAsync(false, context);
+                    Equal(null, reopened.Outbox, "off");
+                })),
             Case("store.outbox.the-outbox-is-off-for-a-new-store-on-from-the-seq-it-is-turned-on-at-kept-when-omitted-dropped-when-turned-off", () =>
                 StoreOutboxOnFile(async (open, _) =>
                 {

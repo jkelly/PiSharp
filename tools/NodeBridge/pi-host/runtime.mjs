@@ -96,7 +96,8 @@ function isUserBashEventResult(value) {
   const result = value.result;
   if (typeof result !== 'object' || result === null) return false;
   return typeof result.output === 'string' && 'exitCode' in result && (result.exitCode === undefined || typeof result.exitCode === 'number') &&
-    typeof result.cancelled === 'boolean' && typeof result.truncated === 'boolean' && (result.fullOutputPath === undefined || typeof result.fullOutputPath === 'string');
+    typeof result.cancelled === 'boolean' && typeof result.truncated === 'boolean' && (result.fullOutputPath === undefined || typeof result.fullOutputPath === 'string') &&
+    (result.fullOutputError === undefined || typeof result.fullOutputError === 'string');
 }
 
 const sameMessages = (left, right) => left.length === right.length && left.every((m, i) => m === right[i]);
@@ -583,7 +584,7 @@ export class ExtensionRuntime {
     const runtime = this, bridge = this.bridge;
     if (!this.hasUI) return this.noOpUIContext();
     const dialog = (kind, title, op, args) => runtime.withUIPrompt(kind, title, () => bridge.call('ui.dialog', { ctx, op, args }, { signal: args?.[args.length - 1]?.signal }));
-    const opts = (o) => o ? { timeout: o.timeout } : undefined;
+    const opts = (o) => o ? { timeout: o.timeout, blockedKind: o.blockedKind } : undefined;
     const ui = {
       select: (title, options, o) => dialog('select', title, 'select', [title, options, opts(o)]).then(v => v ?? undefined),
       confirm: (title, msg, o) => dialog('confirm', title, 'confirm', [title, msg, opts(o)]).then(v => v === true),
