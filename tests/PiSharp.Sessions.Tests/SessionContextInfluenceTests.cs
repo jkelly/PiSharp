@@ -122,7 +122,7 @@ internal static class SessionContextInfluenceTests
         Equal("The following is a summary of a branch that this conversation came back from:\n\n<summary>\nstored</summary>", Text(projected.LlmMessages[1]));
         Equal("The conversation history before this point was compacted into the following summary:\n\n<summary>\ncompacted\n</summary>", Text(projected.LlmMessages[2]));
         Equal("Ran `authored command`\n```\nline\r\n\n```\n\nCommand exited with code 7\n\n[Output truncated. Full output: unopened/private/output]", Text(projected.LlmMessages[3]));
-        Equal("Ran `cancelled`\n(no output)\n\n(command cancelled)", Text(projected.LlmMessages[4]));
+        Equal("Ran `cancelled`\n(no output)\n\n(command cancelled)\n\n[Output truncated]", Text(projected.LlmMessages[4]));
         Equal(1_704_067_200_000L, projected.Messages[0].WireBody.Value.GetProperty("timestamp").GetInt64());
         Equal(JsonValueKind.Null, projected.Messages[1].WireBody.Value.GetProperty("fromId").ValueKind);
         Equal(bash.WireBody.Value.GetProperty("message").GetRawText(), projected.Messages[3].WireBody.ToString());

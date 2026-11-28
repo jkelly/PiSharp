@@ -105,14 +105,19 @@ internal static class CompletionsPreparationOwnershipTests
     private static async Task Rejections()
     {
         foreach (var source in new[] { true, false })
-        foreach (var status in new[] { HttpStatusCode.OK, HttpStatusCode.BadRequest })
+        foreach (var (status, rejectInHook) in new[] { (HttpStatusCode.OK, true), (HttpStatusCode.BadRequest, true), (HttpStatusCode.BadRequest, false) })
         {
             if (source && status == HttpStatusCode.OK) continue;
             using var body = new Body(Wire); using var content = new StreamProbeContent(body);
             using var handler = Handler(content, status); using var client = new HttpClient(handler);
             var hookCalls = 0; var observed = new List<CompletionsInputPublication>();
-            var transport = Transport(client, new() { OnInputPublished = observed.Add, Hooks = new() { OnResponse = (_, _, _) =>
-                { hookCalls++; throw new IOException("PRIVATE_REJECTED_HOOK"); } } });
+            var transport = Transport(client, new() { OnInputPublished = observed.Add, Hooks = new() { OnResponse = (metadata, _, _) =>
+                {
+                    hookCalls++;
+                    Check(metadata.Status == (int)status, "Response hook observed the wrong status.");
+                    if (rejectInHook) throw new IOException("PRIVATE_REJECTED_HOOK");
+                    return ValueTask.CompletedTask;
+                } } });
             if (source)
             {
                 await using var run = await transport.StartAsync(Request); await Drain(run).WaitAsync(Deadline);
@@ -124,10 +129,10 @@ internal static class CompletionsPreparationOwnershipTests
                 Check(!frames.OfType<StreamStarted>().Any() && frames[^1] is StreamError, "Canonical rejection changed Start order.");
             }
             // A rejected status is read once into the openai SDK APIError message (response.text()); a hook rejection never opens the body.
-            var statusRejected = status != HttpStatusCode.OK;
-            Check(content.AcquireCalls == (statusRejected ? 1 : 0) && content.SerializeCalls == 0 && observed.Count == 0 &&
-                (statusRejected || body.Reads == 0 && body.AsyncCloses == 0) &&
-                content.DisposeCalls == 1 && hookCalls == (status == HttpStatusCode.OK ? 1 : 0),
+            var readErrorBody = status != HttpStatusCode.OK && !rejectInHook;
+            Check(content.AcquireCalls == (readErrorBody ? 1 : 0) && content.SerializeCalls == 0 && observed.Count == 0 &&
+                (readErrorBody || body.Reads == 0 && body.AsyncCloses == 0) &&
+                content.DisposeCalls == 1 && hookCalls == 1,
                 "Canonical hook/status rejection opened, prefetched or buffered the rejected body.");
         }
     }
