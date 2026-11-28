@@ -37,9 +37,8 @@ internal static class Sync160CliSessionCases
         {
             await using var pi = new InteractiveHarness("sync170-resume-flags");
             pi.Vars["OSC7577_TOKEN"] = "test-resume-token";
-            pi.Start([.. Regular, "--no-approve", "--no-mcp", "--tool-policy", "explicit"]);
-            await pi.WaitFor("escape interrupt");
-            await pi.Submit("hello");
+            // The host processes an initial prompt after startup has installed the input handlers.
+            pi.Start([.. Regular, "--no-approve", "--no-mcp", "--tool-policy", "explicit", "hello"]);
             await pi.WaitFor("Hello from the fake model.");
             Equal(0, await pi.Quit(), "exit");
             var reports = pi.Terminal.RawOutput.Split("\u001b]7577;", StringSplitOptions.None).Skip(1)
@@ -56,9 +55,7 @@ internal static class Sync160CliSessionCases
         yield return ("sync160.exit.resume-command-is-on-its-own-line", async () =>
         {
             await using var pi = new InteractiveHarness("sync160-resume-line");
-            pi.Start(Regular);
-            await pi.WaitFor("escape interrupt");
-            await pi.Submit("hello there");
+            pi.Start([.. Regular, "hello there"]);
             await pi.WaitFor("Hello from the fake model.");
             Equal(0, await pi.Quit(), "exit code");
             var stdout = pi.Stdout.ToString();
