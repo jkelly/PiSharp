@@ -122,6 +122,7 @@ jobs:
         run: |
           git -C "$RUNNER_TEMP/pi" checkout --detach "$(jq -r '.source.commit' compatibility/target.lock.json)"
           node --test tools/CompatibilityReport/sync-1.7.0-source.test.mjs
+          node tools/CompatibilityReport/accept-sync-1.7.0.mjs --check
           node tools/DurablePortMap/sync-1.7.0.mjs "$RUNNER_TEMP/pi" --check
           node tools/CompatibilityReport/verify-baseline.mjs --upstream "$RUNNER_TEMP/pi"
 
